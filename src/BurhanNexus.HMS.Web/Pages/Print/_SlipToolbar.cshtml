@@ -1,6 +1,6 @@
 @model BurhanNexus.HMS.Web.Pages.Print.SlipModelBase
 @{
-    var basePath = Context.Request.Path;
+    var basePath = ViewContext.HttpContext.Request.Path;
 }
 <div class="print-toolbar no-print">
     <a class="tb-btn tb-light" href="@Model.BackUrl">&larr; Back</a>

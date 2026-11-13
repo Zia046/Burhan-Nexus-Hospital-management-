@@ -5,7 +5,7 @@
     var canView = await PermCtx.HasAsync(Perm.PatientsView);
     var canOpd = await PermCtx.HasAsync(Perm.OpdAdd);
     var canEr = await PermCtx.HasAsync(Perm.EmergencyAdd);
-    var exportQuery = Context.Request.QueryString.Value ?? "";
+    var exportQuery = ViewContext.HttpContext.Request.QueryString.Value ?? "";
 }
 <form method="get" class="card search-card">
     <div class="card-body">
