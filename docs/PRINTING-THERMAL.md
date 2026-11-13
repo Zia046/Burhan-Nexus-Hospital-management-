@@ -49,7 +49,7 @@ the **computer name entered on the login page**; profile `*` is the default for 
 |---|---|---|---|---|
 | **Browser print** | any printer installed in Windows with its driver – USB, LAN or shared (Xprinter XP-Q200/XP-80/XP-58, Rongta RP80/RP58, Epson TM-T20/T82, HPRT TP80 …) | yes (browser print dialog) | page is sized to 58/80 mm × slip height | automated: 58 mm and 80 mm PDFs rendered by Chromium in CI |
 | **LAN printer (direct)** | network thermal printers with ESC/POS on port 9100 | **no** | the HMS server sends ESC/POS bytes to `IP:9100` | automated: ESC/POS bytes received by a test TCP printer (token, cut command) |
-| **Print Agent (USB, silent)** | any Windows printer queue (USB thermal printers with their driver, or the Windows *Generic / Text Only* driver) | **no** | the page sends ESC/POS to the agent on `127.0.0.1:9123`; the agent writes it RAW to the Windows queue | automated on Windows Server 2022 CI: agent installed as a service, RAW job spooled to a printer queue, output file checked |
+| **Print Agent (USB, silent)** | any Windows printer queue (USB thermal printers with their driver, or the Windows *Generic / Text Only* driver) | **no** | the page sends ESC/POS to the agent on `127.0.0.1:9123`; the agent writes it RAW to the Windows queue | automated on Windows Server 2022 CI: agent installed as a Windows service, RAW job sent through a Windows printer queue ("Generic / Text Only" driver) and received byte-for-byte by a test printer |
 
 Honest limits:
 
