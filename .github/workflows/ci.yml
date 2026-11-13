@@ -76,6 +76,7 @@ jobs:
           npx playwright install --with-deps chromium >> ../../ci-output/npm.log 2>&1
           for i in $(seq 1 40); do curl -sf http://127.0.0.1:5080/health > /dev/null && break; sleep 2; done
           OUT_DIR=../../ci-output/screenshots node screenshots.mjs || true
+          OUT_DIR=../../ci-output/screenshots PDF_DIR=../../ci-output/samples node phase2.mjs || true
       - name: Publish Windows server package
         run: |
           set -o pipefail
@@ -96,6 +97,7 @@ jobs:
         run: |
           mkdir -p /tmp/res && cp -r ci-output/. /tmp/res/ 2>/dev/null || true
           cp -r tests/BurhanNexus.HMS.Tests/bin/Release/*/screenshots /tmp/res/screenshots 2>/dev/null || true
+          cp ci-output/server.log /tmp/res/ 2>/dev/null || true
           echo "${GITHUB_SHA} ${{ job.status }} $(date -u)" > /tmp/res/STATUS
           cd /tmp/res
           git init -q -b ci-results
