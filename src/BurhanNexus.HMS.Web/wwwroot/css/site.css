@@ -521,3 +521,7 @@ tr.total th, tr.total td { border-top: 2px solid var(--line); }
 @media print {
   .subnav, .toolbar, .sidebar, .topbar { display: none !important; }
 }
+.collect-lines select { min-width: 150px; max-width: 220px; }
+.collect-lines input:not(.input-num) { width: 130px; }
+.collect-lines .input-num { width: 90px; }
+.kpi-grid[data-finance-kpis] .kpi-value, .kpi-grid[data-account] .kpi-value, .kpi-grid[data-doctor-account] .kpi-value { font-size: 1.2rem; white-space: nowrap; }

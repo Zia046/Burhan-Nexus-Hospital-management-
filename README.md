@@ -62,6 +62,7 @@ docs/                              Installation, user guide, backup, troubleshoo
 - [Patient registration guide](docs/PATIENT-REGISTRATION-GUIDE.md) · [OPD workflow](docs/OPD-WORKFLOW.md) · [Emergency workflow](docs/EMERGENCY-WORKFLOW.md)
 - [Private hospital appointments, doctor-wise tokens & thermal printing](docs/PRINTING-THERMAL.md) · Thermal samples: [80 mm](docs/samples/sample-appointment-thermal-80mm.pdf), [58 mm](docs/samples/sample-appointment-thermal-58mm.pdf)
 - [Phase 2 testing report](docs/PHASE2-TEST-REPORT.md) · Sample slips: [OPD A5](docs/samples/sample-opd-slip-A5.pdf), [OPD A4](docs/samples/sample-opd-slip-A4.pdf), [Emergency A4](docs/samples/sample-emergency-slip-A4.pdf), [Private visit](docs/samples/sample-private-visit-document-A5.pdf)
+- [Phase 3 – financial, cashier & receipt management](docs/FINANCE.md) · [Phase 3 testing report](docs/PHASE3-TEST-REPORT.md) · Receipt samples: [80 mm](docs/samples/sample-receipt-80mm.pdf), [58 mm](docs/samples/sample-receipt-58mm.pdf), [A4](docs/samples/sample-receipt-A4.pdf)
 
 ## Quick start (developer)
 
