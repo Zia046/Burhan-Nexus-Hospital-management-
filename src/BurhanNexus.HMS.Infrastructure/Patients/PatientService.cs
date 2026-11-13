@@ -289,8 +289,6 @@ public sealed partial class PatientService : IPatientService
             // A name-only match is shown only when the guardian also matches (or the guardian is unknown).
             var nameOnly = !r.CnicMatch && !r.MobileMatch;
             if (nameOnly && guardian is not null && r.GuardianScore < 0.5) continue;
-            // A shared family mobile number alone is a weak signal; keep it when the name is somewhat similar.
-            if (!r.CnicMatch && r.MobileMatch && r.NameScore < 0.3 && guardian is not null && r.GuardianScore < 0.5) continue;
             scored.Add((r, reasons, score));
         }
         var top = scored.OrderByDescending(x => x.Score).Take(10).ToList();
