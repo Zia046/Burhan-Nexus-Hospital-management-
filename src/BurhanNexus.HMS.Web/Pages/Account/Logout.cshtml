@@ -1,0 +1,14 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Account.LogoutModel
+@{
+    ViewData["Title"] = "Log out";
+    Layout = "_AuthLayout";
+}
+<div class="auth-center">
+    <form method="post" class="auth-card">
+        <h2>Log out?</h2>
+        <p class="muted">You will need to log in again to continue.</p>
+        <button class="btn btn-primary btn-block" type="submit">Log out</button>
+        <a class="btn btn-light btn-block" href="/">Cancel</a>
+    </form>
+</div>

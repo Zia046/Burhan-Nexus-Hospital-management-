@@ -1,0 +1,221 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Setup.IndexModel
+@{
+    ViewData["Title"] = "Initial Setup";
+    ViewData["BodyClass"] = "setup-body";
+    Layout = "_AuthLayout";
+    var firstInstall = Model.State == SetupState.NotConfigured;
+}
+@if (Model.AccessBlocked)
+{
+    <div class="auth-center">
+        <div class="auth-card">
+            <h2><svg class="icon"><use href="#i-settings" /></svg> Setup in progress</h2>
+            <p class="muted">The system administrator is re-configuring the hospital setup. Please try again later, or log in as the system administrator to continue the setup.</p>
+            <a class="btn btn-primary btn-block" href="/Account/Login">Go to login</a>
+        </div>
+    </div>
+    return;
+}
+<div class="setup-shell">
+    <header class="setup-header">
+        <div class="setup-brand">
+            <img src="/img/default-logo.svg" alt="" />
+            <div><strong>Burhan Nexus Hospital Management</strong><small>@(firstInstall ? "Initial Setup Wizard" : "Re-run Setup Wizard")</small></div>
+        </div>
+        <ol class="steps" data-steps>
+            <li data-step-link="1" class="current"><span>1</span> Hospital</li>
+            <li data-step-link="2"><span>2</span> Type</li>
+            @if (firstInstall) { <li data-step-link="3"><span>3</span> Administrator</li> }
+            <li data-step-link="4"><span>@(firstInstall ? 4 : 3)</span> Preferences</li>
+            <li data-step-link="5"><span>@(firstInstall ? 5 : 4)</span> Review</li>
+        </ol>
+    </header>
+
+    <form method="post" enctype="multipart/form-data" class="setup-card" data-wizard novalidate>
+        <partial name="_ValidationSummary" />
+
+        <section class="wizard-step" data-step="1">
+            <h2>Hospital information</h2>
+            <p class="muted">This information appears on every receipt, slip and report.</p>
+            <div class="grid-2">
+                <div class="field span-2">
+                    <label asp-for="HospitalName">Hospital name <em>*</em></label>
+                    <input asp-for="HospitalName" required maxlength="200" data-review="Hospital name" />
+                </div>
+                <div class="field">
+                    <label asp-for="RegistrationNumber">Registration number <span class="muted">(optional)</span></label>
+                    <input asp-for="RegistrationNumber" maxlength="100" data-review="Registration no." />
+                </div>
+                <div class="field">
+                    <label asp-for="ContactNumber">Contact number <em>*</em></label>
+                    <input asp-for="ContactNumber" required maxlength="50" inputmode="tel" data-review="Contact number" />
+                </div>
+                <div class="field span-2">
+                    <label asp-for="Address">Address <em>*</em></label>
+                    <input asp-for="Address" required maxlength="500" data-review="Address" />
+                </div>
+                <div class="field">
+                    <label asp-for="City">City <em>*</em></label>
+                    <input asp-for="City" required maxlength="100" data-review="City" />
+                </div>
+                <div class="field">
+                    <label asp-for="Province">Province <em>*</em></label>
+                    <select asp-for="Province" required data-review="Province">
+                        <option value="">Select province</option>
+                        @foreach (var p in Options.Provinces) { <option value="@p">@p</option> }
+                    </select>
+                </div>
+                <div class="field">
+                    <label asp-for="Email">Email address <em>*</em></label>
+                    <input asp-for="Email" type="email" required maxlength="200" data-review="Email" />
+                </div>
+                <div class="field">
+                    <label asp-for="Website">Website <span class="muted">(optional)</span></label>
+                    <input asp-for="Website" maxlength="300" placeholder="www.example.com" data-review="Website" />
+                </div>
+                <div class="field span-2">
+                    <label asp-for="Logo">Hospital logo <span class="muted">(PNG, JPEG, GIF or WebP, max 2 MB)</span></label>
+                    <div class="logo-upload">
+                        <img src="/img/default-logo.svg" alt="Logo preview" data-logo-preview />
+                        <input asp-for="Logo" type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-logo-input />
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="wizard-step" data-step="2" hidden>
+            <h2>Hospital type</h2>
+            <p class="muted">The type sets the default rules for later modules (for example pharmacy pricing). Every rule can be adjusted later in Settings.</p>
+            <div class="choice-grid">
+                <label class="choice">
+                    <input type="radio" asp-for="HospitalType" value="Government" required data-review="Hospital type" data-review-text="Government Hospital" />
+                    <span class="choice-body">
+                        <svg class="icon icon-lg"><use href="#i-building" /></svg>
+                        <strong>Government Hospital</strong>
+                        <small>Medicines issued from government stock without purchase or sale prices.</small>
+                    </span>
+                </label>
+                <label class="choice">
+                    <input type="radio" asp-for="HospitalType" value="Private" required data-review="Hospital type" data-review-text="Private Hospital" />
+                    <span class="choice-body">
+                        <svg class="icon icon-lg"><use href="#i-hospital" /></svg>
+                        <strong>Private Hospital</strong>
+                        <small>Medicine purchases, purchase and sale prices, retail sales and profit calculation.</small>
+                    </span>
+                </label>
+            </div>
+        </section>
+
+        @if (firstInstall)
+        {
+            <section class="wizard-step" data-step="3" hidden>
+                <h2>Administrator account</h2>
+                <p class="muted">This is the primary system administrator. It always has full access and cannot be deactivated.</p>
+                <div class="grid-2">
+                    <div class="field span-2">
+                        <label asp-for="AdminFullName">Full name <em>*</em></label>
+                        <input asp-for="AdminFullName" required maxlength="150" data-review="Administrator" />
+                    </div>
+                    <div class="field">
+                        <label asp-for="AdminUsername">Username <em>*</em></label>
+                        <input asp-for="AdminUsername" required maxlength="64" pattern="[A-Za-z0-9._\-]{3,64}" autocomplete="off" data-review="Username" />
+                        <small class="muted">Letters, numbers, dot, underscore or hyphen.</small>
+                    </div>
+                    <div class="field">
+                        <label asp-for="AdminContactNumber">Contact number <span class="muted">(optional)</span></label>
+                        <input asp-for="AdminContactNumber" maxlength="50" inputmode="tel" />
+                    </div>
+                    <div class="field">
+                        <label asp-for="AdminPassword">Password <em>*</em></label>
+                        <div class="input-icon no-lead">
+                            <input asp-for="AdminPassword" type="password" required minlength="8" maxlength="128" autocomplete="new-password" data-password data-strength />
+                            <button type="button" class="input-action" data-toggle-password aria-label="Show password"><svg class="icon"><use href="#i-eye" /></svg></button>
+                        </div>
+                        <div class="strength" data-strength-bar><span></span></div>
+                        <small class="muted">At least 8 characters with letters and numbers.</small>
+                    </div>
+                    <div class="field">
+                        <label asp-for="AdminConfirmPassword">Confirm password <em>*</em></label>
+                        <input asp-for="AdminConfirmPassword" type="password" required maxlength="128" autocomplete="new-password" data-match="AdminPassword" />
+                    </div>
+                </div>
+            </section>
+        }
+
+        <section class="wizard-step" data-step="4" hidden>
+            <h2>System preferences</h2>
+            <div class="grid-2">
+                <div class="field">
+                    <label asp-for="CurrencyCode">Default currency</label>
+                    <select asp-for="CurrencyCode" data-review="Currency">
+                        @foreach (var c in Options.Currencies) { <option value="@c">@(c == "PKR" ? "PKR – Pakistani Rupee" : c)</option> }
+                    </select>
+                </div>
+                <div class="field">
+                    <label asp-for="TimeZoneId">Time zone</label>
+                    <select asp-for="TimeZoneId" data-review="Time zone">
+                        @foreach (var t in Options.TimeZones) { <option value="@t">@t</option> }
+                    </select>
+                </div>
+                <div class="field">
+                    <label asp-for="DateFormat">Date format</label>
+                    <select asp-for="DateFormat" data-review="Date format">
+                        @foreach (var f in Options.DateFormats) { <option value="@f">@f (@DateTime.Now.ToString(f, System.Globalization.CultureInfo.InvariantCulture))</option> }
+                    </select>
+                </div>
+                <div class="field">
+                    <label asp-for="TimeFormat">Time format</label>
+                    <select asp-for="TimeFormat" data-review="Time format">
+                        <option value="hh:mm tt">12-hour (02:30 PM)</option>
+                        <option value="HH:mm">24-hour (14:30)</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label asp-for="DefaultLanguage">Default language</label>
+                    <select asp-for="DefaultLanguage" data-review="Language">
+                        @foreach (var l in Options.Languages) { <option value="@l.Key">@l.Value</option> }
+                    </select>
+                </div>
+            </div>
+            <h3 class="section-title"><svg class="icon"><use href="#i-printer" /></svg> Printers</h3>
+            <p class="muted">Printing is done from the browser on each computer; these defaults set the paper layout. The printer name is shown as a hint in the print dialog.</p>
+            <div class="grid-2">
+                <div class="field">
+                    <label asp-for="ReceiptPrinterName">Receipt printer name <span class="muted">(optional)</span></label>
+                    <input asp-for="ReceiptPrinterName" maxlength="200" placeholder="e.g. BlackCopper 80mm" />
+                </div>
+                <div class="field">
+                    <label asp-for="ReceiptPaperSize">Receipt paper</label>
+                    <select asp-for="ReceiptPaperSize" data-review="Receipt paper">
+                        @foreach (var p in Options.ReceiptPaperSizes) { <option value="@p">@p</option> }
+                    </select>
+                </div>
+                <div class="field">
+                    <label asp-for="ReportPrinterName">Report printer name <span class="muted">(optional)</span></label>
+                    <input asp-for="ReportPrinterName" maxlength="200" placeholder="e.g. HP LaserJet" />
+                </div>
+                <div class="field">
+                    <label asp-for="ReportPaperSize">Report paper</label>
+                    <select asp-for="ReportPaperSize" data-review="Report paper">
+                        @foreach (var p in Options.ReportPaperSizes) { <option value="@p">@p</option> }
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <section class="wizard-step" data-step="5" hidden>
+            <h2>Review and finish</h2>
+            <p class="muted">Please check the details. Everything except the administrator password can be changed later in Settings.</p>
+            <dl class="review" data-review-list></dl>
+            <div class="alert alert-info"><svg class="icon"><use href="#i-key" /></svg><div>A <strong>30-day trial</strong> starts automatically. All features are available during the trial.</div></div>
+        </section>
+
+        <footer class="wizard-actions">
+            <button type="button" class="btn btn-light" data-wizard-prev hidden><svg class="icon icon-sm"><use href="#i-chevron-left" /></svg> Back</button>
+            <span class="spacer"></span>
+            <button type="button" class="btn btn-primary" data-wizard-next>Next <svg class="icon icon-sm"><use href="#i-chevron-right" /></svg></button>
+            <button type="submit" class="btn btn-success" data-wizard-finish hidden><svg class="icon icon-sm"><use href="#i-check" /></svg> Complete setup</button>
+        </footer>
+    </form>
+</div>

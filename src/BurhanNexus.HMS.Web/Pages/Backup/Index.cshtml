@@ -1,0 +1,72 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Backup.IndexModel
+@{
+    ViewData["Title"] = "Backup & Restore";
+}
+@if (Model.ToolsWarning is not null)
+{
+    <div class="alert alert-warning"><svg class="icon"><use href="#i-alert" /></svg><div>@Model.ToolsWarning</div></div>
+}
+<div class="grid-side">
+    <div class="card">
+        <div class="card-header"><h3><svg class="icon"><use href="#i-history" /></svg> Backup history</h3><span class="muted small mono">@Model.Folder</span></div>
+        <div class="table-wrap">
+            <table class="table">
+                <thead><tr><th>Date &amp; time</th><th>File</th><th>Type</th><th>Size</th><th>Status</th><th>By</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var b in Model.Items)
+                    {
+                        <tr>
+                            <td class="nowrap">@Fmt.DateTimeText(b.StartedUtc)</td>
+                            <td class="mono small">@b.FileName @if (!string.IsNullOrEmpty(b.Notes)) { <br /><span class="muted">@b.Notes</span> }</td>
+                            <td>@(b.Kind switch { BackupKind.PreRestoreSafety => "Safety (before restore)", BackupKind.Imported => "Found in folder", _ => b.Kind.ToString() })</td>
+                            <td class="nowrap">@DisplayFormatter.Bytes(b.SizeBytes)</td>
+                            <td>
+                                @switch (b.Status)
+                                {
+                                    case BackupStatus.Completed: <span class="status status-ok">Completed</span> break;
+                                    case BackupStatus.Failed: <span class="status status-bad" title="@b.ErrorMessage">Failed</span> break;
+                                    default: <span class="status status-warn">In progress</span> break;
+                                }
+                                @if (b.LastRestoredUtc is not null) { <br /><small class="muted">Restored @Fmt.DateTimeText(b.LastRestoredUtc)</small> }
+                            </td>
+                            <td>@(b.CreatedByUsername ?? "—")</td>
+                            <td class="actions nowrap">
+                                @if (b.Status == BackupStatus.Completed)
+                                {
+                                    <a bn-permission="@Perm.BackupDownload" class="btn btn-light btn-sm" href="/Backup?handler=Download&id=@b.Id"><svg class="icon icon-sm"><use href="#i-download" /></svg> Download</a>
+                                    <a bn-permission="@Perm.BackupRestore" class="btn btn-light btn-sm" href="/Backup/Restore/@b.Id"><svg class="icon icon-sm"><use href="#i-refresh" /></svg> Restore</a>
+                                }
+                                <form bn-permission="@Perm.BackupDelete" method="post" asp-page-handler="Delete" asp-route-id="@b.Id" class="inline" data-confirm="Delete this backup file permanently?">
+                                    <button class="btn btn-light btn-sm" type="submit" aria-label="Delete"><svg class="icon icon-sm"><use href="#i-x" /></svg></button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    @if (Model.Items.Count == 0) { <tr><td colspan="7" class="empty">No backups yet. Create the first backup now.</td></tr> }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="stack">
+        <form bn-permission="@Perm.BackupCreate" method="post" asp-page-handler="Create" class="card" data-busy="Creating backup… please wait">
+            <div class="card-header"><h3><svg class="icon"><use href="#i-database" /></svg> Create backup</h3></div>
+            <div class="card-body">
+                <p class="muted">Creates a complete backup of the central database (all users, settings and records) on the server.</p>
+                <div class="field"><label for="Notes">Note (optional)</label><input id="Notes" name="Notes" maxlength="200" placeholder="e.g. End of month" /></div>
+            </div>
+            <div class="card-footer form-actions"><button class="btn btn-primary" type="submit"><svg class="icon icon-sm"><use href="#i-database" /></svg> Create backup now</button></div>
+        </form>
+        <div class="card">
+            <div class="card-header"><h3><svg class="icon"><use href="#i-info" /></svg> Good practice</h3></div>
+            <div class="card-body">
+                <ul class="small">
+                    <li>Create a backup at least once a day and before any update.</li>
+                    <li>Copy downloaded backups to a USB drive or another computer regularly.</li>
+                    <li>Restoring replaces <strong>all current data</strong>. A safety backup is taken automatically first.</li>
+                    <li>Automatic scheduled backups will be added in a later update.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

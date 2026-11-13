@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BurhanNexus.HMS.Core/BurhanNexus.HMS.Core.csproj" />
+    <Project Path="src/BurhanNexus.HMS.Infrastructure/BurhanNexus.HMS.Infrastructure.csproj" />
+    <Project Path="src/BurhanNexus.HMS.Web/BurhanNexus.HMS.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BurhanNexus.HMS.Tests/BurhanNexus.HMS.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/BurhanNexus.LicenseGenerator/BurhanNexus.LicenseGenerator.csproj" />
+  </Folder>
+</Solution>

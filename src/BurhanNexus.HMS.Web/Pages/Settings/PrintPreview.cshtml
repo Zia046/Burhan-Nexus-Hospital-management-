@@ -1,0 +1,70 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Settings.PrintPreviewModel
+@{
+    Layout = null;
+    var p = (await Fmt.ProfileAsync())!;
+    var now = DateTime.UtcNow;
+    var paper = Model.Doc == "receipt" ? Model.Config.ReceiptPaperSize : Model.Config.ReportPaperSize;
+    var orientation = Model.Doc == "receipt" ? "portrait" : Model.Config.ReportOrientation.ToLowerInvariant();
+    var pageSize = paper switch
+    {
+        "80mm" => "80mm 200mm",
+        "58mm" => "58mm 200mm",
+        _ => paper + " " + orientation
+    };
+    var margin = paper is "80mm" or "58mm" ? "3mm" : "12mm";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Print preview · @p.HospitalName</title>
+    <link rel="stylesheet" href="~/css/print.css" asp-append-version="true" />
+    <style>@@page { size: @pageSize; margin: @margin; }</style>
+</head>
+<body class="print-body doc-@Model.Doc paper-@paper.ToLowerInvariant() orient-@orientation" data-paper="@paper" data-orientation="@orientation">
+<div class="print-toolbar no-print">
+    <strong>Sample @(Model.Doc == "receipt" ? "receipt" : "report") · @paper @(Model.Doc == "report" ? Model.Config.ReportOrientation : "")</strong>
+    @{ var printer = Model.Doc == "receipt" ? Model.Config.ReceiptPrinterName : Model.Config.ReportPrinterName; }
+    @if (!string.IsNullOrEmpty(printer)) { <span>Printer: @printer</span> }
+    <a href="?doc=report">Report</a> <a href="?doc=receipt">Receipt</a>
+    <button type="button" data-print>Print</button>
+</div>
+
+<div class="sheet">
+    <div class="watermark">SAMPLE</div>
+    <header class="doc-header">
+        <img src="/branding/logo?v=@p.LogoVersion" alt="Logo" />
+        <div class="doc-hospital">
+            <h1>@p.HospitalName</h1>
+            <p>@p.Address, @p.City, @p.Province</p>
+            <p>Phone: @p.ContactNumber · @p.Email @(string.IsNullOrEmpty(p.Website) ? "" : " · " + p.Website)</p>
+            @if (!string.IsNullOrEmpty(p.RegistrationNumber)) { <p>Reg. No: @p.RegistrationNumber</p> }
+        </div>
+    </header>
+    @{ var header = Model.Doc == "receipt" ? p.ReceiptHeader : p.ReportHeader; }
+    @if (!string.IsNullOrEmpty(header)) { <div class="doc-subheader">@header</div> }
+
+    <h2 class="doc-title">@(Model.Doc == "receipt" ? "SAMPLE RECEIPT" : "SAMPLE REPORT")</h2>
+    <table class="doc-meta">
+        <tr><th>Document no.</th><td>SAMPLE-0001</td><th>Date</th><td>@Fmt.DateTimeText(now)</td></tr>
+        <tr><th>Name</th><td>[Name will appear here]</td><th>Prepared by</th><td>@User.GetFullName()</td></tr>
+    </table>
+    <table class="doc-lines">
+        <thead><tr><th>#</th><th>Description</th><th class="num">Amount</th></tr></thead>
+        <tbody>
+            <tr><td>1</td><td>[Service or test name]</td><td class="num">@Fmt.Money(0)</td></tr>
+            <tr><td>2</td><td>[Service or test name]</td><td class="num">@Fmt.Money(0)</td></tr>
+        </tbody>
+        <tfoot><tr><th colspan="2">Total</th><th class="num">@Fmt.Money(0)</th></tr></tfoot>
+    </table>
+    <p class="doc-note">This is a layout preview only. Real receipts, OPD slips, laboratory reports and invoices produced by later modules will automatically use this branding.</p>
+    @{ var footer = Model.Doc == "receipt" ? p.ReceiptFooter : p.ReportFooter; }
+    <footer class="doc-footer">
+        @if (!string.IsNullOrEmpty(footer)) { <p>@footer</p> }
+        <p class="powered">Burhan Nexus Hospital Management</p>
+    </footer>
+</div>
+<script src="~/js/print.js" asp-append-version="true"></script>
+</body>
+</html>

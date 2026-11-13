@@ -1,0 +1,21 @@
+@model BurhanNexus.HMS.Web.Pages.PagerModel
+@if (Model.TotalPages > 1)
+{
+    <nav class="pager">
+        <span class="muted">Page @Model.Page of @Model.TotalPages · @Model.Total records</span>
+        <div class="pager-links">
+            @if (Model.Page > 1)
+            {
+                <a class="btn btn-light btn-sm" href="@Model.Url(Model.Page - 1)"><svg class="icon icon-sm"><use href="#i-chevron-left" /></svg> Previous</a>
+            }
+            @if (Model.Page < Model.TotalPages)
+            {
+                <a class="btn btn-light btn-sm" href="@Model.Url(Model.Page + 1)">Next <svg class="icon icon-sm"><use href="#i-chevron-right" /></svg></a>
+            }
+        </div>
+    </nav>
+}
+else if (Model.Total > 0)
+{
+    <nav class="pager"><span class="muted">@Model.Total record(s)</span></nav>
+}

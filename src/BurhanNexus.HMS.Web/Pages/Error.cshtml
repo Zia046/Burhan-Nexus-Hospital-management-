@@ -1,0 +1,12 @@
+@page
+@model ErrorModel
+@{
+    ViewData["Title"] = Model.Title;
+    Layout = User.Identity?.IsAuthenticated == true ? "_Layout" : "_AuthLayout";
+}
+<div class="empty-state">
+    <svg class="icon icon-xl"><use href="#i-alert" /></svg>
+    <h1>@Model.Title</h1>
+    <p>@Model.Message</p>
+    <a class="btn btn-primary" href="/">Go to dashboard</a>
+</div>

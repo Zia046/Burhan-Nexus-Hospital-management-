@@ -1,0 +1,64 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Account.LoginModel
+@{
+    ViewData["Title"] = "Login";
+    Layout = "_AuthLayout";
+    var profile = await Fmt.ProfileAsync();
+}
+<div class="auth-wrap">
+    <section class="auth-hero">
+        <div class="auth-hero-inner">
+            <img class="auth-logo" src="/branding/logo?v=@(profile?.LogoVersion ?? 0)" alt="Hospital logo" />
+            <h1>@(profile?.HospitalName ?? "Burhan Nexus Hospital Management")</h1>
+            <p>@(profile is null ? "" : $"{profile.City}, {profile.Province}")</p>
+            <ul class="hero-points">
+                <li><svg class="icon"><use href="#i-shield" /></svg> Secure, permission-controlled access</li>
+                <li><svg class="icon"><use href="#i-network" /></svg> One central database for every department</li>
+                <li><svg class="icon"><use href="#i-activity" /></svg> Every important action is audited</li>
+            </ul>
+        </div>
+        <div class="auth-hero-foot">Powered by <strong>Burhan Nexus</strong> Hospital Management</div>
+    </section>
+    <section class="auth-panel">
+        <form method="post" class="auth-card" novalidate>
+            <h2>Welcome back</h2>
+            <p class="muted">Sign in with your hospital account.</p>
+            @if (Model.Info is not null)
+            {
+                <div class="alert alert-info"><svg class="icon"><use href="#i-info" /></svg><div>@Model.Info</div></div>
+            }
+            @if (Model.Error is not null)
+            {
+                <div class="alert alert-danger" role="alert"><svg class="icon"><use href="#i-alert" /></svg><div data-login-error>@Model.Error</div></div>
+            }
+            <div class="field">
+                <label asp-for="Username">Username</label>
+                <div class="input-icon">
+                    <svg class="icon"><use href="#i-users-round" /></svg>
+                    <input asp-for="Username" autocomplete="username" autofocus required maxlength="64" />
+                </div>
+            </div>
+            <div class="field">
+                <label asp-for="Password">Password</label>
+                <div class="input-icon">
+                    <svg class="icon"><use href="#i-lock" /></svg>
+                    <input asp-for="Password" type="password" autocomplete="current-password" required maxlength="128" data-password />
+                    <button type="button" class="input-action" data-toggle-password aria-label="Show password"><svg class="icon"><use href="#i-eye" /></svg></button>
+                </div>
+            </div>
+            <div class="field-row">
+                <label class="check"><input asp-for="RememberUsername" type="checkbox" /> Remember username</label>
+            </div>
+            <details class="workstation">
+                <summary>This computer: <strong>@(Model.Workstation ?? "not named")</strong></summary>
+                <div class="field">
+                    <label asp-for="Workstation">Computer / workstation name (e.g. Reception-1)</label>
+                    <input asp-for="Workstation" maxlength="50" placeholder="Reception-1" />
+                    <small class="muted">Saved on this computer and shown in the audit log.</small>
+                </div>
+            </details>
+            <button type="submit" class="btn btn-primary btn-block btn-lg">Log in</button>
+            <p class="auth-help muted">Forgot your password? Please contact the hospital administrator.</p>
+        </form>
+    </section>
+</div>

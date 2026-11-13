@@ -1,0 +1,58 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Departments.IndexModel
+@{
+    ViewData["Title"] = "Departments";
+}
+<div class="grid-side">
+    <div class="card">
+        <div class="card-header"><h3>Hospital departments</h3><span class="muted">@Model.Items.Count departments</span></div>
+        <div class="table-wrap">
+            <table class="table">
+                <thead><tr><th>Name</th><th>Code</th><th>Description</th><th>Users</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var d in Model.Items)
+                {
+                    if (Model.EditId == d.Id)
+                    {
+                        <tr class="editing">
+                            <td colspan="6">
+                                <form method="post" asp-page-handler="Update" asp-route-id="@d.Id" class="inline-edit">
+                                    <input type="hidden" name="RowVersion" value="@d.RowVersion" />
+                                    <input name="Name" value="@d.Name" required maxlength="100" aria-label="Name" />
+                                    <input name="Code" value="@d.Code" maxlength="20" placeholder="Code" aria-label="Code" />
+                                    <input name="Description" value="@d.Description" maxlength="300" placeholder="Description" aria-label="Description" />
+                                    <label class="check"><input type="checkbox" name="IsActive" value="true" checked="@d.IsActive" /> Active</label>
+                                    <input type="hidden" name="IsActive" value="false" />
+                                    <button class="btn btn-primary btn-sm" type="submit">Save</button>
+                                    <a class="btn btn-light btn-sm" href="/Departments">Cancel</a>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr>
+                            <td><strong>@d.Name</strong></td>
+                            <td class="mono">@d.Code</td>
+                            <td class="muted">@d.Description</td>
+                            <td>@d.UserCount</td>
+                            <td>@if (d.IsActive) { <span class="status status-ok">Active</span> } else { <span class="status status-off">Inactive</span> }</td>
+                            <td class="actions"><a class="btn btn-light btn-sm" href="/Departments?edit=@d.Id"><svg class="icon icon-sm"><use href="#i-edit" /></svg> Edit</a></td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <form method="post" asp-page-handler="Create" class="card">
+        <div class="card-header"><h3><svg class="icon"><use href="#i-plus" /></svg> Add department</h3></div>
+        <div class="card-body">
+            <div class="field"><label for="Name">Name <em>*</em></label><input id="Name" name="Name" required maxlength="100" placeholder="e.g. Dental" /></div>
+            <div class="field"><label for="Code">Code</label><input id="Code" name="Code" maxlength="20" placeholder="e.g. DEN" /></div>
+            <div class="field"><label for="Description">Description</label><input id="Description" name="Description" maxlength="300" /></div>
+            <p class="muted small">Departments are used to organise staff. New departments for future modules can be added at any time.</p>
+        </div>
+        <div class="card-footer form-actions"><button class="btn btn-primary" type="submit">Add department</button></div>
+    </form>
+</div>

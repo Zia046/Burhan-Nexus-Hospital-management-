@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>BurhanNexus.HMS.Web</RootNamespace>
+    <AssemblyName>BurhanNexus.HMS.Web</AssemblyName>
+    <UserSecretsId>burhan-nexus-hms-web</UserSecretsId>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.*">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.*" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BurhanNexus.HMS.Core\BurhanNexus.HMS.Core.csproj" />
+    <ProjectReference Include="..\BurhanNexus.HMS.Infrastructure\BurhanNexus.HMS.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BurhanNexus.HMS.Tests" />
+  </ItemGroup>
+</Project>

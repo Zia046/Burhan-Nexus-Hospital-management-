@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches-ignore: [ci-results]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build-test:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hms
+          POSTGRES_PASSWORD: hms_ci_password
+          POSTGRES_DB: hms_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U hms" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      HMS_TEST_PG: "Host=localhost;Port=5432;Username=hms;Password=hms_ci_password;Database=hms_ci"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Environment info
+        run: |
+          mkdir -p ci-output
+          { dotnet --info; which pg_dump psql pg_restore; pg_dump --version; } > ci-output/env.log 2>&1 || true
+      - name: Install PostgreSQL 16 client
+        run: |
+          sudo apt-get update -y >/dev/null && sudo apt-get install -y postgresql-client-16 >/dev/null 2>&1 || true
+          ls /usr/lib/postgresql >> ci-output/env.log 2>&1 || true
+      - name: Generate EF migration (on request)
+        if: hashFiles('tools/migration-request.txt') != ''
+        run: |
+          set -o pipefail
+          dotnet tool install --global dotnet-ef --version "10.*" > ci-output/migration.log 2>&1 || true
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          NAME=$(head -n1 tools/migration-request.txt | tr -d '\r\n ')
+          if ! ls src/BurhanNexus.HMS.Infrastructure/Persistence/Migrations/*_"$NAME".cs >/dev/null 2>&1; then
+            dotnet ef migrations add "$NAME" \
+              --project src/BurhanNexus.HMS.Infrastructure \
+              --startup-project src/BurhanNexus.HMS.Web \
+              --output-dir Persistence/Migrations >> ci-output/migration.log 2>&1 || echo "MIGRATION FAILED" >> ci-output/migration.log
+            mkdir -p ci-output/generated
+            cp -r src/BurhanNexus.HMS.Infrastructure/Persistence/Migrations ci-output/generated/ 2>/dev/null || true
+          else
+            echo "Migration $NAME already exists" >> ci-output/migration.log
+          fi
+      - name: Build
+        run: |
+          set -o pipefail
+          dotnet build BurhanNexus.HMS.slnx -c Release 2>&1 | tee ci-output/build.log
+      - name: Test
+        run: |
+          set -o pipefail
+          dotnet test BurhanNexus.HMS.slnx -c Release --no-build --logger "console;verbosity=normal" 2>&1 | tee ci-output/test.log
+      - name: Publish (self-contained Windows + Linux)
+        run: |
+          set -o pipefail
+          dotnet publish src/BurhanNexus.HMS.Web -c Release -r win-x64 --self-contained true -o publish/win-x64 2>&1 | tail -n 20 | tee ci-output/publish.log
+      - name: Upload Windows server package
+        uses: actions/upload-artifact@v4
+        with:
+          name: BurhanNexus-HMS-Server-win-x64
+          path: publish/win-x64
+          if-no-files-found: ignore
+      - name: Push CI results
+        if: always()
+        run: |
+          mkdir -p /tmp/res && cp -r ci-output/. /tmp/res/ 2>/dev/null || true
+          cp -r tests/BurhanNexus.HMS.Tests/bin/Release/*/screenshots /tmp/res/screenshots 2>/dev/null || true
+          echo "${GITHUB_SHA} ${{ job.status }} $(date -u)" > /tmp/res/STATUS
+          cd /tmp/res
+          git init -q -b ci-results
+          git config user.name "ci-bot"; git config user.email "ci-bot@users.noreply.github.com"
+          git add -A && git commit -qm "CI results for ${GITHUB_SHA}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-results

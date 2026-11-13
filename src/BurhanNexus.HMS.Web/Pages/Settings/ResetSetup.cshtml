@@ -1,0 +1,21 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Settings.ResetSetupModel
+@{
+    ViewData["Title"] = "Re-run setup wizard";
+}
+<partial name="_SettingsNav" />
+<form method="post" class="card card-medium card-danger" autocomplete="off">
+    <div class="card-header"><h3><svg class="icon"><use href="#i-refresh" /></svg> Re-run the setup wizard</h3></div>
+    <div class="card-body">
+        <p>The setup wizard will open again so the hospital details, type and preferences can be entered from the beginning.</p>
+        <ul>
+            <li>All users, permissions, audit logs, backups and other records are <strong>kept</strong>.</li>
+            <li>Other users will be sent to a "setup in progress" page until you finish the wizard.</li>
+        </ul>
+        <div class="grid-2">
+            <div class="field"><label asp-for="Password">Your password</label><input asp-for="Password" type="password" required autocomplete="current-password" /></div>
+            <div class="field"><label asp-for="Confirmation">Type <code>RESET</code> to confirm</label><input asp-for="Confirmation" required /></div>
+        </div>
+    </div>
+    <div class="card-footer form-actions"><button class="btn btn-danger" type="submit">Re-run setup wizard</button></div>
+</form>

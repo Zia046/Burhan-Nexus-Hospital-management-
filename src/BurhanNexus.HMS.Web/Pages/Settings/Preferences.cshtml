@@ -1,0 +1,30 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Settings.PreferencesModel
+@{
+    ViewData["Title"] = "Preferences";
+}
+<partial name="_SettingsNav" />
+<form method="post" class="card card-medium" novalidate>
+    <div class="card-header"><h3>System preferences</h3></div>
+    <div class="card-body">
+        <partial name="_ValidationSummary" />
+        <input type="hidden" asp-for="RowVersion" />
+        <fieldset disabled="@(!Model.CanEdit)">
+            <div class="grid-2">
+                <div class="field"><label asp-for="Input.CurrencyCode">Currency</label>
+                    <select asp-for="Input.CurrencyCode">@foreach (var c in Options.Currencies) { <option value="@c">@c</option> }</select></div>
+                <div class="field"><label asp-for="Input.CurrencySymbol">Currency symbol</label><input asp-for="Input.CurrencySymbol" maxlength="10" required /></div>
+                <div class="field"><label asp-for="Input.TimeZoneId">Time zone</label>
+                    <select asp-for="Input.TimeZoneId">@foreach (var t in Options.TimeZones) { <option value="@t">@t</option> }</select></div>
+                <div class="field"><label asp-for="Input.DefaultLanguage">Default language</label>
+                    <select asp-for="Input.DefaultLanguage">@foreach (var l in Options.Languages) { <option value="@l.Key">@l.Value</option> }</select>
+                    <small class="muted">Phase 1 screens are in English; the Urdu interface is planned for a later phase.</small></div>
+                <div class="field"><label asp-for="Input.DateFormat">Date format</label>
+                    <select asp-for="Input.DateFormat">@foreach (var f in Options.DateFormats) { <option value="@f">@f (@DateTime.Now.ToString(f, System.Globalization.CultureInfo.InvariantCulture))</option> }</select></div>
+                <div class="field"><label asp-for="Input.TimeFormat">Time format</label>
+                    <select asp-for="Input.TimeFormat"><option value="hh:mm tt">12-hour (02:30 PM)</option><option value="HH:mm">24-hour (14:30)</option></select></div>
+            </div>
+        </fieldset>
+    </div>
+    @if (Model.CanEdit) { <div class="card-footer form-actions"><button class="btn btn-primary" type="submit">Save preferences</button></div> }
+</form>

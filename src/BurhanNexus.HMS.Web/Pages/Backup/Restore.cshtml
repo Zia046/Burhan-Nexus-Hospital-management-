@@ -1,0 +1,36 @@
+@page "{id:int}"
+@model BurhanNexus.HMS.Web.Pages.Backup.RestoreModel
+@{
+    ViewData["Title"] = "Restore backup";
+    var b = Model.Backup!;
+}
+<div class="breadcrumbs"><a href="/Backup">Backup &amp; Restore</a> <svg class="icon icon-sm"><use href="#i-chevron-right" /></svg> Restore</div>
+<form method="post" class="card card-medium card-danger" autocomplete="off" data-busy="Restoring database… do not close this page">
+    <div class="card-header"><h3><svg class="icon"><use href="#i-alert" /></svg> Restore database from backup</h3></div>
+    <div class="card-body">
+        <partial name="_ValidationSummary" />
+        <div class="alert alert-danger">
+            <svg class="icon"><use href="#i-alert" /></svg>
+            <div>
+                <strong>Warning: restoring replaces ALL current data.</strong>
+                Anything entered after <strong>@Fmt.DateTimeText(b.StartedUtc)</strong> on any computer will be lost from the live database.
+                A safety backup of the current data is created automatically before the restore starts. All users will need to log in again.
+            </div>
+        </div>
+        <dl class="kv">
+            <dt>Backup file</dt><dd class="mono">@b.FileName</dd>
+            <dt>Created</dt><dd>@Fmt.DateTimeText(b.StartedUtc) by @(b.CreatedByUsername ?? "—")</dd>
+            <dt>Size</dt><dd>@DisplayFormatter.Bytes(b.SizeBytes)</dd>
+            <dt>Checksum (SHA-256)</dt><dd class="mono small">@b.Sha256</dd>
+        </dl>
+        <label class="check"><input type="checkbox" name="Understood" value="true" /> I understand that current data will be replaced by this backup.</label>
+        <div class="grid-2">
+            <div class="field"><label asp-for="Password">Your password</label><input asp-for="Password" type="password" required autocomplete="current-password" /></div>
+            <div class="field"><label asp-for="Confirmation">Type <code>RESTORE</code> to confirm</label><input asp-for="Confirmation" required /></div>
+        </div>
+    </div>
+    <div class="card-footer form-actions">
+        <a class="btn btn-light" href="/Backup">Cancel</a>
+        <button type="submit" class="btn btn-danger"><svg class="icon icon-sm"><use href="#i-refresh" /></svg> Restore this backup</button>
+    </div>
+</form>

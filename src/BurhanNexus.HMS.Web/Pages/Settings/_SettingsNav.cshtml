@@ -1,0 +1,16 @@
+@{
+    var current = ViewData["SettingsTab"] as string ?? "";
+    string Cls(string k) => current == k ? "active" : "";
+}
+<nav class="subnav">
+    <a bn-permission="@Perm.SettingsView" class="@Cls("hospital")" href="/Settings"><svg class="icon icon-sm"><use href="#i-hospital" /></svg> Hospital &amp; branding</a>
+    <a bn-permission="@Perm.SettingsView" class="@Cls("preferences")" href="/Settings/Preferences"><svg class="icon icon-sm"><use href="#i-sliders" /></svg> Preferences</a>
+    <a bn-permission="@Perm.SettingsView" class="@Cls("printing")" href="/Settings/Printing"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Printing</a>
+    <a bn-permission="@Perm.SettingsView" class="@Cls("type")" href="/Settings/HospitalType"><svg class="icon icon-sm"><use href="#i-building" /></svg> Hospital type &amp; rules</a>
+    <a bn-permission="@Perm.SettingsSecurity" class="@Cls("security")" href="/Settings/Security"><svg class="icon icon-sm"><use href="#i-lock" /></svg> Security</a>
+    <a bn-permission="@Perm.LicenseView" class="@Cls("license")" href="/Settings/License"><svg class="icon icon-sm"><use href="#i-key" /></svg> License</a>
+    @if (User.IsSystemAdministrator())
+    {
+        <a class="@Cls("reset")" href="/Settings/ResetSetup"><svg class="icon icon-sm"><use href="#i-refresh" /></svg> Re-run setup</a>
+    }
+</nav>

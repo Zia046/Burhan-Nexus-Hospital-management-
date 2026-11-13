@@ -1,0 +1,68 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Settings.IndexModel
+@{
+    ViewData["Title"] = "Hospital Settings";
+    var s = Model.Current!;
+}
+<partial name="_SettingsNav" />
+<div class="grid-side">
+    <form method="post" asp-page-handler="Info" class="card" novalidate>
+        <div class="card-header"><h3>Hospital information</h3></div>
+        <div class="card-body">
+            <partial name="_ValidationSummary" />
+            <input type="hidden" asp-for="RowVersion" />
+            <fieldset disabled="@(!Model.CanEdit)">
+                <div class="grid-2">
+                    <div class="field span-2"><label asp-for="Input.HospitalName">Hospital name <em>*</em></label><input asp-for="Input.HospitalName" required maxlength="200" /></div>
+                    <div class="field"><label asp-for="Input.RegistrationNumber">Registration number</label><input asp-for="Input.RegistrationNumber" maxlength="100" /></div>
+                    <div class="field"><label asp-for="Input.ContactNumber">Contact number <em>*</em></label><input asp-for="Input.ContactNumber" required maxlength="50" /></div>
+                    <div class="field span-2"><label asp-for="Input.Address">Address <em>*</em></label><input asp-for="Input.Address" required maxlength="500" /></div>
+                    <div class="field"><label asp-for="Input.City">City <em>*</em></label><input asp-for="Input.City" required maxlength="100" /></div>
+                    <div class="field"><label asp-for="Input.Province">Province <em>*</em></label>
+                        <select asp-for="Input.Province">
+                            @foreach (var p in Options.Provinces) { <option value="@p">@p</option> }
+                            @if (!string.IsNullOrEmpty(Model.Input.Province) && !Options.Provinces.Contains(Model.Input.Province)) { <option value="@Model.Input.Province" selected>@Model.Input.Province</option> }
+                        </select>
+                    </div>
+                    <div class="field"><label asp-for="Input.Email">Email <em>*</em></label><input asp-for="Input.Email" type="email" required maxlength="200" /></div>
+                    <div class="field"><label asp-for="Input.Website">Website</label><input asp-for="Input.Website" maxlength="300" /></div>
+                </div>
+                <h3 class="section-title">Print headers &amp; footers</h3>
+                <div class="grid-2">
+                    <div class="field"><label asp-for="Input.ReceiptHeader">Receipt header</label><textarea asp-for="Input.ReceiptHeader" rows="2" maxlength="500"></textarea></div>
+                    <div class="field"><label asp-for="Input.ReceiptFooter">Receipt footer</label><textarea asp-for="Input.ReceiptFooter" rows="2" maxlength="500"></textarea></div>
+                    <div class="field"><label asp-for="Input.ReportHeader">Report header</label><textarea asp-for="Input.ReportHeader" rows="2" maxlength="1000"></textarea></div>
+                    <div class="field"><label asp-for="Input.ReportFooter">Report footer</label><textarea asp-for="Input.ReportFooter" rows="2" maxlength="1000"></textarea></div>
+                </div>
+            </fieldset>
+        </div>
+        @if (Model.CanEdit)
+        {
+            <div class="card-footer form-actions">
+                <a bn-permission="@Perm.SettingsPrint" class="btn btn-light" href="/Settings/PrintPreview" target="_blank"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print preview</a>
+                <button class="btn btn-primary" type="submit">Save information</button>
+            </div>
+        }
+    </form>
+
+    <div class="card">
+        <div class="card-header"><h3><svg class="icon"><use href="#i-image" /></svg> Hospital logo</h3></div>
+        <div class="card-body center">
+            <img class="logo-large" src="/branding/logo?v=@(s.LogoUpdatedUtc?.Ticks ?? 0)" alt="Hospital logo" data-logo-preview />
+            <p class="muted small">Shown on the login page, the sidebar and every printed document. PNG, JPEG, GIF or WebP, max 2 MB.</p>
+        </div>
+        @if (Model.CanEdit)
+        {
+            <form method="post" asp-page-handler="Logo" enctype="multipart/form-data" class="card-footer stack">
+                <input type="file" name="Logo" accept="image/png,image/jpeg,image/gif,image/webp" required data-logo-input />
+                <div class="form-actions">
+                    @if (s.LogoContent is not null)
+                    {
+                        <button class="btn btn-light" type="submit" name="remove" value="true" formnovalidate data-confirm="Remove the hospital logo?">Remove</button>
+                    }
+                    <button class="btn btn-primary" type="submit"><svg class="icon icon-sm"><use href="#i-upload" /></svg> Upload logo</button>
+                </div>
+            </form>
+        }
+    </div>
+</div>

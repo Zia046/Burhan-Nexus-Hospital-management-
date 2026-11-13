@@ -1,0 +1,41 @@
+/* Printable hospital documents (receipts, slips, reports). */
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #111; background: #e9edf3; }
+.print-toolbar { position: sticky; top: 0; display: flex; gap: 14px; align-items: center; padding: 10px 16px; background: #0f2a52; color: #fff; font-size: 14px; }
+.print-toolbar a { color: #bcd0fb; }
+.print-toolbar button { margin-left: auto; background: #1f56d6; color: #fff; border: 0; border-radius: 6px; padding: 8px 18px; font-weight: 600; cursor: pointer; }
+.sheet { position: relative; background: #fff; margin: 20px auto; padding: 14mm; box-shadow: 0 4px 18px rgba(0,0,0,.15); overflow: hidden; }
+.paper-a4.orient-portrait .sheet { width: 210mm; min-height: 297mm; }
+.paper-a4.orient-landscape .sheet { width: 297mm; min-height: 210mm; }
+.paper-a5 .sheet { width: 148mm; min-height: 210mm; }
+.paper-letter .sheet { width: 216mm; min-height: 279mm; }
+.paper-legal .sheet { width: 216mm; min-height: 356mm; }
+.paper-80mm .sheet { width: 80mm; padding: 4mm; font-size: 11px; }
+.paper-58mm .sheet { width: 58mm; padding: 3mm; font-size: 10px; }
+.watermark { position: absolute; inset: 0; display: grid; place-items: center; font-size: 110px; font-weight: 800; color: rgba(31,86,214,.06); transform: rotate(-28deg); pointer-events: none; }
+.doc-header { display: flex; gap: 16px; align-items: center; border-bottom: 3px solid #0f2a52; padding-bottom: 10px; }
+.doc-header img { width: 78px; height: 78px; object-fit: contain; }
+.doc-hospital h1 { margin: 0 0 4px; font-size: 22px; color: #0f2a52; }
+.doc-hospital p { margin: 1px 0; font-size: 12px; color: #333; }
+.doc-subheader { text-align: center; font-size: 12px; margin: 8px 0; color: #333; white-space: pre-line; }
+.doc-title { text-align: center; letter-spacing: .12em; font-size: 15px; margin: 14px 0; color: #1f56d6; }
+.doc-meta, .doc-lines { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 12px; }
+.doc-meta th { text-align: left; color: #555; font-weight: 600; width: 18%; padding: 4px; }
+.doc-meta td { padding: 4px; border-bottom: 1px dotted #bbb; }
+.doc-lines th, .doc-lines td { border: 1px solid #c7cfdb; padding: 6px 8px; text-align: left; }
+.doc-lines thead th { background: #eef3fb; }
+.doc-lines .num { text-align: right; }
+.doc-note { font-size: 11px; color: #555; font-style: italic; }
+.doc-footer { margin-top: 24px; border-top: 1px solid #c7cfdb; padding-top: 8px; font-size: 11px; text-align: center; color: #333; white-space: pre-line; }
+.doc-footer .powered { color: #888; font-size: 10px; }
+.paper-80mm .doc-header, .paper-58mm .doc-header { flex-direction: column; text-align: center; gap: 4px; }
+.paper-80mm .doc-header img, .paper-58mm .doc-header img { width: 46px; height: 46px; }
+.paper-80mm .doc-hospital h1, .paper-58mm .doc-hospital h1 { font-size: 14px; }
+.paper-80mm .doc-hospital p, .paper-58mm .doc-hospital p { font-size: 9.5px; }
+.paper-80mm .watermark, .paper-58mm .watermark { font-size: 40px; }
+.paper-80mm .doc-meta th, .paper-58mm .doc-meta th { width: auto; }
+@media print {
+  body { background: #fff; }
+  .no-print { display: none !important; }
+  .sheet { margin: 0; box-shadow: none; padding: 0; width: auto !important; min-height: 0 !important; }
+}

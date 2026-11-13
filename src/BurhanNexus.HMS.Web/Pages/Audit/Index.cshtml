@@ -1,0 +1,57 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Audit.IndexModel
+@{
+    ViewData["Title"] = "Audit Log";
+}
+<div class="toolbar">
+    <form method="get" class="filters wrap">
+        <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Search" placeholder="Search user, description, computer" maxlength="100" /></div>
+        <select name="action">
+            <option value="">All activities</option>
+            @foreach (var a in Model.Actions) { <option value="@a" selected="@(Model.ActionFilter == a)">@a</option> }
+        </select>
+        <select name="result">
+            <option value="">All results</option>
+            <option value="ok" selected="@(Model.ResultFilter == "ok")">Successful</option>
+            <option value="failed" selected="@(Model.ResultFilter == "failed")">Failed / denied</option>
+        </select>
+        <label class="inline-label">From <input type="date" name="from" value="@(Model.From?.ToString("yyyy-MM-dd"))" /></label>
+        <label class="inline-label">To <input type="date" name="to" value="@(Model.To?.ToString("yyyy-MM-dd"))" /></label>
+        <button class="btn btn-light" type="submit">Filter</button>
+    </form>
+    <div class="toolbar-actions">
+        <a bn-permission="@Perm.AuditExport" class="btn btn-light" href="/Audit?handler=Export&q=@Uri.EscapeDataString(Model.Search ?? "")&action=@Uri.EscapeDataString(Model.ActionFilter ?? "")&result=@Model.ResultFilter&from=@(Model.From?.ToString("yyyy-MM-dd"))&to=@(Model.To?.ToString("yyyy-MM-dd"))"><svg class="icon icon-sm"><use href="#i-download" /></svg> Export CSV</a>
+    </div>
+</div>
+<div class="card">
+    <div class="table-wrap">
+        <table class="table table-compact">
+            <thead><tr><th>Date &amp; time</th><th>User</th><th>Activity</th><th>Description</th><th>Record</th><th>Computer</th><th>Changes</th></tr></thead>
+            <tbody>
+                @foreach (var a in Model.Result.Items)
+                {
+                    <tr class="@(a.Success ? "" : "row-failed")">
+                        <td class="nowrap">@Fmt.DateTimeText(a.TimestampUtc)</td>
+                        <td class="mono">@(a.Username ?? "—")</td>
+                        <td><span class="tag @(a.Success ? "" : "tag-red")">@a.Action</span></td>
+                        <td>@a.Description</td>
+                        <td class="mono small">@a.EntityType @a.EntityId</td>
+                        <td class="small">@a.Workstation<br /><span class="muted mono">@a.IpAddress</span></td>
+                        <td>
+                            @if (a.OldValues is not null || a.NewValues is not null)
+                            {
+                                <details class="changes">
+                                    <summary>View</summary>
+                                    @if (a.OldValues is not null) { <div><strong>Before</strong><pre>@a.OldValues</pre></div> }
+                                    @if (a.NewValues is not null) { <div><strong>After</strong><pre>@a.NewValues</pre></div> }
+                                </details>
+                            }
+                        </td>
+                    </tr>
+                }
+                @if (Model.Result.Items.Count == 0) { <tr><td colspan="7" class="empty">No audit records match the filter.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pager" model="new PagerModel(Request, Model.Result.Page, Model.Result.TotalPages, Model.Result.Total)" />
+</div>

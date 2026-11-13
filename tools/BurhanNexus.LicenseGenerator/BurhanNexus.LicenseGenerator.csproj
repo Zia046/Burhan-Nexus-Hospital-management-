@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>bnhms-license</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BurhanNexus.HMS.Infrastructure\BurhanNexus.HMS.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

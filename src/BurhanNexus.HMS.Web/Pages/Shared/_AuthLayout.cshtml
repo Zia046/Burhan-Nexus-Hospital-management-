@@ -1,0 +1,20 @@
+@{
+    var profile = await Fmt.ProfileAsync();
+    var hospitalName = profile?.HospitalName ?? "Burhan Nexus Hospital Management";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] · @hospitalName</title>
+    <link rel="icon" href="/img/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="auth-body @(ViewData["BodyClass"])">
+<partial name="_Icons" />
+@RenderBody()
+<script src="~/js/site.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

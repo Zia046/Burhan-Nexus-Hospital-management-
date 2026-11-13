@@ -1,0 +1,48 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Users.CreateModel
+@{
+    ViewData["Title"] = "New user";
+}
+<div class="breadcrumbs"><a href="/Users">Users</a> <svg class="icon icon-sm"><use href="#i-chevron-right" /></svg> New user</div>
+<form method="post" class="card" novalidate>
+    <div class="card-header"><h2><svg class="icon"><use href="#i-plus" /></svg> Create user account</h2></div>
+    <div class="card-body">
+        <partial name="_ValidationSummary" />
+        <h3 class="section-title">Employee details</h3>
+        <div class="grid-2">
+            <div class="field"><label asp-for="FullName">Full name <em>*</em></label><input asp-for="FullName" required maxlength="150" /></div>
+            <div class="field"><label asp-for="Designation">Designation / job title</label><input asp-for="Designation" maxlength="100" placeholder="e.g. Receptionist, Lab Technician" /></div>
+            <div class="field"><label asp-for="ContactNumber">Contact number</label><input asp-for="ContactNumber" maxlength="50" inputmode="tel" /></div>
+            <div class="field"><label asp-for="Email">Email</label><input asp-for="Email" type="email" maxlength="200" /></div>
+        </div>
+        <h3 class="section-title">Login</h3>
+        <div class="grid-2">
+            <div class="field"><label asp-for="Username">Username <em>*</em></label><input asp-for="Username" required maxlength="64" autocomplete="off" pattern="[A-Za-z0-9._\-]{3,64}" /><small class="muted">Letters, numbers, dot, underscore or hyphen.</small></div>
+            <div></div>
+            <div class="field">
+                <label asp-for="Password">Password <em>*</em></label>
+                <div class="input-icon no-lead">
+                    <input asp-for="Password" type="password" required autocomplete="new-password" data-password data-strength />
+                    <button type="button" class="input-action" data-toggle-password aria-label="Show password"><svg class="icon"><use href="#i-eye" /></svg></button>
+                </div>
+                <div class="strength" data-strength-bar><span></span></div>
+            </div>
+            <div class="field"><label asp-for="ConfirmPassword">Confirm password <em>*</em></label><input asp-for="ConfirmPassword" type="password" required autocomplete="new-password" /></div>
+            <label class="check span-2"><input asp-for="MustChangePassword" type="checkbox" /> User must change this password at first login (recommended)</label>
+        </div>
+        @if (Model.CanAssignDepartments)
+        {
+            <h3 class="section-title">Departments</h3>
+            <div class="check-grid">
+                @foreach (var d in Model.Departments)
+                {
+                    <label class="check-card"><input type="checkbox" name="DepartmentIds" value="@d.Id" checked="@Model.DepartmentIds.Contains(d.Id)" /> <span>@d.Name</span></label>
+                }
+            </div>
+        }
+    </div>
+    <div class="card-footer form-actions">
+        <a class="btn btn-light" href="/Users">Cancel</a>
+        <button type="submit" class="btn btn-primary"><svg class="icon icon-sm"><use href="#i-check" /></svg> Create user</button>
+    </div>
+</form>

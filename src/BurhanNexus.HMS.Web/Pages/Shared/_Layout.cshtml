@@ -1,0 +1,132 @@
+@inject BurhanNexus.HMS.Infrastructure.Licensing.ILicenseService LicenseSvc
+@inject ISettingsService SettingsSvc
+@{
+    var profile = await Fmt.ProfileAsync();
+    var perms = await PermCtx.GetAsync();
+    var license = await LicenseSvc.GetStatusAsync();
+    var security = await SettingsSvc.GetSecurityAsync();
+    var nav = ViewData["Nav"] as string ?? "";
+    var hospitalName = profile?.HospitalName ?? "Burhan Nexus Hospital Management";
+    string Active(string key) => nav == key ? "active" : "";
+    bool Any(params string[] keys) => keys.Any(perms.Contains);
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] · @hospitalName</title>
+    <link rel="icon" href="/img/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="app" data-session-timeout="@security.SessionTimeoutMinutes">
+<partial name="_Icons" />
+<aside class="sidebar" id="sidebar">
+    <a class="brand" href="/">
+        <img class="brand-logo" src="/branding/logo?v=@(profile?.LogoVersion ?? 0)" alt="Logo" />
+        <span class="brand-text">
+            <strong>@hospitalName</strong>
+            <small>Burhan Nexus HMS</small>
+        </span>
+    </a>
+    <nav class="nav">
+        @if (perms.Contains(Perm.DashboardView))
+        {
+            <a class="nav-link @Active("dashboard")" href="/"><svg class="icon"><use href="#i-home" /></svg><span>Dashboard</span></a>
+        }
+
+        @if (Any(Perm.UsersView, Perm.DepartmentsManage, Perm.RolesManage, Perm.LoginHistoryView, Perm.AuditView))
+        {
+            <div class="nav-section">Administration</div>
+            @if (perms.Contains(Perm.UsersView))
+            {
+                <a class="nav-link @Active("users")" href="/Users"><svg class="icon"><use href="#i-users" /></svg><span>Users</span></a>
+            }
+            @if (perms.Contains(Perm.DepartmentsManage))
+            {
+                <a class="nav-link @Active("departments")" href="/Departments"><svg class="icon"><use href="#i-building" /></svg><span>Departments</span></a>
+            }
+            @if (perms.Contains(Perm.RolesManage))
+            {
+                <a class="nav-link @Active("roles")" href="/Roles"><svg class="icon"><use href="#i-badge" /></svg><span>Responsibilities</span></a>
+            }
+            @if (perms.Contains(Perm.LoginHistoryView))
+            {
+                <a class="nav-link @Active("logins")" href="/Users/LoginHistory"><svg class="icon"><use href="#i-history" /></svg><span>Login History</span></a>
+            }
+            @if (perms.Contains(Perm.AuditView))
+            {
+                <a class="nav-link @Active("audit")" href="/Audit"><svg class="icon"><use href="#i-shield" /></svg><span>Audit Log</span></a>
+            }
+        }
+
+        @if (Any(Perm.SettingsView, Perm.LicenseView, Perm.BackupView))
+        {
+            <div class="nav-section">System</div>
+            @if (perms.Contains(Perm.SettingsView))
+            {
+                <a class="nav-link @Active("settings")" href="/Settings"><svg class="icon"><use href="#i-settings" /></svg><span>Hospital Settings</span></a>
+            }
+            @if (perms.Contains(Perm.LicenseView))
+            {
+                <a class="nav-link @Active("license")" href="/Settings/License"><svg class="icon"><use href="#i-key" /></svg><span>License</span></a>
+            }
+            @if (perms.Contains(Perm.BackupView))
+            {
+                <a class="nav-link @Active("backup")" href="/Backup"><svg class="icon"><use href="#i-database" /></svg><span>Backup &amp; Restore</span></a>
+            }
+        }
+    </nav>
+    <div class="sidebar-footer">Burhan Nexus · v1.0 · Phase 1</div>
+</aside>
+<div class="sidebar-backdrop" data-sidebar-close></div>
+
+<div class="main">
+    <header class="topbar">
+        <button type="button" class="icon-btn sidebar-toggle" data-sidebar-toggle aria-label="Menu"><svg class="icon"><use href="#i-menu" /></svg></button>
+        <h1 class="page-title">@ViewData["Title"]</h1>
+        <div class="topbar-right">
+            @if (!license.AllowsWrite && license.State != BurhanNexus.HMS.Core.Licensing.LicenseState.NotInitialized)
+            {
+                <span class="pill pill-danger" title="@license.Message"><svg class="icon icon-sm"><use href="#i-lock" /></svg> Read-only</span>
+            }
+            else if (license.State == BurhanNexus.HMS.Core.Licensing.LicenseState.TrialActive)
+            {
+                <span class="pill pill-warning" title="@license.Message">Trial · @license.DaysRemaining days left</span>
+            }
+            <span class="topbar-clock" data-clock data-tz="@(profile?.TimeZoneId ?? "Asia/Karachi")"><svg class="icon icon-sm"><use href="#i-clock" /></svg> <span data-clock-text>@Fmt.DateTimeText(DateTime.UtcNow)</span></span>
+            <div class="user-menu" data-dropdown>
+                <button type="button" class="user-btn" data-dropdown-toggle>
+                    <span class="avatar">@(User.GetFullName().Length > 0 ? User.GetFullName()[..1].ToUpperInvariant() : "U")</span>
+                    <span class="user-name">@User.GetFullName()</span>
+                </button>
+                <div class="dropdown">
+                    <div class="dropdown-header"><strong>@User.GetFullName()</strong><small>@@@User.Identity?.Name</small></div>
+                    <a href="/Account/ChangePassword"><svg class="icon icon-sm"><use href="#i-lock" /></svg> Change password</a>
+                    <form method="post" action="/Account/Logout">
+                        @Html.AntiForgeryToken()
+                        <button type="submit"><svg class="icon icon-sm"><use href="#i-logout" /></svg> Log out</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </header>
+    <main class="content">
+        <partial name="_Flash" />
+        @RenderBody()
+    </main>
+</div>
+
+<div class="modal-backdrop" id="session-warning" hidden>
+    <div class="modal">
+        <h3><svg class="icon"><use href="#i-clock" /></svg> Session about to expire</h3>
+        <p>You have been inactive. For security you will be logged out in <strong data-session-countdown>60</strong> seconds.</p>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-primary" data-session-continue>Stay logged in</button>
+        </div>
+    </div>
+</div>
+<script src="~/js/site.js" asp-append-version="true"></script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

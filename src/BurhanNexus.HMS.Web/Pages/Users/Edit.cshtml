@@ -1,0 +1,142 @@
+@page "{id:int}"
+@model BurhanNexus.HMS.Web.Pages.Users.EditModel
+@{
+    var u = Model.TargetUser!;
+    ViewData["Title"] = u.FullName;
+}
+<div class="breadcrumbs"><a href="/Users">Users</a> <svg class="icon icon-sm"><use href="#i-chevron-right" /></svg> @u.FullName</div>
+
+<section class="profile-head card">
+    <span class="avatar lg">@(u.FullName[..1].ToUpperInvariant())</span>
+    <div>
+        <h2>@u.FullName @if (u.IsSystemAdministrator) { <span class="badge badge-navy">System Administrator</span> }</h2>
+        <p class="muted mono">@@@u.Username · @(u.Designation ?? "No designation")</p>
+        <p>
+            @if (u.IsActive) { <span class="status status-ok">Active</span> } else { <span class="status status-off">Inactive</span> }
+            @if (Model.IsLocked) { <span class="status status-warn">Locked until @Fmt.DateTimeText(u.Credential!.LockoutEndUtc)</span> }
+            <span class="muted">Last login: @Fmt.DateTimeText(u.LastLoginUtc) · Created: @Fmt.Date(u.CreatedUtc)</span>
+        </p>
+    </div>
+    <div class="profile-actions">
+        @if (Model.CanPermissions) { <a class="btn btn-primary" href="/Users/Permissions/@u.Id"><svg class="icon icon-sm"><use href="#i-shield" /></svg> Permissions</a> }
+        @if (Model.CanLoginHistory) { <a class="btn btn-light" href="/Users/LoginHistory?user=@u.Id"><svg class="icon icon-sm"><use href="#i-history" /></svg> Login history</a> }
+    </div>
+</section>
+
+<div class="grid-2 gap-lg">
+    <form method="post" asp-page-handler="Profile" class="card" novalidate>
+        <div class="card-header"><h3>Employee information</h3></div>
+        <div class="card-body">
+            <partial name="_ValidationSummary" />
+            <input type="hidden" asp-for="RowVersion" />
+            <fieldset disabled="@(!Model.CanEdit)">
+                <div class="field"><label asp-for="FullName">Full name</label><input asp-for="FullName" required maxlength="150" /></div>
+                <div class="field"><label asp-for="Username">Username</label><input asp-for="Username" required maxlength="64" /></div>
+                <div class="field"><label asp-for="Designation">Designation</label><input asp-for="Designation" maxlength="100" /></div>
+                <div class="field"><label asp-for="ContactNumber">Contact number</label><input asp-for="ContactNumber" maxlength="50" /></div>
+                <div class="field"><label asp-for="Email">Email</label><input asp-for="Email" type="email" maxlength="200" /></div>
+            </fieldset>
+        </div>
+        @if (Model.CanEdit)
+        {
+            <div class="card-footer form-actions"><button class="btn btn-primary" type="submit">Save changes</button></div>
+        }
+    </form>
+
+    <div class="stack">
+        <form method="post" asp-page-handler="Departments" class="card">
+            <div class="card-header"><h3><svg class="icon"><use href="#i-building" /></svg> Departments</h3></div>
+            <div class="card-body">
+                @if (Model.CanDepartments)
+                {
+                    <div class="check-grid">
+                        @foreach (var d in Model.AllDepartments.Where(d => d.IsActive || Model.DepartmentIds.Contains(d.Id)))
+                        {
+                            <label class="check-card"><input type="checkbox" name="DepartmentIds" value="@d.Id" checked="@Model.DepartmentIds.Contains(d.Id)" /> <span>@d.Name</span></label>
+                        }
+                    </div>
+                }
+                else
+                {
+                    @foreach (var d in u.Departments) { <span class="tag">@d.Department?.Name</span> }
+                    @if (u.Departments.Count == 0) { <span class="muted">No departments assigned.</span> }
+                }
+            </div>
+            @if (Model.CanDepartments) { <div class="card-footer form-actions"><button class="btn btn-primary" type="submit">Save departments</button></div> }
+        </form>
+
+        <form method="post" asp-page-handler="Roles" class="card">
+            <div class="card-header"><h3><svg class="icon"><use href="#i-badge" /></svg> Responsibilities</h3></div>
+            <div class="card-body">
+                @if (u.IsSystemAdministrator)
+                {
+                    <p class="muted">The system administrator has every permission.</p>
+                }
+                else if (Model.CanRoles)
+                {
+                    @if (Model.AllRoles.Count == 0)
+                    {
+                        <p class="muted">No responsibilities defined yet. <a bn-permission="@Perm.RolesManage" href="/Roles/Edit">Create one</a> (e.g. Receptionist, Lab Technician) or assign individual permissions.</p>
+                    }
+                    <div class="check-grid">
+                        @foreach (var r in Model.AllRoles)
+                        {
+                            <label class="check-card"><input type="checkbox" name="RoleIds" value="@r.Id" checked="@Model.RoleIds.Contains(r.Id)" /> <span>@r.Name <small class="muted">@r.PermissionCount permissions</small></span></label>
+                        }
+                    </div>
+                }
+                else
+                {
+                    @foreach (var r in u.Roles) { <span class="tag tag-blue">@r.Role?.Name</span> }
+                    @if (u.Roles.Count == 0) { <span class="muted">No responsibilities assigned.</span> }
+                    @if (Model.IsSelf) { <p class="muted small">You cannot change your own responsibilities or permissions.</p> }
+                }
+            </div>
+            @if (Model.CanRoles && Model.AllRoles.Count > 0) { <div class="card-footer form-actions"><button class="btn btn-primary" type="submit">Save responsibilities</button></div> }
+        </form>
+
+        @if (Model.CanActivate || Model.CanReset)
+        {
+            <div class="card">
+                <div class="card-header"><h3><svg class="icon"><use href="#i-lock" /></svg> Account security</h3></div>
+                <div class="card-body stack">
+                    @if (Model.CanActivate && !u.IsSystemAdministrator)
+                    {
+                        <form method="post" asp-page-handler="Activate" class="inline-form" data-confirm="@(u.IsActive ? "Deactivate this account? The user will be logged out on all computers." : "Activate this account?")">
+                            <input type="hidden" name="active" value="@(!u.IsActive ? "true" : "false")" />
+                            @if (u.IsActive)
+                            {
+                                <button class="btn btn-danger-outline" type="submit"><svg class="icon icon-sm"><use href="#i-x" /></svg> Deactivate account</button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-success" type="submit"><svg class="icon icon-sm"><use href="#i-check" /></svg> Activate account</button>
+                            }
+                        </form>
+                    }
+                    @if (Model.CanReset)
+                    {
+                        @if (Model.IsLocked)
+                        {
+                            <form method="post" asp-page-handler="Unlock" class="inline-form">
+                                <button class="btn btn-light" type="submit"><svg class="icon icon-sm"><use href="#i-unlock" /></svg> Unlock account</button>
+                            </form>
+                        }
+                        <form method="post" asp-page-handler="ResetPassword" class="reset-form" autocomplete="off">
+                            <label for="NewPassword">Reset password</label>
+                            <div class="inline-form">
+                                <div class="input-icon no-lead grow">
+                                    <input id="NewPassword" name="NewPassword" type="password" autocomplete="new-password" placeholder="New password" data-password minlength="8" required />
+                                    <button type="button" class="input-action" data-toggle-password aria-label="Show password"><svg class="icon"><use href="#i-eye" /></svg></button>
+                                </div>
+                                <button class="btn btn-light" type="submit">Reset</button>
+                            </div>
+                            <label class="check"><input type="checkbox" name="MustChange" value="true" checked /> Must change at next login</label>
+                            <input type="hidden" name="MustChange" value="false" />
+                        </form>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>

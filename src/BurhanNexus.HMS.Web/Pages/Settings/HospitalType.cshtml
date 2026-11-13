@@ -1,0 +1,45 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Settings.HospitalTypeModel
+@{
+    ViewData["Title"] = "Hospital type & rules";
+    var c = Model.Config;
+}
+<partial name="_SettingsNav" />
+<div class="grid-side">
+    <form method="post" asp-page-handler="Rules" class="card">
+        <div class="card-header"><h3>Operational rules</h3><span class="pill @(c.HospitalType == HospitalType.Government ? "pill-navy" : "pill-blue")">@c.HospitalType Hospital</span></div>
+        <div class="card-body">
+            <input type="hidden" asp-for="RowVersion" />
+            <p class="muted">These rules prepare future modules. The hospital type sets the defaults; each rule can be changed independently.</p>
+            <fieldset disabled="@(!Model.CanChangeType)" class="toggle-list">
+                <label class="toggle"><input asp-for="Rules.GovernmentStockIssueEnabled" type="checkbox" /><span><strong>Government medicine stock</strong><small>Medicines are issued from supplied stock without purchase or sale prices.</small></span></label>
+                <label class="toggle"><input asp-for="Rules.PharmacyPricingEnabled" type="checkbox" /><span><strong>Pharmacy pricing</strong><small>Record purchase prices and sale prices of medicines.</small></span></label>
+                <label class="toggle"><input asp-for="Rules.PharmacyRetailSalesEnabled" type="checkbox" /><span><strong>Retail medicine sales</strong><small>Sell medicines to patients (requires pricing).</small></span></label>
+                <label class="toggle"><input asp-for="Rules.PharmacyProfitTrackingEnabled" type="checkbox" /><span><strong>Profit calculation</strong><small>Calculate pharmacy profit (requires pricing).</small></span></label>
+                <label class="toggle"><input asp-for="Rules.PatientChargesEnabled" type="checkbox" /><span><strong>Patient charges</strong><small>Charge fees for OPD, laboratory, imaging and other services.</small></span></label>
+            </fieldset>
+        </div>
+        @if (Model.CanChangeType) { <div class="card-footer form-actions"><button class="btn btn-primary" type="submit">Save rules</button></div> }
+    </form>
+
+    @if (Model.CanChangeType)
+    {
+        <form method="post" asp-page-handler="ChangeType" class="card card-danger" autocomplete="off">
+            <div class="card-header"><h3><svg class="icon"><use href="#i-alert" /></svg> Change hospital type</h3></div>
+            <div class="card-body">
+                <p>Current type: <strong>@c.HospitalType</strong>. Changing the type affects how future pharmacy and billing modules behave. Existing data is not deleted.</p>
+                <div class="field">
+                    <label asp-for="NewType">New type</label>
+                    <select asp-for="NewType">
+                        <option value="Government">Government Hospital</option>
+                        <option value="Private">Private Hospital</option>
+                    </select>
+                </div>
+                <label class="check"><input asp-for="ApplyDefaults" type="checkbox" /> Apply the default rules for the new type</label>
+                <div class="field"><label asp-for="Password">Your password</label><input asp-for="Password" type="password" autocomplete="current-password" required /></div>
+                <div class="field"><label asp-for="Confirmation">Type <code>CHANGE</code> to confirm</label><input asp-for="Confirmation" required autocomplete="off" /></div>
+            </div>
+            <div class="card-footer form-actions"><button class="btn btn-danger" type="submit">Change hospital type</button></div>
+        </form>
+    }
+</div>

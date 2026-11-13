@@ -1,0 +1,34 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Settings.PrintingModel
+@{
+    ViewData["Title"] = "Printing";
+}
+<partial name="_SettingsNav" />
+<form method="post" class="card card-medium" novalidate>
+    <div class="card-header"><h3><svg class="icon"><use href="#i-printer" /></svg> Printer settings</h3>
+        <div class="btn-group">
+            <a bn-permission="@Perm.SettingsPrint" class="btn btn-light btn-sm" href="/Settings/PrintPreview?doc=report" target="_blank">Preview report</a>
+            <a bn-permission="@Perm.SettingsPrint" class="btn btn-light btn-sm" href="/Settings/PrintPreview?doc=receipt" target="_blank">Preview receipt</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <partial name="_ValidationSummary" />
+        <input type="hidden" asp-for="RowVersion" />
+        <p class="muted">Documents are printed from the browser of each computer. These settings choose the paper layout; select the matching printer in the print dialog (the name below is shown as a reminder).</p>
+        <fieldset disabled="@(!Model.CanEdit)">
+            <h4 class="section-title">Receipts &amp; slips</h4>
+            <div class="grid-3">
+                <div class="field"><label asp-for="Input.ReceiptPrinterName">Printer name</label><input asp-for="Input.ReceiptPrinterName" maxlength="200" /></div>
+                <div class="field"><label asp-for="Input.ReceiptPaperSize">Paper</label><select asp-for="Input.ReceiptPaperSize">@foreach (var p in Options.ReceiptPaperSizes) { <option value="@p">@p</option> }</select></div>
+                <div class="field"><label asp-for="Input.ReceiptCopies">Copies</label><input asp-for="Input.ReceiptCopies" type="number" min="1" max="5" /></div>
+            </div>
+            <h4 class="section-title">Reports</h4>
+            <div class="grid-3">
+                <div class="field"><label asp-for="Input.ReportPrinterName">Printer name</label><input asp-for="Input.ReportPrinterName" maxlength="200" /></div>
+                <div class="field"><label asp-for="Input.ReportPaperSize">Paper</label><select asp-for="Input.ReportPaperSize">@foreach (var p in Options.ReportPaperSizes) { <option value="@p">@p</option> }</select></div>
+                <div class="field"><label asp-for="Input.ReportOrientation">Orientation</label><select asp-for="Input.ReportOrientation">@foreach (var o in Options.Orientations) { <option value="@o">@o</option> }</select></div>
+            </div>
+        </fieldset>
+    </div>
+    @if (Model.CanEdit) { <div class="card-footer form-actions"><button class="btn btn-primary" type="submit">Save printer settings</button></div> }
+</form>

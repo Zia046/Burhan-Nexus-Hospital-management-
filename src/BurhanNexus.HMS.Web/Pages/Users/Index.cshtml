@@ -1,0 +1,70 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Users.IndexModel
+@{
+    ViewData["Title"] = "Users";
+}
+<div class="toolbar">
+    <form method="get" class="filters">
+        <div class="input-icon">
+            <svg class="icon"><use href="#i-search" /></svg>
+            <input name="q" value="@Model.Query" placeholder="Search name, username, designation, phone" maxlength="100" />
+        </div>
+        <select name="status">
+            <option value="">All statuses</option>
+            <option value="active" selected="@(Model.Status == "active")">Active</option>
+            <option value="inactive" selected="@(Model.Status == "inactive")">Inactive</option>
+        </select>
+        <select name="dept">
+            <option value="">All departments</option>
+            @foreach (var d in Model.Departments)
+            {
+                <option value="@d.Id" selected="@(Model.DepartmentId == d.Id)">@d.Name</option>
+            }
+        </select>
+        <button class="btn btn-light" type="submit">Filter</button>
+    </form>
+    <div class="toolbar-actions">
+        <a bn-permission="@Perm.LoginHistoryView" class="btn btn-light" href="/Users/LoginHistory"><svg class="icon icon-sm"><use href="#i-history" /></svg> Login history</a>
+        <a bn-permission="@Perm.UsersAdd" class="btn btn-primary" href="/Users/Create" data-test="create-user"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New user</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr><th>Name</th><th>Username</th><th>Departments</th><th>Responsibilities</th><th>Status</th><th>Last login</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var u in Model.Result.Items)
+                {
+                    <tr>
+                        <td>
+                            <div class="cell-user">
+                                <span class="avatar sm">@(u.FullName[..1].ToUpperInvariant())</span>
+                                <div><strong>@u.FullName</strong>@if (u.IsSystemAdministrator) { <span class="badge badge-navy">System Admin</span> }<small class="muted">@u.Designation</small></div>
+                            </div>
+                        </td>
+                        <td class="mono">@u.Username</td>
+                        <td>@foreach (var d in u.Departments) { <span class="tag">@d</span> }</td>
+                        <td>@foreach (var r in u.Roles) { <span class="tag tag-blue">@r</span> }</td>
+                        <td>
+                            @if (u.IsActive) { <span class="status status-ok">Active</span> } else { <span class="status status-off">Inactive</span> }
+                            @if (u.IsLocked) { <span class="status status-warn">Locked</span> }
+                        </td>
+                        <td>@Fmt.DateTimeText(u.LastLoginUtc)</td>
+                        <td class="actions">
+                            <a class="btn btn-light btn-sm" href="/Users/Edit/@u.Id">Open</a>
+                            <a bn-permission="@Perm.UsersAssignPermissions" class="btn btn-light btn-sm" href="/Users/Permissions/@u.Id"><svg class="icon icon-sm"><use href="#i-shield" /></svg> Permissions</a>
+                        </td>
+                    </tr>
+                }
+                @if (Model.Result.Items.Count == 0)
+                {
+                    <tr><td colspan="7" class="empty">No users match your search.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pager" model="new PagerModel(Request, Model.Result.Page, Model.Result.TotalPages, Model.Result.Total)" />
+</div>

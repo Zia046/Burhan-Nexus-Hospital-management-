@@ -1,0 +1,48 @@
+@page "{id:int?}"
+@model BurhanNexus.HMS.Web.Pages.Roles.EditModel
+@{
+    ViewData["Title"] = Model.Id is null ? "New responsibility" : "Edit responsibility";
+}
+<div class="breadcrumbs"><a href="/Roles">Responsibilities</a> <svg class="icon icon-sm"><use href="#i-chevron-right" /></svg> @(Model.Id is null ? "New" : Model.Name)</div>
+<form method="post" novalidate>
+    <input type="hidden" asp-for="RowVersion" />
+    <div class="card">
+        <div class="card-body">
+            <partial name="_ValidationSummary" />
+            <div class="grid-2">
+                <div class="field"><label asp-for="Name">Name <em>*</em></label><input asp-for="Name" required maxlength="100" placeholder="e.g. Receptionist" /></div>
+                <div class="field"><label asp-for="Description">Description</label><input asp-for="Description" maxlength="300" /></div>
+                <label class="check"><input asp-for="IsActive" type="checkbox" /> Active (inactive responsibilities grant nothing)</label>
+            </div>
+        </div>
+    </div>
+    <div class="perm-modules">
+        @foreach (var m in PermissionCatalog.Modules)
+        {
+            <section class="card perm-module" data-perm-module>
+                <div class="card-header">
+                    <h3>@m.Name @if (!m.IsAvailable) { <span class="badge badge-soon">Future module</span> }</h3>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-light btn-xs" data-check-all="true">All</button>
+                        <button type="button" class="btn btn-light btn-xs" data-check-all="false">None</button>
+                    </div>
+                </div>
+                <div class="perm-cells">
+                    @foreach (var a in m.Actions)
+                    {
+                        var key = m.PermissionKey(a.Key);
+                        var allowed = User.IsSystemAdministrator() || Model.MyPermissions.Contains(key) || Model.Keys.Contains(key);
+                        <label class="perm-cell check" title="@a.Description">
+                            <input type="checkbox" name="Keys" value="@key" checked="@Model.Keys.Contains(key)" disabled="@(!allowed)" />
+                            <span class="perm-name">@a.Name</span>
+                        </label>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+    <div class="sticky-actions">
+        <a class="btn btn-light" href="/Roles">Cancel</a>
+        <button type="submit" class="btn btn-primary"><svg class="icon icon-sm"><use href="#i-check" /></svg> Save responsibility</button>
+    </div>
+</form>

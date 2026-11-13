@@ -1,0 +1,23 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Settings.SecurityModel
+@{
+    ViewData["Title"] = "Security settings";
+}
+<partial name="_SettingsNav" />
+<form method="post" class="card card-medium" novalidate>
+    <div class="card-header"><h3><svg class="icon"><use href="#i-lock" /></svg> Login &amp; session security</h3></div>
+    <div class="card-body">
+        <partial name="_ValidationSummary" />
+        <div class="grid-3">
+            <div class="field"><label asp-for="SessionTimeoutMinutes">Automatic logout after (minutes idle)</label><input asp-for="SessionTimeoutMinutes" type="number" min="5" max="720" required /></div>
+            <div class="field"><label asp-for="MaxFailedLoginAttempts">Failed logins before lock</label><input asp-for="MaxFailedLoginAttempts" type="number" min="3" max="20" required /></div>
+            <div class="field"><label asp-for="LockoutMinutes">Lock duration (minutes)</label><input asp-for="LockoutMinutes" type="number" min="1" max="1440" required /></div>
+        </div>
+        <ul class="muted small">
+            <li>Passwords are stored only as salted PBKDF2 hashes; they can never be read back.</li>
+            <li>Each computer is also limited in how many login attempts it can make per minute.</li>
+            <li>Sessions are checked against the central database on every request, so deactivating a user logs them out everywhere.</li>
+        </ul>
+    </div>
+    <div class="card-footer form-actions"><button class="btn btn-primary" type="submit">Save security settings</button></div>
+</form>

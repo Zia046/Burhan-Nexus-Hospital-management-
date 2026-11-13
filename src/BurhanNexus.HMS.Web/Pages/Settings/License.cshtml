@@ -1,0 +1,47 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Settings.LicenseModel
+@{
+    ViewData["Title"] = "License";
+    var s = Model.Status;
+    var ok = s.AllowsWrite;
+}
+<partial name="_SettingsNav" />
+@if (Model.ReadOnlyRedirect && !ok)
+{
+    <div class="alert alert-danger"><svg class="icon"><use href="#i-lock" /></svg><div><strong>The system is in read-only mode.</strong> You can view records, take backups and activate a licence. No data has been deleted.</div></div>
+}
+<div class="grid-side">
+    <div class="card">
+        <div class="card-header"><h3><svg class="icon"><use href="#i-key" /></svg> Licence status</h3>
+            <span class="pill @(ok ? (s.State == LicenseState.TrialActive ? "pill-warning" : "pill-success") : "pill-danger")" data-license-state="@s.State">@s.DisplayName</span></div>
+        <div class="card-body">
+            <p>@s.Message</p>
+            @if (s.State == LicenseState.TrialActive && s.DaysRemaining is int d)
+            {
+                var pct = Math.Clamp((int)Math.Round((30 - d) / 30.0 * 100), 0, 100);
+                <div class="progress"><span style="width:@(pct)%"></span></div>
+                <p class="muted small">@d of 30 trial days remaining</p>
+            }
+            <dl class="kv">
+                <dt>Licence type</dt><dd>@(s.Type?.ToString() ?? "—")</dd>
+                <dt>Licensed to</dt><dd>@(s.LicensedTo ?? "—")</dd>
+                <dt>Trial started</dt><dd>@Fmt.Date(s.StartedUtc)</dd>
+                <dt>Activation date</dt><dd>@Fmt.Date(s.ActivatedUtc)</dd>
+                <dt>Expiry date</dt><dd>@(s.Type == BurhanNexus.HMS.Core.Domain.LicenseType.Lifetime ? "Never (lifetime)" : Fmt.Date(s.ExpiresUtc))</dd>
+                <dt>Installation ID</dt><dd class="mono" data-installation-id>@s.InstallationId</dd>
+            </dl>
+            <p class="muted small">Send the Installation ID to Burhan Nexus to receive an Annual or Lifetime activation key. Licence problems never delete or change hospital data.</p>
+        </div>
+    </div>
+    <form method="post" class="card" bn-permission="@Perm.LicenseActivate">
+        <div class="card-header"><h3>Activate licence</h3></div>
+        <div class="card-body">
+            <div class="field">
+                <label for="ActivationKey">Activation key</label>
+                <textarea id="ActivationKey" name="ActivationKey" rows="6" class="mono" placeholder="BNHMS1-..." required maxlength="4000"></textarea>
+            </div>
+            <p class="muted small">Activation works offline – no internet connection is needed.</p>
+        </div>
+        <div class="card-footer form-actions"><button class="btn btn-primary" type="submit"><svg class="icon icon-sm"><use href="#i-check" /></svg> Activate</button></div>
+    </form>
+</div>

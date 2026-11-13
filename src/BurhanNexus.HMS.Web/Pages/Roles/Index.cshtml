@@ -1,0 +1,30 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Roles.IndexModel
+@{
+    ViewData["Title"] = "Responsibilities";
+}
+<div class="toolbar">
+    <p class="muted">A responsibility is a reusable set of permissions (for example <em>Receptionist</em> or <em>Lab Technician</em>). Users may hold several responsibilities; individual permissions can still be granted or denied per user.</p>
+    <div class="toolbar-actions"><a class="btn btn-primary" href="/Roles/Edit"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New responsibility</a></div>
+</div>
+<div class="card">
+    <div class="table-wrap">
+        <table class="table">
+            <thead><tr><th>Responsibility</th><th>Description</th><th>Permissions</th><th>Users</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+                @foreach (var r in Model.Items)
+                {
+                    <tr>
+                        <td><strong>@r.Name</strong></td>
+                        <td class="muted">@r.Description</td>
+                        <td>@r.PermissionCount</td>
+                        <td>@r.UserCount</td>
+                        <td>@if (r.IsActive) { <span class="status status-ok">Active</span> } else { <span class="status status-off">Inactive</span> }</td>
+                        <td class="actions"><a class="btn btn-light btn-sm" href="/Roles/Edit/@r.Id"><svg class="icon icon-sm"><use href="#i-edit" /></svg> Edit</a></td>
+                    </tr>
+                }
+                @if (Model.Items.Count == 0) { <tr><td colspan="6" class="empty">No responsibilities yet. Create one to quickly give the same access to several staff members.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

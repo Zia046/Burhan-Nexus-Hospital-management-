@@ -1,0 +1,39 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Users.LoginHistoryModel
+@{
+    ViewData["Title"] = Model.UserName is null ? "Login history" : "Login history · " + Model.UserName;
+}
+<div class="toolbar">
+    <form method="get" class="filters">
+        @if (Model.UserId is int uid) { <input type="hidden" name="user" value="@uid" /> }
+        <select name="result">
+            <option value="">All attempts</option>
+            <option value="success" selected="@(Model.ResultFilter == "success")">Successful</option>
+            <option value="failed" selected="@(Model.ResultFilter == "failed")">Failed</option>
+        </select>
+        <button class="btn btn-light" type="submit">Filter</button>
+        @if (Model.UserId is not null) { <a class="btn btn-light" href="/Users/LoginHistory">Show all users</a> }
+    </form>
+</div>
+<div class="card">
+    <div class="table-wrap">
+        <table class="table">
+            <thead><tr><th>Date &amp; time</th><th>Username</th><th>Result</th><th>Computer</th><th>IP address</th><th>Session ended</th></tr></thead>
+            <tbody>
+                @foreach (var l in Model.Result.Items)
+                {
+                    <tr>
+                        <td>@Fmt.DateTimeText(l.AttemptedUtc)</td>
+                        <td class="mono">@l.UsernameAttempted</td>
+                        <td>@if (l.Success) { <span class="status status-ok">Success</span> } else { <span class="status status-bad">@l.FailureReason</span> }</td>
+                        <td>@l.Workstation</td>
+                        <td class="mono">@l.IpAddress</td>
+                        <td>@if (l.LogoutUtc is not null) { <span>@Fmt.DateTimeText(l.LogoutUtc) <small class="muted">(@l.LogoutReason)</small></span> } else if (l.Success) { <span class="muted">Active / not logged out</span> }</td>
+                    </tr>
+                }
+                @if (Model.Result.Items.Count == 0) { <tr><td colspan="6" class="empty">No login records.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pager" model="new PagerModel(Request, Model.Result.Page, Model.Result.TotalPages, Model.Result.Total)" />
+</div>

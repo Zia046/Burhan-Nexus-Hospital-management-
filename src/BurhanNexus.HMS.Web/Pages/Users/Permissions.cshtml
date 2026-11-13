@@ -1,0 +1,71 @@
+@page "{id:int}"
+@model BurhanNexus.HMS.Web.Pages.Users.PermissionsModel
+@{
+    var u = Model.TargetUser!;
+    ViewData["Title"] = "Permissions · " + u.FullName;
+}
+<div class="breadcrumbs"><a href="/Users">Users</a> <svg class="icon icon-sm"><use href="#i-chevron-right" /></svg> <a href="/Users/Edit/@u.Id">@u.FullName</a> <svg class="icon icon-sm"><use href="#i-chevron-right" /></svg> Permissions</div>
+
+<div class="card">
+    <div class="card-body perm-intro">
+        <div>
+            <h2>@u.FullName <span class="muted mono">@@@u.Username</span></h2>
+            <p class="muted">Permissions come from the user's <strong>responsibilities</strong>
+                (@(u.Roles.Count == 0 ? "none" : string.Join(", ", u.Roles.Select(r => r.Role?.Name))))
+                plus individual settings below. <strong>Deny</strong> always wins. Anything the user is not allowed to use is hidden from their screens and blocked on the server.</p>
+        </div>
+        <div class="legend">
+            <span><span class="perm-dot on"></span> Allowed</span>
+            <span><span class="perm-dot off"></span> Not allowed</span>
+            <span><span class="tag tag-blue">R</span> From responsibility</span>
+        </div>
+    </div>
+</div>
+
+@if (Model.ReadOnly)
+{
+    <div class="alert alert-info"><svg class="icon"><use href="#i-info" /></svg><div>@Model.ReadOnlyReason</div></div>
+}
+
+<form method="post" data-perm-form>
+    <div class="perm-modules">
+        @foreach (var m in Model.Matrix)
+        {
+            <section class="card perm-module" data-perm-module>
+                <div class="card-header">
+                    <h3>@m.ModuleName @if (!m.IsAvailable) { <span class="badge badge-soon">Future module</span> }</h3>
+                    @if (!Model.ReadOnly)
+                    {
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-light btn-xs" data-perm-all="grant">Grant all</button>
+                            <button type="button" class="btn btn-light btn-xs" data-perm-all="inherit">Reset</button>
+                            <button type="button" class="btn btn-light btn-xs" data-perm-all="deny">Deny all</button>
+                        </div>
+                    }
+                </div>
+                <div class="perm-cells">
+                    @foreach (var c in m.Cells)
+                    {
+                        var value = c.Override switch { PermissionOverride.Grant => "grant", PermissionOverride.Deny => "deny", _ => "inherit" };
+                        <div class="perm-cell" title="@c.Description">
+                            <span class="perm-dot @(c.Effective ? "on" : "off")"></span>
+                            <span class="perm-name">@c.ActionName @if (c.FromResponsibilities) { <span class="tag tag-blue" title="Granted by a responsibility">R</span> }</span>
+                            <select name="P[@c.Key]" data-perm-select disabled="@(Model.ReadOnly || !c.ActorMayChange)" aria-label="@m.ModuleName – @c.ActionName">
+                                <option value="inherit" selected="@(value == "inherit")">@(c.FromResponsibilities ? "Inherit (allowed)" : "Inherit (not allowed)")</option>
+                                <option value="grant" selected="@(value == "grant")">Grant</option>
+                                <option value="deny" selected="@(value == "deny")">Deny</option>
+                            </select>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+    @if (!Model.ReadOnly)
+    {
+        <div class="sticky-actions">
+            <a class="btn btn-light" href="/Users/Edit/@u.Id">Cancel</a>
+            <button type="submit" class="btn btn-primary"><svg class="icon icon-sm"><use href="#i-check" /></svg> Save permissions</button>
+        </div>
+    }
+</form>

@@ -1,0 +1,15 @@
+bin/
+obj/
+publish/
+*.user
+.vs/
+.vscode/
+*.swp
+data/
+backups/
+appsettings.Production.json
+appsettings.Local.json
+*.private.pem
+private-keys/
+ci-output/
+TestResults/

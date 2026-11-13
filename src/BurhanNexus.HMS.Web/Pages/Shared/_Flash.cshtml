@@ -1,0 +1,12 @@
+@{
+    var success = TempData["FlashSuccess"] as string;
+    var error = TempData["FlashError"] as string;
+}
+@if (!string.IsNullOrEmpty(success))
+{
+    <div class="alert alert-success" role="status" data-autohide><svg class="icon"><use href="#i-check-circle" /></svg><div>@success</div></div>
+}
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger" role="alert"><svg class="icon"><use href="#i-alert" /></svg><div>@error</div></div>
+}

@@ -1,0 +1,203 @@
+// Burhan Nexus HMS – UI behaviour (no external libraries; CSP: script-src 'self').
+(function () {
+  "use strict";
+  const $ = (s, r) => (r || document).querySelector(s);
+  const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+
+  // ---- Sidebar (tablets) ----
+  $$("[data-sidebar-toggle]").forEach(b => b.addEventListener("click", () => document.body.classList.toggle("sidebar-open")));
+  $$("[data-sidebar-close]").forEach(b => b.addEventListener("click", () => document.body.classList.remove("sidebar-open")));
+
+  // ---- Dropdown ----
+  $$("[data-dropdown]").forEach(d => {
+    const t = $("[data-dropdown-toggle]", d);
+    t && t.addEventListener("click", e => { e.stopPropagation(); d.classList.toggle("open"); });
+  });
+  document.addEventListener("click", () => $$("[data-dropdown].open").forEach(d => d.classList.remove("open")));
+
+  // ---- Show / hide password ----
+  $$("[data-toggle-password]").forEach(btn => btn.addEventListener("click", () => {
+    const input = btn.parentElement.querySelector("input");
+    if (!input) return;
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    const use = btn.querySelector("use");
+    if (use) use.setAttribute("href", show ? "#i-eye-off" : "#i-eye");
+    btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+  }));
+
+  // ---- Password strength ----
+  $$("[data-strength]").forEach(input => {
+    const bar = input.closest(".field") && $("[data-strength-bar] span", input.closest(".field"));
+    if (!bar) return;
+    input.addEventListener("input", () => {
+      const v = input.value; let s = 0;
+      if (v.length >= 8) s++; if (v.length >= 12) s++;
+      if (/[a-z]/.test(v) && /[A-Z]/.test(v)) s++; if (/\d/.test(v)) s++; if (/[^A-Za-z0-9]/.test(v)) s++;
+      const pct = Math.min(100, s * 20);
+      bar.style.width = pct + "%";
+      bar.style.background = pct < 50 ? "#c9302c" : pct < 80 ? "#b7791f" : "#15924a";
+    });
+  });
+
+  // ---- Confirmations & busy overlay ----
+  $$("form[data-confirm]").forEach(f => f.addEventListener("submit", e => {
+    if (!window.confirm(f.getAttribute("data-confirm"))) e.preventDefault();
+  }));
+  $$("button[data-confirm]").forEach(b => b.addEventListener("click", e => {
+    if (!window.confirm(b.getAttribute("data-confirm"))) e.preventDefault();
+  }));
+  $$("form[data-busy]").forEach(f => f.addEventListener("submit", e => {
+    if (e.defaultPrevented) return;
+    const o = document.createElement("div");
+    o.className = "busy-overlay";
+    o.innerHTML = '<div><div class="spinner"></div><span></span></div>';
+    o.querySelector("span").textContent = f.getAttribute("data-busy");
+    document.body.appendChild(o);
+  }));
+  $$("form").forEach(f => f.addEventListener("submit", e => {
+    setTimeout(() => { if (!e.defaultPrevented) $$("button[type=submit]", f).forEach(b => b.disabled = true); }, 0);
+  }));
+
+  // ---- Flash messages ----
+  $$("[data-autohide]").forEach(a => setTimeout(() => { a.style.transition = "opacity .4s"; a.style.opacity = "0"; setTimeout(() => a.remove(), 450); }, 6000));
+
+  // ---- Live clock in hospital time zone ----
+  const clock = $("[data-clock]");
+  if (clock) {
+    const tz = clock.getAttribute("data-tz") || "Asia/Karachi";
+    const text = $("[data-clock-text]", clock);
+    let fmt;
+    try { fmt = new Intl.DateTimeFormat("en-GB", { timeZone: tz, weekday: "short", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }); } catch (e) { fmt = null; }
+    const tick = () => { if (fmt && text) text.textContent = fmt.format(new Date()); };
+    tick(); setInterval(tick, 1000);
+  }
+
+  // ---- Session timeout warning ----
+  const timeoutMin = parseInt(document.body.getAttribute("data-session-timeout") || "0", 10);
+  const modal = $("#session-warning");
+  if (timeoutMin > 0 && modal) {
+    let deadline, warnTimer, endTimer, countdownTimer;
+    const schedule = () => {
+      clearTimeout(warnTimer); clearTimeout(endTimer); clearInterval(countdownTimer);
+      modal.hidden = true;
+      deadline = Date.now() + timeoutMin * 60000;
+      warnTimer = setTimeout(showWarning, Math.max(0, timeoutMin * 60000 - 60000));
+      endTimer = setTimeout(() => { window.location.href = "/Account/Login?reason=timeout"; }, timeoutMin * 60000 + 3000);
+    };
+    const showWarning = () => {
+      modal.hidden = false;
+      const c = $("[data-session-countdown]", modal);
+      countdownTimer = setInterval(() => { if (c) c.textContent = Math.max(0, Math.round((deadline - Date.now()) / 1000)); }, 500);
+    };
+    const btn = $("[data-session-continue]", modal);
+    btn && btn.addEventListener("click", () => {
+      fetch("/api/me", { credentials: "same-origin" }).then(r => { if (r.ok) schedule(); else window.location.href = "/Account/Login?reason=timeout"; });
+    });
+    schedule();
+  }
+
+  // ---- Dashboard live figures (background requests do not extend the session) ----
+  const live = $("[data-dashboard-live]");
+  if (live) {
+    const get = (o, path) => path.split(".").reduce((a, k) => (a == null ? a : a[k]), o);
+    const refresh = () => fetch("/api/dashboard/summary", { credentials: "same-origin", headers: { "X-BNHMS-Background": "1" } })
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(data => {
+        $$("[data-live]").forEach(el => { const v = get(data, el.getAttribute("data-live")); if (v !== undefined && v !== null) el.textContent = v; });
+        $$("[data-live-dot]").forEach(el => { const v = get(data, el.getAttribute("data-live-dot")); el.className = "dot " + (v ? "dot-ok" : "dot-bad"); });
+        const sd = $("[data-server-dot]"), st = $("[data-server-text]");
+        if (sd) sd.className = "dot dot-ok"; if (st) st.textContent = "Online";
+      })
+      .catch(() => { const sd = $("[data-server-dot]"), st = $("[data-server-text]"); if (sd) sd.className = "dot dot-bad"; if (st) st.textContent = "Not reachable"; });
+    setInterval(refresh, 30000);
+  }
+
+  // ---- Permission matrix ----
+  const paint = s => { s.classList.toggle("v-grant", s.value === "grant"); s.classList.toggle("v-deny", s.value === "deny"); };
+  $$("[data-perm-select]").forEach(s => { paint(s); s.addEventListener("change", () => paint(s)); });
+  $$("[data-perm-all]").forEach(b => b.addEventListener("click", () => {
+    const v = b.getAttribute("data-perm-all");
+    $$("[data-perm-select]:not(:disabled)", b.closest("[data-perm-module]")).forEach(s => { s.value = v; paint(s); });
+  }));
+  $$("[data-check-all]").forEach(b => b.addEventListener("click", () => {
+    const v = b.getAttribute("data-check-all") === "true";
+    $$("input[type=checkbox]:not(:disabled)", b.closest("[data-perm-module]")).forEach(c => c.checked = v);
+  }));
+
+  // ---- Logo preview ----
+  $$("[data-logo-input]").forEach(input => input.addEventListener("change", () => {
+    const f = input.files && input.files[0];
+    const scope = input.closest(".card, .field, form") || document;
+    const img = $("[data-logo-preview]", scope) || $("[data-logo-preview]");
+    if (!f || !img) return;
+    if (f.size > 2 * 1024 * 1024) { window.alert("The logo must be smaller than 2 MB."); input.value = ""; return; }
+    img.src = URL.createObjectURL(f);
+  }));
+
+  // ---- Setup wizard ----
+  const wizard = $("[data-wizard]");
+  if (wizard) {
+    const steps = $$("[data-step]", wizard);
+    const links = $$("[data-step-link]");
+    const prev = $("[data-wizard-prev]", wizard), next = $("[data-wizard-next]", wizard), finish = $("[data-wizard-finish]", wizard);
+    let i = 0;
+    const show = n => {
+      i = n;
+      steps.forEach((s, k) => s.hidden = k !== i);
+      const id = steps[i].getAttribute("data-step");
+      let passed = true;
+      links.forEach(l => {
+        const lid = l.getAttribute("data-step-link");
+        l.classList.toggle("current", lid === id);
+        if (lid === id) passed = false;
+        l.classList.toggle("done", passed);
+      });
+      prev.hidden = i === 0;
+      next.hidden = i === steps.length - 1;
+      finish.hidden = i !== steps.length - 1;
+      if (i === steps.length - 1) buildReview();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    const validStep = step => {
+      let ok = true, first = null;
+      $$("input, select, textarea", step).forEach(el => {
+        el.classList.remove("invalid");
+        let valid = el.checkValidity();
+        const match = el.getAttribute("data-match");
+        if (valid && match) valid = el.value === ($("[name='" + match + "']", wizard) || {}).value;
+        if (el.type === "radio") valid = !!$("input[name='" + el.name + "']:checked", step);
+        if (!valid) { ok = false; el.classList.add("invalid"); first = first || el; }
+      });
+      if (first) first.focus();
+      return ok;
+    };
+    const buildReview = () => {
+      const list = $("[data-review-list]", wizard);
+      if (!list) return;
+      list.innerHTML = "";
+      const seen = new Set();
+      $$("[data-review]", wizard).forEach(el => {
+        const label = el.getAttribute("data-review");
+        if (el.type === "radio") { if (!el.checked) return; }
+        if (seen.has(label)) return;
+        let value = el.tagName === "SELECT" ? (el.options[el.selectedIndex] || {}).text : el.type === "radio" ? el.getAttribute("data-review-text") : el.value;
+        if (!value) return;
+        seen.add(label);
+        const dt = document.createElement("dt"); dt.textContent = label;
+        const dd = document.createElement("dd"); dd.textContent = value;
+        list.append(dt, dd);
+      });
+    };
+    next.addEventListener("click", () => { if (validStep(steps[i])) show(i + 1); });
+    prev.addEventListener("click", () => show(i - 1));
+    links.forEach(l => l.addEventListener("click", () => {
+      const idx = steps.findIndex(s => s.getAttribute("data-step") === l.getAttribute("data-step-link"));
+      if (idx >= 0 && idx < i) show(idx);
+    }));
+    wizard.addEventListener("submit", e => {
+      for (let k = 0; k < steps.length; k++) { if (!validStep(steps[k])) { e.preventDefault(); show(k); validStep(steps[k]); return; } }
+    });
+    show(0);
+  }
+})();
