@@ -653,7 +653,13 @@ public partial class FinanceTests : Phase2TestBase
         foreach (var url in new[] { "/Finance", "/Finance/Collect", "/Finance/Receipts", "/Finance/Dashboard", "/Finance/Reports", "/Finance/Deposits", "/Finance/Refunds",
                      "/Finance/Doctors", "/Finance/Counters", "/Finance/Services", "/Finance/Closing", "/Finance/Adjustments", "/Finance/Settings", "/Finance/Cashiers" })
             Denied(await nobody.GetAsync(url), url);
-        Denied(await PostCollectAsync(nobody, pid, counter, new[] { new Line(svc) }), "forged collection");
+        var forgedToken = await nobody.TokenAsync("/");
+        Denied(await nobody.Http.PostAsync("/Finance/Collect", new FormUrlEncodedContent(new[]
+        {
+            P("__RequestVerificationToken", forgedToken), P("Input.IdempotencyKey", Guid.NewGuid().ToString()), P("Input.CounterId", counter.ToString()),
+            P("Input.PaymentMethodId", (await MethodAsync("CASH")).ToString()), P("PatientId", pid.ToString()), P("Lines[0].ServiceItemId", svc.ToString()),
+        })), "forged collection");
+        await using (var db0 = Factory.NewDb()) Assert.Empty(await db0.Receipts.ToListAsync());
         Assert.DoesNotContain("data-nav=\"finance-collect\"", await nobody.GetHtmlAsync("/"));
         // Fee changes need "Manage Service Fees".
         var (cash, cashId) = await CashierAsync(admin, "sec.cash", counter);

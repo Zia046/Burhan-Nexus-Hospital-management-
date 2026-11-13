@@ -184,7 +184,7 @@ public sealed class BillingService : IBillingService
             // ---- outstanding balances: lock the charges so two counters cannot over-collect the same balance ----
             var balanceIds = balances.Select(b => b.ChargeId).Distinct().ToList();
             var locked = balanceIds.Count == 0 ? new List<Charge>()
-                : await _db.Charges.FromSqlRaw("SELECT * FROM \"Charges\" WHERE \"Id\" = ANY({0}) FOR UPDATE", balanceIds.ToArray()).ToListAsync(ct);
+                : await _db.Charges.FromSqlRaw("SELECT c.*, c.xmin FROM \"Charges\" c WHERE c.\"Id\" = ANY({0}) FOR UPDATE", balanceIds.ToArray()).ToListAsync(ct);
             foreach (var b in balances)
             {
                 var c = locked.FirstOrDefault(x => x.Id == b.ChargeId);
@@ -419,7 +419,7 @@ public sealed class BillingService : IBillingService
         if (await _db.Refunds.AnyAsync(x => x.ReceiptId == r.Id && x.Status != RefundStatus.Rejected, ct))
             return ServiceResult.Fail("This receipt has a refund. A refunded receipt cannot be cancelled – refund the remaining amount instead.");
         var chargeIds = r.Lines.Select(l => l.ChargeId).ToList();
-        var charges = await _db.Charges.FromSqlRaw("SELECT * FROM \"Charges\" WHERE \"Id\" = ANY({0}) FOR UPDATE", chargeIds.ToArray()).ToListAsync(ct);
+        var charges = await _db.Charges.FromSqlRaw("SELECT c.*, c.xmin FROM \"Charges\" c WHERE c.\"Id\" = ANY({0}) FOR UPDATE", chargeIds.ToArray()).ToListAsync(ct);
         var now = _clock.UtcNow;
         var today = await _clock.TodayAsync();
         foreach (var l in r.Lines)
@@ -518,7 +518,7 @@ public sealed class BillingService : IBillingService
 
         var now = _clock.UtcNow;
         var today = await _clock.TodayAsync();
-        var charges = await _db.Charges.FromSqlRaw("SELECT * FROM \"Charges\" WHERE \"Id\" = ANY({0}) FOR UPDATE", r.Lines.Select(l => l.ChargeId).ToArray()).ToListAsync(ct);
+        var charges = await _db.Charges.FromSqlRaw("SELECT c.*, c.xmin FROM \"Charges\" c WHERE c.\"Id\" = ANY({0}) FOR UPDATE", r.Lines.Select(l => l.ChargeId).ToArray()).ToListAsync(ct);
         // Allocate the refund across the receipt lines (in order) and reverse the doctor's share proportionally.
         var remaining = refund.Amount;
         foreach (var l in r.Lines)
