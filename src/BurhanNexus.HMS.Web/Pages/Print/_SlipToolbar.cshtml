@@ -1,0 +1,17 @@
+@model BurhanNexus.HMS.Web.Pages.Print.SlipModelBase
+@{
+    var basePath = Context.Request.Path;
+}
+<div class="print-toolbar no-print">
+    <a class="tb-btn tb-light" href="@Model.BackUrl">&larr; Back</a>
+    <strong>@Model.Encounter.EncounterNumber</strong>
+    <span class="seg">
+        <a class="@(Model.Paper == "A5" ? "on" : "")" href="@basePath?paper=A5">A5</a>
+        <a class="@(Model.Paper == "A4" ? "on" : "")" href="@basePath?paper=A4">A4</a>
+    </span>
+    <span class="print-hint">@(Model.CopyNumber > 1 ? $"Reprint – copy {Model.CopyNumber}" : "First print")</span>
+    <span class="grow"></span>
+    <span class="print-hint">For PDF: choose “Save as PDF” as the printer.</span>
+    <button type="button" data-print>Print</button>
+    <button type="button" data-print data-pdf>Save as PDF</button>
+</div>

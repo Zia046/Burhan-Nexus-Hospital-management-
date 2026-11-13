@@ -1,0 +1,96 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Emergency.VisitModel
+@{
+    var e = Model.Encounter;
+    var v = e.Emergency!;
+    var p = e.Patient!;
+    ViewData["Title"] = "Emergency " + e.EncounterNumber;
+    var canEdit = await PermCtx.HasAsync(Perm.EmergencyEdit);
+}
+<div class="breadcrumbs"><a href="/Emergency">Emergency</a> <svg class="icon icon-sm"><use href="#i-chevron-right" /></svg> @e.EncounterNumber</div>
+@if (p.IsUnidentified)
+{
+    <div class="alert alert-warning"><svg class="icon"><use href="#i-alert" /></svg><div><strong>Unidentified patient.</strong> Complete the patient's name and details when known.
+        <a bn-permission="@Perm.PatientsEdit" href="/Patients/Edit/@p.Id">Complete patient details</a></div></div>
+}
+<section class="card patient-head er-head">
+    <div class="patient-id-box er"><small>Emergency no.</small><strong>@e.EncounterNumber</strong></div>
+    <div class="grow">
+        <h2>@p.FullName <span class="muted mono small">@p.PatientNumber</span> @if (v.IsMedicoLegal) { <span class="badge badge-navy">MLC</span> }</h2>
+        <p class="muted">@Model.AgeText · @p.Gender · Arrived @Fmt.DateTimeText(e.EncounterUtc)@(v.Category is null ? "" : " · " + v.Category.Name)</p>
+        <p><partial name="_StatusBadge" model="v.Status" /> <span class="muted small">since @Fmt.DateTimeText(v.StatusChangedUtc)</span></p>
+    </div>
+    <div class="profile-actions">
+        <a bn-permission="@Perm.EmergencyPrint" class="btn btn-danger" href="/Print/Emergency/@e.Id" target="_blank"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print emergency slip</a>
+        <a bn-permission="@Perm.PatientsView" class="btn btn-light" href="/Patients/Profile/@p.Id">Patient profile</a>
+    </div>
+</section>
+
+<div class="grid-side">
+    <div class="stack">
+        <form method="post" asp-page-handler="Details" class="card">
+            <div class="card-header"><h3>Emergency details</h3></div>
+            <div class="card-body">
+                <input type="hidden" name="RowVersion" value="@Model.RowVersion" />
+                <fieldset disabled="@(!canEdit)">
+                    <div class="grid-2">
+                        <div class="field"><label for="cat">Category</label>
+                            <select id="cat" name="Details.CategoryId"><option value="">—</option>
+                                @foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(v.CategoryId == c.Id)">@c.Name</option> }</select></div>
+                        <div class="field"><label for="bc">Brief complaint</label><input id="bc" name="Details.BriefComplaint" value="@v.BriefComplaint" maxlength="500" /></div>
+                        <div class="field"><label for="bb">Brought by</label><input id="bb" name="Details.BroughtBy" value="@v.BroughtBy" maxlength="150" /></div>
+                        <div class="field"><label for="rb">Referred by</label><input id="rb" name="Details.ReferredBy" value="@v.ReferredBy" maxlength="200" /></div>
+                        <div class="field"><label for="an">Attendant name</label><input id="an" name="Details.AttendantName" value="@v.AttendantName" maxlength="150" /></div>
+                        <div class="field"><label for="ac">Attendant contact</label><input id="ac" name="Details.AttendantContact" value="@v.AttendantContact" maxlength="20" /></div>
+                        <div class="field span-2"><label for="nt">Notes</label><input id="nt" name="Details.Notes" value="@e.Notes" maxlength="1000" /></div>
+                        <label class="check"><input type="checkbox" name="Details.IsMedicoLegal" value="true" checked="@v.IsMedicoLegal" /> Medico-legal case (MLC)</label>
+                    </div>
+                </fieldset>
+                <dl class="kv kv-tight"><dt>Registered by</dt><dd>@e.CreatedByUsername · @e.Workstation · @Fmt.DateTimeText(e.CreatedUtc)</dd></dl>
+            </div>
+            @if (canEdit) { <div class="card-footer form-actions"><button class="btn btn-primary" type="submit">Save details</button></div> }
+        </form>
+    </div>
+
+    <div class="stack">
+        @if (Model.AllowedStatuses.Count > 0)
+        {
+            <form method="post" asp-page-handler="Status" class="card" data-confirm="Change the emergency status?">
+                <div class="card-header"><h3><svg class="icon"><use href="#i-activity" /></svg> Update status</h3></div>
+                <div class="card-body">
+                    <div class="status-choices">
+                        @foreach (var s in Model.AllowedStatuses)
+                        {
+                            <label class="check-card"><input type="radio" name="NewStatus" value="@s" required /> <span>@(v.Status == EmergencyStatus.Closed ? "Re-open (Under Treatment)" : EncounterService.Label(s))</span></label>
+                        }
+                    </div>
+                    <div class="field"><label for="reason">Reason / remarks <span class="muted">(required for Referred, Admitted, Closed and re-opening)</span></label>
+                        <input id="reason" name="Reason" maxlength="500" placeholder="e.g. Referred to DHQ Mardan for CT scan" /></div>
+                </div>
+                <div class="card-footer form-actions"><button class="btn btn-primary" type="submit">Update status</button></div>
+            </form>
+        }
+        <div class="card">
+            <div class="card-header"><h3><svg class="icon"><use href="#i-history" /></svg> Status history</h3></div>
+            <ul class="activity" data-status-history>
+                @foreach (var h in v.StatusHistory.OrderByDescending(x => x.ChangedUtc).ThenByDescending(x => x.Id))
+                {
+                    <li><span class="activity-dot"></span><div>
+                        <strong>@(h.FromStatus is { } f ? EncounterService.Label(f) + " → " : "")@EncounterService.Label(h.ToStatus)</strong>
+                        <small>@Fmt.DateTimeText(h.ChangedUtc) · @h.ChangedByUsername@(string.IsNullOrEmpty(h.Reason) ? "" : " · " + h.Reason)</small>
+                    </div></li>
+                }
+            </ul>
+        </div>
+        <div class="card">
+            <div class="card-header"><h3><svg class="icon"><use href="#i-printer" /></svg> Print history</h3></div>
+            <ul class="activity">
+                @foreach (var d in e.PrintedDocuments.OrderByDescending(x => x.PrintedUtc))
+                {
+                    <li><span class="activity-dot"></span><div><strong>Copy @d.PrintNumber · @d.PaperSize</strong><small>@Fmt.DateTimeText(d.PrintedUtc) · @d.PrintedByUsername</small></div></li>
+                }
+                @if (e.PrintedDocuments.Count == 0) { <li class="muted">Not printed yet.</li> }
+            </ul>
+        </div>
+    </div>
+</div>

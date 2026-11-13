@@ -54,6 +54,12 @@ public static class DependencyInjection
         services.AddScoped<IBackupService, BackupService>();
         services.AddScoped<IAuditQueryService, AuditQueryService>();
         services.AddScoped<ISystemStatusService, SystemStatusService>();
+
+        // Phase 2 – patients, OPD, emergency
+        services.AddScoped<Patients.HospitalClock>();
+        services.AddScoped<Patients.IRegistrationSetupService, Patients.RegistrationSetupService>();
+        services.AddScoped<Patients.IPatientService, Patients.PatientService>();
+        services.AddScoped<Patients.IEncounterService, Patients.EncounterService>();
         return services;
     }
 
@@ -70,6 +76,7 @@ public static class DependencyInjection
         }
         await DatabaseHardening.ApplyAsync(db, ct);
         await PermissionSeeder.SyncAsync(db, ct);
+        await Patients.RegistrationSetupService.SeedAsync(db, DateTime.UtcNow, ct);
         if (await db.HospitalConfigurations.AnyAsync(c => c.SetupCompleted, ct))
             await scope.ServiceProvider.GetRequiredService<ILicenseService>().EnsureInitializedAsync(ct);
         logger.LogInformation("Database ready.");

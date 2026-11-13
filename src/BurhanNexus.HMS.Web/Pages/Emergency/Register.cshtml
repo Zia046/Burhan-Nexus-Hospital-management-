@@ -1,0 +1,94 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Emergency.RegisterModel
+@{
+    ViewData["Title"] = "Emergency registration";
+    ViewData["Minimal"] = true;
+    ViewData["AllowUnidentified"] = true;
+    var p = Model.Existing;
+}
+<form method="post" class="er-form" novalidate data-patient-form data-dup-optional>
+    <div class="alert alert-danger er-banner"><svg class="icon"><use href="#i-siren" /></svg><div><strong>Emergency registration.</strong> Only the minimum details are required – do not delay treatment. Missing information can be completed later.</div></div>
+    <partial name="_ValidationSummary" />
+    <div class="grid-side">
+        <div class="stack">
+            @if (p is not null)
+            {
+                <input type="hidden" name="PatientId" value="@p.Id" />
+                <div class="card patient-mini">
+                    <div class="card-body">
+                        <div class="patient-id-box sm"><small>Existing patient</small><strong>@p.PatientNumber</strong></div>
+                        <h3>@p.FullName</h3>
+                        <p class="muted">@(p.GuardianName is null ? "" : BurhanNexus.HMS.Web.Pages.Print.SlipModelBase.RelationLabel(p.GuardianRelation) + " " + p.GuardianName) · @Model.AgeText · @p.Gender · @p.MobileNumber</p>
+                        @if (p.Status != PatientStatus.Active) { <div class="alert alert-danger">This record is @p.Status.ToString().ToLowerInvariant() and cannot be used.</div> }
+                        <a href="/Emergency/Register">Choose another patient</a>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="card">
+                    <div class="card-header"><h3><svg class="icon"><use href="#i-search" /></svg> Existing patient?</h3></div>
+                    <div class="card-body">
+                        <div class="search-main">
+                            <div class="input-icon grow"><svg class="icon"><use href="#i-search" /></svg>
+                                <input name="q" value="@Model.Q" form="er-search" placeholder="Patient ID, name, mobile or CNIC" autocomplete="off" maxlength="100" /></div>
+                            <button class="btn btn-light" type="submit" form="er-search">Search</button>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(Model.Q))
+                        {
+                            <table class="table table-compact">
+                                <tbody>
+                                @foreach (var m in Model.Matches)
+                                {
+                                    <tr><td class="mono">@m.PatientNumber</td><td><strong>@m.FullName</strong> <small class="muted">@m.GuardianName</small></td><td>@m.AgeText</td>
+                                        <td class="actions"><a class="btn btn-danger btn-xs" href="/Emergency/Register?patientId=@m.Id">Select</a></td></tr>
+                                }
+                                @if (Model.Matches.Count == 0) { <tr><td class="empty">No match – register as new below.</td></tr> }
+                                </tbody>
+                            </table>
+                        }
+                    </div>
+                </div>
+                @if (Model.CanRegisterNewPatient)
+                {
+                    <div class="card">
+                        <div class="card-header"><h3><svg class="icon"><use href="#i-plus" /></svg> New patient (minimum details)</h3></div>
+                        <div class="card-body">
+                            <div data-dup-panel data-can-view="@(await PermCtx.HasAsync(Perm.PatientsView) ? "1" : "0")" data-can-opd="@(await PermCtx.HasAsync(Perm.OpdAdd) ? "1" : "0")" data-can-er="@(await PermCtx.HasAsync(Perm.EmergencyAdd) ? "1" : "0")"></div>
+                            <partial name="_PatientFields" for="Patient" />
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-warning">You can only register emergencies for existing patients (no permission to register new patients).</div>
+                }
+            }
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h3><svg class="icon"><use href="#i-siren" /></svg> Emergency details</h3></div>
+            <div class="card-body">
+                <div class="field"><label for="ArrivalLocal">Arrival date &amp; time</label>
+                    <input id="ArrivalLocal" name="ArrivalLocal" type="datetime-local" value="@Model.ArrivalLocal?.ToString("yyyy-MM-ddTHH:mm")" /></div>
+                <div class="field"><label for="cat">Emergency type / category</label>
+                    <select id="cat" name="Visit.CategoryId"><option value="">Select category</option>
+                        @foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(Model.Visit.CategoryId == c.Id)">@c.Name</option> }</select></div>
+                <div class="field"><label for="bc">Brief complaint <span class="muted">(optional)</span></label><input id="bc" name="Visit.BriefComplaint" value="@Model.Visit.BriefComplaint" maxlength="500" autocomplete="off" /></div>
+                <div class="field"><label for="bb">Brought by <span class="muted">(optional)</span></label><input id="bb" name="Visit.BroughtBy" value="@Model.Visit.BroughtBy" maxlength="150" placeholder="Relatives, Rescue 1122, police…" autocomplete="off" /></div>
+                <div class="grid-2">
+                    <div class="field"><label for="an">Attendant name</label><input id="an" name="Visit.AttendantName" value="@Model.Visit.AttendantName" maxlength="150" autocomplete="off" /></div>
+                    <div class="field"><label for="ac">Attendant contact</label><input id="ac" name="Visit.AttendantContact" value="@Model.Visit.AttendantContact" maxlength="20" inputmode="tel" autocomplete="off" /></div>
+                </div>
+                <div class="field"><label for="rb">Referred by <span class="muted">(optional)</span></label><input id="rb" name="Visit.ReferredBy" value="@Model.Visit.ReferredBy" maxlength="200" autocomplete="off" /></div>
+                <label class="check"><input type="checkbox" name="Visit.IsMedicoLegal" value="true" checked="@Model.Visit.IsMedicoLegal" /> Medico-legal case (MLC)</label>
+                <div class="field"><label for="en">Additional notes</label><input id="en" name="Visit.Notes" value="@Model.Visit.Notes" maxlength="1000" autocomplete="off" /></div>
+            </div>
+            <div class="card-footer form-actions">
+                <a class="btn btn-light" href="/Emergency">Cancel</a>
+                <button class="btn btn-danger btn-lg" type="submit" disabled="@(p is not null && p.Status != PatientStatus.Active)"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Register &amp; print slip</button>
+            </div>
+        </div>
+    </div>
+</form>
+<form id="er-search" method="get" hidden></form>

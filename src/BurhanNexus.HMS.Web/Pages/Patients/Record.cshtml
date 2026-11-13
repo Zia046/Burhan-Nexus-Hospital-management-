@@ -1,0 +1,59 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Patients.RecordModel
+@{
+    Layout = null;
+    var p = Model.Patient;
+    var h = (await Fmt.ProfileAsync())!;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Patient record · @p.PatientNumber</title>
+    <link rel="stylesheet" href="~/css/print.css" asp-append-version="true" />
+    <style>@@page { size: A4 portrait; margin: 12mm; }</style>
+</head>
+<body class="print-body paper-a4 orient-portrait">
+<div class="print-toolbar no-print">
+    <strong>Patient record · @p.PatientNumber</strong>
+    <a href="/Patients/Profile/@p.Id">Back to profile</a>
+    <button type="button" data-print>Print / Save as PDF</button>
+</div>
+<div class="sheet">
+    <header class="doc-header">
+        <img src="/branding/logo?v=@h.LogoVersion" alt="Logo" />
+        <div class="doc-hospital">
+            <h1>@h.HospitalName</h1>
+            <p>@h.Address, @h.City, @h.Province</p>
+            <p>Phone: @h.ContactNumber · @h.Email</p>
+        </div>
+    </header>
+    <h2 class="doc-title">PATIENT RECORD</h2>
+    <table class="doc-meta">
+        <tr><th>Patient ID</th><td><b>@p.PatientNumber</b></td><th>Registered</th><td>@Fmt.DateTimeText(p.RegisteredUtc)</td></tr>
+        <tr><th>Name</th><td>@p.FullName</td><th>@(BurhanNexus.HMS.Web.Pages.Print.SlipModelBase.RelationLabel(p.GuardianRelation) is { Length: > 0 } r ? r : "Father/Husband")</th><td>@p.GuardianName</td></tr>
+        <tr><th>Age / Gender</th><td>@Model.AgeText / @p.Gender</td><th>Blood group</th><td>@p.BloodGroup</td></tr>
+        <tr><th>CNIC</th><td>@p.Cnic</td><th>Mobile</th><td>@p.MobileNumber @(p.AlternateContact is null ? "" : " / " + p.AlternateContact)</td></tr>
+        <tr><th>Address</th><td colspan="3">@p.Address @(p.CityOrVillage is null ? "" : ", " + p.CityOrVillage)</td></tr>
+    </table>
+    @if (Model.ShowVisits)
+    {
+        <table class="doc-lines">
+            <thead><tr><th>#</th><th>Date &amp; time</th><th>Type</th><th>Visit no.</th><th>Department / doctor</th><th>Details</th></tr></thead>
+            <tbody>
+            @{ var n = 0; }
+            @foreach (var v in Model.Visits)
+            {
+                n++;
+                <tr><td>@n</td><td>@Fmt.DateTimeText(v.EncounterUtc)</td><td>@(v.Type == EncounterType.Opd ? "OPD" : "Emergency")</td><td>@v.EncounterNumber</td>
+                    <td>@v.DepartmentName @(v.DoctorName is null ? "" : "· " + v.DoctorName)</td><td>@(v.EmergencyStatus is { } s ? EncounterService.Label(s) + " · " : "")@v.Complaint</td></tr>
+            }
+            @if (Model.Visits.Count == 0) { <tr><td colspan="6">No visits recorded.</td></tr> }
+            </tbody>
+        </table>
+    }
+    <footer class="doc-footer"><p>Confidential patient information. Printed @Fmt.DateTimeText(DateTime.UtcNow) by @User.Identity?.Name.</p><p class="powered">Burhan Nexus Hospital Management</p></footer>
+</div>
+<script src="~/js/print.js" asp-append-version="true"></script>
+</body>
+</html>

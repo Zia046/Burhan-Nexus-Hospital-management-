@@ -416,3 +416,54 @@ label.perm-cell { grid-template-columns: 20px 1fr; margin: 0; }
   .sidebar, .topbar, .toolbar, .subnav { display: none !important; }
   .main { margin: 0; }
 }
+
+/* ---------- Phase 2: patients, OPD, emergency ---------- */
+.block { display: block; }
+.search-main { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.search-main .input-icon input { font-size: 1.05rem; padding-top: 11px; padding-bottom: 11px; }
+.search-filters { margin-top: 12px; }
+.search-card { margin-bottom: 16px; }
+.patient-head { display: flex; gap: 18px; align-items: center; padding: 18px; flex-wrap: wrap; }
+.patient-head h2 { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.patient-head p { margin: 4px 0 0; }
+.patient-id-box { background: var(--navy-800); color: #fff; border-radius: 12px; padding: 10px 16px; min-width: 150px; text-align: center; }
+.patient-id-box small { display: block; color: #9fb5de; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; }
+.patient-id-box strong { font-family: var(--mono); font-size: 1.35rem; letter-spacing: .02em; }
+.patient-id-box.sm { display: inline-block; padding: 6px 12px; min-width: 0; margin-bottom: 8px; }
+.patient-id-box.sm strong { font-size: 1.05rem; }
+.patient-id-box.er { background: var(--red-600); }
+.patient-id-box.er small { color: #ffd6d4; }
+.patient-mini h3 { margin-bottom: 2px; }
+.kv-tight { grid-template-columns: 140px 1fr; gap: 6px 12px; font-size: .9rem; }
+.token { display: inline-grid; place-items: center; min-width: 30px; height: 26px; padding: 0 7px; border-radius: 7px; background: var(--navy-800); color: #fff; font-weight: 700; font-size: .85rem; }
+.age-input { display: flex; gap: 6px; }
+.age-input input { width: 90px; flex: none; }
+.age-input select { flex: 1; }
+.dup-alert .table-wrap { margin-top: 8px; background: #fff; border-radius: 6px; }
+.dup-table { font-size: .84rem; }
+.confirm-dup { background: var(--amber-100); border: 1px solid #f2dca8; padding: 10px 12px; border-radius: 8px; }
+.live-dups { border: 1px solid #f2dca8; background: var(--amber-100); border-radius: 9px; padding: 10px 12px; margin-bottom: 14px; font-size: .88rem; color: #7a5212; }
+.live-dups ul { margin: 6px 0 0; padding: 0; list-style: none; }
+.live-dups li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 4px 0; border-top: 1px dashed #ecd29c; }
+.live-dups li:first-child { border-top: 0; }
+.live-dups .mono { font-weight: 700; }
+.unidentified-toggle { margin-bottom: 14px; border-color: #f3c3c1; }
+.unidentified-toggle:has(input:checked) { background: var(--red-100); border-color: var(--red-600); }
+.er-banner { margin-bottom: 14px; }
+.er-status { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: .78rem; font-weight: 700; white-space: nowrap; }
+.er-registered { background: var(--red-100); color: var(--red-600); }
+.er-treatment { background: var(--amber-100); color: var(--amber-600); }
+.er-referred { background: #ece7fb; color: #5b3fb8; }
+.er-discharged { background: var(--green-100); color: var(--green-600); }
+.er-admitted { background: var(--blue-100); color: var(--blue-600); }
+.er-closed { background: var(--line-2); color: var(--muted); }
+.status-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.subnav.compact { margin-bottom: 0; }
+.example { padding: 9px 11px; background: var(--bg); border: 1px dashed var(--line); border-radius: var(--radius-sm); font-weight: 700; }
+.badge-ok { background: var(--green-100); color: var(--green-600); }
+.module-card.available { color: inherit; border-color: #bcd0fb; }
+.module-card.available:hover { background: var(--blue-50); text-decoration: none; }
+.module-card.available .icon { color: var(--blue-600); }
+.span-3 { grid-column: 1 / -1; }
+.patient-fields [data-hide-unidentified].hidden-unidentified { opacity: .45; }
+@media (max-width: 640px) { .span-3 { grid-column: auto; } .patient-id-box { min-width: 0; width: 100%; } }

@@ -1,0 +1,65 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Print.EmergencyModel
+@{
+    Layout = null;
+    var e = Model.Encounter;
+    var p = Model.Patient;
+    var v = e.Emergency!;
+    var paperCss = Model.Paper == "A4" ? "A4 portrait" : "A5 portrait";
+    var margin = Model.Paper == "A4" ? "11mm" : "8mm";
+    ViewData["Kind"] = "EMERGENCY";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>@e.EncounterNumber · @p.FullName</title>
+    <link rel="stylesheet" href="~/css/slips.css" asp-append-version="true" />
+    <style>@@page { size: @paperCss; margin: @margin; }</style>
+</head>
+<body class="slip-body paper-@Model.Paper.ToLowerInvariant()" data-autoprint="@(Model.AutoPrint ? "1" : null)">
+<partial name="_SlipToolbar" model="Model" />
+<article class="slip" data-slip="emergency">
+    <partial name="_SlipHeader" model="Model" />
+    <section class="s-patient">
+        <div class="mono big"><label>Patient ID</label><span data-field="patient-id">@p.PatientNumber</span></div>
+        <div class="wide big"><label>Patient name</label><span data-field="patient-name">@p.FullName@(p.IsUnidentified ? " (unidentified)" : "")</span></div>
+        <div><label>Age / Gender</label><span>@Model.AgeText / @Model.GenderText</span></div>
+        <div class="wide"><label>Father / Husband</label><span>@Model.Guardian</span></div>
+        <div><label>Arrival</label><span>@Fmt.DateTimeText(e.EncounterUtc)</span></div>
+        <div><label>Contact</label><span>@(p.MobileNumber ?? v.AttendantContact ?? "—")</span></div>
+        <div class="full"><label>Address</label><span>@(string.Join(", ", new[] { p.Address, p.CityOrVillage }.Where(x => !string.IsNullOrWhiteSpace(x))) is { Length: > 0 } a ? a : "—")</span></div>
+    </section>
+    <section class="s-er-info">
+        <div><b>Category</b>@(v.Category?.Name ?? "—")@if (v.IsMedicoLegal) { <span class="mlc">MLC</span> }</div>
+        <div><b>Brought by</b>@(v.BroughtBy ?? "—")</div>
+        <div><b>Complaint</b>@(v.BriefComplaint ?? "—")</div>
+        <div><b>Attendant</b>@(v.AttendantName ?? "—")@(v.AttendantContact is null ? "" : " · " + v.AttendantContact)</div>
+        <div><b>Referred by</b>@(v.ReferredBy ?? "—")</div>
+        <div><b>Registered by</b>@e.CreatedByUsername</div>
+    </section>
+    <section class="s-er">
+        <section class="full"><h3>Initial assessment</h3>
+            <div class="vitals">BP ________ Pulse ______ Temp ______ RR ______ SpO₂ ______ GCS ______ BSR ______ Wt ______</div>
+        </section>
+        <section><h3>Diagnosis</h3></section>
+        <section><h3>Treatment / Medicines</h3></section>
+        <section><h3>Injections</h3></section>
+        <section><h3>IV infusion</h3></section>
+        <section><h3>Dressing / Stitches</h3></section>
+        <section><h3>Investigations</h3></section>
+        <section><h3>Referral instructions</h3></section>
+        <section><h3>Discharge instructions</h3></section>
+    </section>
+    <footer class="s-foot">
+        <div class="follow">Outcome: Discharged / Referred / Admitted &nbsp; Time: ________</div>
+        <div class="line">Medical officer – name, signature &amp; stamp</div>
+    </footer>
+    <div class="s-footer">
+        <span>Patient ID: <b>@p.PatientNumber</b> · Emergency no. <b>@e.EncounterNumber</b></span>
+        <div class="powered">Burhan Nexus Hospital Management · printed @Fmt.DateTimeText(DateTime.UtcNow) by @User.Identity?.Name@(Model.CopyNumber > 1 ? $" · copy {Model.CopyNumber}" : "")</div>
+    </div>
+</article>
+<script src="~/js/print.js" asp-append-version="true"></script>
+</body>
+</html>

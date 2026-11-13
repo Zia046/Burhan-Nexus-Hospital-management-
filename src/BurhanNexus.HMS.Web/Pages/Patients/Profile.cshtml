@@ -1,0 +1,156 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Patients.ProfileModel
+@{
+    var p = Model.Patient;
+    ViewData["Title"] = p.FullName;
+    var active = p.Status == PatientStatus.Active;
+    var rel = BurhanNexus.HMS.Web.Pages.Print.SlipModelBase.RelationLabel(p.GuardianRelation);
+}
+<div class="breadcrumbs"><a bn-permission="@Perm.PatientsSearch" href="/Patients">Patients</a> <svg class="icon icon-sm"><use href="#i-chevron-right" /></svg> @p.PatientNumber</div>
+
+@if (p.Status == PatientStatus.Merged)
+{
+    <div class="alert alert-warning"><svg class="icon"><use href="#i-info" /></svg><div>This was a <strong>duplicate registration</strong> and was merged into
+        <a href="/Patients/Profile/@p.MergedIntoPatientId"><strong>@p.MergedIntoPatient?.PatientNumber – @p.MergedIntoPatient?.FullName</strong></a>. Its visits are shown there. Reason: @p.StatusReason</div></div>
+}
+else if (p.Status == PatientStatus.Archived)
+{
+    <div class="alert alert-warning"><svg class="icon"><use href="#i-info" /></svg><div>This record is <strong>archived</strong> (@Fmt.DateTimeText(p.ArchivedUtc)): @p.StatusReason. New visits cannot be registered until it is restored.</div></div>
+}
+@if (p.IsUnidentified)
+{
+    <div class="alert alert-info"><svg class="icon"><use href="#i-alert" /></svg><div><strong>Temporary registration</strong> of an unidentified patient. Please complete the name and details when known.</div></div>
+}
+
+<section class="card patient-head">
+    <div class="patient-id-box">
+        <small>Patient ID</small>
+        <strong data-patient-number>@p.PatientNumber</strong>
+    </div>
+    <div class="grow">
+        <h2>@p.FullName</h2>
+        <p class="muted">@(p.GuardianName is null ? "" : $"{rel} {p.GuardianName} · ")@Model.AgeText · @p.Gender@(p.BloodGroup is null ? "" : " · Blood group " + p.BloodGroup)</p>
+        <p>
+            @if (active) { <span class="status status-ok">Active</span> } else { <span class="status status-off">@p.Status</span> }
+            <span class="muted small">Registered @Fmt.DateTimeText(p.RegisteredUtc)</span>
+        </p>
+    </div>
+    <div class="profile-actions">
+        @if (active)
+        {
+            <a bn-permission="@Perm.OpdAdd" class="btn btn-primary" href="/Opd/Register?patientId=@p.Id"><svg class="icon icon-sm"><use href="#i-stethoscope" /></svg> New OPD visit</a>
+            <a bn-permission="@Perm.EmergencyAdd" class="btn btn-danger-outline" href="/Emergency/Register?patientId=@p.Id"><svg class="icon icon-sm"><use href="#i-siren" /></svg> Emergency</a>
+        }
+        @if (p.Status != PatientStatus.Merged)
+        {
+            <a bn-permission="@Perm.PatientsEdit" class="btn btn-light" href="/Patients/Edit/@p.Id"><svg class="icon icon-sm"><use href="#i-edit" /></svg> Edit</a>
+        }
+        <a bn-permission="@Perm.PatientsPrint" class="btn btn-light" href="/Patients/Record/@p.Id" target="_blank"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print record</a>
+    </div>
+</section>
+
+<div class="grid-side">
+    <div>
+        @if (Model.CanSeeVisits)
+        {
+            <div class="card">
+                <div class="card-header">
+                    <h3><svg class="icon"><use href="#i-history" /></svg> Visit history</h3>
+                    <span class="muted small"><span class="tag tag-blue">OPD @Model.OpdCount</span> <span class="tag tag-red">Emergency @Model.EmergencyCount</span></span>
+                </div>
+                <form method="get" class="card-body filters wrap">
+                    <select name="type" aria-label="Visit type">
+                        <option value="">All visits</option>
+                        <option value="opd" selected="@(Model.TypeFilter == "opd")">OPD</option>
+                        <option value="emergency" selected="@(Model.TypeFilter == "emergency")">Emergency</option>
+                    </select>
+                    <label class="inline-label">From <input type="date" name="from" value="@Model.From?.ToString("yyyy-MM-dd")" /></label>
+                    <label class="inline-label">To <input type="date" name="to" value="@Model.To?.ToString("yyyy-MM-dd")" /></label>
+                    <button class="btn btn-light btn-sm" type="submit">Filter</button>
+                </form>
+                <div class="table-wrap">
+                    <table class="table" data-visits>
+                        <thead><tr><th>Date &amp; time</th><th>Type</th><th>Visit no.</th><th>Department / doctor</th><th>Details</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var v in Model.Visits.Items)
+                        {
+                            var url = v.Type == EncounterType.Opd ? $"/Opd/Visit/{v.Id}" : $"/Emergency/Visit/{v.Id}";
+                            <tr>
+                                <td class="nowrap">@Fmt.DateTimeText(v.EncounterUtc)</td>
+                                <td>@if (v.Type == EncounterType.Opd) { <span class="tag tag-blue">OPD</span> } else { <span class="tag tag-red">Emergency</span> }</td>
+                                <td class="mono nowrap">@v.EncounterNumber</td>
+                                <td>@v.DepartmentName@(v.DoctorName is null ? "" : " · " + v.DoctorName)</td>
+                                <td>@if (v.EmergencyStatus is { } st) { <span class="status @(st is EmergencyStatus.Registered or EmergencyStatus.UnderTreatment ? "status-warn" : "status-ok")">@EncounterService.Label(st)</span> } @v.Complaint</td>
+                                <td class="actions nowrap">
+                                    @if (v.Type == EncounterType.Opd)
+                                    {
+                                        <a bn-permission="@Perm.OpdView" class="btn btn-light btn-xs" href="@url">Open</a>
+                                        <a bn-permission="@Perm.OpdPrint" class="btn btn-light btn-xs" href="/Print/Opd/@v.Id" target="_blank">Slip</a>
+                                    }
+                                    else
+                                    {
+                                        <a bn-permission="@Perm.EmergencyView" class="btn btn-light btn-xs" href="@url">Open</a>
+                                        <a bn-permission="@Perm.EmergencyPrint" class="btn btn-light btn-xs" href="/Print/Emergency/@v.Id" target="_blank">Slip</a>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        @if (Model.Visits.Items.Count == 0) { <tr><td colspan="6" class="empty">No visits recorded.</td></tr> }
+                        </tbody>
+                    </table>
+                </div>
+                <partial name="_Pager" model="new PagerModel(Request, Model.Visits.Page, Model.Visits.TotalPages, Model.Visits.Total)" />
+            </div>
+        }
+        else
+        {
+            <div class="card"><div class="card-body muted">You do not have permission to view this patient's previous visits.</div></div>
+        }
+    </div>
+
+    <div class="stack">
+        <div class="card">
+            <div class="card-header"><h3><svg class="icon"><use href="#i-users-round" /></svg> Patient details</h3></div>
+            <div class="card-body">
+                <dl class="kv kv-tight">
+                    <dt>Patient ID</dt><dd class="mono">@p.PatientNumber</dd>
+                    <dt>Full name</dt><dd>@p.FullName</dd>
+                    <dt>@(rel.Length > 0 ? rel : "Father / Husband")</dt><dd>@(p.GuardianName ?? "—")</dd>
+                    <dt>Gender</dt><dd>@p.Gender</dd>
+                    <dt>Age</dt><dd>@Model.AgeText</dd>
+                    <dt>Date of birth</dt><dd>@(p.DateOfBirth is { } dob ? dob.ToString("dd/MM/yyyy") + (p.DateOfBirthEstimated ? " (estimated)" : "") : "—")</dd>
+                    <dt>CNIC</dt><dd class="mono">@(p.Cnic ?? "—")</dd>
+                    <dt>Mobile</dt><dd>@(p.MobileNumber ?? "—")</dd>
+                    <dt>Alternative contact</dt><dd>@(p.AlternateContact ?? "—")</dd>
+                    <dt>Address</dt><dd>@(p.Address ?? "—")</dd>
+                    <dt>City / village</dt><dd>@(p.CityOrVillage ?? "—")</dd>
+                    <dt>Blood group</dt><dd>@(p.BloodGroup ?? "—")</dd>
+                    <dt>Registered</dt><dd>@Fmt.DateTimeText(p.RegisteredUtc)</dd>
+                    @if (!string.IsNullOrEmpty(p.Notes)) { <dt>Notes</dt><dd>@p.Notes</dd> }
+                </dl>
+                @{ var aliases = p.Identifiers.Where(i => i.Type != PatientIdentifierType.PatientNumber).ToList(); }
+                @if (aliases.Count > 0)
+                {
+                    <h4 class="section-title">Other identifiers</h4>
+                    @foreach (var i in aliases)
+                    {
+                        <div class="small"><span class="tag">@(i.Type == PatientIdentifierType.MergedPatientNumber ? "Merged duplicate" : "External")</span> <span class="mono">@i.Value</span> <span class="muted">@i.Note</span></div>
+                    }
+                }
+            </div>
+        </div>
+        @if (p.Status != PatientStatus.Merged)
+        {
+            <form bn-permission="@Perm.PatientsArchive" method="post" asp-page-handler="Archive" class="card" data-confirm="@(active ? "Archive this patient record? It is kept and can be restored." : "Restore this patient record?")">
+                <div class="card-header"><h3>@(active ? "Archive record" : "Restore record")</h3></div>
+                <div class="card-body">
+                    <input type="hidden" name="archive" value="@(active ? "true" : "false")" />
+                    <div class="field"><label for="Reason">Reason</label><input id="Reason" name="Reason" required minlength="3" maxlength="500" /></div>
+                    <p class="muted small">Patient records are never deleted. Archived records are hidden from normal search.</p>
+                </div>
+                <div class="card-footer form-actions"><button class="btn btn-light" type="submit">@(active ? "Archive" : "Restore")</button></div>
+            </form>
+            <a bn-permission="@Perm.PatientsMerge" class="btn btn-light btn-block" href="/Patients/Merge/@p.Id"><svg class="icon icon-sm"><use href="#i-users" /></svg> Correct duplicate registration</a>
+        }
+    </div>
+</div>

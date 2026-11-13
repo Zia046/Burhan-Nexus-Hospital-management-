@@ -35,6 +35,35 @@
             <a class="nav-link @Active("dashboard")" href="/"><svg class="icon"><use href="#i-home" /></svg><span>Dashboard</span></a>
         }
 
+        @if (Any(Perm.PatientsAdd, Perm.PatientsSearch, Perm.OpdView, Perm.OpdAdd, Perm.EmergencyView, Perm.EmergencyAdd))
+        {
+            <div class="nav-section">Patients &amp; Visits</div>
+            @if (perms.Contains(Perm.PatientsAdd))
+            {
+                <a class="nav-link @Active("patient-register")" href="/Patients/Register"><svg class="icon"><use href="#i-plus" /></svg><span>Register Patient</span></a>
+            }
+            @if (perms.Contains(Perm.PatientsSearch))
+            {
+                <a class="nav-link @Active("patients")" href="/Patients"><svg class="icon"><use href="#i-search" /></svg><span>Patient Search</span></a>
+            }
+            @if (perms.Contains(Perm.OpdView))
+            {
+                <a class="nav-link @Active("opd")" href="/Opd"><svg class="icon"><use href="#i-stethoscope" /></svg><span>OPD</span></a>
+            }
+            else if (perms.Contains(Perm.OpdAdd))
+            {
+                <a class="nav-link @Active("opd")" href="/Opd/Register"><svg class="icon"><use href="#i-stethoscope" /></svg><span>OPD Registration</span></a>
+            }
+            @if (perms.Contains(Perm.EmergencyView))
+            {
+                <a class="nav-link @Active("emergency")" href="/Emergency"><svg class="icon"><use href="#i-siren" /></svg><span>Emergency</span></a>
+            }
+            else if (perms.Contains(Perm.EmergencyAdd))
+            {
+                <a class="nav-link @Active("emergency")" href="/Emergency/Register"><svg class="icon"><use href="#i-siren" /></svg><span>Emergency Registration</span></a>
+            }
+        }
+
         @if (Any(Perm.UsersView, Perm.DepartmentsManage, Perm.RolesManage, Perm.LoginHistoryView, Perm.AuditView))
         {
             <div class="nav-section">Administration</div>
@@ -60,9 +89,13 @@
             }
         }
 
-        @if (Any(Perm.SettingsView, Perm.LicenseView, Perm.BackupView))
+        @if (Any(Perm.SettingsView, Perm.LicenseView, Perm.BackupView, Perm.PatientsSettings))
         {
             <div class="nav-section">System</div>
+            @if (perms.Contains(Perm.PatientsSettings) && !perms.Contains(Perm.SettingsView))
+            {
+                <a class="nav-link @Active("registration-settings")" href="/Settings/Registration"><svg class="icon"><use href="#i-badge" /></svg><span>Patient ID &amp; Slips</span></a>
+            }
             @if (perms.Contains(Perm.SettingsView))
             {
                 <a class="nav-link @Active("settings")" href="/Settings"><svg class="icon"><use href="#i-settings" /></svg><span>Hospital Settings</span></a>

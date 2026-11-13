@@ -1,0 +1,36 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Settings.RegistrationModel
+@{
+    ViewData["Title"] = "Patient ID & slips";
+    var c = Model.Current;
+    var year = DateTime.UtcNow.Year;
+}
+<partial name="_SettingsNav" />
+<form method="post" class="card card-medium" novalidate>
+    <div class="card-header"><h3><svg class="icon"><use href="#i-badge" /></svg> Patient ID, visit numbers and slips</h3></div>
+    <div class="card-body">
+        <partial name="_ValidationSummary" />
+        <input type="hidden" asp-for="RowVersion" />
+        <div class="alert alert-info"><svg class="icon"><use href="#i-info" /></svg><div>Numbers come from database sequences and are never reused. Changing the format applies only to <strong>new</strong> patients and visits – existing Patient IDs never change.</div></div>
+        <h4 class="section-title">Patient ID</h4>
+        <div class="grid-3">
+            <div class="field"><label asp-for="Input.PatientNumberPrefix">Prefix</label><input asp-for="Input.PatientNumberPrefix" maxlength="12" /></div>
+            <div class="field"><label asp-for="Input.PatientNumberDigits">Digits</label><input asp-for="Input.PatientNumberDigits" type="number" min="4" max="10" /></div>
+            <div class="field"><label>Example</label><div class="example mono">@Model.Setup.FormatPatientNumber(c, 25)</div></div>
+        </div>
+        <h4 class="section-title">OPD and Emergency numbers</h4>
+        <div class="grid-3">
+            <div class="field"><label asp-for="Input.OpdNumberPrefix">OPD prefix</label><input asp-for="Input.OpdNumberPrefix" maxlength="12" /></div>
+            <div class="field"><label asp-for="Input.EmergencyNumberPrefix">Emergency prefix</label><input asp-for="Input.EmergencyNumberPrefix" maxlength="12" /></div>
+            <div class="field"><label asp-for="Input.EncounterNumberDigits">Digits</label><input asp-for="Input.EncounterNumberDigits" type="number" min="4" max="10" /></div>
+        </div>
+        <label class="check"><input asp-for="Input.EncounterNumberIncludesYear" type="checkbox" /> Include the year (e.g. @Model.Setup.FormatEncounterNumber(c, EncounterType.Opd, 123, year) / @Model.Setup.FormatEncounterNumber(c, EncounterType.Emergency, 45, year))</label>
+        <h4 class="section-title">Slips</h4>
+        <div class="grid-3">
+            <div class="field"><label asp-for="Input.OpdSlipPaper">OPD slip paper</label><select asp-for="Input.OpdSlipPaper"><option>A5</option><option>A4</option></select></div>
+            <div class="field"><label asp-for="Input.EmergencySlipPaper">Emergency slip paper</label><select asp-for="Input.EmergencySlipPaper"><option>A4</option><option>A5</option></select></div>
+        </div>
+        <label class="check"><input asp-for="Input.AutoPrintAfterRegistration" type="checkbox" /> Open the print dialog automatically after registering a visit</label>
+    </div>
+    <div class="card-footer form-actions"><button class="btn btn-primary" type="submit">Save</button></div>
+</form>

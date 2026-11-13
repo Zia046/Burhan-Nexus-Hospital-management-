@@ -1,0 +1,37 @@
+@model IReadOnlyList<BurhanNexus.HMS.Infrastructure.Patients.DuplicateCandidate>
+@{
+    var canOpen = await PermCtx.HasAsync(Perm.PatientsView);
+    var canOpd = await PermCtx.HasAsync(Perm.OpdAdd);
+    var canEr = await PermCtx.HasAsync(Perm.EmergencyAdd);
+}
+<div class="alert alert-warning dup-alert" role="alert">
+    <svg class="icon"><use href="#i-alert" /></svg>
+    <div>
+        <strong>Possible existing patient found. Please verify before creating a new registration.</strong>
+        <div class="table-wrap">
+            <table class="table table-compact dup-table">
+                <thead><tr><th>Patient ID</th><th>Name</th><th>Father / Husband</th><th>Age</th><th>Mobile</th><th>CNIC</th><th>Address</th><th>Match</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var d in Model)
+                {
+                    <tr>
+                        <td class="mono"><strong>@d.PatientNumber</strong>@if (d.Status != PatientStatus.Active) { <br /><span class="status status-off">@d.Status</span> }</td>
+                        <td>@d.FullName</td>
+                        <td>@d.GuardianName</td>
+                        <td class="nowrap">@d.AgeText @d.Gender.ToString()[..1]</td>
+                        <td class="nowrap">@d.MobileNumber</td>
+                        <td class="nowrap">@d.Cnic</td>
+                        <td>@d.CityOrVillage</td>
+                        <td>@foreach (var r in d.Reasons) { <span class="tag @(r.StartsWith("Same CNIC") ? "tag-red" : "")">@r</span> }</td>
+                        <td class="actions nowrap">
+                            @if (canOpen) { <a class="btn btn-light btn-xs" href="/Patients/Profile/@d.Id" target="_blank">Open</a> }
+                            @if (canOpd && d.Status == PatientStatus.Active) { <a class="btn btn-primary btn-xs" href="/Opd/Register?patientId=@d.Id">Use – OPD</a> }
+                            @if (canEr && d.Status == PatientStatus.Active) { <a class="btn btn-light btn-xs" href="/Emergency/Register?patientId=@d.Id">Use – Emergency</a> }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

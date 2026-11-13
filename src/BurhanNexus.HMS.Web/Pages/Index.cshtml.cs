@@ -2,6 +2,7 @@ using BurhanNexus.HMS.Core.Domain;
 using BurhanNexus.HMS.Core.Licensing;
 using BurhanNexus.HMS.Core.Security;
 using BurhanNexus.HMS.Infrastructure.Licensing;
+using BurhanNexus.HMS.Infrastructure.Patients;
 using BurhanNexus.HMS.Infrastructure.Services;
 using BurhanNexus.HMS.Web.Security;
 using BurhanNexus.HMS.Web.Services;
@@ -16,8 +17,12 @@ public class IndexModel : HmsPageModel
     private readonly IAuditQueryService _audit;
     private readonly IHospitalAdminService _hospital;
 
-    public IndexModel(IUserService users, ILicenseService license, ISystemStatusService status, IAuditQueryService audit, IHospitalAdminService hospital)
+    private readonly IEncounterService _encounters;
+
+    public IndexModel(IUserService users, ILicenseService license, ISystemStatusService status, IAuditQueryService audit, IHospitalAdminService hospital,
+        IEncounterService encounters)
     {
+        _encounters = encounters;
         _users = users;
         _license = license;
         _status = status;
@@ -35,6 +40,8 @@ public class IndexModel : HmsPageModel
     public string ServerAddresses { get; private set; } = string.Empty;
     public bool IsAdminView { get; private set; }
     public bool ShowDashboard { get; private set; }
+    public ClinicalCounts? Clinical { get; private set; }
+    public IReadOnlyList<ModuleDefinition> AvailableModules { get; private set; } = Array.Empty<ModuleDefinition>();
 
     public async Task OnGetAsync()
     {
@@ -52,6 +59,13 @@ public class IndexModel : HmsPageModel
         }
         if (Perms.Contains(Perm.SettingsView)) Configuration = await _hospital.GetConfigurationAsync();
         if (Perms.Contains(Perm.AuditView)) Recent = await _audit.RecentAsync(8);
+
+        if (Perms.Contains(Perm.OpdView) || Perms.Contains(Perm.EmergencyView) || Perms.Contains(Perm.PatientsSearch))
+            Clinical = await _encounters.CountsAsync();
+        AvailableModules = PermissionCatalog.Modules
+            .Where(m => m.IsAvailable && m.Key is "Patients" or "Opd" or "Emergency")
+            .Where(m => m.Actions.Any(a => Perms.Contains(m.PermissionKey(a.Key)) && a.Key is "View" or "Add" or "Search"))
+            .ToList();
 
         // Future modules: shown as "coming soon" only if the user has been given access to them.
         UpcomingModules = PermissionCatalog.Modules

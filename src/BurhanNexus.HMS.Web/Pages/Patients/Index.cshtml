@@ -1,0 +1,94 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Patients.IndexModel
+@{
+    ViewData["Title"] = "Patient search";
+    var canView = await PermCtx.HasAsync(Perm.PatientsView);
+    var canOpd = await PermCtx.HasAsync(Perm.OpdAdd);
+    var canEr = await PermCtx.HasAsync(Perm.EmergencyAdd);
+    var exportQuery = Context.Request.QueryString.Value ?? "";
+}
+<form method="get" class="card search-card">
+    <div class="card-body">
+        <div class="search-main">
+            <div class="input-icon grow">
+                <svg class="icon"><use href="#i-search" /></svg>
+                <input name="q" value="@Model.Q" placeholder="Patient ID, name, mobile, CNIC, father's name or visit number" maxlength="100" autofocus autocomplete="off" />
+            </div>
+            <button class="btn btn-primary" type="submit"><svg class="icon icon-sm"><use href="#i-search" /></svg> Search</button>
+            <a bn-permission="@Perm.PatientsAdd" class="btn btn-success" href="/Patients/Register@(string.IsNullOrWhiteSpace(Model.Q) ? "" : "?name=" + Uri.EscapeDataString(Model.Q))"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New patient</a>
+        </div>
+        <div class="filters wrap search-filters">
+            <label class="inline-label">Registered from <input type="date" name="from" value="@Model.From?.ToString("yyyy-MM-dd")" /></label>
+            <label class="inline-label">to <input type="date" name="to" value="@Model.To?.ToString("yyyy-MM-dd")" /></label>
+            <select name="gender" aria-label="Gender">
+                <option value="">All genders</option>
+                <option value="Male" selected="@(Model.GenderFilter == Gender.Male)">Male</option>
+                <option value="Female" selected="@(Model.GenderFilter == Gender.Female)">Female</option>
+                <option value="Other" selected="@(Model.GenderFilter == Gender.Other)">Other</option>
+                <option value="Unknown" selected="@(Model.GenderFilter == Gender.Unknown)">Unknown</option>
+            </select>
+            <select name="visits" aria-label="Visits">
+                <option value="">All patients</option>
+                <option value="opd" selected="@(Model.Visits == "opd")">OPD patients</option>
+                <option value="emergency" selected="@(Model.Visits == "emergency")">Emergency patients</option>
+            </select>
+            <select name="status" aria-label="Status">
+                <option value="">Active records</option>
+                <option value="archived" selected="@(Model.Status == "archived")">Archived</option>
+                <option value="merged" selected="@(Model.Status == "merged")">Merged duplicates</option>
+                <option value="all" selected="@(Model.Status == "all")">All records</option>
+            </select>
+            <a class="btn btn-light btn-sm" href="/Patients">Clear</a>
+            <span class="spacer"></span>
+            <a bn-permission="@Perm.PatientsExport" class="btn btn-light btn-sm" href="/Patients@(exportQuery.Length > 0 ? exportQuery + "&" : "?")handler=Export"><svg class="icon icon-sm"><use href="#i-download" /></svg> Export CSV</a>
+        </div>
+    </div>
+</form>
+
+<div class="card">
+    <div class="card-header">
+        <h3>@(string.IsNullOrWhiteSpace(Model.Q) ? "Recently registered patients" : $"Results for “{Model.Q}”")</h3>
+        <span class="muted small">@Model.Result.Total patient(s)</span>
+    </div>
+    <div class="table-wrap">
+        <table class="table" data-patient-results>
+            <thead><tr><th>Patient ID</th><th>Name</th><th>Age / Gender</th><th>Mobile</th><th>CNIC</th><th>City / village</th><th>Registered</th><th>Visits</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var p in Model.Result.Items)
+            {
+                <tr>
+                    <td class="mono nowrap"><strong>@p.PatientNumber</strong></td>
+                    <td>
+                        <strong>@p.FullName</strong>
+                        @if (p.IsUnidentified) { <span class="badge badge-soon">Unidentified</span> }
+                        @if (p.Status != PatientStatus.Active) { <span class="status status-off">@p.Status</span> }
+                        @if (p.GuardianName is not null) { <small class="muted block">@BurhanNexus.HMS.Web.Pages.Print.SlipModelBase.RelationLabel(p.GuardianRelation) @p.GuardianName</small> }
+                    </td>
+                    <td class="nowrap">@(p.AgeText ?? "—") · @p.Gender</td>
+                    <td class="nowrap">@p.MobileNumber</td>
+                    <td class="nowrap mono small">@p.Cnic</td>
+                    <td>@p.CityOrVillage</td>
+                    <td class="nowrap">@Fmt.Date(p.RegisteredUtc)</td>
+                    <td class="nowrap">
+                        @if (p.OpdVisits > 0) { <span class="tag tag-blue">OPD @p.OpdVisits</span> }
+                        @if (p.EmergencyVisits > 0) { <span class="tag tag-red">ER @p.EmergencyVisits</span> }
+                    </td>
+                    <td class="actions nowrap">
+                        @if (canView) { <a class="btn btn-light btn-sm" href="/Patients/Profile/@p.Id">Profile</a> }
+                        @if (p.Status == PatientStatus.Active)
+                        {
+                            @if (canOpd) { <a class="btn btn-primary btn-sm" href="/Opd/Register?patientId=@p.Id">OPD</a> }
+                            @if (canEr) { <a class="btn btn-danger-outline btn-sm" href="/Emergency/Register?patientId=@p.Id">Emergency</a> }
+                        }
+                    </td>
+                </tr>
+            }
+            @if (Model.Result.Items.Count == 0)
+            {
+                <tr><td colspan="9" class="empty">No patients found. <a bn-permission="@Perm.PatientsAdd" href="/Patients/Register">Register a new patient</a></td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pager" model="new PagerModel(Request, Model.Result.Page, Model.Result.TotalPages, Model.Result.Total)" />
+</div>

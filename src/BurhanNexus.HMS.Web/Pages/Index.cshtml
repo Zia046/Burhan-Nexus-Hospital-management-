@@ -26,6 +26,24 @@
 }
 else
 {
+    @if (Model.Clinical is { } cl)
+    {
+        <div class="kpi-grid clinical-kpis">
+            @if (Model.Perms.Contains(Perm.PatientsSearch))
+            {
+                <a class="kpi kpi-link" href="/Patients"><div class="kpi-icon blue"><svg class="icon"><use href="#i-users-round" /></svg></div><div><span class="kpi-label">Registered today</span><strong class="kpi-value" data-kpi="registered">@cl.RegisteredToday</strong></div></a>
+            }
+            @if (Model.Perms.Contains(Perm.OpdView))
+            {
+                <a class="kpi kpi-link" href="/Opd"><div class="kpi-icon navy"><svg class="icon"><use href="#i-stethoscope" /></svg></div><div><span class="kpi-label">OPD visits today</span><strong class="kpi-value" data-kpi="opd">@cl.OpdToday</strong></div></a>
+            }
+            @if (Model.Perms.Contains(Perm.EmergencyView))
+            {
+                <a class="kpi kpi-link" href="/Emergency?status=all"><div class="kpi-icon red"><svg class="icon"><use href="#i-siren" /></svg></div><div><span class="kpi-label">Emergency today</span><strong class="kpi-value" data-kpi="er">@cl.EmergencyToday</strong></div></a>
+                <a class="kpi kpi-link" href="/Emergency"><div class="kpi-icon red"><svg class="icon"><use href="#i-activity" /></svg></div><div><span class="kpi-label">Active emergencies</span><strong class="kpi-value" data-kpi="er-active">@cl.EmergencyActive</strong></div></a>
+            }
+        </div>
+    }
     @if (Model.UserCounts is not null || Model.License is not null || Model.Health is not null)
     {
         <div class="kpi-grid" data-dashboard-live>
@@ -121,10 +139,25 @@ else
     </div>
 }
 
-@if (Model.UpcomingModules.Count > 0)
+@if (Model.UpcomingModules.Count > 0 || Model.AvailableModules.Count > 0)
 {
     <h3 class="section-title">Hospital modules</h3>
     <div class="module-grid">
+        @foreach (var m in Model.AvailableModules)
+        {
+            var link = m.Key switch
+            {
+                "Patients" => Model.Perms.Contains(Perm.PatientsSearch) ? "/Patients" : Model.Perms.Contains(Perm.PatientsAdd) ? "/Patients/Register" : null,
+                "Opd" => Model.Perms.Contains(Perm.OpdView) ? "/Opd" : "/Opd/Register",
+                _ => Model.Perms.Contains(Perm.EmergencyView) ? "/Emergency" : "/Emergency/Register"
+            };
+            <a class="module-card available" href="@(link ?? "#")">
+                <svg class="icon icon-lg"><use href="#i-@m.Icon" /></svg>
+                <strong>@m.Name</strong>
+                <small>@m.Description</small>
+                <span class="badge badge-ok">Open</span>
+            </a>
+        }
         @foreach (var m in Model.UpcomingModules)
         {
             <div class="module-card upcoming" aria-disabled="true" title="This module will be available in a future update">
