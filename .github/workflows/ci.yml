@@ -44,6 +44,7 @@ jobs:
           set -o pipefail
           dotnet tool install --global dotnet-ef --version "10.*" > ci-output/migration.log 2>&1 || true
           export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet restore BurhanNexus.HMS.slnx >> ci-output/migration.log 2>&1
           NAME=$(head -n1 tools/migration-request.txt | tr -d '\r\n ')
           if ! ls src/BurhanNexus.HMS.Infrastructure/Persistence/Migrations/*_"$NAME".cs >/dev/null 2>&1; then
             dotnet ef migrations add "$NAME" \

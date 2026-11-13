@@ -4,6 +4,7 @@ using BurhanNexus.HMS.Core.Security;
 using BurhanNexus.HMS.Infrastructure.Licensing;
 using BurhanNexus.HMS.Infrastructure.Services;
 using BurhanNexus.HMS.Web.Security;
+using BurhanNexus.HMS.Web.Services;
 
 namespace BurhanNexus.HMS.Web.Pages;
 
