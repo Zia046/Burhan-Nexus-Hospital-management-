@@ -25,7 +25,6 @@ public static class DependencyInjection
 
         services.AddDbContext<HmsDbContext>(o => o.UseNpgsql(connectionString, npg =>
         {
-            npg.EnableRetryOnFailure(3);
             npg.MigrationsHistoryTable("__EFMigrationsHistory");
         }));
 
