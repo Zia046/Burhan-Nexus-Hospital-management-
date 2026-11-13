@@ -57,7 +57,7 @@ public partial class AppointmentTests : Phase2TestBase
     }
 
     private async Task<long> BookAsync(Browser b, long patientId, int doctorId, DateOnly? date = null, string? complaint = null) =>
-        await SlipIdAsync(await b.PostFormAsync("/Patients/Register", BookFields(doctorId, date, complaint), $"/Appointments/Book?patientId={patientId}"));
+        await SlipIdAsync(await b.PostFormAsync($"/Appointments/Book?patientId={patientId}", BookFields(doctorId, date, complaint)));
 
     private async Task<Appointment> ApptAsync(long id)
     {
@@ -128,6 +128,7 @@ public partial class AppointmentTests : Phase2TestBase
 
         // Next day: every doctor restarts at 1 (tomorrow's gynae already has token 1, so 2), yesterday unchanged.
         Factory.Clock.Advance(TimeSpan.FromDays(1));
+        admin = await LoginAdminAsync(); // yesterday's session has timed out
         var tomorrow = await TodayAsync();
         Assert.Equal(today.AddDays(1), tomorrow);
         var o1 = await BookAsync(admin, p1, ortho);
