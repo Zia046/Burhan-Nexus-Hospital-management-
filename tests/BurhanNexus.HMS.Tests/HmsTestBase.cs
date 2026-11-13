@@ -13,7 +13,7 @@ public abstract partial class HmsTestBase : IAsyncLifetime
     public static readonly byte[] TinyPng = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==");
 
-    protected HmsFactory Factory { get; private set; } = null!;
+    protected HmsFactory Factory { get; set; } = null!;
 
     public virtual Task InitializeAsync()
     {
