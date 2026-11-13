@@ -220,6 +220,8 @@ public sealed class SetupService : ISetupService
             await _license.EnsureInitializedAsync(ct);
             await tx.CommitAsync(ct);
             await Patients.RegistrationSetupService.SeedAsync(_db, now, ct);
+            await Finance.FinanceSetupService.SeedAsync(_db, now,
+                DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(now, Patients.HospitalClock.Resolve(config.TimeZoneId))), ct);
         }
         catch (Exception ex) when (ex is DbUpdateException { InnerException: PostgresException pg } && pg.SqlState is "23505" or "40001"
                                    || ex is PostgresException { SqlState: "40001" })

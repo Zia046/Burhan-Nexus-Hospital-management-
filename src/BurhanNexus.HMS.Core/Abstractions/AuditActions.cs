@@ -70,4 +70,30 @@ public static class AuditActions
     public const string AppointmentPrintFailed = "Appointment.PrintFailed";
     public const string PrinterProfileSaved = "Printer.ProfileSaved";
     public const string PrinterTestPrint = "Printer.TestPrint";
+
+    // Phase 3 – finance
+    public const string CounterSaved = "Finance.CounterSaved";
+    public const string CounterAssigned = "Finance.CounterAssigned";
+    public const string CounterUnassigned = "Finance.CounterUnassigned";
+    public const string PaymentMethodSaved = "Finance.PaymentMethodSaved";
+    public const string ServiceSaved = "Finance.ServiceSaved";
+    public const string ServiceFeeChanged = "Finance.ServiceFeeChanged";
+    public const string DoctorShareChanged = "Finance.DoctorShareChanged";
+    public const string PaymentCollected = "Finance.PaymentCollected";
+    public const string DuplicatePaymentBlocked = "Finance.DuplicatePaymentBlocked";
+    public const string ReceiptPrinted = "Finance.ReceiptPrinted";
+    public const string ReceiptReprinted = "Finance.ReceiptReprinted";
+    public const string ReceiptCancelled = "Finance.ReceiptCancelled";
+    public const string RefundRequested = "Finance.RefundRequested";
+    public const string RefundCompleted = "Finance.RefundCompleted";
+    public const string RefundRejected = "Finance.RefundRejected";
+    public const string DepositSubmitted = "Finance.DepositSubmitted";
+    public const string DepositConfirmed = "Finance.DepositConfirmed";
+    public const string DepositRejected = "Finance.DepositRejected";
+    public const string DoctorPaid = "Finance.DoctorPaid";
+    public const string AdjustmentRecorded = "Finance.AdjustmentRecorded";
+    public const string DailyClosingCreated = "Finance.DailyClosing";
+    public const string FinanceSettingsChanged = "Finance.SettingsChanged";
+    public const string FinanceExported = "Finance.Exported";
+    public const string FinanceAccessDenied = "Finance.AccessDenied";
 }

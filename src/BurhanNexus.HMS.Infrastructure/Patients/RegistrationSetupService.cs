@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System.Text.RegularExpressions;
 using BurhanNexus.HMS.Core.Abstractions;
 using BurhanNexus.HMS.Core.Domain;
@@ -94,12 +95,14 @@ public sealed partial class RegistrationSetupService : IRegistrationSetupService
     private readonly HmsDbContext _db;
     private readonly IAuditService _audit;
     private readonly TimeProvider _time;
+    private readonly IServiceProvider _services;
 
-    public RegistrationSetupService(HmsDbContext db, IAuditService audit, TimeProvider time)
+    public RegistrationSetupService(HmsDbContext db, IAuditService audit, TimeProvider time, IServiceProvider services)
     {
         _db = db;
         _audit = audit;
         _time = time;
+        _services = services;
     }
 
     private DateTime Now => _time.GetUtcNow().UtcDateTime;
@@ -277,6 +280,7 @@ public sealed partial class RegistrationSetupService : IRegistrationSetupService
 
         ServiceItem item;
         object? old = null;
+        decimal? previousFee = null;
         if (id is null)
         {
             item = new ServiceItem { CreatedUtc = Now };
@@ -287,6 +291,7 @@ public sealed partial class RegistrationSetupService : IRegistrationSetupService
             var found = await _db.ServiceItems.FirstOrDefaultAsync(x => x.Id == id, ct);
             if (found is null) return ServiceResult<int>.Fail("Fee reference not found.");
             item = found;
+            previousFee = item.DefaultFee;
             old = new { item.Code, item.Name, item.Category, item.DefaultFee, item.DoctorId, item.IsActive };
         }
         item.Code = code;
@@ -296,7 +301,17 @@ public sealed partial class RegistrationSetupService : IRegistrationSetupService
         item.DoctorId = i.DoctorId;
         item.IsActive = i.IsActive;
         item.UpdatedUtc = Now;
+        if (id is null)
+            item.Kind = item.DoctorId != null ? ServiceKind.Consultation
+                : item.Category == EncounterType.Emergency ? ServiceKind.EmergencyRegistration : ServiceKind.OpdRegistration;
         await _db.SaveChangesAsync(ct);
+        // Phase 3: keep the fee history in step (a fee change applies to new transactions from today).
+        if (previousFee != item.DefaultFee)
+        {
+            var today = id is null ? DateOnly.MinValue : await _services.GetRequiredService<HospitalClock>().TodayAsync();
+            _db.ServiceFees.Add(new ServiceFee { ServiceItemId = item.Id, Fee = item.DefaultFee, EffectiveFrom = today, CreatedUtc = Now, Note = "Changed in OPD setup" });
+            await _db.SaveChangesAsync(ct);
+        }
         await _audit.LogAsync(AuditActions.ServiceItemSaved, "ServiceItem", item.Id.ToString(), $"Fee reference '{item.Name}' saved", old,
             new { item.Code, item.Name, item.Category, item.DefaultFee, item.DoctorId, item.IsActive }, ct: ct);
         return ServiceResult<int>.Ok(item.Id);
