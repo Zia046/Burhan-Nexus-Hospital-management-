@@ -148,10 +148,20 @@ jobs:
           New-Item -ItemType Directory -Force -Path C:\bnprint | Out-Null
           $out = "C:\bnprint\slip.prn"
           Remove-Item $out -ErrorAction SilentlyContinue
+          # Fake network thermal printer: a TCP listener on 127.0.0.1:9101 that saves what it receives.
+          # (Windows' print-to-file ports are blocked for the spooler service on hardened servers, so the
+          #  Windows queue uses a Standard TCP/IP RAW port, exactly like a LAN/USB-shared receipt printer.)
+          $listener = Start-Job -ArgumentList $out -ScriptBlock {
+            param($file)
+            $l = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 9101); $l.Start()
+            $c = $l.AcceptTcpClient(); $ms = [IO.MemoryStream]::new(); $c.GetStream().CopyTo($ms); $c.Close(); $l.Stop()
+            [IO.File]::WriteAllBytes($file, $ms.ToArray())
+          }
+          Start-Sleep -Seconds 2
           try {
             Add-PrinterDriver -Name "Generic / Text Only"
-            Add-PrinterPort -Name $out
-            Add-Printer -Name "BN Test Thermal" -DriverName "Generic / Text Only" -PortName $out
+            Add-PrinterPort -Name "BN_TCP_9101" -PrinterHostAddress "127.0.0.1" -PortNumber 9101
+            Add-Printer -Name "BN Test Thermal" -DriverName "Generic / Text Only" -PortName "BN_TCP_9101"
             "printer created" | Tee-Object -FilePath $log -Append
           } catch { "PRINTER SETUP FAILED: $($_.Exception.Message)" | Tee-Object -FilePath $log -Append; throw }
           powershell -ExecutionPolicy Bypass -File .\package\deploy\windows\Install-PrintAgent.ps1 -HmsUrl "http://192.168.1.10:5000" *>> $log
@@ -175,6 +185,7 @@ jobs:
             }
             Start-Sleep -Milliseconds 500
           }
+          Receive-Job $listener -ErrorAction SilentlyContinue | Out-String | Tee-Object -FilePath $log -Append
           Get-ChildItem C:\bnprint | Format-Table Name, Length, LastWriteTime | Out-String | Tee-Object -FilePath $log -Append
           $printed = [IO.File]::ReadAllBytes($out)
           "spooled bytes: $($printed.Length) hex: $([BitConverter]::ToString($printed))" | Tee-Object -FilePath $log -Append
