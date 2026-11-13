@@ -169,7 +169,13 @@ jobs:
           "print result: $($r | ConvertTo-Json -Compress)" | Tee-Object -FilePath $log -Append
           try { Invoke-WebRequest -UseBasicParsing -Method Post -Uri http://127.0.0.1:9123/print/raw -ContentType "application/json" -Body $body -Headers @{ Origin = "http://evil.example.com" } | Out-Null; throw "foreign origin was accepted" }
           catch { if ($_.Exception.Message -eq "foreign origin was accepted") { throw }; "foreign origin rejected: OK" | Tee-Object -FilePath $log -Append }
-          for ($i = 0; $i -lt 20 -and -not ((Test-Path $out) -and (Get-Item $out).Length -gt 0); $i++) { Start-Sleep -Milliseconds 500 }
+          for ($i = 0; $i -lt 90 -and -not ((Test-Path $out) -and (Get-Item $out).Length -gt 0); $i++) {
+            if ($i % 10 -eq 0) {
+              "wait $i: jobs=$((Get-PrintJob -PrinterName 'BN Test Thermal' | ForEach-Object { "$($_.Id):$($_.JobStatus)" }) -join ',') printer=$((Get-Printer 'BN Test Thermal').PrinterStatus) file=$(if (Test-Path $out) { (Get-Item $out).Length } else { 'none' })" | Tee-Object -FilePath $log -Append
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          Get-ChildItem C:\bnprint | Format-Table Name, Length, LastWriteTime | Out-String | Tee-Object -FilePath $log -Append
           $printed = [IO.File]::ReadAllBytes($out)
           "spooled bytes: $($printed.Length) hex: $([BitConverter]::ToString($printed))" | Tee-Object -FilePath $log -Append
           $text = [Text.Encoding]::ASCII.GetString($printed)
