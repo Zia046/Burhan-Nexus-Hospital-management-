@@ -76,10 +76,15 @@ jobs:
           npx playwright install --with-deps chromium >> ../../ci-output/npm.log 2>&1
           for i in $(seq 1 40); do curl -sf http://127.0.0.1:5080/health > /dev/null && break; sleep 2; done
           OUT_DIR=../../ci-output/screenshots node screenshots.mjs || true
-      - name: Publish (self-contained Windows + Linux)
+      - name: Publish Windows server package
         run: |
           set -o pipefail
           dotnet publish src/BurhanNexus.HMS.Web -c Release -r win-x64 --self-contained true -o publish/win-x64 2>&1 | tail -n 20 | tee ci-output/publish.log
+          mkdir -p publish/win-x64/deploy publish/win-x64/docs
+          cp -r deploy/windows publish/win-x64/deploy/
+          cp README.md publish/win-x64/
+          cp docs/*.md publish/win-x64/docs/ 2>/dev/null || true
+          rm -f publish/win-x64/appsettings.Development.json
       - name: Upload Windows server package
         uses: actions/upload-artifact@v4
         with:
