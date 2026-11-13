@@ -324,7 +324,7 @@ public partial class AppointmentTests : Phase2TestBase
         Assert.Equal(new[] { "58mm", "80mm" }, a.Encounter.PrintedDocuments.OrderBy(p => p.PrintNumber).Select(p => p.PaperSize));
         Assert.Single(await AuditAsync(AuditActions.AppointmentSlipPrinted));
         Assert.Contains(await AuditAsync(AuditActions.AppointmentSlipReprinted), x => x.Description!.Contains("copy 2") && x.Description.Contains("token 2"));
-        Assert.Contains("Reprint – copy 2", await admin.GetHtmlAsync($"/Appointments/Details/{id}"));
+        Assert.Contains("copy 2 · 80mm", await admin.GetHtmlAsync($"/Appointments/Details/{id}"));
     }
 
     [Fact]
