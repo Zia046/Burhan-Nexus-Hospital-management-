@@ -467,3 +467,7 @@ label.perm-cell { grid-template-columns: 20px 1fr; margin: 0; }
 .span-3 { grid-column: 1 / -1; }
 .patient-fields [data-hide-unidentified].hidden-unidentified { opacity: .45; }
 @media (max-width: 640px) { .span-3 { grid-column: auto; } .patient-id-box { min-width: 0; width: 100%; } }
+.dup-table td.actions { white-space: normal; min-width: 150px; }
+.dup-table td.actions .btn { margin: 2px 0; }
+[data-visits] td.actions { white-space: normal; }
+[data-visits] td.actions .btn { margin: 2px 0; }

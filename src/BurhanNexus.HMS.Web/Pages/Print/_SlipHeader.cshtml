@@ -9,7 +9,7 @@
     <div class="s-hosp">
         <h1>@h.HospitalName</h1>
         <p>@h.Address, @h.City · Ph: @h.ContactNumber</p>
-        @if (!string.IsNullOrEmpty(h.ReceiptHeader)) { <p>@h.ReceiptHeader</p> }
+        @if (!er && !string.IsNullOrEmpty(h.ReceiptHeader)) { <p>@h.ReceiptHeader</p> }
     </div>
     <div class="s-doc">
         <div class="s-kind @(er ? "er" : "")">@kind</div>

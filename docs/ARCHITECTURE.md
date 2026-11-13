@@ -56,6 +56,25 @@ Browser (any LAN computer) ──HTTP/HTTPS──▶ BurhanNexus.HMS.Web  (Razor
 | `SystemSettings` | Key/value settings (session timeout, lockout policy…) |
 | `BackupHistory` | File name (unique), size, SHA-256, status, kind, start/end, created by, error, notes, last restored |
 
+### Phase 2 tables
+
+| Table | Purpose / key columns |
+|-------|-----------------------|
+| `Patients` | Master patient record: permanent `PatientNumber` (unique) + `SequenceNumber`, name, relation, father's/husband's name, gender, date of birth (exact or estimated) + age at registration, CNIC (+ digits, indexed), mobile (+ digits, indexed), alternative contact, address, city/village, blood group, notes, unidentified flag, status (Active / Archived / Merged), merged-into reference, registered/updated by & at. Trigram (pg_trgm) GIN indexes on name and father's name for fast fuzzy duplicate detection |
+| `PatientIdentifiers` | All identifiers of a patient: the Patient ID itself, Patient IDs of merged duplicates, external numbers. Unique (type, value) |
+| `PatientEncounters` | One row per visit (OPD, Emergency; later Lab, Radiology, IPD…): unique `EncounterNumber`, type, patient FK, date/time + local date, department, doctor, daily token (unique per scope + date), hospital type at visit, service/fee reference, notes, created by/at + computer, original patient (if moved by a duplicate correction) |
+| `OpdVisits` | 1:1 with an OPD encounter: repeat-visit flag, presenting complaint |
+| `EmergencyVisits` | 1:1 with an emergency encounter: category, complaint, brought by, attendant, referred by, MLC, current status |
+| `EmergencyStatusHistory` | Every status change: from, to, user, time, reason |
+| `EmergencyCategories` | Configurable emergency types |
+| `Doctors` | Doctor references (no login required); extended by the future Doctor Management module |
+| `ServiceItems` | Configurable service/fee references (OPD registration, emergency, doctor consultation). No payments are stored in Phase 2 |
+| `PrintedDocuments` | Every slip print/reprint: document type, paper, copy number, user, computer, time |
+| `RegistrationSettings` | Single row: Patient ID / visit number formats, tokens, default department & fee references, slip paper, auto-print |
+| Sequences `patient_number_seq`, `opd_number_seq`, `emergency_number_seq` | Atomic, never-reused numbers across all computers |
+
+Patient master data is stored once; every encounter references the patient by foreign key. Future modules (laboratory orders, pharmacy dispensing, radiology, receipts) will reference `PatientEncounters` / `Patients` in the same way.
+
 All timestamps are stored in UTC (`timestamp with time zone`) and displayed in the hospital's time zone. Indexes exist on all foreign keys, audit/login timestamps, users' active flag and audit actions.
 
 Migrations live in `src/BurhanNexus.HMS.Infrastructure/Persistence/Migrations` and are applied automatically at start-up (`Hms:AutoMigrate`). Migrations only add or alter – existing data is preserved.
