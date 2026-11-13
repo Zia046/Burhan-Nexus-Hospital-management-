@@ -1,0 +1,31 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Patients.RegisterModel
+@{
+    ViewData["Title"] = "Register patient";
+    var canOpd = await PermCtx.HasAsync(Perm.OpdAdd);
+    var canEr = await PermCtx.HasAsync(Perm.EmergencyAdd);
+}
+<form method="post" class="card" novalidate data-patient-form>
+    <div class="card-header">
+        <h2><svg class="icon"><use href="#i-plus" /></svg> New patient registration</h2>
+        <span class="muted small">Patient ID is assigned automatically and never changes.</span>
+    </div>
+    <div class="card-body">
+        <partial name="_ValidationSummary" />
+        <div data-dup-panel data-can-view="@(await PermCtx.HasAsync(Perm.PatientsView) ? "1" : "0")" data-can-opd="@(await PermCtx.HasAsync(Perm.OpdAdd) ? "1" : "0")" data-can-er="@(await PermCtx.HasAsync(Perm.EmergencyAdd) ? "1" : "0")">
+            @if (Model.Duplicates.Count > 0)
+            {
+                <partial name="_DuplicateList" model="Model.Duplicates" />
+                <label class="check confirm-dup"><input type="checkbox" name="ConfirmNotDuplicate" value="true" data-confirm-dup /> I have checked the list above – this is a <strong>different person</strong>. Register as a new patient.</label>
+            }
+        </div>
+        <partial name="_PatientFields" for="Patient" />
+        <p class="muted small">Registration date and time are recorded automatically: <strong>@Fmt.DateTimeText(DateTime.UtcNow)</strong></p>
+    </div>
+    <div class="card-footer form-actions">
+        <a class="btn btn-light" href="/Patients">Cancel</a>
+        <button type="submit" class="btn btn-light" name="Next" value="profile"><svg class="icon icon-sm"><use href="#i-check" /></svg> Register</button>
+        @if (canEr) { <button type="submit" class="btn btn-danger-outline" name="Next" value="emergency"><svg class="icon icon-sm"><use href="#i-siren" /></svg> Register &amp; Emergency</button> }
+        @if (canOpd) { <button type="submit" class="btn btn-primary" name="Next" value="opd"><svg class="icon icon-sm"><use href="#i-stethoscope" /></svg> Register &amp; OPD visit</button> }
+    </div>
+</form>

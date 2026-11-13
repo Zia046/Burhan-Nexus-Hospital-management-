@@ -7,6 +7,9 @@
     <a bn-permission="@Perm.SettingsView" class="@Cls("preferences")" href="/Settings/Preferences"><svg class="icon icon-sm"><use href="#i-sliders" /></svg> Preferences</a>
     <a bn-permission="@Perm.SettingsView" class="@Cls("printing")" href="/Settings/Printing"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Printing</a>
     <a bn-permission="@Perm.SettingsView" class="@Cls("type")" href="/Settings/HospitalType"><svg class="icon icon-sm"><use href="#i-building" /></svg> Hospital type &amp; rules</a>
+    <a bn-permission="@Perm.PatientsSettings" class="@Cls("registration")" href="/Settings/Registration"><svg class="icon icon-sm"><use href="#i-badge" /></svg> Patient ID &amp; slips</a>
+    <a bn-permission="@Perm.AppointmentsSettings" class="@Cls("appointments")" href="/Settings/Appointments"><svg class="icon icon-sm"><use href="#i-calendar" /></svg> Appointment slips</a>
+    <a bn-permission="@Perm.PrinterSettings" class="@Cls("printers")" href="/Settings/Printers"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Thermal printers</a>
     <a bn-permission="@Perm.SettingsSecurity" class="@Cls("security")" href="/Settings/Security"><svg class="icon icon-sm"><use href="#i-lock" /></svg> Security</a>
     <a bn-permission="@Perm.LicenseView" class="@Cls("license")" href="/Settings/License"><svg class="icon icon-sm"><use href="#i-key" /></svg> License</a>
     @if (User.IsSystemAdministrator())

@@ -135,6 +135,89 @@
     img.src = URL.createObjectURL(f);
   }));
 
+
+  // ---- Phase 2: patient form helpers ----
+  const pad = n => String(n).padStart(2, "0");
+  $$("[data-patient-fields]").forEach(box => {
+    const dob = $("[data-dob]", box), age = $("[data-age]", box), unit = $("[data-age-unit]", box), hint = $("[data-age-hint]", box);
+    const today = new Date();
+    if (dob) dob.max = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+    const calc = () => {
+      if (!dob || !dob.value) { if (hint) hint.textContent = "Enter the age if the date of birth is unknown."; return; }
+      const d = new Date(dob.value + "T00:00:00");
+      if (isNaN(d) || d > today) return;
+      let y = today.getFullYear() - d.getFullYear();
+      const m0 = today.getMonth() - d.getMonth(), dd = today.getDate() - d.getDate();
+      if (m0 < 0 || (m0 === 0 && dd < 0)) y--;
+      let months = (today.getFullYear() - d.getFullYear()) * 12 + m0 - (dd < 0 ? 1 : 0);
+      const days = Math.floor((today - d) / 86400000);
+      if (y >= 1) { age.value = y; unit.value = "Years"; }
+      else if (months >= 1) { age.value = months; unit.value = "Months"; }
+      else { age.value = days; unit.value = "Days"; }
+      if (hint) hint.textContent = "Calculated from the date of birth.";
+    };
+    dob && dob.addEventListener("change", calc);
+    age && age.addEventListener("input", () => { if (dob && dob.value) dob.value = ""; if (hint) hint.textContent = "Age entered manually (date of birth unknown)."; });
+    calc();
+
+    const cnic = $("[data-cnic]", box);
+    cnic && cnic.addEventListener("input", () => {
+      const d = cnic.value.replace(/\D/g, "").slice(0, 13);
+      cnic.value = d.length > 12 ? `${d.slice(0, 5)}-${d.slice(5, 12)}-${d.slice(12)}` : d.length > 5 ? `${d.slice(0, 5)}-${d.slice(5)}` : d;
+    });
+
+    const unid = $("[data-unidentified]", box);
+    const toggleUnid = () => $$("[data-hide-unidentified]", box).forEach(el => el.classList.toggle("hidden-unidentified", !!(unid && unid.checked)));
+    unid && unid.addEventListener("change", toggleUnid);
+    toggleUnid();
+  });
+
+  // ---- Live duplicate check while typing (server decides what is a possible duplicate) ----
+  $$("[data-patient-form]").forEach(form => {
+    const panel = $("[data-dup-panel]", form);
+    if (!panel || panel.children.length) return; // server-side warning already shown
+    if (panel.dataset.canView === undefined) return;
+    const val = n => { const el = form.querySelector(`[name$='.${n}']`); return el ? el.value.trim() : ""; };
+    let timer = null, lastKey = "";
+    const run = () => {
+      const q = { name: val("FullName"), guardian: val("GuardianName"), cnic: val("Cnic"), mobile: val("MobileNumber") };
+      const enough = q.name.length >= 3 || q.cnic.replace(/\D/g, "").length === 13 || q.mobile.replace(/\D/g, "").length >= 10;
+      const key = JSON.stringify(q);
+      if (!enough || key === lastKey) return;
+      lastKey = key;
+      fetch("/api/patients/duplicates?" + new URLSearchParams(q), { credentials: "same-origin" })
+        .then(r => r.ok ? r.json() : [])
+        .then(list => {
+          panel.innerHTML = "";
+          if (!list.length) return;
+          const box = document.createElement("div");
+          box.className = "live-dups";
+          const title = document.createElement("strong");
+          title.textContent = "Possible existing patient found. Please verify before creating a new registration.";
+          box.appendChild(title);
+          const ul = document.createElement("ul");
+          list.forEach(p => {
+            const li = document.createElement("li");
+            const id = document.createElement("span"); id.className = "mono"; id.textContent = p.patientNumber;
+            const txt = document.createElement("span");
+            txt.textContent = `${p.fullName}${p.guardianName ? " · " + p.guardianName : ""} · ${p.ageText || ""} ${p.gender} · ${p.mobileNumber || ""} ${p.cnic || ""}`;
+            const why = document.createElement("span"); why.className = "tag"; why.textContent = (p.reasons || []).join(", ");
+            const open = document.createElement("a"); open.href = "/Patients/Profile/" + p.id; open.target = "_blank"; open.textContent = "Open";
+            const opd = document.createElement("a"); opd.href = "/Opd/Register?patientId=" + p.id; opd.textContent = "Use – OPD";
+            const er = document.createElement("a"); er.href = "/Emergency/Register?patientId=" + p.id; er.textContent = "Use – Emergency";
+            li.append(id, txt, why);
+            if (panel.dataset.canView === "1") li.append(open);
+            if (panel.dataset.canOpd === "1") li.append(opd);
+            if (panel.dataset.canEr === "1") li.append(er);
+            ul.appendChild(li);
+          });
+          box.appendChild(ul);
+          panel.appendChild(box);
+        }).catch(() => {});
+    };
+    $$("[data-dup-watch]", form).forEach(el => el.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 600); }));
+  });
+
   // ---- Setup wizard ----
   const wizard = $("[data-wizard]");
   if (wizard) {
@@ -200,4 +283,15 @@
     });
     show(0);
   }
+})();
+
+// Print buttons inside the application layout (reports) and report period selector.
+(function () {
+  "use strict";
+  document.querySelectorAll("[data-print]").forEach(b => b.addEventListener("click", () => window.print()));
+  document.querySelectorAll("[data-period-select]").forEach(s => s.addEventListener("change", () => {
+    const f = s.form;
+    f.querySelectorAll("input[name=date],input[name=month],input[name=year]").forEach(i => i.disabled = true);
+    f.submit();
+  }));
 })();

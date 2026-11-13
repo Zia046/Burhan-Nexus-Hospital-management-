@@ -1,0 +1,58 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Emergency.IndexModel
+@{
+    ViewData["Title"] = "Emergency";
+    string Tab(string key, string label) => $"<a class=\"{(Model.Status == key ? "active" : "")}\" href=\"/Emergency?status={key}\">{label}</a>";
+}
+<div class="toolbar">
+    <nav class="subnav compact">
+        @Html.Raw(Tab("active", "Active patients"))
+        @Html.Raw(Tab("Referred", "Referred"))
+        @Html.Raw(Tab("Discharged", "Discharged"))
+        @Html.Raw(Tab("Admitted", "Admitted"))
+        @Html.Raw(Tab("Closed", "Closed"))
+        @Html.Raw(Tab("all", "All"))
+    </nav>
+    <div class="toolbar-actions">
+        <a bn-permission="@Perm.EmergencySettings" class="btn btn-light" href="/Emergency/Setup"><svg class="icon icon-sm"><use href="#i-settings" /></svg> Categories</a>
+        <a bn-permission="@Perm.EmergencyAdd" class="btn btn-danger" href="/Emergency/Register"><svg class="icon icon-sm"><use href="#i-siren" /></svg> Emergency registration</a>
+    </div>
+</div>
+<form method="get" class="filters wrap card card-body">
+    <input type="hidden" name="status" value="@Model.Status" />
+    <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Emergency no., Patient ID, name or mobile" maxlength="100" /></div>
+    <label class="inline-label">From <input type="date" name="from" value="@Model.From?.ToString("yyyy-MM-dd")" /></label>
+    <label class="inline-label">To <input type="date" name="to" value="@Model.To?.ToString("yyyy-MM-dd")" /></label>
+    <select name="category" aria-label="Category"><option value="">All categories</option>
+        @foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(Model.CategoryId == c.Id)">@c.Name</option> }</select>
+    <button class="btn btn-light" type="submit">Filter</button>
+</form>
+<div class="card">
+    <div class="card-header"><h3><svg class="icon"><use href="#i-siren" /></svg> Emergency patients</h3><span class="pill pill-danger">@Model.Result.Total</span></div>
+    <div class="table-wrap">
+        <table class="table" data-er-list>
+            <thead><tr><th>Emergency no.</th><th>Arrival</th><th>Patient ID</th><th>Patient</th><th>Age / Gender</th><th>Category</th><th>Complaint</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var v in Model.Result.Items)
+            {
+                <tr>
+                    <td class="mono nowrap"><strong>@v.EncounterNumber</strong></td>
+                    <td class="nowrap">@Fmt.DateTimeText(v.EncounterUtc)</td>
+                    <td class="mono nowrap">@v.PatientNumber</td>
+                    <td><strong>@v.PatientName</strong>@if (v.IsUnidentified) { <span class="badge badge-soon">Unidentified</span> }</td>
+                    <td class="nowrap">@(v.AgeText ?? "—") · @v.Gender</td>
+                    <td>@v.CategoryName</td>
+                    <td>@v.Complaint</td>
+                    <td>@if (v.EmergencyStatus is { } st) { <partial name="_StatusBadge" model="st" /> }</td>
+                    <td class="actions nowrap">
+                        <a class="btn btn-light btn-sm" href="/Emergency/Visit/@v.Id">Open</a>
+                        <a bn-permission="@Perm.EmergencyPrint" class="btn btn-light btn-sm" href="/Print/Emergency/@v.Id" target="_blank"><svg class="icon icon-sm"><use href="#i-printer" /></svg></a>
+                    </td>
+                </tr>
+            }
+            @if (Model.Result.Items.Count == 0) { <tr><td colspan="9" class="empty">No emergency patients for this selection.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pager" model="new PagerModel(Request, Model.Result.Page, Model.Result.TotalPages, Model.Result.Total)" />
+</div>

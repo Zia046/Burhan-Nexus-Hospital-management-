@@ -76,11 +76,14 @@ jobs:
           npx playwright install --with-deps chromium >> ../../ci-output/npm.log 2>&1
           for i in $(seq 1 40); do curl -sf http://127.0.0.1:5080/health > /dev/null && break; sleep 2; done
           OUT_DIR=../../ci-output/screenshots node screenshots.mjs || true
+          OUT_DIR=../../ci-output/screenshots PDF_DIR=../../ci-output/samples node phase2.mjs || true
       - name: Publish Windows server package
         run: |
           set -o pipefail
           dotnet publish src/BurhanNexus.HMS.Web -c Release -r win-x64 --self-contained true -o publish/win-x64 2>&1 | tail -n 20 | tee ci-output/publish.log
-          mkdir -p publish/win-x64/deploy publish/win-x64/docs
+          mkdir -p publish/win-x64/deploy publish/win-x64/docs publish/win-x64/tools/print-agent
+          dotnet publish tools/BurhanNexus.PrintAgent -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish/win-x64/tools/print-agent 2>&1 | tail -n 5 | tee -a ci-output/publish.log
+          rm -f publish/win-x64/tools/print-agent/*.pdb publish/win-x64/tools/print-agent/appsettings.Development.json
           cp -r deploy/windows publish/win-x64/deploy/
           cp README.md publish/win-x64/
           cp docs/*.md publish/win-x64/docs/ 2>/dev/null || true
@@ -96,6 +99,7 @@ jobs:
         run: |
           mkdir -p /tmp/res && cp -r ci-output/. /tmp/res/ 2>/dev/null || true
           cp -r tests/BurhanNexus.HMS.Tests/bin/Release/*/screenshots /tmp/res/screenshots 2>/dev/null || true
+          cp ci-output/server.log /tmp/res/ 2>/dev/null || true
           echo "${GITHUB_SHA} ${{ job.status }} $(date -u)" > /tmp/res/STATUS
           cd /tmp/res
           git init -q -b ci-results
@@ -136,6 +140,59 @@ jobs:
           Restart-Service BurhanNexusHMS
           Start-Sleep -Seconds 8
           "after restart: $((Invoke-WebRequest -UseBasicParsing http://localhost:5000/health).StatusCode)" | Tee-Object -FilePath verify.log -Append
+      - name: Print Agent – raw printing to a Windows printer queue
+        shell: pwsh
+        run: |
+          $log = "agent.log"
+          "== Print Agent test ==" | Tee-Object -FilePath $log
+          New-Item -ItemType Directory -Force -Path C:\bnprint | Out-Null
+          $out = "C:\bnprint\slip.prn"
+          Remove-Item $out -ErrorAction SilentlyContinue
+          # Fake network thermal printer: a TCP listener on 127.0.0.1:9101 that saves what it receives.
+          # (Windows' print-to-file ports are blocked for the spooler service on hardened servers, so the
+          #  Windows queue uses a Standard TCP/IP RAW port, exactly like a LAN/USB-shared receipt printer.)
+          $listener = Start-Job -ArgumentList $out -ScriptBlock {
+            param($file)
+            $l = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 9101); $l.Start()
+            $c = $l.AcceptTcpClient(); $ms = [IO.MemoryStream]::new(); $c.GetStream().CopyTo($ms); $c.Close(); $l.Stop()
+            [IO.File]::WriteAllBytes($file, $ms.ToArray())
+          }
+          Start-Sleep -Seconds 2
+          try {
+            Add-PrinterDriver -Name "Generic / Text Only"
+            Add-PrinterPort -Name "BN_TCP_9101" -PrinterHostAddress "127.0.0.1" -PortNumber 9101
+            Add-Printer -Name "BN Test Thermal" -DriverName "Generic / Text Only" -PortName "BN_TCP_9101"
+            "printer created" | Tee-Object -FilePath $log -Append
+          } catch { "PRINTER SETUP FAILED: $($_.Exception.Message)" | Tee-Object -FilePath $log -Append; throw }
+          powershell -ExecutionPolicy Bypass -File .\package\deploy\windows\Install-PrintAgent.ps1 -HmsUrl "http://192.168.1.10:5000" *>> $log
+          $status = Invoke-RestMethod http://127.0.0.1:9123/status
+          "status: $($status | ConvertTo-Json -Compress)" | Tee-Object -FilePath $log -Append
+          if ($status.printers -notcontains "BN Test Thermal") { throw "Agent does not list the test printer" }
+          # ESC @, centered, big "TOKEN 17", feed, cut  (same command set as the HMS slip composer)
+          $bytes = [byte[]](0x1B,0x40,0x1B,0x61,0x01,0x1D,0x21,0x33) + [Text.Encoding]::ASCII.GetBytes("TOKEN 17") + [byte[]](0x0A,0x1D,0x21,0x00) + [Text.Encoding]::ASCII.GetBytes("Dr. Test`n") + [byte[]](0x1B,0x64,0x04,0x1D,0x56,0x42,0x03)
+          $body = @{ printerName = "BN Test Thermal"; data = [Convert]::ToBase64String($bytes); jobName = "CI token 17" } | ConvertTo-Json
+          # Preflight like Chrome (Private Network Access)
+          $pre = Invoke-WebRequest -UseBasicParsing -Method Options -Uri http://127.0.0.1:9123/print/raw -Headers @{ Origin = "http://192.168.1.10:5000"; "Access-Control-Request-Method" = "POST"; "Access-Control-Request-Private-Network" = "true" }
+          "preflight: $($pre.StatusCode) allow-origin=$($pre.Headers['Access-Control-Allow-Origin']) pna=$($pre.Headers['Access-Control-Allow-Private-Network'])" | Tee-Object -FilePath $log -Append
+          if ($pre.Headers['Access-Control-Allow-Private-Network'] -ne "true") { throw "PNA header missing" }
+          $r = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:9123/print/raw -ContentType "application/json" -Body $body -Headers @{ Origin = "http://192.168.1.10:5000" }
+          "print result: $($r | ConvertTo-Json -Compress)" | Tee-Object -FilePath $log -Append
+          try { Invoke-WebRequest -UseBasicParsing -Method Post -Uri http://127.0.0.1:9123/print/raw -ContentType "application/json" -Body $body -Headers @{ Origin = "http://evil.example.com" } | Out-Null; throw "foreign origin was accepted" }
+          catch { if ($_.Exception.Message -eq "foreign origin was accepted") { throw }; "foreign origin rejected: OK" | Tee-Object -FilePath $log -Append }
+          for ($i = 0; $i -lt 90 -and -not ((Test-Path $out) -and (Get-Item $out).Length -gt 0); $i++) {
+            if ($i % 10 -eq 0) {
+              "wait ${i}: jobs=$((Get-PrintJob -PrinterName 'BN Test Thermal' | ForEach-Object { "$($_.Id):$($_.JobStatus)" }) -join ',') printer=$((Get-Printer 'BN Test Thermal').PrinterStatus) file=$(if (Test-Path $out) { (Get-Item $out).Length } else { 'none' })" | Tee-Object -FilePath $log -Append
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          Receive-Job $listener -ErrorAction SilentlyContinue | Out-String | Tee-Object -FilePath $log -Append
+          Get-ChildItem C:\bnprint | Format-Table Name, Length, LastWriteTime | Out-String | Tee-Object -FilePath $log -Append
+          $printed = [IO.File]::ReadAllBytes($out)
+          "spooled bytes: $($printed.Length) hex: $([BitConverter]::ToString($printed))" | Tee-Object -FilePath $log -Append
+          $text = [Text.Encoding]::ASCII.GetString($printed)
+          if ($text -notmatch "TOKEN 17") { throw "Token text not found in printer output" }
+          if ([BitConverter]::ToString($printed) -notmatch "1D-56-42-03") { throw "ESC/POS cut command was not passed through RAW" }
+          "RAW ESC/POS printing via Print Agent: PASSED" | Tee-Object -FilePath $log -Append
       - name: Upload Windows install logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -144,3 +201,4 @@ jobs:
           path: |
             install.log
             verify.log
+            agent.log

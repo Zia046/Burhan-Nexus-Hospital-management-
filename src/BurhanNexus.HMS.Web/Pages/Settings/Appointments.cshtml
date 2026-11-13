@@ -1,0 +1,35 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Settings.AppointmentsModel
+@{
+    ViewData["Title"] = "Appointment slips";
+    var i = Model.Input;
+}
+<partial name="_SettingsNav" />
+<form method="post" class="card card-medium" novalidate>
+    <div class="card-header"><h3><svg class="icon"><use href="#i-calendar" /></svg> Private hospital appointment slips</h3></div>
+    <div class="card-body">
+        <partial name="_ValidationSummary" />
+        <input type="hidden" name="RowVersion" value="@Model.RowVersion" />
+        <div class="grid-2">
+            <div class="field">
+                <label for="Input_AppointmentSlipMessage">Message on slip</label>
+                <input id="Input_AppointmentSlipMessage" name="Input.AppointmentSlipMessage" value="@i.AppointmentSlipMessage" maxlength="120" />
+            </div>
+            <div class="field">
+                <label for="Input_AppointmentSlipContact">Reception contact <span class="muted">(optional)</span></label>
+                <input id="Input_AppointmentSlipContact" name="Input.AppointmentSlipContact" value="@i.AppointmentSlipContact" maxlength="120" placeholder="Reception: 0300-0000000" />
+            </div>
+            <div class="field">
+                <label for="Input_AppointmentMaxDaysAhead">Advance booking (days)</label>
+                <input id="Input_AppointmentMaxDaysAhead" type="number" name="Input.AppointmentMaxDaysAhead" value="@i.AppointmentMaxDaysAhead" min="0" max="365" />
+            </div>
+        </div>
+        <div class="checks">
+            <label class="check"><input type="checkbox" name="Input.AppointmentTimeEnabled" value="true" checked="@i.AppointmentTimeEnabled" /> Record appointment time (printed on the slip)</label>
+            <label class="check"><input type="checkbox" name="Input.ShowFeeOnAppointmentSlip" value="true" checked="@i.ShowFeeOnAppointmentSlip" /> Print consultation fee on the slip (doctor's OPD fee reference)</label>
+            <input type="hidden" name="Input.AppointmentTimeEnabled" value="false" /><input type="hidden" name="Input.ShowFeeOnAppointmentSlip" value="false" />
+        </div>
+        <p class="muted small">Token numbers: every doctor has an independent series that restarts at 1 each day (hospital time zone). Cancelled tokens are never reused; reprints always show the original token.</p>
+    </div>
+    <div class="card-footer form-actions"><button class="btn btn-primary" type="submit">Save</button></div>
+</form>

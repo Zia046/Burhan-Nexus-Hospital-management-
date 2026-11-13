@@ -9,5 +9,6 @@
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/BurhanNexus.LicenseGenerator/BurhanNexus.LicenseGenerator.csproj" />
+    <Project Path="tools/BurhanNexus.PrintAgent/BurhanNexus.PrintAgent.csproj" />
   </Folder>
 </Solution>

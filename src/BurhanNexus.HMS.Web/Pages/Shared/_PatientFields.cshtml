@@ -1,0 +1,91 @@
+@model BurhanNexus.HMS.Infrastructure.Patients.PatientInput
+@{
+    var minimal = ViewData["Minimal"] as bool? ?? false;
+    var allowUnidentified = ViewData["AllowUnidentified"] as bool? ?? false;
+    var req = minimal ? "" : "<em>*</em>";
+}
+<div class="patient-fields" data-patient-fields>
+    @if (allowUnidentified)
+    {
+        <label class="toggle unidentified-toggle">
+            <input asp-for="IsUnidentified" type="checkbox" data-unidentified />
+            <span><strong>Unconscious / unidentified patient</strong><small>Register with the minimum details now; complete the patient record later.</small></span>
+        </label>
+    }
+    <div class="grid-3">
+        <div class="field span-2" data-hide-unidentified>
+            <label asp-for="FullName">Patient full name <em>*</em></label>
+            <input asp-for="FullName" maxlength="150" autocomplete="off" data-dup-watch autofocus />
+        </div>
+        <div class="field">
+            <label asp-for="Gender">Gender <em>*</em></label>
+            <select asp-for="Gender" data-dup-watch>
+                <option value="">Select</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+                @if (allowUnidentified || minimal) { <option value="Unknown">Unknown</option> }
+            </select>
+        </div>
+        <div class="field">
+            <label asp-for="GuardianRelation">Relation</label>
+            <select asp-for="GuardianRelation">
+                <option value="SonOf">S/O (son of)</option>
+                <option value="DaughterOf">D/O (daughter of)</option>
+                <option value="WifeOf">W/O (wife of)</option>
+                <option value="Other">Guardian</option>
+            </select>
+        </div>
+        <div class="field span-2">
+            <label asp-for="GuardianName">Father's / Husband's name</label>
+            <input asp-for="GuardianName" maxlength="150" autocomplete="off" data-dup-watch />
+        </div>
+        <div class="field">
+            <label asp-for="DateOfBirth">Date of birth <span class="muted">(optional)</span></label>
+            <input asp-for="DateOfBirth" type="date" data-dob />
+        </div>
+        <div class="field">
+            <label asp-for="Age">Age @Html.Raw(req)</label>
+            <div class="age-input">
+                <input asp-for="Age" type="number" min="0" max="130" inputmode="numeric" data-age />
+                <select asp-for="AgeUnit" data-age-unit>
+                    <option value="Years">Years</option>
+                    <option value="Months">Months</option>
+                    <option value="Days">Days</option>
+                </select>
+            </div>
+            <small class="muted" data-age-hint>Calculated automatically from the date of birth.</small>
+        </div>
+        <div class="field">
+            <label asp-for="BloodGroup">Blood group <span class="muted">(optional)</span></label>
+            <select asp-for="BloodGroup">
+                <option value="">Unknown</option>
+                @foreach (var b in PatientService.BloodGroups) { <option value="@b">@b</option> }
+            </select>
+        </div>
+        <div class="field">
+            <label asp-for="MobileNumber">Mobile number <span class="muted">(optional)</span></label>
+            <input asp-for="MobileNumber" maxlength="20" inputmode="tel" placeholder="03xx-xxxxxxx" autocomplete="off" data-dup-watch />
+        </div>
+        <div class="field">
+            <label asp-for="AlternateContact">Alternative contact <span class="muted">(optional)</span></label>
+            <input asp-for="AlternateContact" maxlength="20" inputmode="tel" autocomplete="off" />
+        </div>
+        <div class="field">
+            <label asp-for="Cnic">CNIC <span class="muted">(optional)</span></label>
+            <input asp-for="Cnic" maxlength="15" inputmode="numeric" placeholder="xxxxx-xxxxxxx-x" autocomplete="off" data-cnic data-dup-watch />
+        </div>
+        <div class="field span-2">
+            <label asp-for="Address">Address @Html.Raw(req)</label>
+            <input asp-for="Address" maxlength="300" autocomplete="off" />
+        </div>
+        <div class="field">
+            <label asp-for="CityOrVillage">City / village @Html.Raw(req)</label>
+            <input asp-for="CityOrVillage" maxlength="100" autocomplete="off" list="bn-cities" />
+        </div>
+        <div class="field span-3">
+            <label asp-for="Notes">Additional notes <span class="muted">(optional)</span></label>
+            <input asp-for="Notes" maxlength="1000" autocomplete="off" />
+        </div>
+    </div>
+</div>

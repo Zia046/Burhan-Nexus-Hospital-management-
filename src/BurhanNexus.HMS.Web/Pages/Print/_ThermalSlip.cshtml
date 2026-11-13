@@ -1,0 +1,34 @@
+@model (BurhanNexus.HMS.Infrastructure.Printing.AppointmentSlipData Slip, PrinterProfile Printer)
+@{
+    var s = Model.Slip;
+    var p = Model.Printer;
+    var width = p.PaperWidthMm;
+    var h = (await Fmt.ProfileAsync())!;
+}
+    <article class="t-slip" data-token="@s.TokenNumber">
+        @if (p.ShowLogo && h.HasLogo) { <img class="t-logo" src="/branding/logo?v=@h.LogoVersion" alt="" /> }
+        <div class="t-hosp">@s.HospitalName</div>
+        @if (s.HospitalContact is not null) { <div class="t-small">@s.HospitalContact</div> }
+        <div class="t-sep"></div>
+        <div class="t-doctor" data-field="doctor">@s.DoctorName</div>
+        @if (!string.IsNullOrWhiteSpace(s.DoctorQualification)) { <div class="t-small">@s.DoctorQualification</div> }
+        @if (!string.IsNullOrWhiteSpace(s.DoctorSpecialty)) { <div class="t-spec">@s.DoctorSpecialty</div> }
+        <div class="t-sep"></div>
+        <div class="t-token-label">TOKEN NO.</div>
+        <div class="t-token" style="font-size:@(p.TokenSize * (width == 58 ? 4 : 5))mm" data-field="token">@s.TokenNumber</div>
+        @if (s.IsCancelled) { <div class="t-cancelled">*** CANCELLED ***</div> }
+        <div class="t-sep"></div>
+        <div class="t-patient" data-field="patient">@s.PatientName</div>
+        <table class="t-kv">
+            <tr><td>Patient ID</td><td data-field="patient-id">@s.PatientNumber</td></tr>
+            <tr><td>Age / Gender</td><td>@s.AgeGender</td></tr>
+            <tr><td>Date</td><td data-field="date">@s.DateText</td></tr>
+            @if (s.TimeText is not null) { <tr><td>Time</td><td>@s.TimeText</td></tr> }
+            @if (s.FeeText is not null) { <tr class="fee"><td>Consultation fee</td><td>@s.FeeText</td></tr> }
+            <tr><td>Appt. no.</td><td>@s.AppointmentNumber</td></tr>
+        </table>
+        <div class="t-sep"></div>
+        @if (!string.IsNullOrWhiteSpace(s.Message)) { <div class="t-msgline">@s.Message</div> }
+        @if (!string.IsNullOrWhiteSpace(s.ContactText)) { <div class="t-small">@s.ContactText</div> }
+        <div class="t-tiny">@s.PrintedText@(s.IsReprint ? " (REPRINT)" : "")</div>
+    </article>

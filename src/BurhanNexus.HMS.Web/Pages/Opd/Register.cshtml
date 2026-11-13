@@ -1,0 +1,121 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Opd.RegisterModel
+@{
+    ViewData["Title"] = "OPD registration";
+    var p = Model.Patient;
+}
+@if (p is null)
+{
+    <div class="card card-medium">
+        <div class="card-header"><h2><svg class="icon"><use href="#i-stethoscope" /></svg> OPD registration – find the patient</h2></div>
+        <div class="card-body">
+            <form method="get" class="search-main">
+                <div class="input-icon grow"><svg class="icon"><use href="#i-search" /></svg>
+                    <input name="q" value="@Model.Q" placeholder="Patient ID, name, mobile or CNIC" autofocus autocomplete="off" maxlength="100" /></div>
+                <button class="btn btn-primary" type="submit">Search</button>
+                <a bn-permission="@Perm.PatientsAdd" class="btn btn-success" href="/Patients/Register?next=opd@(string.IsNullOrWhiteSpace(Model.Q) ? "" : "&name=" + Uri.EscapeDataString(Model.Q))"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New patient</a>
+            </form>
+            @if (!string.IsNullOrWhiteSpace(Model.Q))
+            {
+                <div class="table-wrap">
+                    <table class="table table-compact">
+                        <thead><tr><th>Patient ID</th><th>Name</th><th>Father / Husband</th><th>Age</th><th>Mobile</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var m in Model.Matches)
+                        {
+                            <tr>
+                                <td class="mono">@m.PatientNumber</td><td><strong>@m.FullName</strong></td><td>@m.GuardianName</td>
+                                <td class="nowrap">@m.AgeText · @m.Gender</td><td>@m.MobileNumber</td>
+                                <td class="actions"><a class="btn btn-primary btn-sm" href="/Opd/Register?patientId=@m.Id">Select</a></td>
+                            </tr>
+                        }
+                        @if (Model.Matches.Count == 0) { <tr><td colspan="6" class="empty">No patient found – register a new patient.</td></tr> }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <div class="grid-side">
+        <form method="post" class="card" novalidate>
+            <div class="card-header">
+                <h2><svg class="icon"><use href="#i-stethoscope" /></svg> New OPD visit</h2>
+                <span class="pill @(Model.HospitalType == HospitalType.Government ? "pill-navy" : "pill-blue")">@Model.HospitalType hospital</span>
+            </div>
+            <div class="card-body">
+                <partial name="_ValidationSummary" />
+                @if (p.Status != PatientStatus.Active)
+                {
+                    <div class="alert alert-danger"><svg class="icon"><use href="#i-alert" /></svg><div>This patient record is @p.Status.ToString().ToLowerInvariant(). A new visit cannot be registered.</div></div>
+                }
+                <input type="hidden" name="PatientId" value="@p.Id" />
+                <div class="grid-2">
+                    <div class="field">
+                        <label for="Visit_DepartmentId">Department</label>
+                        <select id="Visit_DepartmentId" name="Visit.DepartmentId">
+                            <option value="">—</option>
+                            @foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(Model.Visit.DepartmentId == d.Id)">@d.Name</option> }
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="Visit_DoctorId">Doctor @Html.Raw(Model.DoctorRequired ? "<em>*</em>" : "<span class=\"muted\">(optional)</span>")</label>
+                        <select id="Visit_DoctorId" name="Visit.DoctorId" required="@Model.DoctorRequired">
+                            <option value="">@(Model.Doctors.Count == 0 ? "No doctors configured" : "Select doctor")</option>
+                            @foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(Model.Visit.DoctorId == d.Id)">@d.Name@(d.Specialty is null ? "" : " – " + d.Specialty)</option> }
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="Visit_ServiceItemId">Service / fee reference</label>
+                        <select id="Visit_ServiceItemId" name="Visit.ServiceItemId">
+                            @foreach (var s in Model.Services) { <option value="@s.Id" selected="@(Model.Visit.ServiceItemId == s.Id)">@s.Name (@(s.DefaultFee == 0 ? "Free" : Fmt.Money(s.DefaultFee)))</option> }
+                        </select>
+                        <small class="muted">Reference only – fee collection and receipts come with the billing module.</small>
+                    </div>
+                    <div class="field">
+                        <label for="Visit_ChiefComplaint">Presenting complaint <span class="muted">(optional)</span></label>
+                        <input id="Visit_ChiefComplaint" name="Visit.ChiefComplaint" value="@Model.Visit.ChiefComplaint" maxlength="300" autocomplete="off" />
+                    </div>
+                    <div class="field span-2">
+                        <label for="Visit_Notes">Notes <span class="muted">(optional)</span></label>
+                        <input id="Visit_Notes" name="Visit.Notes" value="@Model.Visit.Notes" maxlength="1000" autocomplete="off" />
+                    </div>
+                </div>
+                @if (Model.Settings.OpdTokenEnabled) { <p class="muted small">A token number is issued automatically.</p> }
+            </div>
+            <div class="card-footer form-actions">
+                <a class="btn btn-light" href="/Opd/Register">Change patient</a>
+                <button class="btn btn-primary btn-lg" type="submit" disabled="@(p.Status != PatientStatus.Active)"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Register &amp; print slip</button>
+            </div>
+        </form>
+        <div class="stack">
+            <div class="card patient-mini">
+                <div class="card-body">
+                    <div class="patient-id-box sm"><small>Patient ID</small><strong>@p.PatientNumber</strong></div>
+                    <h3>@p.FullName</h3>
+                    <p class="muted">@(p.GuardianName is null ? "" : BurhanNexus.HMS.Web.Pages.Print.SlipModelBase.RelationLabel(p.GuardianRelation) + " " + p.GuardianName)</p>
+                    <dl class="kv kv-tight">
+                        <dt>Age / Gender</dt><dd>@Model.AgeText · @p.Gender</dd>
+                        <dt>Mobile</dt><dd>@(p.MobileNumber ?? "—")</dd>
+                        <dt>Address</dt><dd>@(p.CityOrVillage ?? p.Address ?? "—")</dd>
+                    </dl>
+                    <a bn-permission="@Perm.PatientsView" href="/Patients/Profile/@p.Id">Open profile</a>
+                </div>
+            </div>
+            @if (Model.RecentVisits.Count > 0)
+            {
+                <div class="card">
+                    <div class="card-header"><h3>Previous visits</h3></div>
+                    <ul class="activity">
+                        @foreach (var v in Model.RecentVisits)
+                        {
+                            <li><span class="activity-dot"></span><div><strong>@(v.Type == EncounterType.Opd ? "OPD" : "Emergency") · @v.EncounterNumber</strong><small>@Fmt.DateTimeText(v.EncounterUtc) @(v.DoctorName is null ? "" : "· " + v.DoctorName)</small></div></li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+}

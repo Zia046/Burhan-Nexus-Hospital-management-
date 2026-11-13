@@ -1,0 +1,24 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Patients.EditModel
+@{
+    ViewData["Title"] = "Edit patient";
+    ViewData["Minimal"] = true;
+    ViewData["AllowUnidentified"] = Model.Current?.IsUnidentified == true;
+}
+<div class="breadcrumbs"><a href="/Patients/Profile/@Model.Id">@Model.Current?.PatientNumber</a> <svg class="icon icon-sm"><use href="#i-chevron-right" /></svg> Edit</div>
+<form method="post" class="card" novalidate>
+    <div class="card-header">
+        <h2><svg class="icon"><use href="#i-edit" /></svg> Edit patient information</h2>
+        <span class="pill pill-navy mono">@Model.Current?.PatientNumber</span>
+    </div>
+    <div class="card-body">
+        <partial name="_ValidationSummary" />
+        <p class="muted small">The Patient ID cannot be changed. Every change is recorded in the audit log with the previous values.</p>
+        <input type="hidden" asp-for="RowVersion" />
+        <partial name="_PatientFields" for="Patient" />
+    </div>
+    <div class="card-footer form-actions">
+        <a class="btn btn-light" href="/Patients/Profile/@Model.Id">Cancel</a>
+        <button class="btn btn-primary" type="submit">Save changes</button>
+    </div>
+</form>

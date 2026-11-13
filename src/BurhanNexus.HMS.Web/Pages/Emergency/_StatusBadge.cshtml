@@ -1,0 +1,13 @@
+@model BurhanNexus.HMS.Core.Domain.EmergencyStatus
+@{
+    var cls = Model switch
+    {
+        EmergencyStatus.Registered => "er-registered",
+        EmergencyStatus.UnderTreatment => "er-treatment",
+        EmergencyStatus.Referred => "er-referred",
+        EmergencyStatus.Discharged => "er-discharged",
+        EmergencyStatus.Admitted => "er-admitted",
+        _ => "er-closed"
+    };
+}
+<span class="er-status @cls">@EncounterService.Label(Model)</span>

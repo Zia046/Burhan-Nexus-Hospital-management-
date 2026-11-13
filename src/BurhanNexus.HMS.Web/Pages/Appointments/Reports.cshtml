@@ -1,0 +1,99 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Appointments.ReportsModel
+@{
+    ViewData["Title"] = "Appointment reports";
+    // Breakdown rows: per day for day/month, per month for year.
+    var byMonth = Model.Period == "year";
+    var buckets = Model.Daily
+        .GroupBy(d => byMonth ? new DateOnly(d.Date.Year, d.Date.Month, 1) : d.Date)
+        .OrderBy(g => g.Key)
+        .Select(g => new
+        {
+            Key = g.Key,
+            Booked = g.Where(x => x.Status == AppointmentStatus.Booked).Sum(x => x.Count),
+            Seen = g.Where(x => x.Status == AppointmentStatus.Seen).Sum(x => x.Count),
+            Cancelled = g.Where(x => x.Status == AppointmentStatus.Cancelled).Sum(x => x.Count),
+            PerDoctor = g.Where(x => x.Status != AppointmentStatus.Cancelled).GroupBy(x => x.DoctorId).ToDictionary(x => x.Key, x => x.Sum(y => y.Count))
+        }).ToList();
+    var activeDoctors = Model.Stats.Where(s => s.Total > 0).ToList();
+}
+<div class="toolbar no-print">
+    <form method="get" class="filters wrap">
+        <select name="period" aria-label="Period" data-period-select>
+            <option value="day" selected="@(Model.Period == "day")">Daily</option>
+            <option value="month" selected="@(Model.Period == "month")">Monthly</option>
+            <option value="year" selected="@(Model.Period == "year")">Yearly</option>
+        </select>
+        @switch (Model.Period)
+        {
+            case "month": <input type="month" name="month" value="@Model.Month" aria-label="Month" /> break;
+            case "year": <input type="number" name="year" value="@Model.Year" min="2000" max="2200" aria-label="Year" style="width:100px" /> break;
+            default: <input type="date" name="date" value="@Model.Date?.ToString("yyyy-MM-dd")" aria-label="Date" /> break;
+        }
+        <select name="doctor" aria-label="Doctor"><option value="">All doctors</option>
+            @foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(Model.DoctorId == d.Id)">@d.Name</option> }</select>
+        <button class="btn btn-light" type="submit">Show</button>
+    </form>
+    <div class="toolbar-actions">
+        <button bn-permission="@Perm.AppointmentsReports" type="button" class="btn btn-light" data-print><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print / PDF</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-chart" /></svg> Doctor-wise appointments – @Model.Title</h2>
+        <span class="pill pill-blue">@Model.Stats.Sum(s => s.Active) active · @Model.Stats.Sum(s => s.Cancelled) cancelled</span></div>
+    <div class="table-wrap">
+        <table class="table" data-report-stats>
+            <thead><tr><th>Doctor</th><th>Specialization</th><th class="num">Waiting</th><th class="num">Seen</th><th class="num">Active total</th><th class="num">Cancelled</th><th class="num">Tokens issued</th></tr></thead>
+            <tbody>
+            @foreach (var s in Model.Stats)
+            {
+                <tr data-doctor-row="@s.DoctorId"><td><strong>@s.DoctorName</strong></td><td>@s.Specialty</td><td class="num">@s.Booked</td><td class="num">@s.Seen</td>
+                    <td class="num"><strong data-active>@s.Active</strong></td><td class="num">@s.Cancelled</td><td class="num">@s.Total</td></tr>
+            }
+            @if (Model.Stats.Count == 0) { <tr><td colspan="7" class="empty">No doctors.</td></tr> }
+            </tbody>
+            <tfoot><tr><th colspan="2">Total</th><th class="num">@Model.Stats.Sum(s => s.Booked)</th><th class="num">@Model.Stats.Sum(s => s.Seen)</th><th class="num">@Model.Stats.Sum(s => s.Active)</th><th class="num">@Model.Stats.Sum(s => s.Cancelled)</th><th class="num">@Model.Stats.Sum(s => s.Total)</th></tr></tfoot>
+        </table>
+    </div>
+</div>
+
+@if (Model.Period != "day")
+{
+    <div class="card">
+        <div class="card-header"><h3>@(byMonth ? "Month-wise" : "Day-wise") history (active appointments per doctor)</h3></div>
+        <div class="table-wrap">
+            <table class="table table-compact">
+                <thead><tr><th>@(byMonth ? "Month" : "Date")</th>@foreach (var d in activeDoctors) { <th class="num">@d.DoctorName</th> }<th class="num">Active</th><th class="num">Cancelled</th></tr></thead>
+                <tbody>
+                @foreach (var b in buckets)
+                {
+                    <tr>
+                        <td class="nowrap">@if (byMonth) { @b.Key.ToString("MMM yyyy") } else { <a href="/Appointments/Reports?period=day&date=@b.Key.ToString("yyyy-MM-dd")">@Fmt.Day(b.Key)</a> }</td>
+                        @foreach (var d in activeDoctors) { <td class="num">@(b.PerDoctor.TryGetValue(d.DoctorId, out var c) ? c : 0)</td> }
+                        <td class="num"><strong>@(b.Booked + b.Seen)</strong></td><td class="num">@b.Cancelled</td>
+                    </tr>
+                }
+                @if (buckets.Count == 0) { <tr><td colspan="@(activeDoctors.Count + 3)" class="empty">No appointments in this period.</td></tr> }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="card-header"><h3>Cancelled appointments</h3><span class="pill pill-danger">@Model.Cancelled.Count</span></div>
+    <div class="table-wrap">
+        <table class="table table-compact" data-cancelled-list>
+            <thead><tr><th>Date</th><th>Doctor</th><th>Token</th><th>Appt. no.</th><th>Patient</th><th>Reason</th></tr></thead>
+            <tbody>
+            @foreach (var c in Model.Cancelled)
+            {
+                <tr><td class="nowrap">@Fmt.Day(c.AppointmentDate)</td><td>@c.DoctorName</td><td><span class="token">@c.TokenNumber</span></td>
+                    <td class="mono"><a href="/Appointments/Details/@c.Id">@c.AppointmentNumber</a></td><td>@c.PatientName <small class="muted">@c.PatientNumber</small></td><td>@c.CancelReason</td></tr>
+            }
+            @if (Model.Cancelled.Count == 0) { <tr><td colspan="6" class="empty">No cancelled appointments.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

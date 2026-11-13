@@ -219,6 +219,7 @@ public sealed class SetupService : ISetupService
             await _db.SaveChangesAsync(ct);
             await _license.EnsureInitializedAsync(ct);
             await tx.CommitAsync(ct);
+            await Patients.RegistrationSetupService.SeedAsync(_db, now, ct);
         }
         catch (Exception ex) when (ex is DbUpdateException { InnerException: PostgresException pg } && pg.SqlState is "23505" or "40001"
                                    || ex is PostgresException { SqlState: "40001" })

@@ -1,0 +1,82 @@
+/* OPD / Emergency slips – black-and-white friendly, A4 and A5, generous handwriting space. */
+* { box-sizing: border-box; }
+body.slip-body { margin: 0; background: #e9edf3; font-family: "Segoe UI", Arial, sans-serif; color: #000; }
+.print-toolbar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 16px; background: #0f2a52; color: #fff; font-size: 14px; }
+.print-toolbar a { color: #bcd0fb; }
+.print-toolbar .grow { flex: 1; }
+.print-toolbar button, .print-toolbar .tb-btn { background: #1f56d6; color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; font-weight: 600; cursor: pointer; font-size: 14px; text-decoration: none; }
+.print-toolbar .tb-light { background: #fff; color: #0f2a52; }
+.print-toolbar .seg a { padding: 6px 10px; border-radius: 6px; border: 1px solid #3d5c8f; color: #fff; text-decoration: none; }
+.print-toolbar .seg a.on { background: #fff; color: #0f2a52; }
+.print-hint { font-size: 12px; color: #c9d7f5; }
+
+.slip { background: #fff; margin: 18px auto; box-shadow: 0 4px 18px rgba(0,0,0,.15); display: flex; flex-direction: column; position: relative; }
+.paper-a4 .slip { width: 210mm; height: 297mm; padding: 10mm 12mm; font-size: 12.5px; }
+.paper-a5 .slip { width: 148mm; height: 210mm; padding: 7mm 8mm; font-size: 10.5px; }
+
+/* Header */
+.s-head { display: flex; align-items: center; gap: 10px; border-bottom: 2px solid #000; padding-bottom: 6px; }
+.s-head img { width: 17mm; height: 17mm; object-fit: contain; }
+.paper-a5 .s-head img { width: 13mm; height: 13mm; }
+.s-hosp { flex: 1; min-width: 0; }
+.s-hosp h1 { margin: 0; font-size: 1.65em; line-height: 1.15; letter-spacing: .01em; }
+.s-hosp p { margin: 1px 0 0; font-size: .86em; }
+.s-doc { text-align: right; }
+.s-doc .s-kind { display: inline-block; border: 2px solid #000; padding: 2px 8px; font-weight: 800; letter-spacing: .08em; font-size: 1.05em; }
+.s-doc .s-kind.er { background: #000; color: #fff; }
+.s-doc .s-no { font-family: Consolas, "Courier New", monospace; font-weight: 700; font-size: 1.05em; margin-top: 3px; }
+.s-doc .s-token { margin-top: 2px; font-size: .95em; }
+.s-doc .s-token b { font-size: 1.5em; }
+
+/* Patient strip */
+.s-patient { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid #000; border-top: 0; }
+.s-patient div { padding: 3px 6px; border-right: 1px solid #999; border-top: 1px solid #000; min-width: 0; }
+.s-patient div:nth-child(4n) { border-right: 0; }
+.s-patient label { display: block; font-size: .72em; text-transform: uppercase; letter-spacing: .04em; color: #333; }
+.s-patient span { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.s-patient .wide { grid-column: span 2; }
+.s-patient .full { grid-column: 1 / -1; }
+.s-patient .big span { font-size: 1.2em; }
+.s-patient .mono span { font-family: Consolas, "Courier New", monospace; }
+.s-meta { display: flex; justify-content: space-between; gap: 8px; font-size: .85em; padding: 3px 0; }
+
+/* Prescription body */
+.s-body { flex: 1; display: grid; grid-template-columns: 34% 1fr; border: 1px solid #000; margin-top: 6px; min-height: 0; }
+.s-side { border-right: 1px solid #000; display: flex; flex-direction: column; }
+.s-side section { flex: 1; border-bottom: 1px solid #999; padding: 3px 6px; }
+.s-side section:last-child { border-bottom: 0; }
+.s-side h3, .s-rx h3, .s-er h3 { margin: 0; font-size: .82em; text-transform: uppercase; letter-spacing: .05em; }
+.s-side .vitals { font-size: .82em; line-height: 2.1; }
+.s-rx { padding: 4px 8px; position: relative; display: flex; flex-direction: column; }
+.s-rx .rx { font-family: Georgia, "Times New Roman", serif; font-size: 2.6em; font-weight: 700; line-height: 1; }
+.s-rx .grow { flex: 1; }
+.s-rx .advice { border-top: 1px dashed #666; padding-top: 3px; height: 16%; }
+.s-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; padding-top: 6px; }
+.s-foot .line { border-top: 1px solid #000; padding-top: 2px; text-align: center; font-size: .82em; }
+.s-foot .follow { font-size: .9em; }
+.s-footer { text-align: center; font-size: .75em; border-top: 1px solid #000; margin-top: 5px; padding-top: 3px; }
+.s-footer .powered { color: #555; }
+
+/* Emergency layout */
+.s-er-info { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid #000; border-top: 0; font-size: .95em; }
+.s-er-info div { padding: 3px 6px; border-top: 1px solid #999; }
+.s-er-info div:nth-child(odd) { border-right: 1px solid #999; }
+.s-er-info b { font-size: .8em; text-transform: uppercase; letter-spacing: .03em; margin-right: 4px; }
+.s-er { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto repeat(4, 1fr); border: 1px solid #000; margin-top: 6px; min-height: 0; }
+.s-er section { border-right: 1px solid #999; border-bottom: 1px solid #999; padding: 3px 6px; }
+.s-er section:nth-child(even) { border-right: 0; }
+.s-er section.full { grid-column: 1 / -1; border-right: 0; }
+.s-er .vitals { font-size: .9em; line-height: 2; word-spacing: 3px; }
+.mlc { display: inline-block; border: 2px solid #000; padding: 0 6px; font-weight: 800; margin-left: 6px; }
+
+/* Private visit document */
+.s-doctor { border: 1px solid #000; border-top: 0; padding: 5px 8px; display: flex; justify-content: space-between; gap: 10px; }
+.s-doctor strong { font-size: 1.25em; }
+
+@media print {
+  body.slip-body { background: #fff; }
+  .no-print { display: none !important; }
+  .slip { margin: 0; box-shadow: none; }
+  .paper-a4 .slip { width: auto; height: 275mm; padding: 0; }
+  .paper-a5 .slip { width: auto; height: 194mm; padding: 0; }
+}

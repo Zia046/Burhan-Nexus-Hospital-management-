@@ -1,0 +1,111 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Opd.SetupModel
+@{
+    ViewData["Title"] = "OPD setup";
+    var s = Model.Settings;
+    var editDoc = Model.Doctors.FirstOrDefault(d => d.Id == Model.EditDoctorId);
+    var editSvc = Model.Services.FirstOrDefault(x => x.Id == Model.EditServiceId);
+}
+<div class="breadcrumbs"><a href="/Opd">OPD</a> <svg class="icon icon-sm"><use href="#i-chevron-right" /></svg> Setup</div>
+<div class="grid-2 gap-lg">
+    <form method="post" asp-page-handler="Settings" class="card">
+        <div class="card-header"><h3><svg class="icon"><use href="#i-sliders" /></svg> OPD settings</h3></div>
+        <div class="card-body">
+            <input type="hidden" name="RowVersion" value="@s.RowVersion" />
+            <label class="toggle"><input type="checkbox" name="OpdForm.OpdTokenEnabled" value="true" checked="@s.OpdTokenEnabled" /><span><strong>Issue token numbers</strong><small>Daily queue number printed on the slip, restarting at 1 every day.</small></span></label>
+            <input type="hidden" name="OpdForm.OpdTokenEnabled" value="false" />
+            <div class="field"><label for="scope">Token counting</label>
+                <select id="scope" name="OpdForm.OpdTokenScope">
+                    <option value="Hospital" selected="@(s.OpdTokenScope == TokenScopeMode.Hospital)">One queue for the whole OPD</option>
+                    <option value="Department" selected="@(s.OpdTokenScope == TokenScopeMode.Department)">Separate queue per department</option>
+                    <option value="Doctor" selected="@(s.OpdTokenScope == TokenScopeMode.Doctor)">Separate queue per doctor</option>
+                </select></div>
+            <div class="field"><label for="ddep">Default OPD department</label>
+                <select id="ddep" name="OpdForm.DefaultOpdDepartmentId"><option value="">None</option>
+                    @foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(s.DefaultOpdDepartmentId == d.Id)">@d.Name</option> }</select></div>
+            <div class="field"><label for="dsvc">Default OPD fee reference</label>
+                <select id="dsvc" name="OpdForm.DefaultOpdServiceItemId"><option value="">None</option>
+                    @foreach (var x in Model.Services.Where(x => x.Category == EncounterType.Opd && x.IsActive)) { <option value="@x.Id" selected="@(s.DefaultOpdServiceItemId == x.Id)">@x.Name (@(x.DefaultFee == 0 ? "Free" : Fmt.Money(x.DefaultFee)))</option> }</select></div>
+            <div class="field"><label for="esvc">Default emergency fee reference</label>
+                <select id="esvc" name="OpdForm.DefaultEmergencyServiceItemId"><option value="">None</option>
+                    @foreach (var x in Model.Services.Where(x => x.Category == EncounterType.Emergency && x.IsActive)) { <option value="@x.Id" selected="@(s.DefaultEmergencyServiceItemId == x.Id)">@x.Name (@(x.DefaultFee == 0 ? "Free" : Fmt.Money(x.DefaultFee)))</option> }</select></div>
+            <label class="toggle"><input type="checkbox" name="OpdForm.RequireDoctorForPrivateOpd" value="true" checked="@s.RequireDoctorForPrivateOpd" /><span><strong>Private mode: doctor is required</strong><small>Each private OPD visit is recorded against a doctor (for doctor-wise history and future billing).</small></span></label>
+            <input type="hidden" name="OpdForm.RequireDoctorForPrivateOpd" value="false" />
+        </div>
+        <div class="card-footer form-actions"><button class="btn btn-primary" type="submit">Save OPD settings</button></div>
+    </form>
+
+    <div class="stack">
+        <div class="card">
+            <div class="card-header"><h3><svg class="icon"><use href="#i-user-cross" /></svg> Doctors</h3><span class="muted small">Doctors do not need a login</span></div>
+            <div class="table-wrap">
+                <table class="table table-compact">
+                    <thead><tr><th>Name</th><th>Specialty</th><th>Department</th><th>Status</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var d in Model.Doctors)
+                    {
+                        <tr><td><strong>@d.Name</strong><small class="muted block">@d.Qualification</small></td><td>@d.Specialty</td><td>@d.Department?.Name</td>
+                            <td>@if (d.IsActive) { <span class="status status-ok">Active</span> } else { <span class="status status-off">Inactive</span> }</td>
+                            <td class="actions"><a class="btn btn-light btn-xs" href="/Opd/Setup?doctor=@d.Id">Edit</a></td></tr>
+                    }
+                    @if (Model.Doctors.Count == 0) { <tr><td colspan="5" class="empty">No doctors yet. Doctor selection on the slip stays optional until doctors are added.</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+            <form method="post" asp-page-handler="Doctor" asp-route-id="@editDoc?.Id" class="card-footer">
+                <div class="grid-2">
+                    <div class="field"><label for="dn">@(editDoc is null ? "Add doctor – name" : "Edit doctor – name") <em>*</em></label><input id="dn" name="DoctorForm.Name" value="@editDoc?.Name" required maxlength="150" placeholder="Dr. ..." /></div>
+                    <div class="field"><label for="dq">Qualification</label><input id="dq" name="DoctorForm.Qualification" value="@editDoc?.Qualification" maxlength="150" placeholder="MBBS, FCPS" /></div>
+                    <div class="field"><label for="dsp">Specialty</label><input id="dsp" name="DoctorForm.Specialty" value="@editDoc?.Specialty" maxlength="100" /></div>
+                    <div class="field"><label for="dreg">PMDC / registration no.</label><input id="dreg" name="DoctorForm.RegistrationNumber" value="@editDoc?.RegistrationNumber" maxlength="50" /></div>
+                    <div class="field"><label for="ddp">Department</label>
+                        <select id="ddp" name="DoctorForm.DepartmentId"><option value="">—</option>
+                            @foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(editDoc?.DepartmentId == d.Id)">@d.Name</option> }</select></div>
+                    <label class="check"><input type="checkbox" name="DoctorForm.IsActive" value="true" checked="@(editDoc?.IsActive ?? true)" /> Active</label>
+                    <input type="hidden" name="DoctorForm.IsActive" value="false" />
+                </div>
+                <div class="form-actions">
+                    @if (editDoc is not null) { <a class="btn btn-light" href="/Opd/Setup">Cancel</a> }
+                    <button class="btn btn-primary" type="submit">@(editDoc is null ? "Add doctor" : "Save doctor")</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h3><svg class="icon"><use href="#i-wallet" /></svg> Service / fee references</h3><span class="muted small">Used by the future billing module – no payments are recorded now</span></div>
+            <div class="table-wrap">
+                <table class="table table-compact">
+                    <thead><tr><th>Code</th><th>Name</th><th>For</th><th>Fee</th><th>Doctor</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var x in Model.Services)
+                    {
+                        <tr class="@(x.IsActive ? "" : "row-failed")"><td class="mono">@x.Code</td><td>@x.Name</td><td>@x.Category</td><td>@(x.DefaultFee == 0 ? "Free" : Fmt.Money(x.DefaultFee))</td><td>@x.Doctor?.Name</td>
+                            <td class="actions"><a class="btn btn-light btn-xs" href="/Opd/Setup?service=@x.Id">Edit</a></td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <form method="post" asp-page-handler="Service" asp-route-id="@editSvc?.Id" class="card-footer">
+                <div class="grid-3">
+                    <div class="field"><label for="sc">Code</label><input id="sc" name="ServiceForm.Code" value="@editSvc?.Code" required maxlength="30" placeholder="OPD-DR1" /></div>
+                    <div class="field span-2"><label for="sn">Name</label><input id="sn" name="ServiceForm.Name" value="@editSvc?.Name" required maxlength="150" /></div>
+                    <div class="field"><label for="sf">Fee (@((await Fmt.ProfileAsync())?.CurrencyCode))</label><input id="sf" name="ServiceForm.DefaultFee" type="number" min="0" step="0.01" value="@(editSvc?.DefaultFee.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "0")" /></div>
+                    <div class="field"><label for="scat">For</label>
+                        <select id="scat" name="ServiceForm.Category">
+                            <option value="Opd" selected="@(editSvc?.Category != EncounterType.Emergency)">OPD</option>
+                            <option value="Emergency" selected="@(editSvc?.Category == EncounterType.Emergency)">Emergency</option>
+                        </select></div>
+                    <div class="field"><label for="sdoc">Doctor (optional)</label>
+                        <select id="sdoc" name="ServiceForm.DoctorId"><option value="">—</option>
+                            @foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(editSvc?.DoctorId == d.Id)">@d.Name</option> }</select></div>
+                    <label class="check"><input type="checkbox" name="ServiceForm.IsActive" value="true" checked="@(editSvc?.IsActive ?? true)" /> Active</label>
+                    <input type="hidden" name="ServiceForm.IsActive" value="false" />
+                </div>
+                <div class="form-actions">
+                    @if (editSvc is not null) { <a class="btn btn-light" href="/Opd/Setup">Cancel</a> }
+                    <button class="btn btn-primary" type="submit">@(editSvc is null ? "Add fee reference" : "Save fee reference")</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

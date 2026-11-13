@@ -1,0 +1,61 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Opd.VisitModel
+@{
+    var e = Model.Encounter;
+    var p = e.Patient!;
+    ViewData["Title"] = "OPD visit " + e.EncounterNumber;
+    var canEdit = await PermCtx.HasAsync(Perm.OpdEdit);
+}
+<div class="breadcrumbs"><a href="/Opd">OPD</a> <svg class="icon icon-sm"><use href="#i-chevron-right" /></svg> @e.EncounterNumber</div>
+<section class="card patient-head">
+    <div class="patient-id-box"><small>Visit no.</small><strong>@e.EncounterNumber</strong></div>
+    <div class="grow">
+        <h2>@p.FullName <span class="muted mono small">@p.PatientNumber</span></h2>
+        <p class="muted">@Fmt.DateTimeText(e.EncounterUtc) · @(e.Department?.Name ?? "No department")@(e.Doctor is null ? "" : " · " + e.Doctor.Name)
+            @if (e.TokenNumber is int t) { <span class="token">Token @t</span> }</p>
+        <p><span class="tag tag-blue">@(e.HospitalTypeAtVisit == HospitalType.Private ? "Private visit" : "Government OPD")</span> <span class="tag">@(e.Opd?.IsRepeatVisit == true ? "Follow-up" : "New visit")</span></p>
+    </div>
+    <div class="profile-actions">
+        <a bn-permission="@Perm.OpdPrint" class="btn btn-primary" href="/Print/Opd/@e.Id" target="_blank"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print @(e.HospitalTypeAtVisit == HospitalType.Private ? "visit document" : "OPD slip")</a>
+        <a bn-permission="@Perm.PatientsView" class="btn btn-light" href="/Patients/Profile/@p.Id">Patient profile</a>
+        <a bn-permission="@Perm.OpdAdd" class="btn btn-light" href="/Opd/Register">Next patient</a>
+    </div>
+</section>
+<div class="grid-side">
+    <form method="post" class="card">
+        <div class="card-header"><h3>Visit details</h3></div>
+        <div class="card-body">
+            <input type="hidden" name="RowVersion" value="@Model.RowVersion" />
+            <fieldset disabled="@(!canEdit)">
+                <div class="grid-2">
+                    <div class="field"><label for="dep">Department</label>
+                        <select id="dep" name="Visit.DepartmentId"><option value="">—</option>
+                            @foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(e.DepartmentId == d.Id)">@d.Name</option> }</select></div>
+                    <div class="field"><label for="doc">Doctor</label>
+                        <select id="doc" name="Visit.DoctorId"><option value="">—</option>
+                            @foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(e.DoctorId == d.Id)">@d.Name</option> }</select></div>
+                    <div class="field"><label for="svc">Service / fee reference</label>
+                        <select id="svc" name="Visit.ServiceItemId">
+                            @foreach (var s in Model.Services) { <option value="@s.Id" selected="@(e.ServiceItemId == s.Id)">@s.Name (@(s.DefaultFee == 0 ? "Free" : Fmt.Money(s.DefaultFee)))</option> }</select></div>
+                    <div class="field"><label for="cc">Presenting complaint</label><input id="cc" name="Visit.ChiefComplaint" value="@e.Opd?.ChiefComplaint" maxlength="300" /></div>
+                    <div class="field span-2"><label for="notes">Notes</label><input id="notes" name="Visit.Notes" value="@e.Notes" maxlength="1000" /></div>
+                </div>
+            </fieldset>
+            <dl class="kv kv-tight">
+                <dt>Registered by</dt><dd>@e.CreatedByUsername · @e.Workstation</dd>
+                <dt>Patient ID</dt><dd class="mono">@p.PatientNumber</dd>
+            </dl>
+        </div>
+        @if (canEdit) { <div class="card-footer form-actions"><button class="btn btn-primary" type="submit">Save corrections</button></div> }
+    </form>
+    <div class="card">
+        <div class="card-header"><h3><svg class="icon"><use href="#i-printer" /></svg> Print history</h3></div>
+        <ul class="activity">
+            @foreach (var d in e.PrintedDocuments.OrderByDescending(x => x.PrintedUtc))
+            {
+                <li><span class="activity-dot"></span><div><strong>Copy @d.PrintNumber · @d.PaperSize</strong><small>@Fmt.DateTimeText(d.PrintedUtc) · @d.PrintedByUsername @d.Workstation</small></div></li>
+            }
+            @if (e.PrintedDocuments.Count == 0) { <li class="muted">Not printed yet.</li> }
+        </ul>
+    </div>
+</div>

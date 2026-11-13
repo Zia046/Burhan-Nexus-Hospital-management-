@@ -1,0 +1,98 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Appointments.DetailsModel
+@{
+    var a = Model.Appointment;
+    var p = a.Patient!;
+    var prints = a.Encounter!.PrintedDocuments.Where(d => d.DocumentType == PrintedDocumentType.AppointmentSlip).OrderBy(d => d.PrintNumber).ToList();
+    ViewData["Title"] = $"Appointment {a.Encounter.EncounterNumber}";
+    var cancelled = a.Status == AppointmentStatus.Cancelled;
+    var canFee = await PermCtx.HasAsync(Perm.AppointmentsFees);
+}
+<div class="toolbar">
+    <div>
+        <a bn-permission="@Perm.AppointmentsView" class="btn btn-light" href="/Appointments?date=@a.AppointmentDate.ToString("yyyy-MM-dd")&doctor=@a.DoctorId">&larr; @a.Doctor!.Name – @Fmt.Day(a.AppointmentDate)</a>
+    </div>
+    <div class="toolbar-actions">
+        @if (!cancelled)
+        {
+            <a bn-permission="@(prints.Count == 0 ? Perm.AppointmentsPrint : Perm.AppointmentsReprint)" class="btn btn-primary" href="/Print/Appointment/@a.Id" data-test="appt-print"><svg class="icon icon-sm"><use href="#i-printer" /></svg> @(prints.Count == 0 ? "Print slip" : "Reprint slip")</a>
+        }
+        <a bn-permission="@Perm.AppointmentsAdd" class="btn btn-light" href="/Appointments/Book">Next booking</a>
+    </div>
+</div>
+<partial name="_ValidationSummary" />
+<div class="grid-side">
+    <div class="stack">
+        <div class="card">
+            <div class="card-header">
+                <h2><svg class="icon"><use href="#i-calendar" /></svg> Appointment @a.Encounter.EncounterNumber</h2>
+                <partial name="_ApptStatus" model="a.Status" />
+            </div>
+            <div class="card-body">
+                <div class="appt-hero">
+                    <div class="appt-token-big"><small>Token</small><strong data-token>@a.TokenNumber</strong></div>
+                    <div>
+                        <h3>@a.Doctor.Name</h3>
+                        <p class="muted">@a.Doctor.Qualification @(a.Doctor.Specialty is null ? "" : "· " + a.Doctor.Specialty)</p>
+                        <p>@Fmt.Day(a.AppointmentDate)@(a.AppointmentTime is { } t ? " · " + t.ToString("hh:mm tt") : "")</p>
+                    </div>
+                </div>
+                <dl class="kv">
+                    <dt>Patient</dt><dd><strong>@p.FullName</strong> (<span class="mono">@p.PatientNumber</span>) <a bn-permission="@Perm.PatientsView" href="/Patients/Profile/@p.Id">profile</a></dd>
+                    <dt>Complaint</dt><dd>@(a.Complaint ?? "—")</dd>
+                    <dt>Notes</dt><dd>@(a.Notes ?? "—")</dd>
+                    @if (canFee) { <dt>Consultation fee</dt><dd>@(a.ConsultationFee is decimal f ? Fmt.Money(f) : "—")</dd> }
+                    <dt>Booked</dt><dd>@Fmt.DateTimeText(a.BookedUtc) by @a.BookedByUsername @(a.Workstation is null ? "" : "· " + a.Workstation)</dd>
+                    @if (a.SeenUtc is not null) { <dt>Seen</dt><dd>@Fmt.DateTimeText(a.SeenUtc)</dd> }
+                    @if (cancelled) { <dt>Cancelled</dt><dd class="text-danger">@Fmt.DateTimeText(a.CancelledUtc) by @a.CancelledByUsername – @a.CancelReason</dd> }
+                </dl>
+            </div>
+        </div>
+
+        @if (!cancelled)
+        {
+            <form bn-permission="@Perm.AppointmentsEdit" method="post" asp-page-handler="Edit" class="card" novalidate>
+                <div class="card-header"><h3>Edit appointment</h3><small class="muted">Doctor, date and token cannot be changed – cancel and book again instead.</small></div>
+                <div class="card-body grid-2">
+                    <input type="hidden" name="RowVersion" value="@Model.RowVersion" />
+                    @if (Model.Settings.AppointmentTimeEnabled)
+                    {
+                        <div class="field"><label for="Edit_AppointmentTime">Time</label><input id="Edit_AppointmentTime" type="time" name="Edit.AppointmentTime" value="@Model.Edit.AppointmentTime?.ToString("HH:mm")" /></div>
+                    }
+                    <div class="field"><label for="Edit_Complaint">Presenting complaint</label><input id="Edit_Complaint" name="Edit.Complaint" value="@Model.Edit.Complaint" maxlength="300" /></div>
+                    <div class="field span-2"><label for="Edit_Notes">Notes</label><input id="Edit_Notes" name="Edit.Notes" value="@Model.Edit.Notes" maxlength="500" /></div>
+                </div>
+                <div class="card-footer form-actions"><button class="btn btn-primary" type="submit">Save changes</button></div>
+            </form>
+        }
+    </div>
+    <div class="stack">
+        @if (a.Status == AppointmentStatus.Booked)
+        {
+            <form bn-permission="@Perm.AppointmentsEdit" method="post" asp-page-handler="Seen" class="card">
+                <div class="card-body"><button class="btn btn-success btn-block" type="submit"><svg class="icon icon-sm"><use href="#i-check" /></svg> Mark as seen by doctor</button></div>
+            </form>
+        }
+        @if (!cancelled)
+        {
+            <form bn-permission="@Perm.AppointmentsCancel" method="post" asp-page-handler="Cancel" class="card" novalidate>
+                <div class="card-header"><h3>Cancel appointment</h3></div>
+                <div class="card-body">
+                    <div class="field"><label for="CancelReason">Reason <em>*</em></label><input id="CancelReason" name="CancelReason" maxlength="300" required /></div>
+                    <small class="muted">Token @a.TokenNumber stays used for this doctor on @Fmt.Day(a.AppointmentDate) and is never reissued.</small>
+                </div>
+                <div class="card-footer"><button class="btn btn-danger" type="submit" data-test="appt-cancel">Cancel appointment</button></div>
+            </form>
+        }
+        <div class="card">
+            <div class="card-header"><h3>Print history</h3><span class="pill pill-blue">@prints.Count</span></div>
+            <ul class="activity">
+                @foreach (var d in prints)
+                {
+                    <li><span class="activity-dot"></span><div><strong>@(d.PrintNumber == 1 ? "Printed" : $"Reprint – copy {d.PrintNumber}") · @d.PaperSize</strong><small>@Fmt.DateTimeText(d.PrintedUtc) · @d.PrintedByUsername @(d.Workstation is null ? "" : "· " + d.Workstation)</small></div></li>
+                }
+                @if (prints.Count == 0) { <li class="empty">Slip not printed yet.</li> }
+            </ul>
+        </div>
+    </div>
+</div>

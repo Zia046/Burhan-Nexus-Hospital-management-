@@ -1,0 +1,50 @@
+/* Thermal appointment slip (58 mm / 80 mm roll). Screen = preview, print = slip only. */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body.thermal-body { background: #e9edf2; font-family: "Segoe UI", Arial, sans-serif; color: #000; }
+.t-toolbar { background: #0f2741; color: #fff; padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; position: sticky; top: 0; z-index: 2; }
+.t-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.t-pill { background: rgba(255,255,255,.14); border-radius: 999px; padding: 2px 10px; font-size: 12px; }
+.t-btn { appearance: none; border: 0; border-radius: 6px; padding: 7px 14px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; background: #1e88e5; color: #fff; text-decoration: none; }
+.t-btn.light { background: #fff; color: #0f2741; }
+.t-btn.light.on { background: #ffd54f; }
+.t-btn[disabled] { opacity: .55; cursor: wait; }
+.t-msg.err, .t-status.err { color: #ffb4a9; }
+.t-status { font-size: 13px; color: #cfe3ff; }
+.t-status.ok { color: #9be7a8; }
+.slip-wrap { padding: 18px 0 40px; display: flex; justify-content: center; }
+
+.t-slip { background: #fff; padding: 3mm 3mm 5mm; box-shadow: 0 2px 10px rgba(0,0,0,.18); line-height: 1.25; }
+.w80 .t-slip { width: 80mm; font-size: 12px; }
+.w58 .t-slip { width: 58mm; font-size: 10.5px; padding: 2mm 2mm 4mm; }
+.font-small .t-slip { font-size: 90%; }
+.font-large .w80 .t-slip, .w80.font-large .t-slip { font-size: 13.5px; }
+.w58.font-large .t-slip { font-size: 12px; }
+.bold .t-slip { font-weight: 600; }
+.align-center .t-slip { text-align: center; }
+.align-left .t-slip { text-align: left; }
+.t-logo { display: block; max-width: 60%; max-height: 16mm; margin: 0 auto 1.5mm; object-fit: contain; filter: grayscale(1); }
+.align-left .t-logo { margin-left: 0; }
+.t-hosp { font-size: 1.35em; font-weight: 800; text-transform: uppercase; letter-spacing: .02em; }
+.t-small { font-size: .9em; }
+.t-tiny { font-size: .78em; margin-top: 1.5mm; }
+.t-sep { border-top: 1px dashed #000; margin: 1.6mm 0; }
+.t-doctor { font-size: 1.25em; font-weight: 800; }
+.t-spec { font-weight: 700; text-transform: uppercase; font-size: .95em; }
+.t-token-label { font-size: .95em; font-weight: 700; letter-spacing: .15em; }
+.t-token { font-weight: 900; line-height: 1; margin: 1mm 0 1.5mm; text-align: center; font-family: "Arial Black", Arial, sans-serif; }
+.t-cancelled { font-weight: 900; text-align: center; border: 2px solid #000; padding: 1mm; }
+.t-patient { font-size: 1.15em; font-weight: 800; margin-bottom: 1mm; }
+.t-kv { width: 100%; border-collapse: collapse; text-align: left; }
+.t-kv td { padding: .3mm 0; vertical-align: top; }
+.t-kv td:first-child { white-space: nowrap; padding-right: 2mm; width: 1%; }
+.t-kv td:last-child { font-weight: 700; word-break: break-word; }
+.t-kv tr.fee td:last-child { font-size: 1.1em; }
+.t-msgline { font-weight: 800; text-align: center; font-size: 1.05em; margin: 1mm 0; }
+
+@media print {
+  body.thermal-body { background: #fff; }
+  .no-print { display: none !important; }
+  .slip-wrap { padding: 0; display: block; }
+  .t-slip { box-shadow: none; margin: 0; }
+}

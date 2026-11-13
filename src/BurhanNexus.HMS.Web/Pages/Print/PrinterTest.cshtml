@@ -1,0 +1,37 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Print.PrinterTestModel
+@{
+    Layout = null;
+    var p = Model.Printer;
+    var width = p.PaperWidthMm;
+    var basePath = ViewContext.HttpContext.Request.Path + "?profile=" + Model.Profile + "&handler=";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Printer test · @width mm</title>
+    <link rel="stylesheet" href="~/css/thermal.css" asp-append-version="true" />
+</head>
+<body class="thermal-body w@(width) font-@p.FontSize.ToString().ToLowerInvariant() align-@p.Alignment.ToString().ToLowerInvariant() @(p.BoldText ? "bold" : "")"
+      data-thermal data-mode="@p.Mode" data-width="@width" data-can-print="1"
+      data-record-url="@(basePath)Record" data-escpos-url="@(basePath)EscPos" data-lan-url="@(basePath)Lan" data-agent="@p.AgentUrl">
+@Html.AntiForgeryToken()
+<div class="t-toolbar no-print">
+    <div class="t-row">
+        <strong>Printer test</strong>
+        <span class="t-pill">@width mm · @p.Mode @(p.Mode == PrintMode.LanDirect ? p.LanHost + ":" + p.LanPort : p.Mode == PrintMode.LocalAgent ? (p.WindowsPrinterName ?? p.LanHost) : "")</span>
+    </div>
+    <div class="t-row">
+        <a class="t-btn light" href="/Settings/Printers@(Model.Profile is null ? "" : "?id=" + Model.Profile)">&larr; Printer settings</a>
+        <button type="button" class="t-btn" data-thermal-print>Print test slip</button>
+        @if (p.Mode != PrintMode.Browser) { <button type="button" class="t-btn light" data-thermal-browser>Print with browser dialog</button> }
+    </div>
+    <div class="t-status" data-thermal-status>Prints a sample slip with token 7 using this profile.</div>
+</div>
+<main class="slip-wrap">
+    <partial name="_ThermalSlip" model="(Model.Slip, Model.Printer)" />
+</main>
+<script src="~/js/thermal.js" asp-append-version="true"></script>
+</body>
+</html>

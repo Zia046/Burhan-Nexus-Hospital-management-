@@ -1,0 +1,59 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Opd.IndexModel
+@{
+    ViewData["Title"] = "OPD";
+    var isToday = Model.From == Model.Today && Model.To == Model.Today;
+}
+<div class="toolbar">
+    <form method="get" class="filters wrap">
+        <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Visit no., Patient ID, name or mobile" maxlength="100" /></div>
+        <label class="inline-label">From <input type="date" name="from" value="@Model.From?.ToString("yyyy-MM-dd")" /></label>
+        <label class="inline-label">To <input type="date" name="to" value="@Model.To?.ToString("yyyy-MM-dd")" /></label>
+        <select name="dept" aria-label="Department"><option value="">All departments</option>
+            @foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(Model.DepartmentId == d.Id)">@d.Name</option> }</select>
+        @if (Model.Doctors.Count > 0)
+        {
+            <select name="doctor" aria-label="Doctor"><option value="">All doctors</option>
+                @foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(Model.DoctorId == d.Id)">@d.Name</option> }</select>
+        }
+        <button class="btn btn-light" type="submit">Filter</button>
+        @if (!isToday) { <a class="btn btn-light" href="/Opd">Today</a> }
+    </form>
+    <div class="toolbar-actions">
+        <a bn-permission="@Perm.OpdSettings" class="btn btn-light" href="/Opd/Setup"><svg class="icon icon-sm"><use href="#i-settings" /></svg> OPD setup</a>
+        <a bn-permission="@Perm.OpdAdd" class="btn btn-primary" href="/Opd/Register" data-test="opd-register"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New OPD visit</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3><svg class="icon"><use href="#i-stethoscope" /></svg> @(isToday ? "Today's OPD visits" : "OPD visits")</h3>
+        <span class="pill pill-blue">@Model.Result.Total visit(s)</span>
+    </div>
+    <div class="table-wrap">
+        <table class="table" data-opd-list>
+            <thead><tr><th>Token</th><th>Visit no.</th><th>Time</th><th>Patient ID</th><th>Patient</th><th>Age / Gender</th><th>Department / doctor</th><th>Slip</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var v in Model.Result.Items)
+            {
+                <tr>
+                    <td><span class="token">@(v.TokenNumber?.ToString() ?? "—")</span></td>
+                    <td class="mono nowrap">@v.EncounterNumber</td>
+                    <td class="nowrap">@(isToday ? Fmt.Time(v.EncounterUtc) : Fmt.DateTimeText(v.EncounterUtc))</td>
+                    <td class="mono nowrap">@v.PatientNumber</td>
+                    <td><strong>@v.PatientName</strong>@if (v.GuardianName is not null) { <small class="muted block">@BurhanNexus.HMS.Web.Pages.Print.SlipModelBase.RelationLabel(v.GuardianRelation) @v.GuardianName</small> }</td>
+                    <td class="nowrap">@v.AgeText · @v.Gender</td>
+                    <td>@v.DepartmentName@(v.DoctorName is null ? "" : " · " + v.DoctorName)</td>
+                    <td>@if (v.PrintCount > 0) { <span class="status status-ok">Printed</span> } else { <span class="status status-warn">Not printed</span> }</td>
+                    <td class="actions nowrap">
+                        <a class="btn btn-light btn-sm" href="/Opd/Visit/@v.Id">Open</a>
+                        <a bn-permission="@Perm.OpdPrint" class="btn btn-light btn-sm" href="/Print/Opd/@v.Id" target="_blank"><svg class="icon icon-sm"><use href="#i-printer" /></svg></a>
+                    </td>
+                </tr>
+            }
+            @if (Model.Result.Items.Count == 0) { <tr><td colspan="9" class="empty">No OPD visits for this selection.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+    <partial name="_Pager" model="new PagerModel(Request, Model.Result.Page, Model.Result.TotalPages, Model.Result.Total)" />
+</div>

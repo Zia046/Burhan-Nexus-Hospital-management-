@@ -1,0 +1,59 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Patients.MergeModel
+@{
+    ViewData["Title"] = "Correct duplicate registration";
+    var d = Model.Duplicate!;
+    var t = Model.Target;
+}
+<div class="breadcrumbs"><a href="/Patients/Profile/@d.Id">@d.PatientNumber</a> <svg class="icon icon-sm"><use href="#i-chevron-right" /></svg> Correct duplicate</div>
+<div class="alert alert-info"><svg class="icon"><use href="#i-info" /></svg><div>
+    Use this only when the <strong>same person</strong> was registered twice. The visits of the duplicate move to the correct patient,
+    the duplicate's Patient ID keeps working as an alias, nothing is deleted and the correction is recorded in the audit log.</div></div>
+
+<div class="grid-2 gap-lg">
+    <div class="card">
+        <div class="card-header"><h3>Duplicate registration (will be merged)</h3><span class="pill pill-danger mono">@d.PatientNumber</span></div>
+        <div class="card-body"><dl class="kv kv-tight">
+            <dt>Name</dt><dd>@d.FullName</dd><dt>Father / Husband</dt><dd>@d.GuardianName</dd>
+            <dt>Mobile</dt><dd>@d.MobileNumber</dd><dt>CNIC</dt><dd>@d.Cnic</dd><dt>Registered</dt><dd>@Fmt.DateTimeText(d.RegisteredUtc)</dd>
+        </dl></div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3>Correct patient (keeps its Patient ID)</h3>@if (t is not null) { <span class="pill pill-success mono">@t.PatientNumber</span> }</div>
+        <div class="card-body">
+            <form method="get" class="inline-form">
+                <input name="target" value="@Model.TargetNumber" placeholder="Enter the correct Patient ID" required />
+                <button class="btn btn-light" type="submit">Find</button>
+            </form>
+            @if (t is not null)
+            {
+                <dl class="kv kv-tight">
+                    <dt>Name</dt><dd>@t.FullName</dd><dt>Father / Husband</dt><dd>@t.GuardianName</dd>
+                    <dt>Mobile</dt><dd>@t.MobileNumber</dd><dt>CNIC</dt><dd>@t.Cnic</dd><dt>Registered</dt><dd>@Fmt.DateTimeText(t.RegisteredUtc)</dd>
+                </dl>
+            }
+            @if (Model.Suggestions.Count > 0)
+            {
+                <h4 class="section-title">Possible matches</h4>
+                @foreach (var s in Model.Suggestions.Where(s => s.Status != PatientStatus.Merged))
+                {
+                    <div class="small"><a href="/Patients/Merge/@d.Id?target=@s.PatientNumber" class="mono">@s.PatientNumber</a> @s.FullName · @s.GuardianName · @string.Join(", ", s.Reasons)</div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@if (t is not null)
+{
+    <form method="post" class="card card-medium card-danger" autocomplete="off">
+        <div class="card-header"><h3><svg class="icon"><use href="#i-alert" /></svg> Merge @d.PatientNumber into @t.PatientNumber</h3></div>
+        <div class="card-body">
+            <input type="hidden" name="TargetId" value="@t.Id" />
+            <input type="hidden" name="TargetNumber" value="@t.PatientNumber" />
+            <div class="field"><label for="Reason">Reason <em>*</em></label><input id="Reason" name="Reason" required minlength="5" maxlength="500" placeholder="e.g. Same CNIC – registered twice at reception" /></div>
+            <div class="field"><label for="Confirmation">Type <code>MERGE</code> to confirm</label><input id="Confirmation" name="Confirmation" required /></div>
+        </div>
+        <div class="card-footer form-actions"><button class="btn btn-danger" type="submit">Correct duplicate</button></div>
+    </form>
+}

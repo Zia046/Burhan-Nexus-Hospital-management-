@@ -1,0 +1,19 @@
+@model BurhanNexus.HMS.Web.Pages.Print.SlipModelBase
+@{
+    var h = Model.Hospital;
+    var kind = ViewData["Kind"] as string ?? "OPD SLIP";
+    var er = Model.Encounter.Type == EncounterType.Emergency;
+}
+<header class="s-head">
+    <img src="/branding/logo?v=@h.LogoVersion" alt="" />
+    <div class="s-hosp">
+        <h1>@h.HospitalName</h1>
+        <p>@h.Address, @h.City · Ph: @h.ContactNumber</p>
+        @if (!er && !string.IsNullOrEmpty(h.ReceiptHeader)) { <p>@h.ReceiptHeader</p> }
+    </div>
+    <div class="s-doc">
+        <div class="s-kind @(er ? "er" : "")">@kind</div>
+        <div class="s-no">@Model.Encounter.EncounterNumber</div>
+        @if (Model.Encounter.TokenNumber is int t) { <div class="s-token">Token <b>@t</b></div> }
+    </div>
+</header>

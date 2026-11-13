@@ -42,4 +42,32 @@ public static class AuditActions
     public const string BackupRestored = "Backup.Restored";
     public const string BackupRestoreFailed = "Backup.RestoreFailed";
     public const string AuditExported = "Audit.Exported";
+
+    // Phase 2 – patients, OPD, emergency
+    public const string PatientRegistered = "Patient.Registered";
+    public const string PatientDuplicateWarningOverridden = "Patient.DuplicateWarningOverridden";
+    public const string PatientUpdated = "Patient.Updated";
+    public const string PatientArchived = "Patient.Archived";
+    public const string PatientRestored = "Patient.Restored";
+    public const string PatientMerged = "Patient.DuplicateMerged";
+    public const string PatientsExported = "Patient.Exported";
+    public const string OpdVisitRegistered = "Opd.VisitRegistered";
+    public const string OpdVisitUpdated = "Opd.VisitUpdated";
+    public const string EmergencyRegistered = "Emergency.Registered";
+    public const string EmergencyUpdated = "Emergency.Updated";
+    public const string EmergencyStatusChanged = "Emergency.StatusChanged";
+    public const string DocumentPrinted = "Document.Printed";
+    public const string RegistrationSettingsChanged = "Settings.RegistrationChanged";
+    public const string DoctorSaved = "Doctor.Saved";
+    public const string ServiceItemSaved = "ServiceItem.Saved";
+    public const string EmergencyCategorySaved = "EmergencyCategory.Saved";
+    public const string AppointmentBooked = "Appointment.Booked";
+    public const string AppointmentUpdated = "Appointment.Updated";
+    public const string AppointmentCancelled = "Appointment.Cancelled";
+    public const string AppointmentSeen = "Appointment.Seen";
+    public const string AppointmentSlipPrinted = "Appointment.SlipPrinted";
+    public const string AppointmentSlipReprinted = "Appointment.SlipReprinted";
+    public const string AppointmentPrintFailed = "Appointment.PrintFailed";
+    public const string PrinterProfileSaved = "Printer.ProfileSaved";
+    public const string PrinterTestPrint = "Printer.TestPrint";
 }

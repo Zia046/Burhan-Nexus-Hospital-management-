@@ -4,10 +4,10 @@ A modern, secure, web-based Hospital Management System by **Burhan Nexus**.
 One central server and database; every computer in the hospital (reception, laboratory, pharmacy,
 X-Ray, ultrasound, administration…) opens it in a web browser over the LAN – no internet needed.
 
-> **Status: Phase 1 complete** – core system, architecture, setup wizard, login, users, departments,
-> responsibilities, granular permissions, dashboard, branding & printing, licensing, audit log,
-> backup & restore. Clinical modules (OPD, Emergency, Laboratory, Pharmacy, X-Ray, Ultrasound,
-> billing…) follow in later phases on top of this foundation.
+> **Status: Phase 2 complete (awaiting approval)** – Phase 1 core system plus patient registration with
+> permanent Patient IDs, duplicate detection, patient search & profile, OPD (government slip / private
+> visit document, tokens, doctors), Emergency (minimum & unidentified registration, status workflow),
+> visit history and print-ready slips. Laboratory, Pharmacy, X-Ray, Ultrasound and billing follow in later phases.
 
 ## Highlights
 
@@ -22,6 +22,9 @@ X-Ray, ultrasound, administration…) opens it in a web browser over the LAN –
 | Licensing | 30-day trial on install, offline Annual/Lifetime activation keys (ECDSA-signed), expiry ⇒ read-only, **never** deletes data |
 | Audit | Every important action with user, computer, IP, before/after values; tamper-proof at database level; CSV export |
 | Backup | Manual backup (pg_dump), history, checksum, download, protected restore with automatic safety backup |
+| Patients | Permanent unique Patient ID from DB sequences, infant ages (Y/M/D), CNIC/mobile normalisation, duplicate warning (name, father, CNIC, mobile), search, profile, visit history, archive, controlled duplicate merge |
+| OPD | New encounter + visit number per visit, daily tokens, departments, doctors, fee references (no payments), Government A5/A4 prescription slip with handwriting space, Private visit document |
+| Emergency | Existing / new / unidentified patient, ER numbers, categories, MLC, A4/A5 slip with treatment boxes, status workflow with history and restricted statuses |
 
 ## Technology
 
@@ -56,6 +59,9 @@ docs/                              Installation, user guide, backup, troubleshoo
 - [Architecture & database](docs/ARCHITECTURE.md)
 - [Development](docs/DEVELOPMENT.md)
 - [Phase 1 testing report](docs/PHASE1-TEST-REPORT.md)
+- [Patient registration guide](docs/PATIENT-REGISTRATION-GUIDE.md) · [OPD workflow](docs/OPD-WORKFLOW.md) · [Emergency workflow](docs/EMERGENCY-WORKFLOW.md)
+- [Private hospital appointments, doctor-wise tokens & thermal printing](docs/PRINTING-THERMAL.md) · Thermal samples: [80 mm](docs/samples/sample-appointment-thermal-80mm.pdf), [58 mm](docs/samples/sample-appointment-thermal-58mm.pdf)
+- [Phase 2 testing report](docs/PHASE2-TEST-REPORT.md) · Sample slips: [OPD A5](docs/samples/sample-opd-slip-A5.pdf), [OPD A4](docs/samples/sample-opd-slip-A4.pdf), [Emergency A4](docs/samples/sample-emergency-slip-A4.pdf), [Private visit](docs/samples/sample-private-visit-document-A5.pdf)
 
 ## Quick start (developer)
 

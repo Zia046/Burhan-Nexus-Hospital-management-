@@ -9,6 +9,7 @@
     var hospitalName = profile?.HospitalName ?? "Burhan Nexus Hospital Management";
     string Active(string key) => nav == key ? "active" : "";
     bool Any(params string[] keys) => keys.Any(perms.Contains);
+    var isPrivate = profile?.HospitalType == HospitalType.Private;
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -33,6 +34,52 @@
         @if (perms.Contains(Perm.DashboardView))
         {
             <a class="nav-link @Active("dashboard")" href="/"><svg class="icon"><use href="#i-home" /></svg><span>Dashboard</span></a>
+        }
+
+        @if (isPrivate && Any(Perm.AppointmentsView, Perm.AppointmentsAdd, Perm.AppointmentsReports))
+        {
+            <div class="nav-section">Appointments</div>
+            @if (perms.Contains(Perm.AppointmentsAdd))
+            {
+                <a class="nav-link @Active("appointment-book")" href="/Appointments/Book" data-nav="appointment-book"><svg class="icon"><use href="#i-plus" /></svg><span>New Appointment</span></a>
+            }
+            @if (perms.Contains(Perm.AppointmentsView))
+            {
+                <a class="nav-link @Active("appointments")" href="/Appointments" data-nav="appointments"><svg class="icon"><use href="#i-calendar" /></svg><span>Doctor-wise Lists</span></a>
+            }
+            @if (perms.Contains(Perm.AppointmentsReports))
+            {
+                <a class="nav-link @Active("appointment-reports")" href="/Appointments/Reports"><svg class="icon"><use href="#i-chart" /></svg><span>Appointment Reports</span></a>
+            }
+        }
+
+        @if (Any(Perm.PatientsAdd, Perm.PatientsSearch, Perm.OpdView, Perm.OpdAdd, Perm.EmergencyView, Perm.EmergencyAdd))
+        {
+            <div class="nav-section">Patients &amp; Visits</div>
+            @if (perms.Contains(Perm.PatientsAdd))
+            {
+                <a class="nav-link @Active("patient-register")" href="/Patients/Register"><svg class="icon"><use href="#i-plus" /></svg><span>Register Patient</span></a>
+            }
+            @if (perms.Contains(Perm.PatientsSearch))
+            {
+                <a class="nav-link @Active("patients")" href="/Patients"><svg class="icon"><use href="#i-search" /></svg><span>Patient Search</span></a>
+            }
+            @if (perms.Contains(Perm.OpdView))
+            {
+                <a class="nav-link @Active("opd")" href="/Opd"><svg class="icon"><use href="#i-stethoscope" /></svg><span>OPD</span></a>
+            }
+            else if (perms.Contains(Perm.OpdAdd) && !(isPrivate && perms.Contains(Perm.AppointmentsAdd)))
+            {
+                <a class="nav-link @Active("opd")" href="/Opd/Register"><svg class="icon"><use href="#i-stethoscope" /></svg><span>OPD Registration</span></a>
+            }
+            @if (perms.Contains(Perm.EmergencyView))
+            {
+                <a class="nav-link @Active("emergency")" href="/Emergency"><svg class="icon"><use href="#i-siren" /></svg><span>Emergency</span></a>
+            }
+            else if (perms.Contains(Perm.EmergencyAdd))
+            {
+                <a class="nav-link @Active("emergency")" href="/Emergency/Register"><svg class="icon"><use href="#i-siren" /></svg><span>Emergency Registration</span></a>
+            }
         }
 
         @if (Any(Perm.UsersView, Perm.DepartmentsManage, Perm.RolesManage, Perm.LoginHistoryView, Perm.AuditView))
@@ -60,9 +107,13 @@
             }
         }
 
-        @if (Any(Perm.SettingsView, Perm.LicenseView, Perm.BackupView))
+        @if (Any(Perm.SettingsView, Perm.LicenseView, Perm.BackupView, Perm.PatientsSettings))
         {
             <div class="nav-section">System</div>
+            @if (perms.Contains(Perm.PatientsSettings) && !perms.Contains(Perm.SettingsView))
+            {
+                <a class="nav-link @Active("registration-settings")" href="/Settings/Registration"><svg class="icon"><use href="#i-badge" /></svg><span>Patient ID &amp; Slips</span></a>
+            }
             @if (perms.Contains(Perm.SettingsView))
             {
                 <a class="nav-link @Active("settings")" href="/Settings"><svg class="icon"><use href="#i-settings" /></svg><span>Hospital Settings</span></a>

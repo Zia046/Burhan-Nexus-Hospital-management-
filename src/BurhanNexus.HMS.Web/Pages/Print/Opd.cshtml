@@ -1,0 +1,79 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Print.OpdModel
+@{
+    Layout = null;
+    var e = Model.Encounter;
+    var p = Model.Patient;
+    var paperCss = Model.Paper == "A4" ? "A4 portrait" : "A5 portrait";
+    var margin = Model.Paper == "A4" ? "11mm" : "8mm";
+    ViewData["Kind"] = Model.IsPrivate ? "VISIT RECORD" : "OPD SLIP";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>@e.EncounterNumber · @p.FullName</title>
+    <link rel="stylesheet" href="~/css/slips.css" asp-append-version="true" />
+    <style>@@page { size: @paperCss; margin: @margin; }</style>
+</head>
+<body class="slip-body paper-@Model.Paper.ToLowerInvariant()" data-autoprint="@(Model.AutoPrint ? "1" : null)">
+<partial name="_SlipToolbar" model="Model" />
+<article class="slip" data-slip="@(Model.IsPrivate ? "private" : "opd")">
+    <partial name="_SlipHeader" model="Model" />
+    <section class="s-patient">
+        <div class="mono big"><label>Patient ID</label><span data-field="patient-id">@p.PatientNumber</span></div>
+        <div class="wide big"><label>Patient name</label><span data-field="patient-name">@p.FullName</span></div>
+        <div><label>Age / Gender</label><span>@Model.AgeText / @Model.GenderText</span></div>
+        <div class="wide"><label>Father / Husband</label><span>@Model.Guardian</span></div>
+        <div><label>Mobile</label><span>@(p.MobileNumber ?? "—")</span></div>
+        <div><label>Date &amp; time</label><span>@Fmt.DateTimeText(e.EncounterUtc)</span></div>
+        @if (Model.IsPrivate)
+        {
+            <div class="wide"><label>Department</label><span>@(e.Department?.Name ?? "—")</span></div>
+            <div class="wide"><label>Address</label><span>@(p.CityOrVillage ?? p.Address ?? "—")</span></div>
+        }
+        else
+        {
+            <div class="wide"><label>Doctor</label><span>@(e.Doctor?.Name ?? "")</span></div>
+            <div><label>Department</label><span>@(e.Department?.Name ?? "—")</span></div>
+            <div><label>Visit</label><span>@(e.Opd?.IsRepeatVisit == true ? "Follow-up" : "New")</span></div>
+        }
+    </section>
+    @if (Model.IsPrivate)
+    {
+        <section class="s-doctor">
+            <div><strong data-field="doctor">@(e.Doctor?.Name ?? "Doctor")</strong><br />@e.Doctor?.Qualification @(e.Doctor?.Specialty is null ? "" : " · " + e.Doctor.Specialty)</div>
+            <div style="text-align:right">Visit no. <b>@e.EncounterNumber</b><br />@(e.Opd?.IsRepeatVisit == true ? "Follow-up visit" : "New patient")</div>
+        </section>
+    }
+    @if (!string.IsNullOrEmpty(e.Opd?.ChiefComplaint))
+    {
+        <div class="s-meta"><span><b>Presenting complaint:</b> @e.Opd.ChiefComplaint</span></div>
+    }
+    <section class="s-body">
+        <div class="s-side">
+            <section><h3>Complaints</h3></section>
+            <section><h3>Clinical findings</h3><div class="vitals">BP ______ Pulse ____<br />Temp ____ Wt ______</div></section>
+            <section><h3>Diagnosis</h3></section>
+            <section><h3>Lab investigations</h3></section>
+            <section><h3>X-Ray / Ultrasound</h3></section>
+        </div>
+        <div class="s-rx">
+            <div class="rx">&#8478;</div>
+            <div class="grow"></div>
+            <div class="advice"><h3>Advice / Follow-up</h3></div>
+        </div>
+    </section>
+    <footer class="s-foot">
+        <div class="follow">Next visit: ____________________</div>
+        <div class="line">@(Model.IsPrivate ? "Doctor's signature" : "Doctor's signature & stamp")</div>
+    </footer>
+    <div class="s-footer">
+        @if (!string.IsNullOrEmpty(Model.Hospital.ReceiptFooter)) { <span>@Model.Hospital.ReceiptFooter · </span> }
+        <span>Please bring this slip on your next visit. Patient ID: <b>@p.PatientNumber</b></span>
+        <div class="powered">Burhan Nexus Hospital Management · printed @Fmt.DateTimeText(DateTime.UtcNow) by @User.Identity?.Name@(Model.CopyNumber > 1 ? $" · copy {Model.CopyNumber}" : "")</div>
+    </div>
+</article>
+<script src="~/js/print.js" asp-append-version="true"></script>
+</body>
+</html>

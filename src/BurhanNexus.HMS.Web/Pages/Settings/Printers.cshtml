@@ -1,0 +1,115 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Settings.PrintersModel
+@{
+    ViewData["Title"] = "Thermal printers";
+    var i = Model.Input;
+}
+<partial name="_SettingsNav" />
+<div class="grid-side">
+    <form method="post" class="card" novalidate data-printer-form>
+        <div class="card-header">
+            <h3><svg class="icon"><use href="#i-printer" /></svg> @(Model.Editing is null ? "New printer profile" : "Printer profile – " + (Model.Editing.WorkstationName == "*" ? "default (all computers)" : Model.Editing.WorkstationName))</h3>
+            @if (Model.Editing is not null) { <a class="btn btn-light btn-sm" href="/Print/PrinterTest?profile=@Model.Editing.Id" target="_blank" data-test="printer-test">Test print</a> }
+        </div>
+        <div class="card-body">
+            <partial name="_ValidationSummary" />
+            <input type="hidden" name="Id" value="@Model.Id" />
+            <div class="grid-2">
+                <div class="field">
+                    <label for="Input_WorkstationName">Computer (workstation) name</label>
+                    <input id="Input_WorkstationName" name="Input.WorkstationName" value="@i.WorkstationName" maxlength="50" required />
+                    <small class="muted">Use <code>*</code> for the default of all computers. This computer: <strong>@(string.IsNullOrEmpty(Model.Workstation) ? "not named (enter a computer name on the login page)" : Model.Workstation)</strong></small>
+                </div>
+                <div class="field">
+                    <label for="Input_PaperWidthMm">Paper width</label>
+                    <select id="Input_PaperWidthMm" name="Input.PaperWidthMm">
+                        <option value="80" selected="@(i.PaperWidthMm == 80)">80 mm (Xprinter XP-80/Q200, Rongta RP80, Epson TM-T20/T82, HPRT TP80)</option>
+                        <option value="58" selected="@(i.PaperWidthMm == 58)">58 mm (Xprinter XP-58, Rongta RP58)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="field">
+                <label>Print method</label>
+                <div class="printer-mode">
+                    <label class="doctor-choice"><input type="radio" name="Input.Mode" value="Browser" checked="@(i.Mode == PrintMode.Browser)" />
+                        <span class="dc-body"><strong>Browser print</strong><small>Any Windows / USB printer installed with its driver. Shows the print dialog (Chrome/Edge kiosk printing can make it silent).</small></span></label>
+                    <label class="doctor-choice"><input type="radio" name="Input.Mode" value="LanDirect" checked="@(i.Mode == PrintMode.LanDirect)" />
+                        <span class="dc-body"><strong>LAN printer (direct)</strong><small>Network thermal printer (ESC/POS, port 9100). The server prints directly – no dialog.</small></span></label>
+                    <label class="doctor-choice"><input type="radio" name="Input.Mode" value="LocalAgent" checked="@(i.Mode == PrintMode.LocalAgent)" />
+                        <span class="dc-body"><strong>Print Agent (USB, silent)</strong><small>Burhan Nexus Print Agent installed on this computer sends ESC/POS to the Windows/USB printer – no dialog.</small></span></label>
+                </div>
+            </div>
+            <div class="grid-2">
+                <div class="field">
+                    <label for="Input_WindowsPrinterName">Windows printer name <span class="muted">(Print Agent)</span></label>
+                    <input id="Input_WindowsPrinterName" name="Input.WindowsPrinterName" value="@i.WindowsPrinterName" maxlength="200" placeholder="e.g. XP-80C" />
+                </div>
+                <div class="field">
+                    <label for="Input_AgentUrl">Print Agent address</label>
+                    <input id="Input_AgentUrl" name="Input.AgentUrl" value="@i.AgentUrl" maxlength="200" placeholder="http://127.0.0.1:9123" />
+                </div>
+                <div class="field">
+                    <label for="Input_LanHost">LAN printer IP <span class="muted">(LAN mode)</span></label>
+                    <input id="Input_LanHost" name="Input.LanHost" value="@i.LanHost" maxlength="100" placeholder="192.168.1.87" />
+                </div>
+                <div class="field">
+                    <label for="Input_LanPort">LAN port</label>
+                    <input id="Input_LanPort" type="number" name="Input.LanPort" value="@i.LanPort" min="1" max="65535" />
+                </div>
+                <div class="field">
+                    <label for="Input_Alignment">Alignment</label>
+                    <select id="Input_Alignment" name="Input.Alignment">
+                        <option value="Center" selected="@(i.Alignment == SlipAlignment.Center)">Center</option>
+                        <option value="Left" selected="@(i.Alignment == SlipAlignment.Left)">Left</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="Input_FontSize">Font size</label>
+                    <select id="Input_FontSize" name="Input.FontSize">
+                        <option value="Small" selected="@(i.FontSize == SlipFontSize.Small)">Small</option>
+                        <option value="Normal" selected="@(i.FontSize == SlipFontSize.Normal)">Normal</option>
+                        <option value="Large" selected="@(i.FontSize == SlipFontSize.Large)">Large</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="Input_TokenSize">Token number size (2–8)</label>
+                    <input id="Input_TokenSize" type="number" name="Input.TokenSize" value="@i.TokenSize" min="2" max="8" />
+                </div>
+                <div class="field">
+                    <label for="Input_Copies">Copies per print</label>
+                    <input id="Input_Copies" type="number" name="Input.Copies" value="@i.Copies" min="1" max="3" />
+                </div>
+            </div>
+            <div class="checks">
+                <label class="check"><input type="checkbox" name="Input.ShowLogo" value="true" checked="@i.ShowLogo" /> Show logo <small class="muted">(browser print only; ESC/POS prints text)</small></label>
+                <label class="check"><input type="checkbox" name="Input.BoldText" value="true" checked="@i.BoldText" /> Bold text</label>
+                <label class="check"><input type="checkbox" name="Input.AutoCut" value="true" checked="@i.AutoCut" /> Auto-cut paper <small class="muted">(ESC/POS)</small></label>
+                <input type="hidden" name="Input.ShowLogo" value="false" /><input type="hidden" name="Input.BoldText" value="false" /><input type="hidden" name="Input.AutoCut" value="false" />
+            </div>
+        </div>
+        <div class="card-footer form-actions">
+            <a class="btn btn-light" href="/Settings/Printers?new=true">New profile</a>
+            <button class="btn btn-primary" type="submit">Save printer settings</button>
+        </div>
+    </form>
+    <div class="stack">
+        <div class="card">
+            <div class="card-header"><h3>Profiles</h3></div>
+            <ul class="activity">
+                @foreach (var p in Model.Profiles)
+                {
+                    <li><span class="activity-dot"></span><div><a href="/Settings/Printers?id=@p.Id"><strong>@(p.WorkstationName == "*" ? "Default – all computers" : p.WorkstationName)</strong></a>
+                        <small>@p.PaperWidthMm mm · @(p.Mode switch { PrintMode.LanDirect => "LAN " + p.LanHost + ":" + p.LanPort, PrintMode.LocalAgent => "Print Agent → " + (p.WindowsPrinterName ?? p.LanHost), _ => "Browser" })</small></div></li>
+                }
+                @if (Model.Profiles.Count == 0) { <li class="empty">No profiles yet – browser printing on 80 mm is used.</li> }
+            </ul>
+        </div>
+        <div class="card">
+            <div class="card-header"><h3>This computer uses</h3></div>
+            <div class="card-body small">
+                <p><strong>@Model.Effective.PaperWidthMm mm · @Model.Effective.Mode</strong> @(Model.Effective.Id == 0 ? "(built-in default)" : "")</p>
+                <p class="muted">Browsers cannot print silently to USB printers by themselves. For one-click printing without a dialog use a LAN printer, or install the <strong>Burhan Nexus Print Agent</strong> on the reception computer (see docs/PRINTING-THERMAL.md).</p>
+            </div>
+        </div>
+    </div>
+</div>

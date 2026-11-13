@@ -24,8 +24,33 @@ public class HmsDbContext : DbContext
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
     public DbSet<BackupHistory> BackupHistory => Set<BackupHistory>();
 
+    // Phase 2
+    public DbSet<Patient> Patients => Set<Patient>();
+    public DbSet<PatientIdentifier> PatientIdentifiers => Set<PatientIdentifier>();
+    public DbSet<PatientEncounter> PatientEncounters => Set<PatientEncounter>();
+    public DbSet<OpdVisit> OpdVisits => Set<OpdVisit>();
+    public DbSet<EmergencyVisit> EmergencyVisits => Set<EmergencyVisit>();
+    public DbSet<EmergencyStatusHistory> EmergencyStatusHistory => Set<EmergencyStatusHistory>();
+    public DbSet<EmergencyCategory> EmergencyCategories => Set<EmergencyCategory>();
+    public DbSet<Doctor> Doctors => Set<Doctor>();
+    public DbSet<ServiceItem> ServiceItems => Set<ServiceItem>();
+    public DbSet<PrintedDocument> PrintedDocuments => Set<PrintedDocument>();
+    public DbSet<RegistrationSettings> RegistrationSettings => Set<RegistrationSettings>();
+    public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<PrinterProfile> PrinterProfiles => Set<PrinterProfile>();
+
+    public const string PatientNumberSequence = "patient_number_seq";
+    public const string OpdNumberSequence = "opd_number_seq";
+    public const string EmergencyNumberSequence = "emergency_number_seq";
+
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.HasPostgresExtension("pg_trgm");
+        // Database sequences guarantee unique numbers even when many computers register at the same moment.
+        b.HasSequence<long>(PatientNumberSequence).StartsAt(1).IncrementsBy(1);
+        b.HasSequence<long>(OpdNumberSequence).StartsAt(1).IncrementsBy(1);
+        b.HasSequence<long>(EmergencyNumberSequence).StartsAt(1).IncrementsBy(1);
+
         b.Entity<HospitalSettings>(e =>
         {
             e.ToTable("HospitalSettings", t => t.HasCheckConstraint("CK_HospitalSettings_Singleton", "\"Id\" = 1"));
@@ -140,6 +165,144 @@ public class HmsDbContext : DbContext
         {
             e.ToTable("SystemSettings");
             e.HasKey(x => x.Key);
+        });
+
+        b.Entity<Patient>(e =>
+        {
+            e.ToTable("Patients");
+            e.HasIndex(x => x.PatientNumber).IsUnique();
+            e.HasIndex(x => x.SequenceNumber).IsUnique();
+            e.HasIndex(x => x.CnicDigits);
+            e.HasIndex(x => x.MobileDigits);
+            e.HasIndex(x => x.RegisteredUtc);
+            e.HasIndex(x => x.Status);
+            e.HasIndex(x => x.FullName).HasMethod("gin").HasOperators("gin_trgm_ops").HasDatabaseName("IX_Patients_FullName_trgm");
+            e.HasIndex(x => x.GuardianName).HasMethod("gin").HasOperators("gin_trgm_ops").HasDatabaseName("IX_Patients_GuardianName_trgm");
+            e.Property(x => x.Gender).HasConversion<string>().HasMaxLength(10);
+            e.Property(x => x.GuardianRelation).HasConversion<string>().HasMaxLength(12);
+            e.Property(x => x.AgeUnitAtRegistration).HasConversion<string>().HasMaxLength(10);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(10);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.MergedIntoPatient).WithMany().HasForeignKey(x => x.MergedIntoPatientId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<PatientIdentifier>(e =>
+        {
+            e.ToTable("PatientIdentifiers");
+            e.HasIndex(x => new { x.Type, x.Value }).IsUnique();
+            e.HasIndex(x => x.Value);
+            e.Property(x => x.Type).HasConversion<string>().HasMaxLength(30);
+            e.HasOne(x => x.Patient).WithMany(p => p.Identifiers).HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<PatientEncounter>(e =>
+        {
+            e.ToTable("PatientEncounters");
+            e.HasIndex(x => x.EncounterNumber).IsUnique();
+            e.HasIndex(x => new { x.Type, x.SequenceNumber }).IsUnique();
+            e.HasIndex(x => new { x.PatientId, x.EncounterUtc });
+            e.HasIndex(x => new { x.Type, x.EncounterDate });
+            e.HasIndex(x => new { x.TokenScope, x.EncounterDate, x.TokenNumber }).IsUnique().HasFilter("\"TokenNumber\" IS NOT NULL");
+            e.Property(x => x.Type).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.HospitalTypeAtVisit).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.Patient).WithMany(p => p.Encounters).HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Department).WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Doctor).WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ServiceItem).WithMany().HasForeignKey(x => x.ServiceItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<OpdVisit>(e =>
+        {
+            e.ToTable("OpdVisits");
+            e.HasKey(x => x.EncounterId);
+            e.HasOne(x => x.Encounter).WithOne(x => x.Opd!).HasForeignKey<OpdVisit>(x => x.EncounterId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<EmergencyVisit>(e =>
+        {
+            e.ToTable("EmergencyVisits");
+            e.HasKey(x => x.EncounterId);
+            e.HasIndex(x => x.Status);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.HasOne(x => x.Encounter).WithOne(x => x.Emergency!).HasForeignKey<EmergencyVisit>(x => x.EncounterId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<EmergencyStatusHistory>(e =>
+        {
+            e.ToTable("EmergencyStatusHistory");
+            e.HasIndex(x => new { x.EncounterId, x.ChangedUtc });
+            e.Property(x => x.FromStatus).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ToStatus).HasConversion<string>().HasMaxLength(20);
+            e.HasOne(x => x.Visit).WithMany(v => v.StatusHistory).HasForeignKey(x => x.EncounterId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<EmergencyCategory>(e =>
+        {
+            e.ToTable("EmergencyCategories");
+            e.HasIndex(x => x.Name).IsUnique();
+        });
+
+        b.Entity<Doctor>(e =>
+        {
+            e.ToTable("Doctors");
+            e.HasIndex(x => x.Name);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.Department).WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<ServiceItem>(e =>
+        {
+            e.ToTable("ServiceItems");
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.Category).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.DefaultFee).HasPrecision(12, 2);
+            e.HasOne(x => x.Doctor).WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<PrintedDocument>(e =>
+        {
+            e.ToTable("PrintedDocuments");
+            e.HasIndex(x => new { x.EncounterId, x.PrintedUtc });
+            e.Property(x => x.DocumentType).HasConversion<string>().HasMaxLength(30);
+            e.HasOne(x => x.Encounter).WithMany(x => x.PrintedDocuments).HasForeignKey(x => x.EncounterId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<RegistrationSettings>(e =>
+        {
+            e.ToTable("RegistrationSettings", t => t.HasCheckConstraint("CK_RegistrationSettings_Singleton", "\"Id\" = 1"));
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.OpdTokenScope).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+        });
+
+        b.Entity<Appointment>(e =>
+        {
+            e.ToTable("Appointments");
+            // Doctor-wise independent daily token: the database itself rejects a duplicate token for the same doctor and date.
+            e.HasIndex(x => new { x.DoctorId, x.AppointmentDate, x.TokenNumber }).IsUnique().HasDatabaseName("UX_Appointments_Doctor_Date_Token");
+            e.HasIndex(x => new { x.AppointmentDate, x.DoctorId, x.Status });
+            e.HasIndex(x => x.PatientId);
+            e.HasIndex(x => x.EncounterId).IsUnique();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ConsultationFee).HasPrecision(12, 2);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.ToTable(t => t.HasCheckConstraint("CK_Appointments_Token_Positive", "\"TokenNumber\" > 0"));
+            e.HasOne(x => x.Patient).WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Doctor).WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Encounter).WithOne().HasForeignKey<Appointment>(x => x.EncounterId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ServiceItem).WithMany().HasForeignKey(x => x.ServiceItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<PrinterProfile>(e =>
+        {
+            e.ToTable("PrinterProfiles");
+            e.HasIndex(x => x.WorkstationName).IsUnique();
+            e.Property(x => x.Mode).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Alignment).HasConversion<string>().HasMaxLength(10);
+            e.Property(x => x.FontSize).HasConversion<string>().HasMaxLength(10);
+            e.Property(x => x.RowVersion).IsRowVersion();
         });
 
         b.Entity<BackupHistory>(e =>
