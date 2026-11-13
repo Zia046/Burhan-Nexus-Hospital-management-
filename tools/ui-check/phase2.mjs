@@ -79,16 +79,43 @@ try {
   await submit("button[value='profile']");
   await shot(page, "p2-04-duplicate-warning");
 
-  // ---- Private OPD visit ----
+  // ---- Private hospital: appointment with doctor-wise token + thermal slip ----
   await go(patientUrl.replace(base, ""));
   await submit("a:has-text('New OPD visit')");
-  await page.selectOption("#Visit_DoctorId", { label: "Dr. Sana Khan – Gynaecology & Obstetrics" });
-  await page.fill("#Visit_ChiefComplaint", "Lower abdominal pain");
-  await shot(page, "p2-05-opd-register-private");
-  await submit("button:has-text('Register')");
-  const privUrl = page.url().split("?")[0];
-  step("private print: " + privUrl);
-  await pdf(privUrl.replace(base, "") + "?paper=A5", "sample-private-visit-document-A5.pdf");
+  step("private OPD link → " + page.url());
+  await page.check(`label.doctor-choice:has-text('Dr. Sana Khan') input`);
+  await page.fill("#Input_Complaint", "Lower abdominal pain");
+  await shot(page, "pa-05-appointment-book");
+  await submit("button[data-test='appt-save']");
+  await page.waitForTimeout(800);
+  const slipUrl = page.url().split("?")[0];
+  step("appointment slip: " + slipUrl);
+  await shot(page, "pa-05b-thermal-slip-preview");
+  // More bookings so each doctor shows an independent token series.
+  const pid = new URL(patientUrl).pathname.split("/").pop();
+  for (const [doc, n] of [["Dr. Sana Khan", 3], ["Dr. Imran Ali", 4]]) {
+    for (let i = 0; i < n; i++) {
+      await go(`/Appointments/Book?patientId=${pid}`);
+      await page.check(`label.doctor-choice:has-text('${doc}') input`);
+      await submit("button[data-test='appt-save']");
+    }
+  }
+  await go(`/Appointments/Book?patientId=${pid}`);
+  await shot(page, "pa-05c-appointment-next-tokens");
+  await go("/Appointments");
+  await shot(page, "pa-06-appointments-doctor-wise");
+  await go("/Appointments/Reports");
+  await shot(page, "pa-07-appointment-report-daily");
+  await go("/Settings/Printers");
+  await shot(page, "pa-08-printer-settings");
+  await go("/Settings/Appointments");
+  await shot(page, "pa-08b-appointment-settings");
+  await pdf(slipUrl.replace(base, "") + "?width=80", "sample-appointment-thermal-80mm.pdf");
+  await pdf(slipUrl.replace(base, "") + "?width=58", "sample-appointment-thermal-58mm.pdf");
+  await go(slipUrl.replace(base, "").replace("/Print/Appointment/", "/Appointments/Details/"));
+  await shot(page, "pa-09-appointment-details");
+  await go("/");
+  await shot(page, "pa-09b-dashboard-private");
 
   // ---- Switch to Government mode ----
   await go("/Settings/HospitalType");

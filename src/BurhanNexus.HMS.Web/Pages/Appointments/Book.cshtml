@@ -110,7 +110,7 @@ else
                     </div>
                     <div class="field">
                         <label for="Input_Notes">Notes <span class="muted">(optional)</span></label>
-                        <input id="Input_Notes" name="Input.Notes" value="@Model.Input.Notes" maxlength="1000" autocomplete="off" />
+                        <input id="Input_Notes" name="Input.Notes" value="@Model.Input.Notes" maxlength="500" autocomplete="off" />
                     </div>
                 </div>
                 @if (date != Model.Today) { <p class="muted small">Next-token numbers above are for @Fmt.Day(date).</p> }

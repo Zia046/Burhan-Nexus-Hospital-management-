@@ -74,7 +74,9 @@ public class OpdEmergencyTests : Phase2TestBase
         }
         var pid = await RegisterPatientAsync(admin, PatientFields("Rukhsana Bibi", "Javed Iqbal", "Female"));
 
-        var noDoctor = await admin.PostFormAsync($"/Opd/Register?patientId={pid}", Array.Empty<KeyValuePair<string, string>>());
+        // Private hospitals now book through /Appointments; the classic private OPD visit (A5 visit record) still works for direct posts.
+        Assert.Equal($"/Appointments/Book?patientId={pid}", (await admin.GetAsync($"/Opd/Register?patientId={pid}")).Headers.Location!.OriginalString);
+        var noDoctor = await admin.PostFormAsync("/Patients/Register", Array.Empty<KeyValuePair<string, string>>(), $"/Opd/Register?patientId={pid}");
         Assert.Contains("Please select the doctor", await noDoctor.Content.ReadAsStringAsync());
 
         var v1 = await RegisterOpdAsync(admin, pid, ("Visit.DoctorId", sana.ToString()));

@@ -32,8 +32,9 @@ public abstract partial class Phase2TestBase : HmsTestBase
 
     protected async Task<long> RegisterOpdAsync(Browser b, long patientId, params (string Key, string Value)[] extra)
     {
+        // Token taken from another page: in private hospitals GET /Opd/Register forwards to appointment booking.
         var url = $"/Opd/Register?patientId={patientId}";
-        var r = await b.PostFormAsync(url, extra.Select(e => P(e.Key, e.Value)));
+        var r = await b.PostFormAsync("/Patients/Register", extra.Select(e => P(e.Key, e.Value)), url);
         Assert.True(r.StatusCode == HttpStatusCode.Redirect, "OPD registration failed: " + Errors(await r.Content.ReadAsStringAsync()));
         return long.Parse(EncounterRegex().Match(r.Headers.Location!.OriginalString).Groups[1].Value);
     }
