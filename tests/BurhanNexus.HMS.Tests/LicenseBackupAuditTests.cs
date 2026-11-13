@@ -137,10 +137,10 @@ public class BackupAndAuditTests : HmsTestBase
         await CreateUserAsync(admin, "created.after.backup", "After12345");
 
         // Ordinary user cannot see, download or restore backups.
-        var staffId = await CreateUserAsync(admin, "ordinary", "Ordinary123");
+        var staffId = await CreateUserAsync(admin, "ordinary", "Ord#Pass2026");
         await SetPermissionsAsync(admin, staffId, (Perm.DashboardView, "grant"));
         var staff = Factory.NewBrowser();
-        await LoginAsync(staff, "ordinary", "Ordinary123");
+        await LoginAsync(staff, "ordinary", "Ord#Pass2026");
         Assert.Contains("/Account/AccessDenied", (await staff.GetAsync($"/Backup?handler=Download&id={backupId}")).Headers.Location!.ToString());
         Assert.Contains("/Account/AccessDenied", (await staff.GetAsync($"/Backup/Restore/{backupId}")).Headers.Location!.ToString());
 

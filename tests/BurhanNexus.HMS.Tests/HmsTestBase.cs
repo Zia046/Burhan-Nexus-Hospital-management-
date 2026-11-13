@@ -9,7 +9,7 @@ namespace BurhanNexus.HMS.Tests;
 public abstract partial class HmsTestBase : IAsyncLifetime
 {
     public const string AdminUser = "admin";
-    public const string AdminPassword = "Admin12345";
+    public const string AdminPassword = "Hospital#2026";
     public static readonly byte[] TinyPng = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==");
 
@@ -41,7 +41,7 @@ public abstract partial class HmsTestBase : IAsyncLifetime
     {
         var b = Factory.NewBrowser();
         var r = await b.PostMultipartAsync("/Setup", SetupFields(hospitalType), ("Logo", "logo.png", TinyPng, "image/png"));
-        Assert.Equal(HttpStatusCode.Redirect, r.StatusCode);
+        Assert.True(r.StatusCode == HttpStatusCode.Redirect, "Setup failed: " + Errors(await r.Content.ReadAsStringAsync()));
         Assert.Equal("/Account/Login", r.Headers.Location?.OriginalString);
         return b;
     }
@@ -63,6 +63,16 @@ public abstract partial class HmsTestBase : IAsyncLifetime
     }
 
     [GeneratedRegex(@"/Users/Edit/(\d+)")] private static partial Regex EditIdRegex();
+    [GeneratedRegex(@"<div class=""alert alert-danger""[\s\S]*?</div>\s*</div>|<div class=""alert alert-danger""[\s\S]*?</div>")] private static partial Regex AlertRegex();
+    [GeneratedRegex("<[^>]+>")] private static partial Regex TagRegex();
+
+    /// <summary>Extracts the visible error messages from a page (for clear test failure messages).</summary>
+    protected static string Errors(string html)
+    {
+        var m = AlertRegex().Matches(html).Select(x => TagRegex().Replace(x.Value, " ")).ToList();
+        var text = m.Count > 0 ? string.Join(" | ", m) : html[..Math.Min(html.Length, 1500)];
+        return System.Text.RegularExpressions.Regex.Replace(System.Net.WebUtility.HtmlDecode(text), @"\s+", " ");
+    }
 
     protected async Task<int> CreateUserAsync(Browser admin, string username, string password, bool mustChange = false, params int[] departmentIds)
     {
@@ -73,7 +83,7 @@ public abstract partial class HmsTestBase : IAsyncLifetime
         };
         fields.AddRange(departmentIds.Select(d => P("DepartmentIds", d.ToString())));
         var r = await admin.PostFormAsync("/Users/Create", fields);
-        Assert.True(r.StatusCode == HttpStatusCode.Redirect, "Create user failed: " + await r.Content.ReadAsStringAsync());
+        Assert.True(r.StatusCode == HttpStatusCode.Redirect, "Create user failed: " + Errors(await r.Content.ReadAsStringAsync()));
         return int.Parse(EditIdRegex().Match(r.Headers.Location!.OriginalString).Groups[1].Value);
     }
 

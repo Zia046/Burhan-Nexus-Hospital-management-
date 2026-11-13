@@ -64,13 +64,13 @@ public class PermissionTests : HmsTestBase
     {
         await SetupAsync();
         var admin = await LoginAdminAsync();
-        var managerId = await CreateUserAsync(admin, "manager1", "Manager123");
+        var managerId = await CreateUserAsync(admin, "manager1", "Mgr#Pass2026");
         await SetPermissionsAsync(admin, managerId, (Perm.DashboardView, "grant"), (Perm.UsersView, "grant"), (Perm.UsersAdd, "grant"),
             (Perm.UsersAssignPermissions, "grant"));
-        var staffId = await CreateUserAsync(admin, "staff1", "Staff12345");
+        var staffId = await CreateUserAsync(admin, "staff1", "Stf#Pass2026");
 
         var manager = Factory.NewBrowser();
-        Assert.Equal(HttpStatusCode.Redirect, (await LoginAsync(manager, "manager1", "Manager123")).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await LoginAsync(manager, "manager1", "Mgr#Pass2026")).StatusCode);
 
         // Own permissions: read-only page and server-side rejection.
         Assert.Contains("You cannot change your own permissions", await manager.GetHtmlAsync($"/Users/Permissions/{managerId}"));
@@ -109,13 +109,13 @@ public class PermissionTests : HmsTestBase
         await using var db = Factory.NewDb();
         var roleId = await db.Roles.Where(r => r.Name == "Receptionist").Select(r => r.Id).SingleAsync();
 
-        var id = await CreateUserAsync(admin, "front1", "Front12345");
+        var id = await CreateUserAsync(admin, "front1", "Frt#Pass2026");
         var roles = await admin.PostFormAsync($"/Users/Edit/{id}", new[] { P("RoleIds", roleId.ToString()) }, $"/Users/Edit/{id}?handler=Roles");
         Assert.Equal(HttpStatusCode.Redirect, roles.StatusCode);
         await SetPermissionsAsync(admin, id, ("Opd.View", "deny"));
 
         var user = Factory.NewBrowser();
-        await LoginAsync(user, "front1", "Front12345");
+        await LoginAsync(user, "front1", "Frt#Pass2026");
         var me = await (await user.GetAsync("/api/me")).Content.ReadAsStringAsync();
         Assert.Contains("Patients.Add", me);
         Assert.DoesNotContain("Opd.View", me);
@@ -128,11 +128,11 @@ public class PermissionTests : HmsTestBase
     {
         await SetupAsync();
         var admin = await LoginAdminAsync();
-        var id = await CreateUserAsync(admin, "lab1", "Lab1234567");
+        var id = await CreateUserAsync(admin, "lab1", "Lab#Pass2026");
         await SetPermissionsAsync(admin, id, (Perm.DashboardView, "grant"));
 
         var labPc = Factory.NewBrowser();
-        await LoginAsync(labPc, "lab1", "Lab1234567", "Lab-PC");
+        await LoginAsync(labPc, "lab1", "Lab#Pass2026", "Lab-PC");
         Assert.Equal(HttpStatusCode.OK, (await labPc.GetAsync("/")).StatusCode);
 
         var r = await admin.PostFormAsync($"/Users/Edit/{id}", new[] { P("active", "false") }, $"/Users/Edit/{id}?handler=Activate");
@@ -141,12 +141,12 @@ public class PermissionTests : HmsTestBase
         var after = await labPc.GetAsync("/");
         Assert.Equal(HttpStatusCode.Redirect, after.StatusCode);
         Assert.Contains("/Account/Login", after.Headers.Location!.ToString());
-        var relogin = await LoginAsync(Factory.NewBrowser(), "lab1", "Lab1234567");
+        var relogin = await LoginAsync(Factory.NewBrowser(), "lab1", "Lab#Pass2026");
         Assert.Contains("inactive", await relogin.Content.ReadAsStringAsync());
 
         // Reactivate → can log in again; admin cannot deactivate itself.
         await admin.PostFormAsync($"/Users/Edit/{id}", new[] { P("active", "true") }, $"/Users/Edit/{id}?handler=Activate");
-        Assert.Equal(HttpStatusCode.Redirect, (await LoginAsync(Factory.NewBrowser(), "lab1", "Lab1234567")).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await LoginAsync(Factory.NewBrowser(), "lab1", "Lab#Pass2026")).StatusCode);
         Assert.Single(await AuditAsync(AuditActions.UserDeactivated));
         Assert.Single(await AuditAsync(AuditActions.UserActivated));
     }
@@ -161,7 +161,7 @@ public class PermissionTests : HmsTestBase
         var dental = await DepartmentIdAsync("Dental");
         var lab = await DepartmentIdAsync("Laboratory");
 
-        var id = await CreateUserAsync(admin, "multi1", "Multi12345", false, dental);
+        var id = await CreateUserAsync(admin, "multi1", "Mlt#Pass2026", false, dental);
         await admin.PostFormAsync($"/Users/Edit/{id}", new[] { P("DepartmentIds", dental.ToString()), P("DepartmentIds", lab.ToString()) }, $"/Users/Edit/{id}?handler=Departments");
         await using (var db = Factory.NewDb())
             Assert.Equal(2, await db.UserDepartments.CountAsync(d => d.UserId == id));
@@ -185,7 +185,7 @@ public class PermissionTests : HmsTestBase
     {
         await SetupAsync();
         var pc1 = await LoginAdminAsync();
-        var id = await CreateUserAsync(pc1, "shared1", "Shared1234");
+        var id = await CreateUserAsync(pc1, "shared1", "Shr#Pass2026");
         var pc2 = await LoginAdminAsync();
 
         uint version;
@@ -204,7 +204,7 @@ public class PermissionTests : HmsTestBase
         Assert.Contains("Edited On PC1", page);
 
         // Duplicate usernames are rejected.
-        var dup = await pc2.PostFormAsync("/Users/Create", new[] { P("FullName", "Dup"), P("Username", "SHARED1"), P("Password", "Shared1234"), P("ConfirmPassword", "Shared1234") });
+        var dup = await pc2.PostFormAsync("/Users/Create", new[] { P("FullName", "Dup"), P("Username", "SHARED1"), P("Password", "Shr#Pass2026"), P("ConfirmPassword", "Shr#Pass2026") });
         Assert.Contains("already in use", await dup.Content.ReadAsStringAsync());
     }
 }
