@@ -258,15 +258,15 @@ public sealed partial class PatientService : IPatientService
         const string sql = """
             SELECT "Id",
                    similarity("FullName", @name)::float8 AS "NameScore",
-                   CASE WHEN @guardian IS NULL OR "GuardianName" IS NULL THEN 0 ELSE similarity("GuardianName", @guardian)::float8 END AS "GuardianScore",
-                   (@cnic IS NOT NULL AND "CnicDigits" = @cnic) AS "CnicMatch",
-                   (@mobile IS NOT NULL AND "MobileDigits" = @mobile) AS "MobileMatch"
+                   CASE WHEN @guardian IS NULL OR "GuardianName" IS NULL THEN 0::float8 ELSE similarity("GuardianName", @guardian)::float8 END AS "GuardianScore",
+                   COALESCE(@cnic IS NOT NULL AND "CnicDigits" = @cnic, false) AS "CnicMatch",
+                   COALESCE(@mobile IS NOT NULL AND "MobileDigits" = @mobile, false) AS "MobileMatch"
             FROM "Patients"
             WHERE "Status" <> 'Merged' AND "Id" <> @exclude
               AND ((@cnic IS NOT NULL AND "CnicDigits" = @cnic)
                    OR (@mobile IS NOT NULL AND "MobileDigits" = @mobile)
                    OR (length(@name) >= 3 AND "FullName" % @name AND similarity("FullName", @name) >= 0.45))
-            ORDER BY (@cnic IS NOT NULL AND "CnicDigits" = @cnic) DESC, similarity("FullName", @name) DESC
+            ORDER BY COALESCE(@cnic IS NOT NULL AND "CnicDigits" = @cnic, false) DESC, similarity("FullName", @name) DESC
             LIMIT 40
             """;
         var rows = await _db.Database.SqlQueryRaw<DuplicateRow>(sql,

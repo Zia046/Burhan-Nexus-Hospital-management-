@@ -41,7 +41,7 @@ public class OpdEmergencyTests : Phase2TestBase
             Assert.Contains(expected, slip);
         Assert.Contains("paper-a4", await admin.GetHtmlAsync($"/Print/Opd/{v1}?paper=A4"));
         Assert.Equal(2, (await EncounterAsync(v1)).PrintedDocuments.Count);
-        Assert.Contains("copy 2", await admin.GetHtmlAsync($"/Opd/Visit/{v1}"));
+        Assert.Contains("Copy 2", await admin.GetHtmlAsync($"/Opd/Visit/{v1}"));
 
         var history = await admin.GetHtmlAsync($"/Patients/Profile/{pid}");
         Assert.Contains(e1.EncounterNumber, history);
