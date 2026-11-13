@@ -102,3 +102,45 @@ jobs:
           git config user.name "ci-bot"; git config user.email "ci-bot@users.noreply.github.com"
           git add -A && git commit -qm "CI results for ${GITHUB_SHA}"
           git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-results
+
+  windows-install:
+    needs: build-test
+    runs-on: windows-2022
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: BurhanNexus-HMS-Server-win-x64
+          path: package
+      - name: Start PostgreSQL
+        shell: pwsh
+        run: |
+          $svc = Get-Service -Name "postgresql*" | Select-Object -First 1
+          Set-Service $svc.Name -StartupType Manual
+          Start-Service $svc.Name
+          Get-ChildItem "C:\Program Files\PostgreSQL"
+      - name: Run server installer
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File .\package\deploy\windows\Install-Server.ps1 -PostgresPassword root -Port 5000 *> install.log
+          Get-Content install.log
+      - name: Verify installation
+        shell: pwsh
+        run: |
+          $h = Invoke-WebRequest -UseBasicParsing http://localhost:5000/health
+          "health: $($h.StatusCode) $($h.Content)" | Tee-Object -FilePath verify.log
+          $s = Invoke-WebRequest -UseBasicParsing http://localhost:5000/ -MaximumRedirection 5
+          if ($s.Content -notmatch "Initial Setup Wizard") { throw "Setup wizard not shown" }
+          "setup wizard OK" | Tee-Object -FilePath verify.log -Append
+          Get-Service BurhanNexusHMS | Format-List Name, Status, StartType | Out-String | Tee-Object -FilePath verify.log -Append
+          Get-NetFirewallRule -DisplayName "Burhan Nexus HMS*" | Format-List DisplayName, Enabled, Profile | Out-String | Tee-Object -FilePath verify.log -Append
+          Restart-Service BurhanNexusHMS
+          Start-Sleep -Seconds 8
+          "after restart: $((Invoke-WebRequest -UseBasicParsing http://localhost:5000/health).StatusCode)" | Tee-Object -FilePath verify.log -Append
+      - name: Upload Windows install logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-install-logs
+          path: |
+            install.log
+            verify.log
