@@ -64,6 +64,18 @@ jobs:
         run: |
           set -o pipefail
           dotnet test BurhanNexus.HMS.slnx -c Release --no-build --logger "console;verbosity=normal" 2>&1 | tee ci-output/test.log
+      - name: UI walk-through with screenshots
+        run: |
+          dotnet publish src/BurhanNexus.HMS.Web -c Release -o publish/linux > ci-output/publish-linux.log 2>&1
+          cd publish/linux
+          export ConnectionStrings__HmsDatabase="Host=localhost;Port=5432;Username=hms;Password=hms_ci_password;Database=hms_ui"
+          export Kestrel__Endpoints__Http__Url="http://127.0.0.1:5080"
+          nohup dotnet BurhanNexus.HMS.Web.dll > ../../ci-output/server.log 2>&1 &
+          cd ../../tools/ui-check
+          npm install --no-audit --no-fund > ../../ci-output/npm.log 2>&1
+          npx playwright install --with-deps chromium >> ../../ci-output/npm.log 2>&1
+          for i in $(seq 1 40); do curl -sf http://127.0.0.1:5080/health > /dev/null && break; sleep 2; done
+          OUT_DIR=../../ci-output/screenshots node screenshots.mjs || true
       - name: Publish (self-contained Windows + Linux)
         run: |
           set -o pipefail
