@@ -12,9 +12,14 @@ public class ResetAndCatalogTests : HmsTestBase
     public void Permission_catalogue_is_consistent()
     {
         Assert.Equal(PermissionCatalog.All.Count, PermissionCatalog.AllKeys.Count);
-        foreach (var module in new[] { "Patients", "Opd", "Emergency", "Laboratory", "XRay", "Ultrasound", "Pharmacy", "MinorOt", "Doctors", "Finance", "Reports" })
+        foreach (var module in new[] { "Patients", "Opd", "Emergency", "Laboratory", "XRay", "Ultrasound", "Pharmacy", "MinorOt", "Doctors", "Reports" })
             foreach (var action in new[] { "View", "Add", "Edit", "Delete", "Print", "ExportPdf", "Verify", "Approve", "Cancel", "Refund", "FinancialAccess", "SettingsAccess" })
                 Assert.Contains($"{module}.{action}", PermissionCatalog.AllKeys);
+        // Phase 3: Finance became a real module with its own, specific financial permissions.
+        var finance = PermissionCatalog.FindModule("Finance")!;
+        Assert.True(finance.IsAvailable);
+        Assert.True(finance.IsFinancialModule);
+        Assert.Equal(24, finance.Actions.Count);
         foreach (var key in typeof(Perm).GetFields().Select(f => (string)f.GetValue(null)!))
             Assert.Contains(key, PermissionCatalog.AllKeys);
     }

@@ -1,0 +1,93 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Finance.CountersModel
+@{
+    ViewData["Title"] = "Counters";
+    var e = Model.Editing;
+    var sum = Model.Summary;
+}
+<partial name="_FinanceNav" />
+<partial name="_ValidationSummary" />
+<div class="toolbar">
+    <form method="get" class="filters wrap">
+        @if (Model.Id is int cid) { <input type="hidden" name="id" value="@cid" /> }
+        <partial name="_PeriodFilter" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" />
+        <button class="btn btn-light" type="submit">Show</button>
+    </form>
+    <div class="toolbar-actions">@if (Model.Id is not null) { <a class="btn btn-light" href="/Finance/Counters">All counters</a> }</div>
+</div>
+<div class="grid-side">
+    <div class="stack">
+        <div class="card">
+            <div class="card-header"><h2><svg class="icon"><use href="#i-building" /></svg> @(e is null ? "Counter-wise collections" : e.Counter.Name) – @BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(Model.From!.Value, Model.To!.Value)</h2></div>
+            <div class="table-wrap">
+                <table class="table" data-counters>
+                    <thead><tr><th>Counter</th><th>Staff</th><th class="num">Receipts</th><th class="num">Collection</th><th class="num">Outstanding cash (at @Fmt.Day(Model.To!.Value))</th><th>Status</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var c in Model.Counters.Where(c => Model.Id is null || c.Counter.Id == Model.Id))
+                    {
+                        var g = sum.ByCounter.FirstOrDefault(x => x.Key == c.Counter.Id.ToString());
+                        var bal = Model.Balances.FirstOrDefault(b => b.ScopeName == c.Counter.Name);
+                        <tr data-counter="@c.Counter.Code"><td><strong>@c.Counter.Name</strong> <small class="muted mono">@c.Counter.Code</small></td>
+                            <td>@string.Join(", ", c.Staff.Select(s => s.FullName))</td>
+                            <td class="num">@(g?.Count ?? 0)</td><td class="num">@Fmt.Money(g?.Amount ?? 0)</td><td class="num">@Fmt.Money(bal?.Closing ?? 0)</td>
+                            <td>@(c.Counter.IsActive ? "Active" : "Inactive")</td>
+                            <td class="actions nowrap"><a class="btn btn-light btn-sm" href="/Finance/Counters?id=@c.Counter.Id">Open</a>
+                                <a bn-permission="@Perm.FinanceViewAllAccounts" class="btn btn-light btn-sm" href="/Finance/Receipts?counter=@c.Counter.Id&period=@Model.PresetKey&from=@Model.From?.ToString("yyyy-MM-dd")&to=@Model.To?.ToString("yyyy-MM-dd")">Receipts</a></td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        @if (e is not null)
+        {
+            <div class="card">
+                <div class="card-header"><h3>Staff of @e.Counter.Name</h3></div>
+                <div class="table-wrap">
+                    <table class="table table-compact" data-counter-staff>
+                        <thead><tr><th>Employee</th><th>Since</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var s in e.Staff)
+                        {
+                            <tr><td>@s.FullName (@s.Username)</td><td>@Fmt.DateTimeText(s.AssignedUtc)</td>
+                                <td>@if (Model.CanManage) { <form method="post" asp-page-handler="Unassign" asp-route-id="@e.Counter.Id" asp-route-userId="@s.UserId"><button class="btn btn-light btn-sm" type="submit">Remove</button></form> }</td></tr>
+                        }
+                        @if (e.Staff.Count == 0) { <tr><td colspan="3" class="empty">Nobody assigned.</td></tr> }
+                        </tbody>
+                    </table>
+                </div>
+                @if (Model.CanManage && e.Counter.IsActive)
+                {
+                    <form method="post" asp-page-handler="Assign" asp-route-id="@e.Counter.Id" class="card-body inline-form" novalidate>
+                        <select name="AssignUserId" aria-label="Employee" required><option value="">– employee –</option>@foreach (var u in Model.Users) { <option value="@u.Id">@u.Name</option> }</select>
+                        <select name="TransferFrom" aria-label="Transfer from"><option value="">New assignment (keep other counters)</option>
+                            @foreach (var c in Model.Counters.Where(c => c.Counter.Id != e.Counter.Id)) { <option value="@c.Counter.Id">Transfer from @c.Counter.Name</option> }</select>
+                        <button class="btn btn-primary btn-sm" type="submit" data-test="counter-assign">Assign</button>
+                    </form>
+                }
+            </div>
+            <div class="card">
+                <div class="card-header"><h3>Assignment history</h3></div>
+                <ul class="activity">
+                    @foreach (var h in Model.History)
+                    {
+                        <li><span class="activity-dot"></span><div><strong>@h.User?.FullName</strong><small>@Fmt.DateTimeText(h.AssignedUtc) by @h.AssignedBy@(h.EndedUtc is null ? " · current" : $" → ended {Fmt.DateTimeText(h.EndedUtc)} by {h.EndedBy}")</small></div></li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+    <div class="stack">
+        <form bn-permission="@Perm.FinanceManageCounters" method="post" asp-page-handler="Save" asp-route-id="@Model.Id" class="card" novalidate>
+            <div class="card-header"><h3>@(e is null ? "New counter" : "Edit counter")</h3></div>
+            <div class="card-body">
+                <div class="field"><label for="Form_Code">Code <em>*</em></label><input id="Form_Code" name="Form.Code" value="@Model.Form.Code" maxlength="20" required /></div>
+                <div class="field"><label for="Form_Name">Name <em>*</em></label><input id="Form_Name" name="Form.Name" value="@Model.Form.Name" maxlength="100" required placeholder="e.g. Laboratory Counter" /></div>
+                <div class="field"><label for="Form_DepartmentId">Department</label><select id="Form_DepartmentId" name="Form.DepartmentId"><option value="">—</option>
+                    @foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(Model.Form.DepartmentId == d.Id)">@d.Name</option> }</select></div>
+                <label class="check"><input type="checkbox" name="Form.IsActive" value="true" checked="@Model.Form.IsActive" /> Active</label>
+                <input type="hidden" name="Form.IsActive" value="false" />
+            </div>
+            <div class="card-footer form-actions">@if (e is not null) { <a class="btn btn-light" href="/Finance/Counters">New</a> }<button class="btn btn-primary" type="submit" data-test="counter-save">Save counter</button></div>
+        </form>
+    </div>
+</div>

@@ -1,0 +1,53 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Finance.SettingsModel
+@{
+    ViewData["Title"] = "Financial settings";
+    var i = Model.Input;
+    var m = Model.Method;
+}
+<partial name="_FinanceNav" />
+<partial name="_ValidationSummary" />
+<div class="grid-2">
+    <form method="post" asp-page-handler="Settings" class="card" novalidate>
+        <div class="card-header"><h3>Receipts</h3></div>
+        <div class="card-body">
+            <input type="hidden" name="RowVersion" value="@Model.RowVersion" />
+            <div class="field"><label for="Input_ReceiptPrefix">Receipt number prefix</label><input id="Input_ReceiptPrefix" name="Input.ReceiptPrefix" value="@i.ReceiptPrefix" maxlength="10" />
+                <small class="muted">Numbers look like <span class="mono">@(i.ReceiptPrefix)-@DateTime.Now.Year-000123</span>. Numbers are never reused.</small></div>
+            <div class="field"><label for="Input_DefaultReceiptWidthMm">Default receipt paper</label><select id="Input_DefaultReceiptWidthMm" name="Input.DefaultReceiptWidthMm">
+                <option value="80" selected="@(i.DefaultReceiptWidthMm == 80)">80 mm</option><option value="58" selected="@(i.DefaultReceiptWidthMm == 58)">58 mm</option></select>
+                <small class="muted">Each computer's thermal printer profile (Settings → Thermal printers) decides the actual paper.</small></div>
+            <div class="field"><label for="Input_ReceiptFooter">Receipt footer</label><input id="Input_ReceiptFooter" name="Input.ReceiptFooter" value="@i.ReceiptFooter" maxlength="200" /></div>
+            <label class="check"><input type="checkbox" name="Input.IssueZeroReceiptForFreeServices" value="true" checked="@i.IssueZeroReceiptForFreeServices" /> Issue a zero-amount receipt for free services (proof of service)</label>
+            <label class="check"><input type="checkbox" name="Input.ShowCashierOnReceipt" value="true" checked="@i.ShowCashierOnReceipt" /> Print the cashier's name</label>
+            <input type="hidden" name="Input.IssueZeroReceiptForFreeServices" value="false" /><input type="hidden" name="Input.ShowCashierOnReceipt" value="false" />
+        </div>
+        <div class="card-footer"><button class="btn btn-primary" type="submit">Save</button></div>
+    </form>
+    <div class="stack">
+        <div class="card">
+            <div class="card-header"><h3>Payment methods</h3></div>
+            <div class="table-wrap">
+                <table class="table table-compact">
+                    <thead><tr><th>Code</th><th>Name</th><th>Cash in hand</th><th>Reference</th><th>Status</th></tr></thead>
+                    <tbody>@foreach (var x in Model.Methods) { <tr><td class="mono"><a href="/Finance/Settings?methodId=@x.Id">@x.Code</a></td><td>@x.Name</td><td>@(x.CountsAsCashInHand ? "Yes" : "No")</td><td>@(x.RequiresReference ? "Required" : "")</td><td>@(x.IsActive ? "Active" : "Inactive")</td></tr> }</tbody>
+                </table>
+            </div>
+        </div>
+        <form method="post" asp-page-handler="Method" asp-route-methodId="@Model.MethodId" class="card" novalidate>
+            <div class="card-header"><h3>@(Model.MethodId is null ? "New payment method" : "Edit payment method")</h3></div>
+            <div class="card-body">
+                <div class="grid-2">
+                    <div class="field"><label for="Method_Code">Code</label><input id="Method_Code" name="Method.Code" value="@m.Code" maxlength="20" /></div>
+                    <div class="field"><label for="Method_Name">Name</label><input id="Method_Name" name="Method.Name" value="@m.Name" maxlength="60" placeholder="e.g. JazzCash" /></div>
+                </div>
+                <div class="field"><label for="Method_SortOrder">Order</label><input id="Method_SortOrder" name="Method.SortOrder" type="number" value="@m.SortOrder" /></div>
+                <label class="check"><input type="checkbox" name="Method.CountsAsCashInHand" value="true" checked="@m.CountsAsCashInHand" /> Money stays with the cashier (must be deposited)</label>
+                <label class="check"><input type="checkbox" name="Method.RequiresReference" value="true" checked="@m.RequiresReference" /> Reference number required</label>
+                <label class="check"><input type="checkbox" name="Method.IsActive" value="true" checked="@m.IsActive" /> Active</label>
+                <input type="hidden" name="Method.CountsAsCashInHand" value="false" /><input type="hidden" name="Method.RequiresReference" value="false" /><input type="hidden" name="Method.IsActive" value="false" />
+            </div>
+            <div class="card-footer form-actions">@if (Model.MethodId is not null) { <a class="btn btn-light" href="/Finance/Settings">New</a> }<button class="btn btn-primary" type="submit">Save method</button></div>
+        </form>
+    </div>
+</div>

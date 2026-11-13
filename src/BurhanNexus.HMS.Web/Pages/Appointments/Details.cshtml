@@ -17,6 +17,7 @@
         {
             <a bn-permission="@(prints.Count == 0 ? Perm.AppointmentsPrint : Perm.AppointmentsReprint)" class="btn btn-primary" href="/Print/Appointment/@a.Id" data-test="appt-print"><svg class="icon icon-sm"><use href="#i-printer" /></svg> @(prints.Count == 0 ? "Print slip" : "Reprint slip")</a>
         }
+        @if (!cancelled) { <a bn-permission="@Perm.FinanceCollect" class="btn btn-light" href="/Finance/Collect?encounterId=@a.EncounterId" data-test="appt-collect"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Collect fee</a> }
         <a bn-permission="@Perm.AppointmentsAdd" class="btn btn-light" href="/Appointments/Book">Next booking</a>
     </div>
 </div>

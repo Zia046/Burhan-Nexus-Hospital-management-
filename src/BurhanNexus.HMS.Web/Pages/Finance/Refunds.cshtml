@@ -1,0 +1,42 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Finance.RefundsModel
+@{ ViewData["Title"] = "Refunds"; }
+<partial name="_FinanceNav" />
+<partial name="_ValidationSummary" />
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-refresh" /></svg> Refunds waiting for approval</h2><span class="pill pill-blue">@Model.Pending.Count</span></div>
+    <div class="table-wrap">
+        <table class="table" data-pending-refunds>
+            <thead><tr><th>Refund</th><th>Receipt</th><th>Patient</th><th class="num">Amount</th><th>Method</th><th>Reason</th><th>Requested</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var f in Model.Pending)
+            {
+                <tr><td class="mono">@f.RefundNumber</td><td class="mono"><a href="/Finance/Receipts/Details/@f.ReceiptId">@f.Receipt?.ReceiptNumber</a></td>
+                    <td>@(f.Receipt?.Patient?.FullName ?? f.Receipt?.PayerName)</td><td class="num"><strong>@Fmt.Money(f.Amount)</strong></td><td>@f.PaymentMethod?.Name</td><td>@f.Reason</td>
+                    <td class="nowrap">@f.RequestedByUsername · @Fmt.DateTimeText(f.RequestedUtc)</td>
+                    <td><form method="post" class="inline-form" novalidate>
+                        <input name="Note" maxlength="300" placeholder="Note (required to reject)" aria-label="Note" />
+                        <button class="btn btn-success btn-sm" type="submit" asp-page-handler="Approve" asp-route-id="@f.Id">Approve &amp; pay out</button>
+                        <button class="btn btn-danger btn-sm" type="submit" asp-page-handler="Reject" asp-route-id="@f.Id">Reject</button></form></td></tr>
+            }
+            @if (Model.Pending.Count == 0) { <tr><td colspan="8" class="empty">No refunds waiting.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header"><h3>Refund history</h3></div>
+    <div class="table-wrap">
+        <table class="table table-compact">
+            <thead><tr><th>Refund</th><th>Receipt</th><th class="num">Amount</th><th>Method</th><th>Reason</th><th>Status</th><th>Decided</th></tr></thead>
+            <tbody>
+            @foreach (var f in Model.History)
+            {
+                <tr><td class="mono">@f.RefundNumber</td><td class="mono"><a href="/Finance/Receipts/Details/@f.ReceiptId">@f.Receipt?.ReceiptNumber</a></td><td class="num">@Fmt.Money(f.Amount)</td>
+                    <td>@f.PaymentMethod?.Name</td><td>@f.Reason</td><td>@f.Status</td><td class="nowrap">@f.DecidedByUsername · @Fmt.DateTimeText(f.DecidedUtc) @f.DecisionNote</td></tr>
+            }
+            @if (Model.History.Count == 0) { <tr><td colspan="7" class="empty">No refunds yet.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -75,7 +75,7 @@ public class IndexModel : HmsPageModel
         }
         AvailableModules = PermissionCatalog.Modules
             .Where(m => m.IsAvailable && m.Key is "Patients" or "Opd" or "Emergency")
-            .Where(m => m.Actions.Any(a => Perms.Contains(m.PermissionKey(a.Key)) && a.Key is "View" or "Add" or "Search"))
+            .Where(m => m.Actions.Any(a => Perms.Contains(m.PermissionKey(a.Key)) && a.Key is "View" or "Add" or "Search" or "ViewOwnAccount"))
             .ToList();
 
         // Future modules: shown as "coming soon" only if the user has been given access to them.

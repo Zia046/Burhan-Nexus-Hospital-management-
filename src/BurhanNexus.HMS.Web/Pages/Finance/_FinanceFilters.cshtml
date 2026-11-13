@@ -1,0 +1,11 @@
+@model BurhanNexus.HMS.Web.Pages.Finance.FinanceFilterModel
+<form method="get" class="filters wrap">
+    <partial name="_PeriodFilter" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" />
+    <select name="department" aria-label="Department"><option value="">All departments</option>@foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(Model.DepartmentId == d.Id)">@d.Name</option> }</select>
+    <select name="counter" aria-label="Counter"><option value="">All counters</option>@foreach (var c in Model.Counters) { <option value="@c.Counter.Id" selected="@(Model.CounterId == c.Counter.Id)">@c.Counter.Name</option> }</select>
+    <select name="cashier" aria-label="Cashier"><option value="">All cashiers</option>@foreach (var u in Model.Users) { <option value="@u.Id" selected="@(Model.CashierId == u.Id)">@u.FullName</option> }</select>
+    <select name="doctor" aria-label="Doctor"><option value="">All doctors</option>@foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(Model.DoctorId == d.Id)">@d.Name</option> }</select>
+    <select name="method" aria-label="Payment method"><option value="">All methods</option>@foreach (var m in Model.Methods) { <option value="@m.Id" selected="@(Model.MethodId == m.Id)">@m.Name</option> }</select>
+    <select name="status" aria-label="Status"><option value="">All statuses</option><option value="valid" selected="@(Model.Status == "valid")">Valid</option><option value="cancelled" selected="@(Model.Status == "cancelled")">Cancelled</option><option value="refunded" selected="@(Model.Status == "refunded")">Refunded</option></select>
+    <button class="btn btn-light" type="submit">Apply</button>
+</form>

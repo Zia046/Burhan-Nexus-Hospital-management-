@@ -17,6 +17,7 @@
     </div>
     <div class="profile-actions">
         <a bn-permission="@Perm.OpdPrint" class="btn btn-primary" href="/Print/Opd/@e.Id" target="_blank"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print @(e.HospitalTypeAtVisit == HospitalType.Private ? "visit document" : "OPD slip")</a>
+        <a bn-permission="@Perm.FinanceCollect" class="btn btn-light" href="/Finance/Collect?encounterId=@e.Id" data-test="collect-fee"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Collect fee</a>
         <a bn-permission="@Perm.PatientsView" class="btn btn-light" href="/Patients/Profile/@p.Id">Patient profile</a>
         <a bn-permission="@Perm.OpdAdd" class="btn btn-light" href="/Opd/Register">Next patient</a>
     </div>

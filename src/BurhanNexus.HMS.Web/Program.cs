@@ -30,6 +30,7 @@ builder.Services.AddScoped<IRequestContext, HttpRequestContext>();
 builder.Services.AddScoped<UserPermissionContext>();
 builder.Services.AddScoped<DisplayFormatter>();
 builder.Services.AddScoped<AppointmentSlipFactory>();
+builder.Services.AddScoped<ReceiptSlipFactory>();
 
 // ---- Authentication: server-validated cookie sessions ----
 builder.Services.AddScoped<HmsCookieEvents>();

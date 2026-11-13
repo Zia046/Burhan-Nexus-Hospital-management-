@@ -48,3 +48,18 @@ body.thermal-body { background: #e9edf2; font-family: "Segoe UI", Arial, sans-se
   .slip-wrap { padding: 0; display: block; }
   .t-slip { box-shadow: none; margin: 0; }
 }
+
+/* Receipts */
+.t-title { font-weight: 800; letter-spacing: .08em; margin: 1mm 0; text-align: center; }
+.t-items { width: 100%; border-collapse: collapse; text-align: left; }
+.t-items th { font-size: .85em; border-bottom: 1px solid #000; padding: .4mm 0; }
+.t-items td { padding: .6mm 0; vertical-align: top; }
+.t-items .num, .t-items th:nth-child(n+2) { text-align: right; white-space: nowrap; padding-left: 2mm; }
+.t-items small.block, .t-slip small.block { display: block; font-size: .85em; }
+.t-kv.totals td:last-child { text-align: right; }
+.t-kv tr.paid td { font-size: 1.25em; font-weight: 900; border-top: 1px solid #000; border-bottom: 1px solid #000; }
+body.a4 .t-slip { width: 180mm; font-size: 13px; padding: 10mm; text-align: left; }
+body.a4 .t-hosp, body.a4 .t-title, body.a4 .t-small, body.a4 .t-msgline, body.a4 .t-tiny { text-align: center; }
+body.a4 .t-logo { max-height: 22mm; }
+.t-slip.receipt { text-align: center; }
+.t-slip.receipt .t-kv, .t-slip.receipt .t-items { text-align: left; }

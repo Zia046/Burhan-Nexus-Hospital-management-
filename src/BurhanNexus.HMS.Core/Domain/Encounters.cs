@@ -3,7 +3,13 @@ using System.ComponentModel.DataAnnotations;
 namespace BurhanNexus.HMS.Core.Domain;
 
 /// <summary>Kind of hospital encounter. Future phases add Laboratory, Radiology, Pharmacy, IPD…</summary>
-public enum EncounterType { Opd = 1, Emergency = 2 }
+public enum EncounterType
+{
+    Opd = 1,
+    Emergency = 2,
+    /// <summary>Only used by <see cref="ServiceItem.Category"/>: a service billed by the cashier (laboratory, X-Ray ...), not used at OPD/ER registration.</summary>
+    ServiceOnly = 9
+}
 
 public enum EmergencyStatus
 {
@@ -137,6 +143,10 @@ public class Doctor
     public DateTime CreatedUtc { get; set; }
     public DateTime UpdatedUtc { get; set; }
     public uint RowVersion { get; set; }
+    /// <summary>Phase 3: how consultation fees are shared between hospital and doctor (applies to new charges only).</summary>
+    public DoctorShareType ShareType { get; set; } = DoctorShareType.HospitalKeepsAll;
+    /// <summary>Percentage (0–100) or fixed amount, depending on <see cref="ShareType"/>.</summary>
+    public decimal ShareValue { get; set; }
 }
 
 /// <summary>
@@ -155,6 +165,14 @@ public class ServiceItem
     public bool IsActive { get; set; } = true;
     public DateTime CreatedUtc { get; set; }
     public DateTime UpdatedUtc { get; set; }
+    // ---- Phase 3: service & fee management ----
+    public ServiceKind Kind { get; set; } = ServiceKind.Other;
+    public int? DepartmentId { get; set; }
+    public Department? Department { get; set; }
+    public bool AllowPartialPayment { get; set; }
+    [MaxLength(300)] public string? Description { get; set; }
+    public List<ServiceFee> Fees { get; set; } = new();
+    public List<ServiceCounter> Counters { get; set; } = new();
 }
 
 public class PrintedDocument

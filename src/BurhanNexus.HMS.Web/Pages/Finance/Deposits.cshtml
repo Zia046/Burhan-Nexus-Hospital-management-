@@ -1,0 +1,59 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Finance.DepositsModel
+@{
+    ViewData["Title"] = "Cash deposits";
+    var me = User.GetUserId();
+}
+<partial name="_FinanceNav" />
+<partial name="_ValidationSummary" />
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-download" /></svg> Pending deposits</h2><span class="pill pill-blue">@Model.Pending.Count · @Fmt.Money(Model.Pending.Sum(d => d.Amount))</span></div>
+    <div class="table-wrap">
+        <table class="table" data-pending-deposits>
+            <thead><tr><th>Deposit</th><th>Cashier</th><th>Counter</th><th>Submitted</th><th class="num">Declared</th><th>Notes</th><th>Verify</th></tr></thead>
+            <tbody>
+            @foreach (var d in Model.Pending)
+            {
+                <tr data-deposit="@d.DepositNumber">
+                    <td class="mono">@d.DepositNumber</td><td><a bn-permission="@Perm.FinanceViewAllAccounts" href="/Finance?userId=@d.UserId">@d.Username</a></td><td>@d.Counter?.Name</td>
+                    <td class="nowrap">@Fmt.DateTimeText(d.SubmittedUtc)</td><td class="num"><strong>@Fmt.Money(d.Amount)</strong></td><td>@d.Notes</td>
+                    <td>
+                        @if (d.UserId == me)
+                        {
+                            <span class="muted">Your own deposit – another authorised person must confirm it.</span>
+                        }
+                        else
+                        {
+                            <form method="post" class="inline-form" novalidate>
+                                <input type="number" step="0.01" min="0.01" max="@d.Amount" name="ReceivedAmount" value="@d.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture)" class="input-num" aria-label="Amount received" />
+                                <input name="Remarks" maxlength="300" placeholder="Remarks (required)" aria-label="Remarks" required />
+                                <button class="btn btn-success btn-sm" type="submit" asp-page-handler="Confirm" asp-route-id="@d.Id" data-test="deposit-confirm">Confirm received</button>
+                                <button bn-permission="@Perm.FinanceRejectDeposits" class="btn btn-danger btn-sm" type="submit" asp-page-handler="Reject" asp-route-id="@d.Id">Reject</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (Model.Pending.Count == 0) { <tr><td colspan="7" class="empty">No deposits waiting.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header"><h3>History</h3>
+        <form method="get" class="filters"><select name="status" aria-label="Status"><option value="">All</option><option value="confirmed" selected="@(Model.Status == "confirmed")">Confirmed</option><option value="rejected" selected="@(Model.Status == "rejected")">Rejected</option></select><button class="btn btn-light btn-sm" type="submit">Show</button></form></div>
+    <div class="table-wrap">
+        <table class="table table-compact">
+            <thead><tr><th>Deposit</th><th>Cashier</th><th>Submitted</th><th class="num">Declared</th><th class="num">Received</th><th>Status</th><th>Reviewed</th><th>Remarks</th></tr></thead>
+            <tbody>
+            @foreach (var d in Model.History)
+            {
+                <tr><td class="mono">@d.DepositNumber</td><td>@d.Username</td><td class="nowrap">@Fmt.DateTimeText(d.SubmittedUtc)</td><td class="num">@Fmt.Money(d.Amount)</td>
+                    <td class="num">@(d.ReceivedAmount is decimal r ? Fmt.Money(r) : "—")</td><td><partial name="_DepositStatus" model="d.Status" /></td>
+                    <td class="nowrap">@d.ReviewedByUsername · @Fmt.DateTimeText(d.ReviewedUtc)</td><td>@d.ReviewRemarks</td></tr>
+            }
+            @if (Model.History.Count == 0) { <tr><td colspan="8" class="empty">No reviewed deposits.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

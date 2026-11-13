@@ -1,0 +1,18 @@
+@model (string Title, IReadOnlyList<GroupTotal> Rows, string Key)
+@{ var max = Model.Rows.Count == 0 ? 0 : Model.Rows.Max(r => r.Amount); }
+<div class="card">
+    <div class="card-header"><h3>@Model.Title</h3></div>
+    <div class="table-wrap">
+        <table class="table table-compact" data-group="@Model.Key">
+            <thead><tr><th>Name</th><th class="num">Receipts</th><th class="num">Amount</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr><td>@r.Name</td><td class="num">@r.Count</td><td class="num">@Fmt.Money(r.Amount)</td>
+                    <td><div class="share-bar"><i style="width:@(max <= 0 ? 0 : (int)Math.Round(r.Amount / max * 100))%"></i></div></td></tr>
+            }
+            @if (Model.Rows.Count == 0) { <tr><td colspan="4" class="empty">No data.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

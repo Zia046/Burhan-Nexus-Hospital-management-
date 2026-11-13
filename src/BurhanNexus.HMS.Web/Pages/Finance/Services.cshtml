@@ -1,0 +1,79 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Finance.ServicesModel
+@{
+    ViewData["Title"] = "Services & fees";
+    var f = Model.Form;
+}
+<partial name="_FinanceNav" />
+<partial name="_ValidationSummary" />
+<div class="grid-side">
+    <div class="card">
+        <div class="card-header"><h2><svg class="icon"><use href="#i-sliders" /></svg> Services &amp; fees</h2><a class="btn btn-light btn-sm" href="/Finance/Services">New service</a></div>
+        <div class="table-wrap">
+            <table class="table table-compact" data-services>
+                <thead><tr><th>Code</th><th>Service</th><th>Type</th><th>Department / doctor</th><th class="num">Current fee</th><th>Next change</th><th>Partial</th><th>Counters</th><th>Status</th></tr></thead>
+                <tbody>
+                @foreach (var s in Model.Services)
+                {
+                    <tr class="@(s.Item.IsActive ? "" : "row-muted")" data-service="@s.Item.Code">
+                        <td class="mono"><a href="/Finance/Services?id=@s.Item.Id">@s.Item.Code</a></td><td><strong>@s.Item.Name</strong></td><td>@s.Item.Kind</td>
+                        <td>@s.Item.Department?.Name @s.Item.Doctor?.Name</td>
+                        <td class="num" data-fee>@(s.CurrentFee == 0 ? "Free" : Fmt.Money(s.CurrentFee))</td>
+                        <td>@(s.NextChange is { } n ? $"{Fmt.Money(n.Fee)} from {Fmt.Day(n.EffectiveFrom)}" : "")</td>
+                        <td>@(s.Item.AllowPartialPayment ? "Yes" : "No")</td>
+                        <td>@(s.CounterNames.Count == 0 ? "Any" : string.Join(", ", s.CounterNames))</td>
+                        <td>@(s.Item.IsActive ? "Active" : "Inactive")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="stack">
+        <form method="post" asp-route-id="@Model.Id" class="card" novalidate>
+            <div class="card-header"><h3>@(Model.Editing is null ? "New service" : "Edit " + Model.Editing.Item.Name)</h3></div>
+            <div class="card-body">
+                <div class="grid-2">
+                    <div class="field"><label for="Form_Code">Code <em>*</em></label><input id="Form_Code" name="Form.Code" value="@f.Code" maxlength="30" required /></div>
+                    <div class="field"><label for="Form_Kind">Type</label><select id="Form_Kind" name="Form.Kind">
+                        @foreach (var k in Enum.GetValues<ServiceKind>()) { <option value="@k" selected="@(f.Kind == k)">@k</option> }</select></div>
+                </div>
+                <div class="field"><label for="Form_Name">Name <em>*</em></label><input id="Form_Name" name="Form.Name" value="@f.Name" maxlength="150" required placeholder="e.g. CBC, Chest X-Ray" /></div>
+                <div class="grid-2">
+                    <div class="field"><label for="Form_DepartmentId">Department</label><select id="Form_DepartmentId" name="Form.DepartmentId"><option value="">—</option>
+                        @foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(f.DepartmentId == d.Id)">@d.Name</option> }</select></div>
+                    <div class="field"><label for="Form_DoctorId">Doctor (consultation)</label><select id="Form_DoctorId" name="Form.DoctorId"><option value="">—</option>
+                        @foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(f.DoctorId == d.Id)">@d.Name</option> }</select></div>
+                </div>
+                <label class="check"><input type="checkbox" name="Form.IsFree" value="true" checked="@f.IsFree" /> Free service</label>
+                <input type="hidden" name="Form.IsFree" value="false" />
+                <div class="grid-2">
+                    <div class="field"><label for="Form_Fee">Fee</label><input id="Form_Fee" name="Form.Fee" type="number" step="0.01" min="0" value="@f.Fee.ToString(System.Globalization.CultureInfo.InvariantCulture)" /></div>
+                    <div class="field"><label for="Form_FeeEffectiveFrom">Fee effective from</label><input id="Form_FeeEffectiveFrom" name="Form.FeeEffectiveFrom" type="date" value="@f.FeeEffectiveFrom?.ToString("yyyy-MM-dd")" /></div>
+                </div>
+                <div class="field"><label for="Form_FeeNote">Reason for fee change</label><input id="Form_FeeNote" name="Form.FeeNote" maxlength="300" /></div>
+                <div class="field"><label>Counters that may collect it <span class="muted">(none = any)</span></label>
+                    <div class="checks">@foreach (var c in Model.Counters) { <label class="check"><input type="checkbox" name="Form.CounterIds" value="@c.Counter.Id" checked="@f.CounterIds.Contains(c.Counter.Id)" /> @c.Counter.Name</label> }</div></div>
+                <label class="check"><input type="checkbox" name="Form.AllowPartialPayment" value="true" checked="@f.AllowPartialPayment" /> Allow partial payment</label>
+                <input type="hidden" name="Form.AllowPartialPayment" value="false" />
+                <label class="check"><input type="checkbox" name="Form.IsActive" value="true" checked="@f.IsActive" /> Active</label>
+                <input type="hidden" name="Form.IsActive" value="false" />
+                <div class="field"><label for="Form_Description">Description</label><input id="Form_Description" name="Form.Description" value="@f.Description" maxlength="300" /></div>
+                <small class="muted">Changing a fee never changes old receipts. A future date schedules the change.</small>
+            </div>
+            <div class="card-footer form-actions"><button class="btn btn-primary" type="submit" data-test="service-save">Save service</button></div>
+        </form>
+        @if (Model.Editing is not null)
+        {
+            <div class="card">
+                <div class="card-header"><h3>Fee history</h3></div>
+                <ul class="activity" data-fee-history>
+                    @foreach (var h in Model.FeeHistory)
+                    {
+                        <li><span class="activity-dot"></span><div><strong>@(h.Fee == 0 ? "Free" : Fmt.Money(h.Fee)) from @(h.EffectiveFrom == DateOnly.MinValue ? "the start" : Fmt.Day(h.EffectiveFrom))</strong><small>@Fmt.DateTimeText(h.CreatedUtc) · @h.CreatedByUsername @h.Note</small></div></li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+</div>

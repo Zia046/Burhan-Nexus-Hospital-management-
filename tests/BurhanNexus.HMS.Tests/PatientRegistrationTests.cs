@@ -44,7 +44,8 @@ public class PatientRegistrationTests : Phase2TestBase
         Assert.Equal("BNH-000002", b.PatientNumber);
         Assert.Equal("BNH-000003", c.PatientNumber);
         Assert.Equal("Muhammad Ali", a.FullName); // cleaned & title-cased
-        Assert.Equal(35, AgeCalculator.Of(a, DateOnly.FromDateTime(DateTime.UtcNow))!.Value.Value);
+        // Ages are calculated on the hospital's (Asia/Karachi) date, as at registration.
+        Assert.Equal(35, AgeCalculator.Of(a, DateOnly.FromDateTime(DateTime.UtcNow.AddHours(5)))!.Value.Value);
         Assert.Equal(AgeUnit.Months, AgeCalculator.Of(b, DateOnly.FromDateTime(DateTime.UtcNow.AddHours(5)))!.Value.Unit);
         Assert.False(b.DateOfBirthEstimated);
         Assert.Equal("17301-1234567-1", b.Cnic);

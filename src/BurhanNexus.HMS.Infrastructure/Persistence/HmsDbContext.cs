@@ -1,5 +1,6 @@
 using BurhanNexus.HMS.Core.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace BurhanNexus.HMS.Infrastructure.Persistence;
 
@@ -38,10 +39,34 @@ public class HmsDbContext : DbContext
     public DbSet<RegistrationSettings> RegistrationSettings => Set<RegistrationSettings>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<PrinterProfile> PrinterProfiles => Set<PrinterProfile>();
+    // Phase 3 – finance
+    public DbSet<Counter> Counters => Set<Counter>();
+    public DbSet<CounterAssignment> CounterAssignments => Set<CounterAssignment>();
+    public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
+    public DbSet<ServiceFee> ServiceFees => Set<ServiceFee>();
+    public DbSet<ServiceCounter> ServiceCounters => Set<ServiceCounter>();
+    public DbSet<Charge> Charges => Set<Charge>();
+    public DbSet<Receipt> Receipts => Set<Receipt>();
+    public DbSet<ReceiptLine> ReceiptLines => Set<ReceiptLine>();
+    public DbSet<ReceiptPrint> ReceiptPrints => Set<ReceiptPrint>();
+    public DbSet<Refund> Refunds => Set<Refund>();
+    public DbSet<CashDeposit> CashDeposits => Set<CashDeposit>();
+    public DbSet<CashierLedgerEntry> CashierLedger => Set<CashierLedgerEntry>();
+    public DbSet<DoctorLedgerEntry> DoctorLedger => Set<DoctorLedgerEntry>();
+    public DbSet<DoctorSettlement> DoctorSettlements => Set<DoctorSettlement>();
+    public DbSet<FinancialAdjustment> FinancialAdjustments => Set<FinancialAdjustment>();
+    public DbSet<DailyCashClosing> DailyCashClosings => Set<DailyCashClosing>();
+    public DbSet<FinanceSettings> FinanceSettings => Set<FinanceSettings>();
 
     public const string PatientNumberSequence = "patient_number_seq";
     public const string OpdNumberSequence = "opd_number_seq";
     public const string EmergencyNumberSequence = "emergency_number_seq";
+    public const string ReceiptNumberSequence = "receipt_number_seq";
+    public const string ChargeNumberSequence = "charge_number_seq";
+    public const string RefundNumberSequence = "refund_number_seq";
+    public const string DepositNumberSequence = "deposit_number_seq";
+    public const string SettlementNumberSequence = "settlement_number_seq";
+    public const string AdjustmentNumberSequence = "adjustment_number_seq";
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -50,6 +75,8 @@ public class HmsDbContext : DbContext
         b.HasSequence<long>(PatientNumberSequence).StartsAt(1).IncrementsBy(1);
         b.HasSequence<long>(OpdNumberSequence).StartsAt(1).IncrementsBy(1);
         b.HasSequence<long>(EmergencyNumberSequence).StartsAt(1).IncrementsBy(1);
+        foreach (var seq in new[] { ReceiptNumberSequence, ChargeNumberSequence, RefundNumberSequence, DepositNumberSequence, SettlementNumberSequence, AdjustmentNumberSequence })
+            b.HasSequence<long>(seq).StartsAt(1).IncrementsBy(1);
 
         b.Entity<HospitalSettings>(e =>
         {
@@ -250,6 +277,8 @@ public class HmsDbContext : DbContext
             e.HasIndex(x => x.Name);
             e.Property(x => x.RowVersion).IsRowVersion();
             e.HasOne(x => x.Department).WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.ShareType).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.ShareValue).HasPrecision(14, 2);
         });
 
         b.Entity<ServiceItem>(e =>
@@ -258,7 +287,9 @@ public class HmsDbContext : DbContext
             e.HasIndex(x => x.Code).IsUnique();
             e.Property(x => x.Category).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.DefaultFee).HasPrecision(12, 2);
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(30);
             e.HasOne(x => x.Doctor).WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Department).WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<PrintedDocument>(e =>
@@ -305,6 +336,8 @@ public class HmsDbContext : DbContext
             e.Property(x => x.RowVersion).IsRowVersion();
         });
 
+        ConfigureFinance(b);
+
         b.Entity<BackupHistory>(e =>
         {
             e.ToTable("BackupHistory");
@@ -312,6 +345,190 @@ public class HmsDbContext : DbContext
             e.HasIndex(x => x.StartedUtc);
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(30);
+        });
+    }
+
+    private static void ConfigureFinance(ModelBuilder b)
+    {
+        static void Money<T>(EntityTypeBuilder<T> e) where T : class
+        {
+            foreach (var p in typeof(T).GetProperties().Where(p => p.PropertyType == typeof(decimal) || p.PropertyType == typeof(decimal?)))
+                e.Property(p.Name).HasPrecision(14, 2);
+        }
+
+        b.Entity<Counter>(e =>
+        {
+            e.ToTable("Counters");
+            e.HasIndex(x => x.Code).IsUnique();
+            e.HasIndex(x => x.Name).IsUnique();
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.Department).WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<CounterAssignment>(e =>
+        {
+            e.ToTable("CounterAssignments");
+            e.Ignore(x => x.IsCurrent);
+            // One current assignment per user and counter.
+            e.HasIndex(x => new { x.CounterId, x.UserId }).IsUnique().HasFilter("\"EndedUtc\" IS NULL").HasDatabaseName("UX_CounterAssignments_Current");
+            e.HasIndex(x => x.UserId);
+            e.HasOne(x => x.Counter).WithMany(x => x.Assignments).HasForeignKey(x => x.CounterId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<PaymentMethod>(e =>
+        {
+            e.ToTable("PaymentMethods");
+            e.HasIndex(x => x.Code).IsUnique();
+            e.HasIndex(x => x.Name).IsUnique();
+        });
+        b.Entity<ServiceFee>(e =>
+        {
+            e.ToTable("ServiceFees", t => t.HasCheckConstraint("CK_ServiceFees_NonNegative", "\"Fee\" >= 0"));
+            Money(e);
+            e.HasIndex(x => new { x.ServiceItemId, x.EffectiveFrom });
+            e.HasOne(x => x.ServiceItem).WithMany(x => x.Fees).HasForeignKey(x => x.ServiceItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<ServiceCounter>(e =>
+        {
+            e.ToTable("ServiceCounters");
+            e.HasKey(x => new { x.ServiceItemId, x.CounterId });
+            e.HasOne(x => x.ServiceItem).WithMany(x => x.Counters).HasForeignKey(x => x.ServiceItemId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Counter).WithMany().HasForeignKey(x => x.CounterId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<Charge>(e =>
+        {
+            e.ToTable("Charges", t =>
+            {
+                t.HasCheckConstraint("CK_Charges_Amounts", "\"Fee\" >= 0 AND \"Discount\" >= 0 AND \"Discount\" <= \"Fee\" AND \"NetAmount\" = \"Fee\" - \"Discount\"");
+                t.HasCheckConstraint("CK_Charges_Paid", "\"PaidAmount\" >= 0 AND \"PaidAmount\" <= \"NetAmount\" AND \"RefundedAmount\" >= 0 AND \"RefundedAmount\" <= \"PaidAmount\"");
+            });
+            Money(e);
+            e.HasIndex(x => x.ChargeNumber).IsUnique();
+            e.HasIndex(x => new { x.PatientId, x.Status });
+            e.HasIndex(x => x.EncounterId);
+            e.HasIndex(x => new { x.DoctorId, x.BusinessDate });
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ServiceKind).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.DoctorShareType).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.Ignore(x => x.Balance);
+            e.HasOne(x => x.Patient).WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Encounter).WithMany().HasForeignKey(x => x.EncounterId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ServiceItem).WithMany().HasForeignKey(x => x.ServiceItemId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Department).WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Doctor).WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Receipt>().WithMany().HasForeignKey(x => x.OriginReceiptId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<Receipt>(e =>
+        {
+            e.ToTable("Receipts", t => t.HasCheckConstraint("CK_Receipts_Amounts", "\"AmountPaid\" >= 0 AND \"RefundedAmount\" >= 0 AND \"RefundedAmount\" <= \"AmountPaid\""));
+            Money(e);
+            e.HasIndex(x => x.ReceiptNumber).IsUnique().HasDatabaseName("UX_Receipts_Number");
+            e.HasIndex(x => x.IdempotencyKey).IsUnique().HasDatabaseName("UX_Receipts_Idempotency");
+            e.HasIndex(x => new { x.BusinessDate, x.CounterId });
+            e.HasIndex(x => new { x.CashierUserId, x.BusinessDate });
+            e.HasIndex(x => x.PatientId);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.Patient).WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Counter).WithMany().HasForeignKey(x => x.CounterId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Cashier).WithMany().HasForeignKey(x => x.CashierUserId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.PaymentMethod).WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<ReceiptLine>(e =>
+        {
+            e.ToTable("ReceiptLines", t => t.HasCheckConstraint("CK_ReceiptLines_Amounts", "\"Amount\" >= 0 AND \"DoctorShare\" >= 0 AND \"DoctorShare\" <= \"Amount\" AND \"RefundedAmount\" >= 0 AND \"RefundedAmount\" <= \"Amount\""));
+            Money(e);
+            e.HasIndex(x => x.ChargeId);
+            e.HasOne(x => x.Receipt).WithMany(x => x.Lines).HasForeignKey(x => x.ReceiptId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Charge).WithMany().HasForeignKey(x => x.ChargeId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<ReceiptPrint>(e =>
+        {
+            e.ToTable("ReceiptPrints");
+            e.HasIndex(x => new { x.ReceiptId, x.CopyNumber }).IsUnique();
+            e.HasOne(x => x.Receipt).WithMany(x => x.Prints).HasForeignKey(x => x.ReceiptId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<Refund>(e =>
+        {
+            e.ToTable("Refunds", t => t.HasCheckConstraint("CK_Refunds_Positive", "\"Amount\" > 0"));
+            Money(e);
+            e.HasIndex(x => x.RefundNumber).IsUnique();
+            e.HasIndex(x => new { x.ReceiptId, x.Status });
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.Receipt).WithMany().HasForeignKey(x => x.ReceiptId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.PaymentMethod).WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<CashDeposit>(e =>
+        {
+            e.ToTable("CashDeposits", t => t.HasCheckConstraint("CK_CashDeposits_Positive", "\"Amount\" > 0 AND (\"ReceivedAmount\" IS NULL OR (\"ReceivedAmount\" > 0 AND \"ReceivedAmount\" <= \"Amount\"))"));
+            Money(e);
+            e.HasIndex(x => x.DepositNumber).IsUnique();
+            e.HasIndex(x => new { x.UserId, x.Status });
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Counter).WithMany().HasForeignKey(x => x.CounterId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<CashierLedgerEntry>(e =>
+        {
+            e.ToTable("CashierLedger");
+            Money(e);
+            e.HasIndex(x => new { x.UserId, x.BusinessDate });
+            e.HasIndex(x => new { x.CounterId, x.BusinessDate });
+            e.HasIndex(x => x.ReceiptId);
+            e.Property(x => x.EntryType).HasConversion<string>().HasMaxLength(30);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Counter>().WithMany().HasForeignKey(x => x.CounterId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Receipt>().WithMany().HasForeignKey(x => x.ReceiptId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Refund>().WithMany().HasForeignKey(x => x.RefundId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<CashDeposit>().WithMany().HasForeignKey(x => x.DepositId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<FinancialAdjustment>().WithMany().HasForeignKey(x => x.AdjustmentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<PaymentMethod>().WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<DoctorLedgerEntry>(e =>
+        {
+            e.ToTable("DoctorLedger");
+            Money(e);
+            e.HasIndex(x => new { x.DoctorId, x.BusinessDate });
+            e.Property(x => x.EntryType).HasConversion<string>().HasMaxLength(30);
+            e.HasOne<Doctor>().WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Receipt>().WithMany().HasForeignKey(x => x.ReceiptId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<ReceiptLine>().WithMany().HasForeignKey(x => x.ReceiptLineId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Refund>().WithMany().HasForeignKey(x => x.RefundId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<DoctorSettlement>().WithMany().HasForeignKey(x => x.SettlementId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<FinancialAdjustment>().WithMany().HasForeignKey(x => x.AdjustmentId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<DoctorSettlement>(e =>
+        {
+            e.ToTable("DoctorSettlements", t => t.HasCheckConstraint("CK_DoctorSettlements_Positive", "\"Amount\" > 0"));
+            Money(e);
+            e.HasIndex(x => x.SettlementNumber).IsUnique();
+            e.HasIndex(x => new { x.DoctorId, x.BusinessDate });
+            e.HasOne(x => x.Doctor).WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.PaymentMethod).WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<FinancialAdjustment>(e =>
+        {
+            e.ToTable("FinancialAdjustments", t => t.HasCheckConstraint("CK_FinancialAdjustments_NonZero", "\"Amount\" <> 0"));
+            Money(e);
+            e.HasIndex(x => x.AdjustmentNumber).IsUnique();
+            e.Property(x => x.Target).HasConversion<string>().HasMaxLength(20);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Doctor>().WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<DailyCashClosing>(e =>
+        {
+            e.ToTable("DailyCashClosings");
+            Money(e);
+            e.HasIndex(x => new { x.BusinessDate, x.Scope, x.UserId, x.CounterId });
+            e.Property(x => x.Scope).HasConversion<string>().HasMaxLength(20);
+        });
+        b.Entity<FinanceSettings>(e =>
+        {
+            e.ToTable("FinanceSettings", t => t.HasCheckConstraint("CK_FinanceSettings_Singleton", "\"Id\" = 1"));
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.RowVersion).IsRowVersion();
         });
     }
 }

@@ -295,3 +295,71 @@
     f.submit();
   }));
 })();
+
+// ---------------- Phase 3: finance screens ----------------
+(function () {
+  "use strict";
+  const money = v => (Math.round(v * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // Period presets: choosing a preset ignores the date boxes; editing a date switches to "Custom range".
+  document.querySelectorAll("[data-period-custom]").forEach(sel => {
+    const form = sel.form;
+    sel.addEventListener("change", () => {
+      if (sel.value !== "custom") form.querySelectorAll("input[name=from],input[name=to]").forEach(i => i.disabled = true);
+      form.submit();
+    });
+    form.querySelectorAll("input[name=from],input[name=to]").forEach(i => i.addEventListener("change", () => { sel.value = "custom"; }));
+  });
+
+  // Submit buttons that must only be pressed once (the server is idempotent as well).
+  document.querySelectorAll("form").forEach(f => f.addEventListener("submit", () => {
+    f.querySelectorAll("button[data-once]").forEach(b => setTimeout(() => { b.disabled = true; b.textContent = "Saving…"; }, 0));
+  }));
+
+  const form = document.querySelector("[data-collect-form]");
+  if (!form) return;
+  const rows = Array.from(form.querySelectorAll("[data-line]"));
+  const total = form.querySelector("[data-total]");
+  const method = form.querySelector("[data-method]");
+  const refField = form.querySelector("[data-ref-field]");
+
+  function recalc() {
+    let sum = 0;
+    rows.forEach(r => {
+      const opt = r.querySelector("[data-service]").selectedOptions[0];
+      const fee = opt && opt.value !== "0" ? parseFloat(opt.dataset.fee || "0") : 0;
+      const discEl = r.querySelector("[data-discount]");
+      const disc = discEl ? parseFloat(discEl.value || "0") || 0 : 0;
+      const net = Math.max(0, fee - disc);
+      r.querySelector("[data-fee-cell]").textContent = opt && opt.value !== "0" ? (fee === 0 ? "Free" : money(fee)) : "—";
+      const pay = r.querySelector("[data-paynow]");
+      pay.placeholder = opt && opt.value !== "0" ? money(net) : "full";
+      pay.readOnly = !(opt && opt.dataset.partial === "1");
+      if (pay.readOnly) pay.value = "";
+      if (opt && opt.value !== "0") sum += pay.value === "" ? net : (parseFloat(pay.value) || 0);
+    });
+    form.querySelectorAll("[data-balance-pay]").forEach(i => { sum += parseFloat(i.value || "0") || 0; });
+    if (total) total.textContent = money(sum);
+    if (refField && method) refField.style.display = method.selectedOptions[0] && method.selectedOptions[0].dataset.ref === "1" ? "" : "none";
+  }
+
+  rows.forEach(r => {
+    const svc = r.querySelector("[data-service]");
+    const doc = r.querySelector("[data-doctor]");
+    svc.addEventListener("change", () => {
+      const opt = svc.selectedOptions[0];
+      if (opt && opt.dataset.doctor) doc.value = opt.dataset.doctor;
+      recalc();
+    });
+    r.querySelectorAll("input").forEach(i => i.addEventListener("input", recalc));
+  });
+  form.querySelectorAll("[data-balance-pay]").forEach(i => i.addEventListener("input", recalc));
+  if (method) method.addEventListener("change", recalc);
+  const add = form.querySelector("[data-add-line]");
+  if (add) add.addEventListener("click", () => {
+    const hidden = rows.find(r => r.classList.contains("line-hidden"));
+    if (hidden) hidden.classList.remove("line-hidden");
+    if (!rows.some(r => r.classList.contains("line-hidden"))) add.style.display = "none";
+  });
+  recalc();
+})();

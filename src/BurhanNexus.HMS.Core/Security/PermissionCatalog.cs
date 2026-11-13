@@ -148,7 +148,34 @@ public static class PermissionCatalog
             }),
         Future("MinorOt", "Minor OT", "Minor operation theatre settings", "scissors"),
         Future("Doctors", "Doctor Management", "Doctors, schedules and shares", "user-cross"),
-        Future("Finance", "Financial Management", "Collections, expenses and accounts", "wallet", financial: true),
+        new(Modules_.Finance, "Financial Management", "Cashier counters, receipts, deposits, refunds, doctor accounts and financial reports", "wallet", true, "/Finance",
+            new PermissionAction[]
+            {
+                new(FinanceActions.ViewOwnAccount, "View Own Financial Account", "Own collections, deposits and outstanding balance"),
+                new(FinanceActions.ViewOwnReceipts, "View Own Receipt History", "Receipts issued by this user"),
+                new(FinanceActions.Collect, "Collect Patient Payments", "Take payments and create receipts at an assigned counter"),
+                new(FinanceActions.IssueReceipts, "Issue (Print) Receipts", "Print the first copy of a receipt"),
+                new(FinanceActions.Reprint, "Reprint Receipts", "Print further copies (same receipt number)"),
+                new(FinanceActions.Discount, "Give Discounts", "Enter a discount on a service fee"),
+                new(FinanceActions.ViewCancelled, "View Cancelled Receipts", "See cancelled receipts in own history"),
+                new(FinanceActions.SubmitDeposit, "Submit Cash Deposit", "Hand over collected cash to Admin"),
+                new(FinanceActions.DailyClosing, "Perform Daily Cash Closing", "Create the daily closing summary of own collections"),
+                new(FinanceActions.CounterReports, "View Counter Reports", "Counter-wise collections, balances and receipts"),
+                new(FinanceActions.ManageCounters, "Manage Counters", "Create counters and assign / transfer employees"),
+                new(FinanceActions.ManageServiceFees, "Manage Service Fees", "Add services, change fees and payment rules"),
+                new(FinanceActions.ViewAllAccounts, "View All Financial Accounts", "Every cashier's account, all receipts and hospital-wide closing"),
+                new(FinanceActions.Dashboard, "View Hospital Financial Dashboard", "Hospital-wide totals, charts and reports"),
+                new(FinanceActions.ConfirmDeposits, "Confirm Cash Deposits", "Confirm cash received from cashiers"),
+                new(FinanceActions.RejectDeposits, "Reject Cash Deposits", "Reject a deposit with a reason"),
+                new(FinanceActions.CancelReceipts, "Cancel Receipts", "Cancel an issued receipt with a reason (never deleted)"),
+                new(FinanceActions.ProcessRefunds, "Process Refunds", "Enter refund requests for patients"),
+                new(FinanceActions.ApproveRefunds, "Approve Refunds", "Approve or reject refunds (money returned)"),
+                new(FinanceActions.ManageDoctorAccounts, "Manage Doctor Accounts", "Doctor consultation accounts and fee-sharing arrangements"),
+                new(FinanceActions.RecordDoctorPayments, "Record Doctor Payments", "Pay doctors (full or partial settlement)"),
+                new(FinanceActions.Adjustments, "Record Financial Adjustments", "Correct cashier / doctor balances with a reason"),
+                new(FinanceActions.Export, "Export Financial Reports", "Excel / CSV export of financial reports"),
+                new(FinanceActions.Settings, "Manage Financial Settings", "Payment methods and receipt settings"),
+            }, IsFinancialModule: true),
         Future("Reports", "Reports", "Operational and financial reports", "chart"),
 
         new(Modules_.UserManagement, "User Management", "Users, departments and responsibilities", "user-cog", true, "/Users",
@@ -213,6 +240,35 @@ public static class PermissionCatalog
         public const string Opd = "Opd";
         public const string Emergency = "Emergency";
         public const string Appointments = "Appointments";
+        public const string Finance = "Finance";
+    }
+
+    public static class FinanceActions
+    {
+        public const string ViewOwnAccount = "ViewOwnAccount";
+        public const string ViewOwnReceipts = "ViewOwnReceipts";
+        public const string Collect = "Collect";
+        public const string IssueReceipts = "IssueReceipts";
+        public const string Reprint = "Reprint";
+        public const string Discount = "Discount";
+        public const string ViewCancelled = "ViewCancelled";
+        public const string SubmitDeposit = "SubmitDeposit";
+        public const string DailyClosing = "DailyClosing";
+        public const string CounterReports = "CounterReports";
+        public const string ManageCounters = "ManageCounters";
+        public const string ManageServiceFees = "ManageServiceFees";
+        public const string ViewAllAccounts = "ViewAllAccounts";
+        public const string Dashboard = "Dashboard";
+        public const string ConfirmDeposits = "ConfirmDeposits";
+        public const string RejectDeposits = "RejectDeposits";
+        public const string CancelReceipts = "CancelReceipts";
+        public const string ProcessRefunds = "ProcessRefunds";
+        public const string ApproveRefunds = "ApproveRefunds";
+        public const string ManageDoctorAccounts = "ManageDoctorAccounts";
+        public const string RecordDoctorPayments = "RecordDoctorPayments";
+        public const string Adjustments = "Adjustments";
+        public const string Export = "Export";
+        public const string Settings = "Settings";
     }
 
     public static class AppointmentActions
@@ -340,6 +396,30 @@ public static class Perm
     public const string PrinterSettings = "Appointments.PrinterSettings";
     public const string AppointmentsFees = "Appointments.FinancialAccess";
     public const string AppointmentsSettings = "Appointments.SettingsAccess";
+    public const string FinanceViewOwnAccount = "Finance.ViewOwnAccount";
+    public const string FinanceViewOwnReceipts = "Finance.ViewOwnReceipts";
+    public const string FinanceCollect = "Finance.Collect";
+    public const string FinanceIssueReceipts = "Finance.IssueReceipts";
+    public const string FinanceReprint = "Finance.Reprint";
+    public const string FinanceDiscount = "Finance.Discount";
+    public const string FinanceViewCancelled = "Finance.ViewCancelled";
+    public const string FinanceSubmitDeposit = "Finance.SubmitDeposit";
+    public const string FinanceDailyClosing = "Finance.DailyClosing";
+    public const string FinanceCounterReports = "Finance.CounterReports";
+    public const string FinanceManageCounters = "Finance.ManageCounters";
+    public const string FinanceManageServiceFees = "Finance.ManageServiceFees";
+    public const string FinanceViewAllAccounts = "Finance.ViewAllAccounts";
+    public const string FinanceDashboard = "Finance.Dashboard";
+    public const string FinanceConfirmDeposits = "Finance.ConfirmDeposits";
+    public const string FinanceRejectDeposits = "Finance.RejectDeposits";
+    public const string FinanceCancelReceipts = "Finance.CancelReceipts";
+    public const string FinanceProcessRefunds = "Finance.ProcessRefunds";
+    public const string FinanceApproveRefunds = "Finance.ApproveRefunds";
+    public const string FinanceManageDoctorAccounts = "Finance.ManageDoctorAccounts";
+    public const string FinanceRecordDoctorPayments = "Finance.RecordDoctorPayments";
+    public const string FinanceAdjustments = "Finance.Adjustments";
+    public const string FinanceExport = "Finance.Export";
+    public const string FinanceSettings = "Finance.Settings";
 
     public const string AuditView = "AuditLog.View";
     public const string AuditExport = "AuditLog.Export";

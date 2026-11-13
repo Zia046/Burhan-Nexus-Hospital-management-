@@ -22,6 +22,7 @@
     </div>
     <div class="profile-actions">
         <a bn-permission="@Perm.EmergencyPrint" class="btn btn-danger" href="/Print/Emergency/@e.Id" target="_blank"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print emergency slip</a>
+        <a bn-permission="@Perm.FinanceCollect" class="btn btn-light" href="/Finance/Collect?encounterId=@e.Id"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Collect fee</a>
         <a bn-permission="@Perm.PatientsView" class="btn btn-light" href="/Patients/Profile/@p.Id">Patient profile</a>
     </div>
 </section>
