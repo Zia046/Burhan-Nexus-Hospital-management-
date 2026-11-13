@@ -23,6 +23,7 @@
         <form method="post" class="auth-card" novalidate>
             <h2>Welcome back</h2>
             <p class="muted">Sign in with your hospital account.</p>
+            <partial name="_Flash" />
             @if (Model.Info is not null)
             {
                 <div class="alert alert-info"><svg class="icon"><use href="#i-info" /></svg><div>@Model.Info</div></div>

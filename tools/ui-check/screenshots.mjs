@@ -116,7 +116,7 @@ try {
   await page.fill("#Notes", "Before go-live");
   await Promise.all([page.waitForNavigation(), page.click("button:has-text('Create backup now')")]);
   await shot(page, "25-backup");
-  const restoreLink = await page.$("a:has-text('Restore')");
+  const restoreLink = await page.$("a[href^='/Backup/Restore/']");
   if (restoreLink) { await Promise.all([page.waitForNavigation(), restoreLink.click()]); await shot(page, "26-restore-warning"); }
   await page.goto(base + "/Audit");
   await shot(page, "27-audit");
@@ -145,6 +145,7 @@ try {
   await Promise.all([p3.waitForNavigation(), p3.click("button[type=submit]")]);
   await shot(p3, "32-tablet-dashboard");
   await p3.click("[data-sidebar-toggle]");
+  await p3.waitForTimeout(500);
   await shot(p3, "33-tablet-menu", false);
 } catch (e) {
   errors.push("SCRIPT FAILURE: " + (e && e.stack || e));

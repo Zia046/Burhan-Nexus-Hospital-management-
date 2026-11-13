@@ -41,7 +41,7 @@ else
             }
             @if (Model.Health is { } h)
             {
-                <div class="kpi"><div class="kpi-icon @(h.DatabaseConnected ? "green" : "red")"><svg class="icon"><use href="#i-database" /></svg></div><div><span class="kpi-label">Database</span><strong class="kpi-value kpi-small"><span class="dot @(h.DatabaseConnected ? "dot-ok" : "dot-bad")" data-live-dot="system.database"></span> @(h.DatabaseConnected ? "Connected" : "Unavailable")</strong><small class="muted">PostgreSQL @h.DatabaseVersion</small></div></div>
+                <div class="kpi"><div class="kpi-icon @(h.DatabaseConnected ? "green" : "red")"><svg class="icon"><use href="#i-database" /></svg></div><div><span class="kpi-label">Database</span><strong class="kpi-value kpi-small"><span class="dot @(h.DatabaseConnected ? "dot-ok" : "dot-bad")" data-live-dot="system.database"></span> @(h.DatabaseConnected ? "Connected" : "Unavailable")</strong><small class="muted">PostgreSQL @(h.DatabaseVersion?.Split(' ')[0])</small></div></div>
                 <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-server" /></svg></div><div><span class="kpi-label">Server</span><strong class="kpi-value kpi-small"><span class="dot dot-ok" data-server-dot></span> <span data-server-text>Online</span></strong><small class="muted"><span data-live="system.activeSessions">@h.ActiveSessions</span> active session(s)</small></div></div>
             }
         </div>

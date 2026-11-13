@@ -90,7 +90,7 @@
             {
                 <span class="pill pill-danger" title="@license.Message"><svg class="icon icon-sm"><use href="#i-lock" /></svg> Read-only</span>
             }
-            else if (license.State == BurhanNexus.HMS.Core.Licensing.LicenseState.TrialActive)
+            else if (license.State == BurhanNexus.HMS.Core.Licensing.LicenseState.TrialActive && perms.Contains(Perm.LicenseView))
             {
                 <span class="pill pill-warning" title="@license.Message">Trial · @license.DaysRemaining days left</span>
             }
