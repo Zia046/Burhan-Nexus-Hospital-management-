@@ -1,0 +1,7 @@
+@model DepositStatus
+@switch (Model)
+{
+    case DepositStatus.Pending: <span class="status status-warn">Pending</span> break;
+    case DepositStatus.Confirmed: <span class="status status-ok">Confirmed</span> break;
+    default: <span class="status status-bad">Rejected</span> break;
+}

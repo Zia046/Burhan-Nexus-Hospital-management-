@@ -1,0 +1,134 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Finance.IndexModel
+@{
+    var a = Model.Account;
+    ViewData["Title"] = Model.IsOwn ? "My financial account" : $"Financial account – {a.FullName}";
+}
+<partial name="_FinanceNav" />
+<div class="toolbar">
+    <form method="get" class="filters wrap" data-period-form>
+        @if (!Model.IsOwn) { <input type="hidden" name="userId" value="@a.UserId" /> }
+        <partial name="_PeriodFilter" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" />
+        <button class="btn btn-light" type="submit">Show</button>
+    </form>
+    <div class="toolbar-actions">
+        @if (Model.IsOwn) { <a bn-permission="@Perm.FinanceCollect" class="btn btn-primary" href="/Finance/Collect"><svg class="icon icon-sm"><use href="#i-plus" /></svg> Collect payment</a> }
+        else { <a class="btn btn-light" href="/Finance/Cashiers">&larr; All cashier accounts</a> }
+    </div>
+</div>
+<partial name="_ValidationSummary" />
+<div class="card">
+    <div class="card-header">
+        <h2><svg class="icon"><use href="#i-wallet" /></svg> @a.FullName <small class="muted">(@a.Username)</small></h2>
+        <span class="muted">@string.Join(", ", Model.Counters.Select(c => c.Name)) @(Model.Counters.Count == 0 ? "No counter assigned" : "")</span>
+    </div>
+    <div class="card-body">
+        <div class="kpi-grid" data-account>
+            <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-wallet" /></svg></div><div><span class="kpi-label">Today's collection</span><strong class="kpi-value" data-kpi="today">@Fmt.Money(a.TodayCollection)</strong></div></div>
+            <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-chart" /></svg></div><div><span class="kpi-label">Valid collections (@BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(a.From, a.To))</span><strong class="kpi-value" data-kpi="valid">@Fmt.Money(a.ValidCollections)</strong></div></div>
+            <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-check-circle" /></svg></div><div><span class="kpi-label">Deposits confirmed (period)</span><strong class="kpi-value" data-kpi="deposited">@Fmt.Money(a.DepositsConfirmed)</strong></div></div>
+            <div class="kpi"><div class="kpi-icon red"><svg class="icon"><use href="#i-alert" /></svg></div><div><span class="kpi-label">Outstanding – payable to Admin</span><strong class="kpi-value" data-kpi="outstanding">@Fmt.Money(a.OutstandingNow)</strong></div></div>
+        </div>
+        <p class="muted small">Outstanding = cash collections − cancellations − cash refunds − deposits confirmed by Admin ± approved adjustments.
+            Bank transfer / card payments go to the hospital account directly and are not part of your cash balance.
+            @if (a.PendingDepositsNow > 0) { <strong>@Fmt.Money(a.PendingDepositsNow) is waiting for Admin's confirmation.</strong> }</p>
+    </div>
+</div>
+
+<div class="grid-side">
+    <div class="stack">
+        <div class="card">
+            <div class="card-header"><h3>Summary – @BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(a.From, a.To)</h3></div>
+            <div class="table-wrap">
+                <table class="table table-compact" data-summary>
+                    <tbody>
+                        <tr><td>Opening cash balance</td><td class="num">@Fmt.Money(a.OpeningCashBalance)</td></tr>
+                        <tr><td>Cash collections</td><td class="num">@Fmt.Money(a.CashCollections)</td></tr>
+                        <tr><td>Non-cash collections (bank / card)</td><td class="num">@Fmt.Money(a.NonCashCollections)</td></tr>
+                        <tr><td>Receipts issued</td><td class="num">@a.ReceiptCount</td></tr>
+                        <tr><td>Cancelled receipts (@a.CancelledCount)</td><td class="num">− @Fmt.Money(a.CancelledAmount)</td></tr>
+                        <tr><td>Refunds</td><td class="num">− @Fmt.Money(a.Refunds)</td></tr>
+                        <tr><td>Deposits submitted</td><td class="num">@Fmt.Money(a.DepositsSubmitted)</td></tr>
+                        <tr><td>Deposits confirmed by Admin</td><td class="num">− @Fmt.Money(a.DepositsConfirmed)</td></tr>
+                        <tr><td>Adjustments</td><td class="num">@Fmt.Money(a.Adjustments)</td></tr>
+                        <tr class="total"><th>Closing cash balance</th><th class="num" data-closing>@Fmt.Money(a.ClosingCashBalance)</th></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><h3>Receipts</h3><a bn-permission="@Perm.FinanceViewOwnReceipts" class="btn btn-light btn-sm" href="/Finance/Receipts@(Model.IsOwn ? "" : "?cashier=" + a.UserId)">All receipts</a></div>
+            <div class="table-wrap">
+                <table class="table table-compact" data-receipts>
+                    <thead><tr><th>Receipt</th><th>Date</th><th>Patient</th><th>Services</th><th>Method</th><th class="num">Amount</th><th>Status</th></tr></thead>
+                    <tbody>
+                    @foreach (var r in Model.Receipts)
+                    {
+                        <tr class="@(r.Status == ReceiptStatus.Cancelled ? "row-muted" : "")">
+                            <td class="mono"><a href="/Finance/Receipts/Details/@r.Id">@r.ReceiptNumber</a></td>
+                            <td class="nowrap">@Fmt.DateTimeText(r.CreatedUtc)</td>
+                            <td>@(r.PatientName ?? r.PayerName) <small class="muted">@r.PatientNumber</small></td>
+                            <td>@r.Services</td><td>@r.PaymentMethod</td>
+                            <td class="num">@Fmt.Money(r.AmountPaid)</td>
+                            <td><partial name="_ReceiptStatus" model="r" /></td>
+                        </tr>
+                    }
+                    @if (Model.Receipts.Count == 0) { <tr><td colspan="7" class="empty">No receipts in this period.</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><h3>Account entries</h3></div>
+            <div class="table-wrap">
+                <table class="table table-compact">
+                    <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Details</th><th class="num">Amount</th><th>Cash?</th></tr></thead>
+                    <tbody>
+                    @foreach (var e in Model.Ledger)
+                    {
+                        <tr><td class="nowrap">@Fmt.Day(e.BusinessDate)</td><td>@e.EntryType</td><td class="mono">@e.Reference</td><td>@e.Description</td>
+                            <td class="num @(e.Amount < 0 ? "text-danger" : "")">@Fmt.Money(e.Amount)</td><td>@(e.AffectsCashInHand ? "Cash" : "Non-cash")</td></tr>
+                    }
+                    @if (Model.Ledger.Count == 0) { <tr><td colspan="6" class="empty">No entries.</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="stack">
+        @if (Model.IsOwn)
+        {
+            <form bn-permission="@Perm.FinanceSubmitDeposit" method="post" asp-page-handler="Deposit" class="card" novalidate>
+                <div class="card-header"><h3><svg class="icon"><use href="#i-download" /></svg> Deposit cash to Admin</h3></div>
+                <div class="card-body">
+                    <div class="field"><label for="DepositAmount">Amount <em>*</em></label>
+                        <input id="DepositAmount" name="DepositAmount" type="number" step="0.01" min="0.01" max="@Math.Max(0, a.OutstandingNow - a.PendingDepositsNow)" required /></div>
+                    <div class="field"><label for="DepositNotes">Notes</label><input id="DepositNotes" name="DepositNotes" maxlength="300" placeholder="e.g. 50 × 1000 notes" /></div>
+                    <small class="muted">Available to deposit: @Fmt.Money(Math.Max(0, a.OutstandingNow - a.PendingDepositsNow)). Partial deposits are allowed.</small>
+                </div>
+                <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="deposit-submit">Submit deposit</button></div>
+            </form>
+        }
+        <div class="card">
+            <div class="card-header"><h3>Payment methods</h3></div>
+            <ul class="activity">
+                @foreach (var m in a.ByMethod)
+                {
+                    <li><span class="activity-dot"></span><div><strong>@m.Method · @Fmt.Money(m.Amount)</strong><small>@m.Count receipt(s) · @(m.IsCash ? "cash in hand" : "non-cash")</small></div></li>
+                }
+                @if (a.ByMethod.Count == 0) { <li class="empty">No collections in this period.</li> }
+            </ul>
+        </div>
+        <div class="card">
+            <div class="card-header"><h3>Deposit history</h3></div>
+            <ul class="activity" data-deposits>
+                @foreach (var d in Model.Deposits.Take(30))
+                {
+                    <li><span class="activity-dot"></span><div><strong>@d.DepositNumber · @Fmt.Money(d.Amount) · <partial name="_DepositStatus" model="d.Status" /></strong>
+                        <small>@Fmt.DateTimeText(d.SubmittedUtc)@(d.ReviewedByUsername is null ? "" : $" · {d.Status.ToString().ToLowerInvariant()} by {d.ReviewedByUsername}")@(d.ReceivedAmount is decimal rcv && rcv != d.Amount ? $" · received {rcv:N2}" : "")@(d.ReviewRemarks is null ? "" : " – " + d.ReviewRemarks)</small></div></li>
+                }
+                @if (Model.Deposits.Count == 0) { <li class="empty">No deposits yet.</li> }
+            </ul>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,35 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Finance.ReportsModel
+@{
+    ViewData["Title"] = "Financial reports";
+    var s = Model.Summary;
+}
+<partial name="_FinanceNav" />
+<div class="toolbar no-print">
+    <partial name="_FinanceFilters" model="Model" />
+    <div class="toolbar-actions">
+        <a bn-permission="@Perm.FinanceExport" class="btn btn-light" href="/Finance/Reports@(Model.QueryString("&handler=Export&format=xlsx"))" data-test="export-xlsx"><svg class="icon icon-sm"><use href="#i-download" /></svg> Excel</a>
+        <a bn-permission="@Perm.FinanceExport" class="btn btn-light" href="/Finance/Reports@(Model.QueryString("&handler=Export&format=csv"))">CSV</a>
+        <button type="button" class="btn btn-light" data-print><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print / PDF</button>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-file" /></svg> Financial transactions – @BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(Model.From!.Value, Model.To!.Value)</h2>
+        <span class="pill pill-blue">Collected @Fmt.Money(s.Collected) · refunds @Fmt.Money(s.Refunds) · net @Fmt.Money(s.NetCollection)</span></div>
+    <div class="table-wrap">
+        <table class="table table-compact" data-transactions>
+            <thead><tr><th>Receipt</th><th>Date</th><th>Patient</th><th>Service</th><th>Doctor</th><th>Counter</th><th>Cashier</th><th>Method</th><th class="num">Fee</th><th class="num">Disc.</th><th class="num">Paid</th><th class="num">Refunded</th><th>Status</th></tr></thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr class="@(r.Status == "Cancelled" ? "row-muted" : "")"><td class="mono"><a href="/Finance/Receipts/Details/@r.ReceiptId">@r.ReceiptNumber</a></td><td class="nowrap">@Fmt.Day(r.BusinessDate)</td>
+                    <td>@r.PatientName <small class="muted">@r.PatientNumber</small></td><td>@r.Service</td><td>@r.Doctor</td><td>@r.Counter</td><td>@r.Cashier</td><td>@r.Method</td>
+                    <td class="num">@Fmt.Money(r.Fee)</td><td class="num">@(r.Discount == 0 ? "" : Fmt.Money(r.Discount))</td><td class="num">@Fmt.Money(r.Paid)</td>
+                    <td class="num">@(r.Refunded == 0 ? "" : Fmt.Money(r.Refunded))</td><td>@r.Status</td></tr>
+            }
+            @if (Model.Rows.Count == 0) { <tr><td colspan="13" class="empty">No transactions for these filters.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+    @if (Model.Rows.Count >= 3000) { <div class="card-body muted small">Showing the first 3,000 lines – use Excel export for the full list.</div> }
+</div>

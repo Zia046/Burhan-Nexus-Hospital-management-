@@ -1,0 +1,53 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Finance.DashboardModel
+@{
+    ViewData["Title"] = "Financial dashboard";
+    var d = Model.Data;
+    var maxDay = d.ByDay.Count == 0 ? 0 : d.ByDay.Max(x => x.Amount);
+}
+<partial name="_FinanceNav" />
+<div class="toolbar no-print">
+    <partial name="_FinanceFilters" model="Model" />
+    <div class="toolbar-actions">
+        <a class="btn btn-light" href="/Finance/Reports@(Model.QueryString())">Detailed report</a>
+        <button type="button" class="btn btn-light" data-print><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print / PDF</button>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-chart" /></svg> Hospital finances – @BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(d.Filter.From, d.Filter.To)</h2></div>
+    <div class="card-body">
+        <div class="kpi-grid" data-finance-kpis>
+            <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-wallet" /></svg></div><div><span class="kpi-label">Total collection</span><strong class="kpi-value" data-kpi="collected">@Fmt.Money(d.Collected)</strong></div></div>
+            <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-chart" /></svg></div><div><span class="kpi-label">Net (after refunds)</span><strong class="kpi-value" data-kpi="net">@Fmt.Money(d.NetCollection)</strong></div></div>
+            <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-check-circle" /></svg></div><div><span class="kpi-label">Confirmed deposits</span><strong class="kpi-value" data-kpi="deposits">@Fmt.Money(d.DepositsConfirmed)</strong></div></div>
+            <div class="kpi"><div class="kpi-icon red"><svg class="icon"><use href="#i-alert" /></svg></div><div><span class="kpi-label">Outstanding with cashiers (now)</span><strong class="kpi-value" data-kpi="outstanding">@Fmt.Money(d.CashOutstanding)</strong></div></div>
+            <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-file" /></svg></div><div><span class="kpi-label">Valid / cancelled receipts</span><strong class="kpi-value" data-kpi="receipts">@d.ValidReceipts / @d.CancelledReceipts</strong></div></div>
+            <div class="kpi"><div class="kpi-icon red"><svg class="icon"><use href="#i-refresh" /></svg></div><div><span class="kpi-label">Refunds (@d.RefundCount)</span><strong class="kpi-value" data-kpi="refunds">@Fmt.Money(d.Refunds)</strong></div></div>
+            <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-stethoscope" /></svg></div><div><span class="kpi-label">Doctor consultation collections</span><strong class="kpi-value" data-kpi="consult">@Fmt.Money(d.DoctorConsultationCollections)</strong></div></div>
+            <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-users" /></svg></div><div><span class="kpi-label">Pending doctor payments (now)</span><strong class="kpi-value" data-kpi="doctors">@Fmt.Money(d.DoctorsPayableNow)</strong></div></div>
+        </div>
+        <p class="muted small">Cancelled amount @Fmt.Money(d.CancelledAmount) · discounts @Fmt.Money(d.Discounts) · doctors' share earned @Fmt.Money(d.DoctorShareEarned) · paid to doctors @Fmt.Money(d.DoctorsPaid) ·
+            <a bn-permission="@Perm.FinanceConfirmDeposits" href="/Finance/Deposits">@d.PendingDepositCount deposit(s) pending (@Fmt.Money(d.PendingDeposits))</a> ·
+            <a bn-permission="@Perm.FinanceApproveRefunds" href="/Finance/Refunds">@d.PendingRefundCount refund(s) pending</a></p>
+    </div>
+</div>
+@if (d.ByDay.Count > 1)
+{
+    <div class="card">
+        <div class="card-header"><h3>Collection per day</h3></div>
+        <div class="card-body"><div class="bar-chart" role="img" aria-label="Daily collection chart">
+            @foreach (var x in d.ByDay)
+            {
+                <div class="bar" style="height:@(maxDay <= 0 ? 0 : Math.Max(2, (int)Math.Round(x.Amount / maxDay * 100)))%" title="@Fmt.Day(x.Date): @Fmt.Money(x.Amount) (@x.Count)"><span>@x.Date.ToString("dd/MM")</span></div>
+            }
+        </div></div>
+    </div>
+}
+<div class="grid-2">
+    @await Html.PartialAsync("_GroupTable", ("Department-wise", d.ByDepartment, "department"))
+    @await Html.PartialAsync("_GroupTable", ("Counter-wise", d.ByCounter, "counter"))
+    @await Html.PartialAsync("_GroupTable", ("User-wise (cashier)", d.ByUser, "user"))
+    @await Html.PartialAsync("_GroupTable", ("Doctor consultations", d.ByDoctor, "doctor"))
+    @await Html.PartialAsync("_GroupTable", ("Payment methods", d.ByMethod, "method"))
+    @await Html.PartialAsync("_GroupTable", ("Services", d.ByService, "service"))
+</div>

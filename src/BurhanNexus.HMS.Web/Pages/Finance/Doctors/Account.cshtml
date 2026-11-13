@@ -1,0 +1,93 @@
+@page "{id:int}"
+@model BurhanNexus.HMS.Web.Pages.Finance.Doctors.AccountModel
+@{
+    var a = Model.Account;
+    var p = Model.PeriodAccount;
+    ViewData["Title"] = "Doctor account – " + a.Name;
+}
+<partial name="_FinanceNav" />
+<div class="toolbar">
+    <form method="get" class="filters wrap"><partial name="_PeriodFilter" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" /><button class="btn btn-light" type="submit">Show</button></form>
+    <div class="toolbar-actions"><a class="btn btn-light" href="/Finance/Doctors">&larr; Doctor accounts</a></div>
+</div>
+<partial name="_ValidationSummary" />
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-stethoscope" /></svg> @a.Name <small class="muted">@a.Specialty</small></h2><span class="pill pill-blue">@a.Arrangement</span></div>
+    <div class="card-body">
+        <div class="kpi-grid" data-doctor-account>
+            <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-users" /></svg></div><div><span class="kpi-label">Consultations (all time)</span><strong class="kpi-value">@a.Consultations</strong></div></div>
+            <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-wallet" /></svg></div><div><span class="kpi-label">Fees collected</span><strong class="kpi-value" data-kpi="collected">@Fmt.Money(a.FeesCollected)</strong></div></div>
+            <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-hospital" /></svg></div><div><span class="kpi-label">Hospital share</span><strong class="kpi-value" data-kpi="hospital">@Fmt.Money(a.HospitalShare)</strong></div></div>
+            <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-check-circle" /></svg></div><div><span class="kpi-label">Paid to doctor</span><strong class="kpi-value" data-kpi="paid">@Fmt.Money(a.PaidToDoctor)</strong></div></div>
+            <div class="kpi"><div class="kpi-icon red"><svg class="icon"><use href="#i-alert" /></svg></div><div><span class="kpi-label">Remaining payable</span><strong class="kpi-value" data-kpi="payable">@Fmt.Money(a.Payable)</strong></div></div>
+        </div>
+        <p class="muted small">@BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(Model.From!.Value, Model.To!.Value): @p.Consultations consultations, @Fmt.Money(p.FeesCollected) collected, doctor's share @Fmt.Money(p.DoctorEarned), paid @Fmt.Money(p.PaidToDoctor).</p>
+    </div>
+</div>
+<div class="grid-side">
+    <div class="stack">
+        <div class="card">
+            <div class="card-header"><h3>Account entries</h3></div>
+            <div class="table-wrap">
+                <table class="table table-compact" data-doctor-ledger>
+                    <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Details</th><th class="num">Collected</th><th class="num">Hospital</th><th class="num">Doctor</th></tr></thead>
+                    <tbody>
+                    @foreach (var e in Model.Ledger)
+                    {
+                        <tr><td class="nowrap">@Fmt.Day(e.BusinessDate)</td><td>@e.EntryType</td><td class="mono">@e.Reference</td><td>@e.Description</td>
+                            <td class="num">@(e.GrossAmount == 0 ? "" : Fmt.Money(e.GrossAmount))</td><td class="num">@(e.HospitalShare == 0 ? "" : Fmt.Money(e.HospitalShare))</td>
+                            <td class="num @(e.Amount < 0 ? "text-danger" : "")">@Fmt.Money(e.Amount)</td></tr>
+                    }
+                    @if (Model.Ledger.Count == 0) { <tr><td colspan="7" class="empty">No entries in this period.</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><h3>Payments to doctor</h3></div>
+            <div class="table-wrap">
+                <table class="table table-compact" data-settlements>
+                    <thead><tr><th>Payment</th><th>Date</th><th class="num">Amount</th><th>Method</th><th>Reference</th><th>Notes</th><th>Recorded by</th></tr></thead>
+                    <tbody>
+                    @foreach (var s in Model.Settlements)
+                    {
+                        <tr><td class="mono">@s.SettlementNumber</td><td>@Fmt.Day(s.BusinessDate)</td><td class="num">@Fmt.Money(s.Amount)</td><td>@s.PaymentMethod?.Name</td><td>@s.PaymentReference</td><td>@s.Notes</td><td>@s.RecordedByUsername · @Fmt.DateTimeText(s.PaidUtc)</td></tr>
+                    }
+                    @if (Model.Settlements.Count == 0) { <tr><td colspan="7" class="empty">No payments yet.</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="stack">
+        <form bn-permission="@Perm.FinanceRecordDoctorPayments" method="post" asp-page-handler="Pay" class="card" novalidate>
+            <div class="card-header"><h3>Pay doctor</h3></div>
+            <div class="card-body">
+                <div class="field"><label for="Pay_Amount">Amount (payable @Fmt.Money(a.Payable)) <em>*</em></label>
+                    <input id="Pay_Amount" name="Pay.Amount" type="number" step="0.01" min="0.01" max="@Math.Max(0, a.Payable)" value="@(a.Payable > 0 ? a.Payable.ToString(System.Globalization.CultureInfo.InvariantCulture) : "")" required /></div>
+                <div class="field"><label for="Pay_PaymentMethodId">Method</label><select id="Pay_PaymentMethodId" name="Pay.PaymentMethodId">@foreach (var m in Model.Methods) { <option value="@m.Id">@m.Name</option> }</select></div>
+                <div class="field"><label for="Pay_PaymentReference">Reference</label><input id="Pay_PaymentReference" name="Pay.PaymentReference" maxlength="100" /></div>
+                <div class="field"><label for="Pay_PaidOn">Date</label><input id="Pay_PaidOn" name="Pay.PaidOn" type="date" /></div>
+                <div class="field"><label for="Pay_Notes">Notes</label><input id="Pay_Notes" name="Pay.Notes" maxlength="300" /></div>
+            </div>
+            <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="doctor-pay" data-once>Record payment</button></div>
+        </form>
+        <form method="post" asp-page-handler="Share" class="card" novalidate>
+            <div class="card-header"><h3>Fee-sharing arrangement</h3></div>
+            <div class="card-body">
+                <div class="field"><label for="ShareType">Arrangement</label>
+                    <select id="ShareType" name="ShareType">
+                        <option value="HospitalKeepsAll" selected="@(Model.ShareType == DoctorShareType.HospitalKeepsAll)">Hospital keeps full fee (salaried)</option>
+                        <option value="FullFeeToDoctor" selected="@(Model.ShareType == DoctorShareType.FullFeeToDoctor)">A – Full fee collected by hospital, paid to doctor</option>
+                        <option value="HospitalCommissionPercent" selected="@(Model.ShareType == DoctorShareType.HospitalCommissionPercent)">B – Hospital commission % (rest to doctor)</option>
+                        <option value="DoctorPercent" selected="@(Model.ShareType == DoctorShareType.DoctorPercent)">C – Doctor gets %</option>
+                        <option value="DoctorFixedAmount" selected="@(Model.ShareType == DoctorShareType.DoctorFixedAmount)">C – Doctor gets fixed amount per consultation</option>
+                        <option value="HospitalFixedAmount" selected="@(Model.ShareType == DoctorShareType.HospitalFixedAmount)">C – Hospital keeps fixed amount per consultation</option>
+                    </select></div>
+                <div class="field"><label for="ShareValue">Percentage / amount</label><input id="ShareValue" name="ShareValue" type="number" step="0.01" min="0" value="@Model.ShareValue.ToString(System.Globalization.CultureInfo.InvariantCulture)" /></div>
+                <small class="muted">Applies to consultations collected from now on; earlier consultations keep their arrangement.</small>
+            </div>
+            <div class="card-footer"><button class="btn btn-light" type="submit" data-test="doctor-share">Save arrangement</button></div>
+        </form>
+    </div>
+</div>

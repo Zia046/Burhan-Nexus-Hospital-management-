@@ -1,0 +1,91 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Print.ReceiptModel
+@{
+    Layout = null;
+    var s = Model.Slip;
+    var p = Model.Printer;
+    var h = (await Fmt.ProfileAsync())!;
+    var width = p.PaperWidthMm;
+    var basePath = ViewContext.HttpContext.Request.Path;
+    var mode = Model.IsA4 ? "Browser" : p.Mode.ToString();
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Receipt @s.ReceiptNumber</title>
+    <link rel="stylesheet" href="~/css/thermal.css" asp-append-version="true" />
+    @if (Model.IsA4) { <style>@@page { size: A4; margin: 14mm; }</style> }
+</head>
+<body class="thermal-body @(Model.IsA4 ? "a4" : "w" + width) font-@p.FontSize.ToString().ToLowerInvariant() @(p.BoldText ? "bold" : "")"
+      data-thermal data-mode="@mode" data-width="@(Model.IsA4 ? "a4" : width.ToString())" data-autoprint="@(Model.AutoPrint ? "1" : null)"
+      data-can-print="@(Model.CanPrintNow ? "1" : "0")" data-record-url="@basePath?handler=Record" data-escpos-url="@basePath?handler=EscPos" data-lan-url="@basePath?handler=Lan"
+      data-agent="@p.AgentUrl" @(Model.IsA4 ? "data-no-fit" : "")>
+@Html.AntiForgeryToken()
+<div class="t-toolbar no-print">
+    <div class="t-row">
+        <strong>Receipt @s.ReceiptNumber</strong>
+        <span class="t-pill">@(Model.IsA4 ? "A4" : width + " mm") · @(mode switch { "LanDirect" => "LAN printer " + p.LanHost, "LocalAgent" => "Print Agent → " + (p.WindowsPrinterName ?? p.LanHost), _ => "Browser printing" })</span>
+    </div>
+    <div class="t-row">
+        <a class="t-btn light" href="/Finance/Receipts/Details/@Model.Receipt.Id">&larr; Receipt</a>
+        <a class="t-btn light" href="/Finance/Collect">Next payment</a>
+        <a class="t-btn light @(!Model.IsA4 && width == 58 ? "on" : "")" href="@basePath?width=58">58 mm</a>
+        <a class="t-btn light @(!Model.IsA4 && width == 80 ? "on" : "")" href="@basePath?width=80">80 mm</a>
+        <a class="t-btn light @(Model.IsA4 ? "on" : "")" href="@basePath?format=a4">A4</a>
+        @if (Model.CanPrintNow)
+        {
+            <button type="button" class="t-btn" data-thermal-print>@(Model.PrintCount == 0 ? "Print receipt" : $"Reprint (copy {Model.PrintCount + 1})")</button>
+            @if (mode != "Browser") { <button type="button" class="t-btn light" data-thermal-browser>Print with browser dialog</button> }
+        }
+        else { <span class="t-msg err">Already printed. You need the “Reprint Receipts” permission to print again.</span> }
+    </div>
+    <div class="t-status" data-thermal-status>@(Model.PrintCount == 0 ? "Not printed yet. For PDF choose “Save as PDF” in the print dialog." : $"Printed {Model.PrintCount} time(s). Reprints keep the same receipt number.")</div>
+</div>
+<main class="slip-wrap">
+    <article class="t-slip receipt @(Model.IsA4 ? "receipt-a4" : "")" data-receipt="@s.ReceiptNumber">
+        @if ((p.ShowLogo || Model.IsA4) && h.HasLogo) { <img class="t-logo" src="/branding/logo?v=@h.LogoVersion" alt="" /> }
+        <div class="t-hosp">@s.HospitalName</div>
+        @if (s.Address is not null) { <div class="t-small">@s.Address</div> }
+        @if (s.Contact is not null) { <div class="t-small">@s.Contact</div> }
+        <div class="t-sep"></div>
+        <div class="t-title">@(s.IsCancelled ? "*** CANCELLED RECEIPT ***" : "PAYMENT RECEIPT")</div>
+        <table class="t-kv">
+            <tr><td>Receipt no.</td><td data-field="number">@s.ReceiptNumber</td></tr>
+            <tr><td>Date</td><td>@s.DateTimeText</td></tr>
+            @if (s.PatientName is not null) { <tr><td>Patient</td><td data-field="patient">@s.PatientName</td></tr> }
+            @if (s.PatientNumber is not null) { <tr><td>Patient ID</td><td>@s.PatientNumber</td></tr> }
+            @if (s.AgeGender is not null) { <tr><td>Age / Gender</td><td>@s.AgeGender</td></tr> }
+        </table>
+        <div class="t-sep"></div>
+        <table class="t-items">
+            <thead><tr><th>Service</th><th>Fee</th><th>Paid</th></tr></thead>
+            <tbody>
+            @foreach (var l in s.Lines)
+            {
+                <tr><td>@l.Service@if (l.Doctor is not null) { <small class="block">@l.Doctor</small> }@if (l.Discount is not null) { <small class="block">Discount −@l.Discount</small> }@if (l.Balance is not null) { <small class="block">Remaining @l.Balance</small> }</td>
+                    <td class="num">@l.Fee</td><td class="num">@l.Paid</td></tr>
+            }
+            </tbody>
+        </table>
+        <div class="t-sep"></div>
+        <table class="t-kv totals">
+            <tr><td>Total fee</td><td>@s.TotalFee</td></tr>
+            @if (s.TotalDiscount is not null) { <tr><td>Discount</td><td>−@s.TotalDiscount</td></tr> }
+            <tr><td>Net payable</td><td>@s.TotalNet</td></tr>
+            <tr class="paid"><td>Paid</td><td data-field="paid">@s.Paid</td></tr>
+            @if (s.Balance is not null) { <tr><td>Remaining</td><td data-field="balance">@s.Balance</td></tr> }
+            @if (s.Refunded is not null) { <tr><td>Refunded</td><td>−@s.Refunded</td></tr> }
+            <tr><td>Payment</td><td>@s.PaymentMethod @s.PaymentReference</td></tr>
+            <tr><td>Counter</td><td>@s.CounterName</td></tr>
+            @if (s.CashierName is not null) { <tr><td>Cashier</td><td>@s.CashierName</td></tr> }
+        </table>
+        @if (s.IsCancelled) { <div class="t-cancelled">CANCELLED: @s.CancelReason</div> }
+        <div class="t-sep"></div>
+        @if (!string.IsNullOrWhiteSpace(s.Footer)) { <div class="t-msgline">@s.Footer</div> }
+        <div class="t-tiny">@s.PrintedText@(s.IsReprint ? " (REPRINT)" : "")</div>
+    </article>
+</main>
+<script src="~/js/thermal.js" asp-append-version="true"></script>
+</body>
+</html>

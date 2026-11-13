@@ -1,0 +1,108 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Finance.Receipts.DetailsModel
+@{
+    var r = Model.Receipt;
+    ViewData["Title"] = $"Receipt {r.ReceiptNumber}";
+    var cancelled = r.Status == ReceiptStatus.Cancelled;
+    var canApprove = await PermCtx.HasAsync(Perm.FinanceApproveRefunds);
+    var printPerm = r.Prints.Count == 0 ? Perm.FinanceIssueReceipts : Perm.FinanceReprint;
+}
+<partial name="_FinanceNav" />
+<div class="toolbar">
+    <div><a class="btn btn-light" href="/Finance/Receipts">&larr; Receipts</a></div>
+    <div class="toolbar-actions">
+        <a bn-permission="@printPerm" class="btn btn-primary" href="/Print/Receipt/@r.Id" data-test="receipt-print"><svg class="icon icon-sm"><use href="#i-printer" /></svg> @(r.Prints.Count == 0 ? "Print receipt" : "Reprint")</a>
+        <a bn-permission="@printPerm" class="btn btn-light" href="/Print/Receipt/@r.Id?format=a4">A4 / PDF</a>
+        @if (r.PatientId is long pid) { <a bn-permission="@Perm.FinanceCollect" class="btn btn-light" href="/Finance/Collect?patientId=@pid">New payment</a> }
+    </div>
+</div>
+<partial name="_ValidationSummary" />
+<div class="grid-side">
+    <div class="stack">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="mono">@r.ReceiptNumber</h2>
+                @if (cancelled) { <span class="status status-bad" data-receipt-status>Cancelled</span> } else { <span class="status status-ok" data-receipt-status>Valid</span> }
+            </div>
+            <div class="card-body">
+                <dl class="kv">
+                    <dt>Patient</dt><dd>@(r.Patient?.FullName ?? r.PayerName) <span class="mono">@r.Patient?.PatientNumber</span></dd>
+                    <dt>Date / time</dt><dd>@Fmt.DateTimeText(r.CreatedUtc)</dd>
+                    <dt>Counter</dt><dd>@r.Counter!.Name</dd>
+                    <dt>Cashier</dt><dd>@r.CashierName (@r.CashierUsername)</dd>
+                    <dt>Payment</dt><dd>@r.PaymentMethod!.Name @(r.PaymentReference is null ? "" : "· ref " + r.PaymentReference)</dd>
+                    @if (r.Notes is not null) { <dt>Notes</dt><dd>@r.Notes</dd> }
+                    @if (cancelled) { <dt>Cancelled</dt><dd class="text-danger">@Fmt.DateTimeText(r.CancelledUtc) by @r.CancelledByUsername – @r.CancelReason</dd> }
+                </dl>
+            </div>
+            <div class="table-wrap">
+                <table class="table table-compact" data-receipt-lines>
+                    <thead><tr><th>Service</th><th>Doctor</th><th class="num">Fee</th><th class="num">Discount</th><th class="num">Net</th><th class="num">Paid before</th><th class="num">Paid now</th><th class="num">Balance</th></tr></thead>
+                    <tbody>
+                    @foreach (var l in r.Lines)
+                    {
+                        <tr><td>@l.ServiceName <small class="muted mono">@l.Charge?.ChargeNumber</small></td><td>@l.DoctorName</td><td class="num">@Fmt.Money(l.Fee)</td><td class="num">@Fmt.Money(l.Discount)</td>
+                            <td class="num">@Fmt.Money(l.NetAmount)</td><td class="num">@Fmt.Money(l.PreviouslyPaid)</td><td class="num"><strong>@Fmt.Money(l.Amount)</strong></td><td class="num">@Fmt.Money(l.BalanceAfter)</td></tr>
+                    }
+                    </tbody>
+                    <tfoot><tr><th colspan="6">Total received</th><th class="num" data-amount>@Fmt.Money(r.AmountPaid)</th><th class="num">@Fmt.Money(r.BalanceAfter)</th></tr>
+                        @if (r.RefundedAmount > 0) { <tr><th colspan="6">Refunded</th><th class="num text-danger" data-refunded>− @Fmt.Money(r.RefundedAmount)</th><th></th></tr> }</tfoot>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><h3>Refunds</h3></div>
+            <div class="table-wrap">
+                <table class="table table-compact" data-refunds>
+                    <thead><tr><th>Refund</th><th>Amount</th><th>Method</th><th>Reason</th><th>Status</th><th>By</th></tr></thead>
+                    <tbody>
+                    @foreach (var f in Model.Refunds)
+                    {
+                        <tr><td class="mono">@f.RefundNumber</td><td>@Fmt.Money(f.Amount)</td><td>@f.PaymentMethod?.Name</td><td>@f.Reason</td><td>@f.Status</td>
+                            <td>@f.RequestedByUsername@(f.DecidedByUsername is null ? "" : " / " + f.DecidedByUsername)</td></tr>
+                    }
+                    @if (Model.Refunds.Count == 0) { <tr><td colspan="6" class="empty">No refunds.</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="stack">
+        <div class="card">
+            <div class="card-header"><h3>Print history</h3><span class="pill pill-blue">@r.Prints.Count</span></div>
+            <ul class="activity">
+                @foreach (var pr in r.Prints)
+                {
+                    <li><span class="activity-dot"></span><div><strong>@(pr.CopyNumber == 1 ? "Printed" : $"Reprint – copy {pr.CopyNumber}") · @pr.Format</strong><small>@Fmt.DateTimeText(pr.PrintedUtc) · @pr.PrintedByUsername · @pr.Method</small></div></li>
+                }
+                @if (r.Prints.Count == 0) { <li class="empty">Not printed yet.</li> }
+            </ul>
+        </div>
+        @if (!cancelled && Model.Refundable > 0)
+        {
+            <form bn-permission="@Perm.FinanceProcessRefunds" method="post" asp-page-handler="Refund" class="card" novalidate>
+                <div class="card-header"><h3>Refund to patient</h3></div>
+                <div class="card-body">
+                    <div class="field"><label for="RefundAmount">Amount (max @Fmt.Money(Model.Refundable)) <em>*</em></label>
+                        <input id="RefundAmount" name="RefundAmount" type="number" step="0.01" min="0.01" max="@Model.Refundable" required /></div>
+                    <div class="field"><label for="RefundMethodId">Refund method</label>
+                        <select id="RefundMethodId" name="RefundMethodId">@foreach (var m in Model.Methods) { <option value="@m.Id" selected="@(m.Id == r.PaymentMethodId)">@m.Name</option> }</select></div>
+                    <div class="field"><label for="RefundReason">Reason <em>*</em></label><input id="RefundReason" name="RefundReason" maxlength="300" required /></div>
+                    @if (canApprove) { <label class="check"><input type="checkbox" name="ApproveNow" value="true" checked /> Approve and complete now</label> }
+                </div>
+                <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="refund-submit" data-once>@(canApprove ? "Refund" : "Request refund")</button></div>
+            </form>
+        }
+        @if (!cancelled)
+        {
+            <form bn-permission="@Perm.FinanceCancelReceipts" method="post" asp-page-handler="Cancel" class="card" novalidate>
+                <div class="card-header"><h3>Cancel receipt</h3></div>
+                <div class="card-body">
+                    <div class="field"><label for="CancelReason">Reason <em>*</em></label><input id="CancelReason" name="CancelReason" maxlength="300" required /></div>
+                    <small class="muted">For a wrongly entered receipt. The receipt stays in the records, its number is never reused, and the cashier's and doctor's accounts are corrected automatically. To return money to the patient, use a refund.</small>
+                </div>
+                <div class="card-footer"><button class="btn btn-danger" type="submit" data-test="receipt-cancel" data-once>Cancel receipt</button></div>
+            </form>
+        }
+    </div>
+</div>

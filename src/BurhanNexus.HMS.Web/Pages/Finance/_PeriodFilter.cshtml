@@ -1,0 +1,9 @@
+@model (string Preset, DateOnly From, DateOnly To)
+<select name="period" aria-label="Period" data-period-custom>
+    @foreach (var (key, name) in BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Presets)
+    {
+        <option value="@key" selected="@(Model.Preset == key)">@name</option>
+    }
+</select>
+<label class="inline-label">From <input type="date" name="from" value="@Model.From.ToString("yyyy-MM-dd")" /></label>
+<label class="inline-label">To <input type="date" name="to" value="@Model.To.ToString("yyyy-MM-dd")" /></label>

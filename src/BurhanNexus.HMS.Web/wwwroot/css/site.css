@@ -502,3 +502,22 @@ label.perm-cell { grid-template-columns: 20px 1fr; margin: 0; }
   .no-print { display: none !important; }
   .card { break-inside: avoid; box-shadow: none; }
 }
+
+/* ---------- Phase 3: finance ---------- */
+.line-hidden { display: none; }
+.collect-lines select { min-width: 180px; }
+.input-num { width: 110px; text-align: right; }
+.collect-total { margin-right: auto; font-size: 1.05rem; }
+.collect-total strong { font-size: 1.3rem; }
+.section-title { margin: 18px 0 8px; font-size: 1rem; }
+tr.total th, tr.total td { border-top: 2px solid var(--line); }
+.text-danger { color: var(--red-600, #c62828); }
+.bar-chart { display: flex; align-items: flex-end; gap: 4px; height: 160px; padding: 8px 0; overflow-x: auto; }
+.bar-chart .bar { flex: 1 0 18px; min-width: 18px; background: var(--blue-600); border-radius: 4px 4px 0 0; position: relative; }
+.bar-chart .bar span { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: .65rem; color: var(--muted); white-space: nowrap; }
+.share-bar { height: 8px; background: var(--blue-100); border-radius: 4px; overflow: hidden; min-width: 80px; }
+.share-bar i { display: block; height: 100%; background: var(--blue-600); }
+.no-js-hide { }
+@media print {
+  .subnav, .toolbar, .sidebar, .topbar { display: none !important; }
+}

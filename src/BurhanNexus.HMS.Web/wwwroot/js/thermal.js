@@ -31,7 +31,7 @@
   // Page size = paper width x slip height, so the roll is not fed with blank paper.
   function fitPage() {
     const slip = document.querySelector(".t-slip");
-    if (!slip) return;
+    if (!slip || body.hasAttribute("data-no-fit")) return;
     const mm = Math.ceil(slip.getBoundingClientRect().height * 25.4 / 96) + 4;
     let st = document.getElementById("thermal-page");
     if (!st) { st = document.createElement("style"); st.id = "thermal-page"; document.head.appendChild(st); }

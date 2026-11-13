@@ -45,6 +45,7 @@ else if (p.Status == PatientStatus.Archived)
         {
             <a bn-permission="@Perm.PatientsEdit" class="btn btn-light" href="/Patients/Edit/@p.Id"><svg class="icon icon-sm"><use href="#i-edit" /></svg> Edit</a>
         }
+        <a bn-permission="@Perm.FinanceCollect" class="btn btn-light" href="/Finance/Collect?patientId=@p.Id"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Collect payment</a>
         <a bn-permission="@Perm.PatientsPrint" class="btn btn-light" href="/Patients/Record/@p.Id" target="_blank"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print record</a>
     </div>
 </section>

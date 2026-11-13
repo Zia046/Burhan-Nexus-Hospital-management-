@@ -1,0 +1,20 @@
+@{
+    var tab = ViewData["FinanceTab"] as string;
+    string Cls(string t) => t == tab ? "active" : "";
+}
+<nav class="subnav no-print">
+    <a bn-permission="@Perm.FinanceViewOwnAccount" class="@Cls("account")" href="/Finance"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> My account</a>
+    <a bn-permission="@Perm.FinanceCollect" class="@Cls("collect")" href="/Finance/Collect"><svg class="icon icon-sm"><use href="#i-plus" /></svg> Collect payment</a>
+    <a bn-permission="@Perm.FinanceViewOwnReceipts" class="@Cls("receipts")" href="/Finance/Receipts"><svg class="icon icon-sm"><use href="#i-file" /></svg> Receipts</a>
+    <a bn-permission="@Perm.FinanceDailyClosing" class="@Cls("closing")" href="/Finance/Closing"><svg class="icon icon-sm"><use href="#i-check-circle" /></svg> Daily closing</a>
+    <a bn-permission="@Perm.FinanceDashboard" class="@Cls("dashboard")" href="/Finance/Dashboard"><svg class="icon icon-sm"><use href="#i-chart" /></svg> Dashboard</a>
+    <a bn-permission="@Perm.FinanceDashboard" class="@Cls("reports")" href="/Finance/Reports"><svg class="icon icon-sm"><use href="#i-file" /></svg> Reports</a>
+    <a bn-permission="@Perm.FinanceViewAllAccounts" class="@Cls("cashiers")" href="/Finance/Cashiers"><svg class="icon icon-sm"><use href="#i-users" /></svg> Cashier accounts</a>
+    <a bn-permission="@Perm.FinanceConfirmDeposits" class="@Cls("deposits")" href="/Finance/Deposits"><svg class="icon icon-sm"><use href="#i-download" /></svg> Deposits</a>
+    <a bn-permission="@Perm.FinanceApproveRefunds" class="@Cls("refunds")" href="/Finance/Refunds"><svg class="icon icon-sm"><use href="#i-refresh" /></svg> Refunds</a>
+    <a bn-permission="@Perm.FinanceManageDoctorAccounts" class="@Cls("doctors")" href="/Finance/Doctors"><svg class="icon icon-sm"><use href="#i-stethoscope" /></svg> Doctor accounts</a>
+    <a bn-permission="@Perm.FinanceCounterReports" class="@Cls("counters")" href="/Finance/Counters"><svg class="icon icon-sm"><use href="#i-building" /></svg> Counters</a>
+    <a bn-permission="@Perm.FinanceManageServiceFees" class="@Cls("services")" href="/Finance/Services"><svg class="icon icon-sm"><use href="#i-sliders" /></svg> Services &amp; fees</a>
+    <a bn-permission="@Perm.FinanceAdjustments" class="@Cls("adjustments")" href="/Finance/Adjustments"><svg class="icon icon-sm"><use href="#i-edit" /></svg> Adjustments</a>
+    <a bn-permission="@Perm.FinanceSettings" class="@Cls("settings")" href="/Finance/Settings"><svg class="icon icon-sm"><use href="#i-settings" /></svg> Settings</a>
+</nav>

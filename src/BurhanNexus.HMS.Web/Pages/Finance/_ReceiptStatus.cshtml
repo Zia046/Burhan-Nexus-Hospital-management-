@@ -1,0 +1,6 @@
+@model ReceiptListItem
+@if (Model.Status == ReceiptStatus.Cancelled) { <span class="status status-bad">Cancelled</span> }
+else if (Model.RefundedAmount >= Model.AmountPaid && Model.AmountPaid > 0) { <span class="status status-warn">Refunded</span> }
+else if (Model.RefundedAmount > 0) { <span class="status status-warn">Part refunded</span> }
+else if (Model.BalanceAfter > 0) { <span class="status status-warn">Balance @Model.BalanceAfter.ToString("N2")</span> }
+else { <span class="status status-ok">Valid</span> }

@@ -1,0 +1,65 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Finance.ClosingModel
+@{
+    ViewData["Title"] = "Daily cash closing";
+    var f = Model.Figures;
+}
+<partial name="_FinanceNav" />
+<div class="toolbar">
+    <form method="get" class="filters wrap">
+        <select name="scope" aria-label="Scope">
+            <option value="Cashier" selected="@(Model.Scope == ClosingScope.Cashier)">Cashier</option>
+            @if (Model.SeeCounters) { <option value="Counter" selected="@(Model.Scope == ClosingScope.Counter)">Counter</option> }
+            @if (Model.SeeAll) { <option value="Hospital" selected="@(Model.Scope == ClosingScope.Hospital)">Entire hospital</option> }
+        </select>
+        @if (Model.Scope == ClosingScope.Cashier && Model.SeeAll)
+        {
+            <select name="id" aria-label="Cashier">@foreach (var c in Model.Cashiers) { <option value="@c.UserId" selected="@(Model.Id == c.UserId)">@c.FullName</option> }
+                @if (Model.Cashiers.All(c => c.UserId != Model.Id)) { <option value="@Model.Id" selected>Me</option> }</select>
+        }
+        @if (Model.Scope == ClosingScope.Counter)
+        {
+            <select name="id" aria-label="Counter">@foreach (var c in Model.Counters) { <option value="@c.Counter.Id" selected="@(Model.Id == c.Counter.Id)">@c.Counter.Name</option> }</select>
+        }
+        <input type="date" name="date" value="@Model.Date?.ToString("yyyy-MM-dd")" aria-label="Date" />
+        <button class="btn btn-light" type="submit">Show</button>
+    </form>
+    <div class="toolbar-actions"><button type="button" class="btn btn-light" data-print><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print / PDF</button></div>
+</div>
+<partial name="_ValidationSummary" />
+<div class="grid-side">
+    <div class="card">
+        <div class="card-header"><h2><svg class="icon"><use href="#i-check-circle" /></svg> Daily closing – @f.ScopeName – @Fmt.Day(f.Date)</h2></div>
+        <div class="table-wrap">
+            <table class="table" data-closing-figures>
+                <tbody>
+                    <tr><td>Opening cash balance</td><td class="num" data-k="opening">@Fmt.Money(f.Opening)</td></tr>
+                    <tr><td>Cash collections</td><td class="num" data-k="cash">@Fmt.Money(f.Cash)</td></tr>
+                    <tr><td>Non-cash collections (bank / card)</td><td class="num" data-k="noncash">@Fmt.Money(f.NonCash)</td></tr>
+                    <tr><td>Receipts issued</td><td class="num" data-k="receipts">@f.Receipts</td></tr>
+                    <tr><td>Cancelled receipts (@f.Cancelled)</td><td class="num" data-k="cancelled">− @Fmt.Money(f.CancelledAmount)</td></tr>
+                    <tr><td>Refunds</td><td class="num" data-k="refunds">− @Fmt.Money(f.Refunds)</td></tr>
+                    <tr><td>Deposits submitted</td><td class="num" data-k="submitted">@Fmt.Money(f.DepositsSubmitted)</td></tr>
+                    <tr><td>Deposits confirmed by Admin</td><td class="num" data-k="confirmed">− @Fmt.Money(f.DepositsConfirmed)</td></tr>
+                    <tr><td>Adjustments</td><td class="num" data-k="adjustments">@Fmt.Money(f.Adjustments)</td></tr>
+                    <tr class="total"><th>Closing outstanding cash balance</th><th class="num" data-k="closing">@Fmt.Money(f.Closing)</th></tr>
+                </tbody>
+            </table>
+        </div>
+        <form method="post" class="card-body no-print" asp-route-scope="@Model.Scope" asp-route-id="@Model.Id" asp-route-date="@Model.Date?.ToString("yyyy-MM-dd")" novalidate>
+            <div class="field"><label for="Notes">Notes / discrepancy remarks</label><input id="Notes" name="Notes" maxlength="300" /></div>
+            <button class="btn btn-primary" type="submit" data-test="closing-save">Save daily closing</button>
+            <small class="muted block">Saving creates a dated summary. Transactions are not deleted or reset. A discrepancy is corrected by an authorised adjustment.</small>
+        </form>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3>Saved closings</h3></div>
+        <ul class="activity" data-closings>
+            @foreach (var c in Model.History.Take(60))
+            {
+                <li><span class="activity-dot"></span><div><strong>@Fmt.Day(c.BusinessDate) · closing @Fmt.Money(c.ClosingBalance)</strong><small>cash @Fmt.Money(c.CashCollections) · non-cash @Fmt.Money(c.NonCashCollections) · by @c.ClosedByUsername @Fmt.DateTimeText(c.ClosedUtc) @c.Notes</small></div></li>
+            }
+            @if (Model.History.Count == 0) { <li class="empty">No closing saved yet.</li> }
+        </ul>
+    </div>
+</div>

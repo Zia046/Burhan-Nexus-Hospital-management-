@@ -1,0 +1,25 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Finance.CashiersModel
+@{ ViewData["Title"] = "Cashier accounts"; }
+<partial name="_FinanceNav" />
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-users" /></svg> Cashier accounts</h2>
+        <span class="pill pill-blue">Outstanding @Fmt.Money(Model.Rows.Sum(r => r.Outstanding)) · today @Fmt.Money(Model.Rows.Sum(r => r.TodayCollection))</span></div>
+    <div class="table-wrap">
+        <table class="table" data-cashiers>
+            <thead><tr><th>Employee</th><th>Counters</th><th class="num">Today's collection</th><th class="num">Pending deposits</th><th class="num">Outstanding (payable to Admin)</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr data-cashier="@r.Username"><td><strong>@r.FullName</strong> <small class="muted">@r.Username</small></td><td>@r.Counters</td>
+                    <td class="num">@Fmt.Money(r.TodayCollection)</td><td class="num">@Fmt.Money(r.PendingDeposits)</td>
+                    <td class="num"><strong data-outstanding>@Fmt.Money(r.Outstanding)</strong></td>
+                    <td class="actions nowrap"><a class="btn btn-light btn-sm" href="/Finance?userId=@r.UserId">Account</a>
+                        <a class="btn btn-light btn-sm" href="/Finance/Receipts?cashier=@r.UserId&period=month">Receipts</a>
+                        <a bn-permission="@Perm.FinanceDailyClosing" class="btn btn-light btn-sm" href="/Finance/Closing?scope=Cashier&id=@r.UserId">Closing</a></td></tr>
+            }
+            @if (Model.Rows.Count == 0) { <tr><td colspan="6" class="empty">No cashier has collected money yet. Assign employees to counters first.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

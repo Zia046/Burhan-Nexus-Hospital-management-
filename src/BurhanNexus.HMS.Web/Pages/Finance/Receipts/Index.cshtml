@@ -1,0 +1,55 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Finance.Receipts.IndexModel
+@{
+    ViewData["Title"] = "Receipts";
+    var valid = Model.Items.Where(i => i.Status == ReceiptStatus.Valid).ToList();
+}
+<partial name="_FinanceNav" />
+<div class="toolbar">
+    <form method="get" class="filters wrap">
+        <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Receipt no., Patient ID or name" maxlength="100" /></div>
+        <partial name="_PeriodFilter" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" />
+        @if (Model.SeeAll)
+        {
+            <select name="counter" aria-label="Counter"><option value="">All counters</option>
+                @foreach (var c in Model.Counters) { <option value="@c.Counter.Id" selected="@(Model.Counter == c.Counter.Id)">@c.Counter.Name</option> }</select>
+        }
+        <select name="status" aria-label="Status">
+            <option value="">All</option>
+            <option value="valid" selected="@(Model.Status == "valid")">Valid</option>
+            <option value="balance" selected="@(Model.Status == "balance")">With balance due</option>
+            <option value="refunded" selected="@(Model.Status == "refunded")">Refunded</option>
+            <option value="cancelled" selected="@(Model.Status == "cancelled")">Cancelled</option>
+        </select>
+        @if (Model.PatientId is long pid) { <input type="hidden" name="patientId" value="@pid" /> }
+        @if (Model.Cashier is int cid && Model.SeeAll) { <input type="hidden" name="cashier" value="@cid" /> }
+        <button class="btn btn-light" type="submit">Show</button>
+    </form>
+    <div class="toolbar-actions"><a bn-permission="@Perm.FinanceCollect" class="btn btn-primary" href="/Finance/Collect"><svg class="icon icon-sm"><use href="#i-plus" /></svg> Collect payment</a></div>
+</div>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-file" /></svg> @(Model.SeeAll ? "Receipts" : "My receipts") – @BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(Model.From!.Value, Model.To!.Value)</h2>
+        <span class="pill pill-blue">@valid.Count valid · @Fmt.Money(valid.Sum(i => i.AmountPaid - i.RefundedAmount))</span></div>
+    <div class="table-wrap">
+        <table class="table table-compact" data-receipt-list>
+            <thead><tr><th>Receipt</th><th>Date / time</th><th>Patient</th><th>Services</th><th>Counter</th>@if (Model.SeeAll) { <th>Cashier</th> }<th>Method</th><th class="num">Paid</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var r in Model.Items)
+            {
+                <tr class="@(r.Status == ReceiptStatus.Cancelled ? "row-muted" : "")" data-receipt="@r.ReceiptNumber">
+                    <td class="mono nowrap"><a href="/Finance/Receipts/Details/@r.Id">@r.ReceiptNumber</a></td>
+                    <td class="nowrap">@Fmt.DateTimeText(r.CreatedUtc)</td>
+                    <td>@(r.PatientName ?? r.PayerName) <small class="muted block">@r.PatientNumber</small></td>
+                    <td>@r.Services</td><td>@r.CounterName</td>
+                    @if (Model.SeeAll) { <td>@r.CashierName</td> }
+                    <td>@r.PaymentMethod</td>
+                    <td class="num nowrap">@Fmt.Money(r.AmountPaid)</td>
+                    <td><partial name="_ReceiptStatus" model="r" /></td>
+                    <td class="actions nowrap"><a class="btn btn-light btn-sm" href="/Finance/Receipts/Details/@r.Id">Open</a></td>
+                </tr>
+            }
+            @if (Model.Items.Count == 0) { <tr><td colspan="10" class="empty">No receipts found.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

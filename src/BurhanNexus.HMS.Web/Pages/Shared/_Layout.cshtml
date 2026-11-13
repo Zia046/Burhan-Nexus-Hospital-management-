@@ -82,6 +82,39 @@
             }
         }
 
+        @if (Any(Perm.FinanceViewOwnAccount, Perm.FinanceCollect, Perm.FinanceViewOwnReceipts, Perm.FinanceDashboard, Perm.FinanceConfirmDeposits, Perm.FinanceManageDoctorAccounts, Perm.FinanceCounterReports, Perm.FinanceManageServiceFees))
+        {
+            <div class="nav-section">Finance</div>
+            @if (perms.Contains(Perm.FinanceCollect))
+            {
+                <a class="nav-link @Active("finance-collect")" href="/Finance/Collect" data-nav="finance-collect"><svg class="icon"><use href="#i-plus" /></svg><span>Collect Payment</span></a>
+            }
+            @if (perms.Contains(Perm.FinanceViewOwnAccount))
+            {
+                <a class="nav-link @Active("finance-account")" href="/Finance" data-nav="finance-account"><svg class="icon"><use href="#i-wallet" /></svg><span>My Financial Account</span></a>
+            }
+            @if (perms.Contains(Perm.FinanceViewOwnReceipts))
+            {
+                <a class="nav-link @Active("finance-receipts")" href="/Finance/Receipts" data-nav="finance-receipts"><svg class="icon"><use href="#i-file" /></svg><span>Receipts</span></a>
+            }
+            @if (perms.Contains(Perm.FinanceDashboard))
+            {
+                <a class="nav-link @Active("finance-dashboard")" href="/Finance/Dashboard" data-nav="finance-dashboard"><svg class="icon"><use href="#i-chart" /></svg><span>Financial Dashboard</span></a>
+            }
+            @if (perms.Contains(Perm.FinanceConfirmDeposits))
+            {
+                <a class="nav-link @Active("finance-deposits")" href="/Finance/Deposits" data-nav="finance-deposits"><svg class="icon"><use href="#i-download" /></svg><span>Cash Deposits</span></a>
+            }
+            @if (perms.Contains(Perm.FinanceManageDoctorAccounts))
+            {
+                <a class="nav-link @Active("finance-doctors")" href="/Finance/Doctors" data-nav="finance-doctors"><svg class="icon"><use href="#i-stethoscope" /></svg><span>Doctor Accounts</span></a>
+            }
+            @if (perms.Contains(Perm.FinanceManageServiceFees))
+            {
+                <a class="nav-link @Active("finance-services")" href="/Finance/Services" data-nav="finance-services"><svg class="icon"><use href="#i-sliders" /></svg><span>Services &amp; Fees</span></a>
+            }
+        }
+
         @if (Any(Perm.UsersView, Perm.DepartmentsManage, Perm.RolesManage, Perm.LoginHistoryView, Perm.AuditView))
         {
             <div class="nav-section">Administration</div>
