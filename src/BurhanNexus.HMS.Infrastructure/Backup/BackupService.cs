@@ -229,6 +229,7 @@ public sealed class BackupService : IBackupService
             // 3. Bring the restored database up to the current schema and record the restore.
             await _db.Database.MigrateAsync(CancellationToken.None);
             await DatabaseHardening.ApplyAsync(_db, CancellationToken.None);
+            await RepairHistoryAfterRestoreAsync(safety.Value!, CancellationToken.None);
             await SyncFolderAsync(CancellationToken.None);
             var restoredRow = await _db.BackupHistory.FirstOrDefaultAsync(x => x.FileName == b.FileName, CancellationToken.None);
             if (restoredRow is not null) restoredRow.LastRestoredUtc = Now;
@@ -249,6 +250,41 @@ public sealed class BackupService : IBackupService
         {
             _lock.Semaphore.Release();
         }
+    }
+
+    /// <summary>
+    /// The restored history is a snapshot from the time of the backup: re-register the safety backup and
+    /// complete entries that were still "in progress" when the snapshot was taken.
+    /// </summary>
+    private async Task RepairHistoryAfterRestoreAsync(BackupHistory safety, CancellationToken ct)
+    {
+        if (!await _db.BackupHistory.AnyAsync(b => b.FileName == safety.FileName, ct))
+        {
+            _db.BackupHistory.Add(new BackupHistory
+            {
+                FileName = safety.FileName, SizeBytes = safety.SizeBytes, Sha256 = safety.Sha256, Status = safety.Status,
+                Kind = safety.Kind, StartedUtc = safety.StartedUtc, CompletedUtc = safety.CompletedUtc,
+                CreatedByUserId = safety.CreatedByUserId, CreatedByUsername = safety.CreatedByUsername, Notes = safety.Notes
+            });
+        }
+        foreach (var row in await _db.BackupHistory.Where(b => b.Status == BackupStatus.InProgress).ToListAsync(ct))
+        {
+            var path = SafePath(row.FileName);
+            if (path is not null && File.Exists(path))
+            {
+                var info = new FileInfo(path);
+                row.Status = BackupStatus.Completed;
+                row.SizeBytes = info.Length;
+                row.Sha256 = await HashFileAsync(path, ct);
+                row.CompletedUtc ??= info.LastWriteTimeUtc;
+            }
+            else
+            {
+                row.Status = BackupStatus.Failed;
+                row.ErrorMessage = "Interrupted";
+            }
+        }
+        await _db.SaveChangesAsync(ct);
     }
 
     /// <summary>Registers backup files that exist on disk but not in the history (e.g. after a restore).</summary>

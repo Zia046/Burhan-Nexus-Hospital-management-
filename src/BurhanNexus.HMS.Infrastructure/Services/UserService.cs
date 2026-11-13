@@ -370,7 +370,8 @@ public sealed class UserService : IUserService
         var now = Now;
         foreach (var (key, value) in changed)
         {
-            var existing = user.Permissions.FirstOrDefault(p => p.Permission!.Key == key);
+            var permissionId = permIds[key];
+            var existing = user.Permissions.FirstOrDefault(p => p.PermissionId == permissionId);
             if (value == PermissionOverride.Inherit)
             {
                 if (existing is not null) user.Permissions.Remove(existing);
@@ -379,7 +380,7 @@ public sealed class UserService : IUserService
             {
                 user.Permissions.Add(new UserPermission
                 {
-                    UserId = user.Id, PermissionId = permIds[key], IsGranted = value == PermissionOverride.Grant,
+                    UserId = user.Id, PermissionId = permissionId, IsGranted = value == PermissionOverride.Grant,
                     AssignedUtc = now, AssignedByUserId = _ctx.UserId
                 });
             }

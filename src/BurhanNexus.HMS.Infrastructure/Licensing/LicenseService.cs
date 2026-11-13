@@ -28,6 +28,8 @@ public sealed class LicenseService : ILicenseService
     public const int TrialDays = 30;
     private const string CacheKey = "hms:license";
 
+    private sealed record CachedStatus(LicenseStatus Status, DateTime ComputedUtc);
+
     private sealed class SealedLicense
     {
         public Guid InstallationId { get; set; }
@@ -83,9 +85,12 @@ public sealed class LicenseService : ILicenseService
 
     public async Task<LicenseStatus> GetStatusAsync(CancellationToken ct = default)
     {
-        if (_cache.TryGetValue(CacheKey, out LicenseStatus? cached) && cached is not null) return cached;
+        var now = Now;
+        if (_cache.TryGetValue(CacheKey, out CachedStatus? cached) && cached is not null
+            && now >= cached.ComputedUtc && now - cached.ComputedUtc < TimeSpan.FromMinutes(1))
+            return cached.Status;
         var status = await ComputeAsync(ct);
-        _cache.Set(CacheKey, status, TimeSpan.FromMinutes(1));
+        _cache.Set(CacheKey, new CachedStatus(status, now), TimeSpan.FromMinutes(5));
         return status;
     }
 
