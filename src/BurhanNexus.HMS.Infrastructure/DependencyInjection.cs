@@ -60,6 +60,9 @@ public static class DependencyInjection
         services.AddScoped<Patients.IRegistrationSetupService, Patients.RegistrationSetupService>();
         services.AddScoped<Patients.IPatientService, Patients.PatientService>();
         services.AddScoped<Patients.IEncounterService, Patients.EncounterService>();
+        services.AddScoped<Patients.IAppointmentService, Patients.AppointmentService>();
+        services.AddScoped<Printing.IPrinterProfileService, Printing.PrinterProfileService>();
+        services.AddSingleton<Printing.INetworkPrinter, Printing.NetworkPrinter>();
         return services;
     }
 

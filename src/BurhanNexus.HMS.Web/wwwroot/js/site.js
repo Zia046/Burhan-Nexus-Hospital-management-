@@ -284,3 +284,14 @@
     show(0);
   }
 })();
+
+// Print buttons inside the application layout (reports) and report period selector.
+(function () {
+  "use strict";
+  document.querySelectorAll("[data-print]").forEach(b => b.addEventListener("click", () => window.print()));
+  document.querySelectorAll("[data-period-select]").forEach(s => s.addEventListener("change", () => {
+    const f = s.form;
+    f.querySelectorAll("input[name=date],input[name=month],input[name=year]").forEach(i => i.disabled = true);
+    f.submit();
+  }));
+})();

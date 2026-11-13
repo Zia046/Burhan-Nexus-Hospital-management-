@@ -127,6 +127,25 @@ public static class PermissionCatalog
         Future("XRay", "X-Ray Management", "X-Ray department", "scan"),
         Future("Ultrasound", "Ultrasound Management", "Ultrasound department", "wave"),
         Future("Pharmacy", "Pharmacy Management", "Medicine inventory and dispensing", "pill"),
+        new(Modules_.Appointments, "Appointments", "Private hospital doctor appointments and thermal token slips", "calendar", true, "/Appointments",
+            new PermissionAction[]
+            {
+                new(Actions.View, "View Appointments", "Doctor-wise appointment lists and details"),
+                new(Actions.Add, "Create Appointment", "Book appointments (assigns the doctor token)"),
+                new(Actions.Edit, "Edit Appointment", "Change time, complaint, notes; mark as seen"),
+                new(Actions.Cancel, "Cancel Appointment", "Cancel appointments (token is never reused)"),
+                new(Actions.Print, "Print Appointment Slip", "Print the first copy of the thermal slip"),
+                new(AppointmentActions.Reprint, "Reprint Appointment Slip", "Print further copies (same token)"),
+                new(AppointmentActions.Reports, "Doctor-Wise Appointment Reports", "Daily, monthly and yearly statistics per doctor"),
+                new(AppointmentActions.PrinterSettings, "Manage Printer Settings", "Thermal printer settings for workstations"),
+                new(Actions.FinancialAccess, "See Consultation Fees", "See fee amounts in appointment screens"),
+                new(Actions.SettingsAccess, "Appointment Settings", "Slip text, appointment time and booking rules"),
+                new(Actions.Delete, "Delete", "Reserved – appointments are never deleted"),
+                new(Actions.ExportPdf, "Export PDF", "Export documents as PDF"),
+                new(Actions.Verify, "Verify", "Reserved for future use"),
+                new(Actions.Approve, "Approve", "Reserved for future use"),
+                new(Actions.Refund, "Refund", "Reserved for the billing phase"),
+            }),
         Future("MinorOt", "Minor OT", "Minor operation theatre settings", "scissors"),
         Future("Doctors", "Doctor Management", "Doctors, schedules and shares", "user-cross"),
         Future("Finance", "Financial Management", "Collections, expenses and accounts", "wallet", financial: true),
@@ -193,6 +212,14 @@ public static class PermissionCatalog
         public const string Patients = "Patients";
         public const string Opd = "Opd";
         public const string Emergency = "Emergency";
+        public const string Appointments = "Appointments";
+    }
+
+    public static class AppointmentActions
+    {
+        public const string Reprint = "Reprint";
+        public const string Reports = "Reports";
+        public const string PrinterSettings = "PrinterSettings";
     }
 
     public static class PatientActions
@@ -302,6 +329,17 @@ public static class Perm
     public const string EmergencyStatus = "Emergency.UpdateStatus";
     public const string EmergencyClose = "Emergency.CloseStatus";
     public const string EmergencySettings = "Emergency.SettingsAccess";
+
+    public const string AppointmentsView = "Appointments.View";
+    public const string AppointmentsAdd = "Appointments.Add";
+    public const string AppointmentsEdit = "Appointments.Edit";
+    public const string AppointmentsCancel = "Appointments.Cancel";
+    public const string AppointmentsPrint = "Appointments.Print";
+    public const string AppointmentsReprint = "Appointments.Reprint";
+    public const string AppointmentsReports = "Appointments.Reports";
+    public const string PrinterSettings = "Appointments.PrinterSettings";
+    public const string AppointmentsFees = "Appointments.FinancialAccess";
+    public const string AppointmentsSettings = "Appointments.SettingsAccess";
 
     public const string AuditView = "AuditLog.View";
     public const string AuditExport = "AuditLog.Export";

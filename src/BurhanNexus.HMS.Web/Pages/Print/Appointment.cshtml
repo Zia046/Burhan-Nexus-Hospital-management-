@@ -1,0 +1,56 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Print.AppointmentModel
+@{
+    Layout = null;
+    var s = Model.Slip;
+    var p = Model.Printer;
+    var h = (await Fmt.ProfileAsync())!;
+    var width = p.PaperWidthMm;
+    var basePath = ViewContext.HttpContext.Request.Path;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Token @s.TokenNumber · @s.DoctorName</title>
+    <link rel="stylesheet" href="~/css/thermal.css" asp-append-version="true" />
+</head>
+<body class="thermal-body w@(width) font-@p.FontSize.ToString().ToLowerInvariant() align-@p.Alignment.ToString().ToLowerInvariant() @(p.BoldText ? "bold" : "")"
+      data-thermal data-mode="@p.Mode" data-width="@width" data-autoprint="@(Model.AutoPrint ? "1" : null)"
+      data-can-print="@(Model.CanPrintNow ? "1" : "0")" data-record-url="@basePath?handler=Record" data-escpos-url="@basePath?handler=EscPos" data-lan-url="@basePath?handler=Lan"
+      data-agent="@p.AgentUrl">
+@Html.AntiForgeryToken()
+<div class="t-toolbar no-print">
+    <div class="t-row">
+        <strong>Appointment slip · Token @s.TokenNumber</strong>
+        <span class="t-pill">@width mm · @(p.Mode switch { PrintMode.LanDirect => "LAN printer " + p.LanHost, PrintMode.LocalAgent => "Print Agent → " + (p.WindowsPrinterName ?? p.LanHost), _ => "Browser printing" })</span>
+        <span class="t-pill">Computer: @(string.IsNullOrEmpty(Model.Workstation) ? "not named" : Model.Workstation)</span>
+    </div>
+    <div class="t-row">
+        <a class="t-btn light" href="/Appointments/Details/@Model.Appointment.Id">&larr; Appointment</a>
+        <a class="t-btn light" href="/Appointments/Book">Next booking</a>
+        <a class="t-btn light @(width == 58 ? "on" : "")" href="@basePath?width=58">58 mm</a>
+        <a class="t-btn light @(width == 80 ? "on" : "")" href="@basePath?width=80">80 mm</a>
+        @if (Model.CanPrintNow)
+        {
+            <button type="button" class="t-btn" data-thermal-print>@(Model.PrintCount == 0 ? "Print slip" : $"Reprint (copy {Model.PrintCount + 1})")</button>
+            @if (p.Mode != PrintMode.Browser) { <button type="button" class="t-btn light" data-thermal-browser>Print with browser dialog</button> }
+        }
+        else if (Model.Appointment.Status == AppointmentStatus.Cancelled)
+        {
+            <span class="t-msg err">Cancelled appointment – printing disabled.</span>
+        }
+        else
+        {
+            <span class="t-msg err">Already printed. You need the “Reprint Appointment Slip” permission to print again.</span>
+        }
+    </div>
+    <div class="t-status" data-thermal-status>@(Model.PrintCount == 0 ? "Not printed yet." : $"Printed {Model.PrintCount} time(s). Reprints keep the same token.")</div>
+</div>
+
+<main class="slip-wrap">
+    <partial name="_ThermalSlip" model="(Model.Slip, Model.Printer)" />
+</main>
+<script src="~/js/thermal.js" asp-append-version="true"></script>
+</body>
+</html>

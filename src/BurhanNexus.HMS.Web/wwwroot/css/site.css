@@ -471,3 +471,34 @@ label.perm-cell { grid-template-columns: 20px 1fr; margin: 0; }
 .dup-table td.actions .btn { margin: 2px 0; }
 [data-visits] td.actions { white-space: normal; }
 [data-visits] td.actions .btn { margin: 2px 0; }
+
+/* ---------- Phase 2 correction: private appointments & printers ---------- */
+.row-muted td { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(0,0,0,.25); }
+.row-muted td:last-child, .row-muted td:nth-last-child(2), .row-muted td:nth-last-child(3) { text-decoration: none; }
+.appt-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.appt-doc-card { display: flex; flex-direction: column; gap: 2px; background: #fff; border: 1px solid var(--border, #dde3ec); border-radius: 12px; padding: 12px 14px; color: inherit; text-decoration: none; }
+.appt-doc-card:hover { border-color: var(--blue-600); }
+.appt-doc-card small { color: var(--muted); }
+.appt-doc-card.total { background: var(--navy-800); color: #fff; border-color: var(--navy-800); }
+.appt-doc-card.total small { color: #9fb5de; }
+.appt-nums { font-size: .82rem; margin-top: 4px; }
+.appt-nums b { font-size: 1.15rem; }
+.doctor-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.doctor-choice { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--border, #dde3ec); border-radius: 10px; padding: 10px 12px; cursor: pointer; font-weight: 400; }
+.doctor-choice:has(input:checked) { border-color: var(--blue-600); background: var(--blue-100); box-shadow: 0 0 0 1px var(--blue-600); }
+.doctor-choice input { margin-top: 3px; width: auto; }
+.dc-body { display: flex; flex-direction: column; gap: 2px; }
+.dc-body small { color: var(--muted); }
+.dc-meta { font-size: .8rem; }
+.appt-hero { display: flex; gap: 18px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+.appt-hero h3 { margin: 0; }
+.appt-hero p { margin: 2px 0; }
+.appt-token-big { background: var(--navy-800); color: #fff; border-radius: 14px; padding: 10px 22px; text-align: center; min-width: 110px; }
+.appt-token-big small { display: block; color: #9fb5de; text-transform: uppercase; letter-spacing: .1em; font-size: .72rem; }
+.appt-token-big strong { font-size: 2.6rem; line-height: 1.1; }
+.printer-mode { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.printer-test-result { margin-top: 10px; }
+@media print {
+  .no-print { display: none !important; }
+  .card { break-inside: avoid; box-shadow: none; }
+}

@@ -15,7 +15,13 @@ public class OpdModel : SlipModelBase
 
     public bool IsPrivate => Encounter.HospitalTypeAtVisit == HospitalType.Private;
 
-    public Task<IActionResult> OnGetAsync(long id, string? paper, bool autoprint) =>
-        LoadAsync(id, EncounterType.Opd, paper, autoprint, s => s.OpdSlipPaper,
+    public async Task<IActionResult> OnGetAsync(long id, string? paper, bool autoprint)
+    {
+        // Private-hospital appointments print the doctor-wise thermal token slip instead of the A5/A4 document.
+        var appointments = HttpContext.RequestServices.GetRequiredService<IAppointmentService>();
+        if (await appointments.GetByEncounterAsync(id) is { } appt)
+            return Redirect($"/Print/Appointment/{appt.Id}" + (autoprint ? "?autoprint=true" : ""));
+        return await LoadAsync(id, EncounterType.Opd, paper, autoprint, s => s.OpdSlipPaper,
             e => e.HospitalTypeAtVisit == HospitalType.Private ? PrintedDocumentType.PrivateVisitDocument : PrintedDocumentType.OpdSlip);
+    }
 }

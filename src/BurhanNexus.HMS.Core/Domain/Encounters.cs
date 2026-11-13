@@ -16,7 +16,7 @@ public enum EmergencyStatus
     Closed = 6
 }
 
-public enum PrintedDocumentType { OpdSlip = 1, PrivateVisitDocument = 2, EmergencySlip = 3, PatientRecord = 4 }
+public enum PrintedDocumentType { OpdSlip = 1, PrivateVisitDocument = 2, EmergencySlip = 3, PatientRecord = 4, AppointmentSlip = 5 }
 
 /// <summary>
 /// One visit of a patient (OPD, Emergency, and later Lab/Radiology/IPD…). Holds the unique visit number and the
@@ -201,6 +201,16 @@ public class RegistrationSettings
     /// <summary>Fee reference shown for future billing; 0 = free OPD.</summary>
     public int? DefaultOpdServiceItemId { get; set; }
     public int? DefaultEmergencyServiceItemId { get; set; }
+
+    // ---- Private hospital appointments (thermal slips) ----
+    /// <summary>Ask for an appointment time when booking.</summary>
+    public bool AppointmentTimeEnabled { get; set; }
+    /// <summary>Print the doctor's consultation fee on the appointment slip.</summary>
+    public bool ShowFeeOnAppointmentSlip { get; set; } = true;
+    /// <summary>How many days ahead appointments may be booked (0 = same day only).</summary>
+    public int AppointmentMaxDaysAhead { get; set; } = 30;
+    [MaxLength(200)] public string AppointmentSlipMessage { get; set; } = "Please wait for your turn.";
+    [MaxLength(200)] public string? AppointmentSlipContact { get; set; }
 
     public DateTime UpdatedUtc { get; set; }
     public uint RowVersion { get; set; }

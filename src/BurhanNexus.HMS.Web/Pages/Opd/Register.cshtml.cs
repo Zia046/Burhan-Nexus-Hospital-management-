@@ -70,6 +70,9 @@ public class RegisterModel : HmsPageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
+        // Private hospitals register OPD patients through doctor appointments (doctor-wise tokens + thermal slip).
+        if ((await _hospital.GetConfigurationAsync()).HospitalType == HospitalType.Private && await CanAsync(Perm.AppointmentsAdd))
+            return Redirect("/Appointments/Book" + (PatientId is long pid ? $"?patientId={pid}" : !string.IsNullOrWhiteSpace(Q) ? "?q=" + Uri.EscapeDataString(Q) : ""));
         await LoadAsync();
         Visit.DepartmentId = Settings.DefaultOpdDepartmentId;
         Visit.ServiceItemId = Settings.DefaultOpdServiceItemId;

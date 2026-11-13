@@ -1,0 +1,86 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Appointments.IndexModel
+@{
+    ViewData["Title"] = "Appointments";
+    var date = Model.Date!.Value;
+    var groups = Model.Items.GroupBy(i => new { i.DoctorId, i.DoctorName, i.DoctorSpecialty }).OrderBy(g => g.Key.DoctorName).ToList();
+}
+<div class="toolbar">
+    <form method="get" class="filters wrap">
+        <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Patient ID, appointment no., name or mobile" maxlength="100" /></div>
+        <label class="inline-label">Date <input type="date" name="date" value="@date.ToString("yyyy-MM-dd")" /></label>
+        <select name="doctor" aria-label="Doctor"><option value="">All doctors</option>
+            @foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(Model.DoctorId == d.Id)">@d.Name</option> }</select>
+        <select name="status" aria-label="Status">
+            <option value="">All statuses</option>
+            <option value="active" selected="@(Model.Status == "active")">Active (booked + seen)</option>
+            <option value="booked" selected="@(Model.Status == "booked")">Waiting</option>
+            <option value="seen" selected="@(Model.Status == "seen")">Seen</option>
+            <option value="cancelled" selected="@(Model.Status == "cancelled")">Cancelled</option>
+        </select>
+        <button class="btn btn-light" type="submit">Show</button>
+        <a class="btn btn-light" href="/Appointments?date=@date.AddDays(-1).ToString("yyyy-MM-dd")" title="Previous day">&lsaquo;</a>
+        <a class="btn btn-light" href="/Appointments?date=@date.AddDays(1).ToString("yyyy-MM-dd")" title="Next day">&rsaquo;</a>
+        @if (date != Model.Today) { <a class="btn btn-light" href="/Appointments">Today</a> }
+    </form>
+    <div class="toolbar-actions">
+        <a bn-permission="@Perm.AppointmentsReports" class="btn btn-light" href="/Appointments/Reports"><svg class="icon icon-sm"><use href="#i-chart" /></svg> Reports</a>
+        <a bn-permission="@Perm.PrinterSettings" class="btn btn-light" href="/Settings/Printers"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Printers</a>
+        <a bn-permission="@Perm.AppointmentsAdd" class="btn btn-primary" href="/Appointments/Book" data-test="appt-book"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New appointment</a>
+    </div>
+</div>
+
+<div class="appt-summary">
+    @foreach (var s in Model.Stats.Where(s => s.Total > 0 || Model.DoctorId == s.DoctorId))
+    {
+        <a class="appt-doc-card" href="#doc-@s.DoctorId" data-doctor-total="@s.DoctorId">
+            <strong>@s.DoctorName</strong>
+            <small>@s.Specialty</small>
+            <span class="appt-nums"><b>@s.Active</b> active · @s.Booked waiting · @s.Seen seen · @s.Cancelled cancelled</span>
+        </a>
+    }
+    <div class="appt-doc-card total"><strong>@Fmt.Day(date)</strong><small>All doctors</small>
+        <span class="appt-nums"><b>@Model.Stats.Sum(s => s.Active)</b> active · @Model.Stats.Sum(s => s.Cancelled) cancelled</span></div>
+</div>
+
+@foreach (var g in groups)
+{
+    <div class="card" id="doc-@g.Key.DoctorId" data-doctor-list="@g.Key.DoctorId">
+        <div class="card-header">
+            <h3><svg class="icon"><use href="#i-stethoscope" /></svg> @g.Key.DoctorName @if (g.Key.DoctorSpecialty is not null) { <small class="muted">· @g.Key.DoctorSpecialty</small> }</h3>
+            <span class="pill pill-blue">@g.Count(i => i.Status != AppointmentStatus.Cancelled) patient(s)</span>
+        </div>
+        <div class="table-wrap">
+            <table class="table table-compact">
+                <thead><tr><th>Token</th><th>Appt. no.</th><th>Patient ID</th><th>Patient</th><th>Age / Gender</th><th>Mobile</th>@if (Model.ShowFees) { <th class="num">Fee</th> }<th>Status</th><th>Slip</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var a in g)
+                {
+                    <tr class="@(a.Status == AppointmentStatus.Cancelled ? "row-muted" : "")" data-token-row="@a.TokenNumber">
+                        <td><span class="token">@a.TokenNumber</span></td>
+                        <td class="mono nowrap">@a.AppointmentNumber @if (a.AppointmentTime is { } t) { <small class="muted block">@t.ToString("hh:mm tt")</small> }</td>
+                        <td class="mono nowrap">@a.PatientNumber</td>
+                        <td><strong>@a.PatientName</strong>@if (a.GuardianName is not null) { <small class="muted block">@a.GuardianName</small> }</td>
+                        <td class="nowrap">@a.AgeText · @a.Gender</td>
+                        <td>@a.MobileNumber</td>
+                        @if (Model.ShowFees) { <td class="num nowrap">@(a.ConsultationFee is decimal f ? Fmt.Money(f) : "—")</td> }
+                        <td><partial name="_ApptStatus" model="a.Status" /></td>
+                        <td>@if (a.PrintCount > 0) { <span class="status status-ok">@a.PrintCount×</span> } else { <span class="status status-warn">No</span> }</td>
+                        <td class="actions nowrap">
+                            <a class="btn btn-light btn-sm" href="/Appointments/Details/@a.Id">Open</a>
+                            @if (a.Status != AppointmentStatus.Cancelled)
+                            {
+                                <a bn-permission="@(a.PrintCount == 0 ? Perm.AppointmentsPrint : Perm.AppointmentsReprint)" class="btn btn-light btn-sm" href="/Print/Appointment/@a.Id" title="Slip"><svg class="icon icon-sm"><use href="#i-printer" /></svg></a>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+@if (groups.Count == 0)
+{
+    <div class="card"><div class="card-body empty">No appointments for @Fmt.Day(date)@(Model.DoctorId is null ? "" : " for this doctor").</div></div>
+}

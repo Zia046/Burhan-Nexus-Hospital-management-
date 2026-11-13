@@ -37,6 +37,7 @@ public sealed class DisplayFormatter
 
     public string Date(DateTime? utc) => utc is null ? "—" : ToLocal(utc.Value).ToString(DateFormat, CultureInfo.InvariantCulture);
     public string Time(DateTime? utc) => utc is null ? "—" : ToLocal(utc.Value).ToString(TimeFormat, CultureInfo.InvariantCulture);
+    public string Day(DateOnly date) => date.ToString(DateFormat, CultureInfo.InvariantCulture);
     public string DateTimeText(DateTime? utc) => utc is null ? "—" : $"{Date(utc)} {Time(utc)}";
     public string Money(decimal amount) => $"{_profile?.CurrencySymbol ?? "Rs."} {amount.ToString("N2", CultureInfo.InvariantCulture)}";
 

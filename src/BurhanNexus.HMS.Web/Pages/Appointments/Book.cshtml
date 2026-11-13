@@ -1,0 +1,151 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Appointments.BookModel
+@{
+    ViewData["Title"] = "New appointment";
+    var p = Model.Patient;
+    var date = Model.Input.AppointmentDate ?? Model.Today;
+}
+@if (!Model.IsPrivate)
+{
+    <div class="alert alert-warning"><svg class="icon"><use href="#i-info" /></svg><div>Doctor appointments with thermal token slips are used by <strong>private hospitals</strong>. This hospital is configured as a government hospital – use <a href="/Opd/Register">OPD registration</a>.</div></div>
+}
+@if (p is null)
+{
+    <div class="card card-medium">
+        <div class="card-header"><h2><svg class="icon"><use href="#i-calendar" /></svg> New appointment – find the patient</h2></div>
+        <div class="card-body">
+            <form method="get" class="search-main">
+                @if (Model.PreselectDoctor is int pd) { <input type="hidden" name="doctor" value="@pd" /> }
+                <div class="input-icon grow"><svg class="icon"><use href="#i-search" /></svg>
+                    <input name="q" value="@Model.Q" placeholder="Patient ID, name, mobile or CNIC" autofocus autocomplete="off" maxlength="100" /></div>
+                <button class="btn btn-primary" type="submit">Search</button>
+                <a bn-permission="@Perm.PatientsAdd" class="btn btn-success" href="/Patients/Register?next=appointment@(string.IsNullOrWhiteSpace(Model.Q) ? "" : "&name=" + Uri.EscapeDataString(Model.Q))"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New patient</a>
+            </form>
+            @if (!string.IsNullOrWhiteSpace(Model.Q))
+            {
+                <div class="table-wrap">
+                    <table class="table table-compact">
+                        <thead><tr><th>Patient ID</th><th>Name</th><th>Father / Husband</th><th>Age</th><th>Mobile</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var m in Model.Matches)
+                        {
+                            <tr>
+                                <td class="mono">@m.PatientNumber</td><td><strong>@m.FullName</strong></td><td>@m.GuardianName</td>
+                                <td class="nowrap">@m.AgeText · @m.Gender</td><td>@m.MobileNumber</td>
+                                <td class="actions"><a class="btn btn-primary btn-sm" href="/Appointments/Book?patientId=@m.Id@(Model.PreselectDoctor is int d ? "&doctor=" + d : "")">Select</a></td>
+                            </tr>
+                        }
+                        @if (Model.Matches.Count == 0) { <tr><td colspan="6" class="empty">No patient found – register a new patient.</td></tr> }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3>Today's doctors</h3><a bn-permission="@Perm.AppointmentsView" class="btn btn-light btn-sm" href="/Appointments">Appointment lists</a></div>
+        <div class="table-wrap">
+            <table class="table table-compact">
+                <thead><tr><th>Doctor</th><th>Specialization</th><th class="num">Tokens issued</th><th class="num">Next token</th></tr></thead>
+                <tbody>
+                @foreach (var d in Model.Doctors)
+                {
+                    <tr><td><strong>@d.DoctorName</strong></td><td>@d.Specialty</td><td class="num">@d.Issued</td><td class="num"><span class="token">@(d.LastToken + 1)</span></td></tr>
+                }
+                @if (Model.Doctors.Count == 0) { <tr><td colspan="4" class="empty">No active doctors. Add doctors under OPD setup.</td></tr> }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+else
+{
+    <div class="grid-side">
+        <form method="post" class="card" novalidate>
+            <div class="card-header">
+                <h2><svg class="icon"><use href="#i-calendar" /></svg> New appointment</h2>
+                <span class="pill pill-blue">Doctor-wise token</span>
+            </div>
+            <div class="card-body">
+                <partial name="_ValidationSummary" />
+                @if (p.Status != PatientStatus.Active)
+                {
+                    <div class="alert alert-danger"><svg class="icon"><use href="#i-alert" /></svg><div>This patient record is @p.Status.ToString().ToLowerInvariant(). An appointment cannot be booked.</div></div>
+                }
+                <input type="hidden" name="PatientId" value="@p.Id" />
+                <div class="field">
+                    <label>Doctor <em>*</em></label>
+                    <div class="doctor-picker" role="radiogroup">
+                        @foreach (var d in Model.Doctors)
+                        {
+                            <label class="doctor-choice">
+                                <input type="radio" name="Input.DoctorId" value="@d.DoctorId" checked="@(Model.Input.DoctorId == d.DoctorId)" required />
+                                <span class="dc-body">
+                                    <strong>@d.DoctorName</strong>
+                                    <small>@(d.Specialty ?? "—")</small>
+                                    <span class="dc-meta">Next token <b class="token" data-next-token="@d.DoctorId">@(d.LastToken + 1)</b> · @d.Issued issued@(Model.ShowFees && d.Fee is > 0 ? " · " + Fmt.Money(d.Fee.Value) : "")</span>
+                                </span>
+                            </label>
+                        }
+                    </div>
+                    @if (Model.Doctors.Count == 0) { <p class="muted">No active doctors – add doctors under <a href="/Opd/Setup">OPD setup</a>.</p> }
+                    <small class="muted">Each doctor has his own token series that starts at 1 every day. The final token is assigned when you save.</small>
+                </div>
+                <div class="grid-2">
+                    <div class="field">
+                        <label for="Input_AppointmentDate">Appointment date</label>
+                        <input id="Input_AppointmentDate" type="date" name="Input.AppointmentDate" value="@date.ToString("yyyy-MM-dd")"
+                               min="@Model.Today.ToString("yyyy-MM-dd")" max="@Model.Today.AddDays(Model.Settings.AppointmentMaxDaysAhead).ToString("yyyy-MM-dd")" />
+                    </div>
+                    @if (Model.Settings.AppointmentTimeEnabled)
+                    {
+                        <div class="field">
+                            <label for="Input_AppointmentTime">Time <span class="muted">(optional)</span></label>
+                            <input id="Input_AppointmentTime" type="time" name="Input.AppointmentTime" value="@Model.Input.AppointmentTime?.ToString("HH:mm")" />
+                        </div>
+                    }
+                    <div class="field">
+                        <label for="Input_Complaint">Presenting complaint <span class="muted">(optional)</span></label>
+                        <input id="Input_Complaint" name="Input.Complaint" value="@Model.Input.Complaint" maxlength="300" autocomplete="off" />
+                    </div>
+                    <div class="field">
+                        <label for="Input_Notes">Notes <span class="muted">(optional)</span></label>
+                        <input id="Input_Notes" name="Input.Notes" value="@Model.Input.Notes" maxlength="1000" autocomplete="off" />
+                    </div>
+                </div>
+                @if (date != Model.Today) { <p class="muted small">Next-token numbers above are for @Fmt.Day(date).</p> }
+            </div>
+            <div class="card-footer form-actions">
+                <a class="btn btn-light" href="/Appointments/Book">Change patient</a>
+                <button class="btn btn-primary btn-lg" type="submit" data-test="appt-save" disabled="@(p.Status != PatientStatus.Active || !Model.IsPrivate)"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Save &amp; print token</button>
+            </div>
+        </form>
+        <div class="stack">
+            <div class="card patient-mini">
+                <div class="card-body">
+                    <div class="patient-id-box sm"><small>Patient ID</small><strong>@p.PatientNumber</strong></div>
+                    <h3>@p.FullName</h3>
+                    <p class="muted">@(p.GuardianName is null ? "" : BurhanNexus.HMS.Web.Pages.Print.SlipModelBase.RelationLabel(p.GuardianRelation) + " " + p.GuardianName)</p>
+                    <dl class="kv kv-tight">
+                        <dt>Age / Gender</dt><dd>@Model.AgeText · @p.Gender</dd>
+                        <dt>Mobile</dt><dd>@(p.MobileNumber ?? "—")</dd>
+                        <dt>Address</dt><dd>@(p.CityOrVillage ?? p.Address ?? "—")</dd>
+                    </dl>
+                    <a bn-permission="@Perm.PatientsView" href="/Patients/Profile/@p.Id">Open profile</a>
+                </div>
+            </div>
+            @if (Model.Recent.Count > 0)
+            {
+                <div class="card">
+                    <div class="card-header"><h3>Previous appointments</h3></div>
+                    <ul class="activity">
+                        @foreach (var v in Model.Recent)
+                        {
+                            <li><span class="activity-dot"></span><div><strong>@Fmt.Day(v.AppointmentDate) · Token @v.TokenNumber</strong><small>@v.DoctorName · @v.Status</small></div></li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+}

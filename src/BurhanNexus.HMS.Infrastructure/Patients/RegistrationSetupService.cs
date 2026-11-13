@@ -21,6 +21,15 @@ public sealed class RegistrationSettingsInput
     public bool AutoPrintAfterRegistration { get; set; } = true;
 }
 
+public sealed class AppointmentSettingsInput
+{
+    public bool AppointmentTimeEnabled { get; set; }
+    public bool ShowFeeOnAppointmentSlip { get; set; } = true;
+    public int AppointmentMaxDaysAhead { get; set; } = 30;
+    public string? AppointmentSlipMessage { get; set; }
+    public string? AppointmentSlipContact { get; set; }
+}
+
 public sealed class OpdSettingsInput
 {
     public bool OpdTokenEnabled { get; set; }
@@ -55,6 +64,7 @@ public interface IRegistrationSetupService
 {
     Task<RegistrationSettings> GetSettingsAsync(CancellationToken ct = default);
     Task<ServiceResult> UpdateNumberingAsync(RegistrationSettingsInput input, uint rowVersion, CancellationToken ct = default);
+    Task<ServiceResult> UpdateAppointmentSettingsAsync(AppointmentSettingsInput input, uint rowVersion, CancellationToken ct = default);
     Task<ServiceResult> UpdateOpdAsync(OpdSettingsInput input, uint rowVersion, CancellationToken ct = default);
 
     Task<IReadOnlyList<Doctor>> DoctorsAsync(bool activeOnly, CancellationToken ct = default);
@@ -172,6 +182,24 @@ public sealed partial class RegistrationSetupService : IRegistrationSetupService
         _audit.Add(AuditActions.RegistrationSettingsChanged, "RegistrationSettings", "1",
             "Patient ID / visit number / slip settings changed (existing numbers never change)", old,
             new { s.PatientNumberPrefix, s.PatientNumberDigits, s.OpdNumberPrefix, s.EmergencyNumberPrefix, s.EncounterNumberIncludesYear, s.EncounterNumberDigits, s.OpdSlipPaper, s.EmergencySlipPaper, s.AutoPrintAfterRegistration });
+        return await SaveAsync(ct);
+    }
+
+    public async Task<ServiceResult> UpdateAppointmentSettingsAsync(AppointmentSettingsInput i, uint rowVersion, CancellationToken ct = default)
+    {
+        if (i.AppointmentMaxDaysAhead is < 0 or > 365) return ServiceResult.Fail("Advance booking must be between 0 and 365 days.");
+        static string? T(string? v, int max) => string.IsNullOrWhiteSpace(v) ? null : v.Trim().Length > max ? v.Trim()[..max] : v.Trim();
+        var s = await _db.RegistrationSettings.FirstAsync(ct);
+        var old = new { s.AppointmentTimeEnabled, s.ShowFeeOnAppointmentSlip, s.AppointmentMaxDaysAhead, s.AppointmentSlipMessage, s.AppointmentSlipContact };
+        _db.Entry(s).Property(x => x.RowVersion).OriginalValue = rowVersion;
+        s.AppointmentTimeEnabled = i.AppointmentTimeEnabled;
+        s.ShowFeeOnAppointmentSlip = i.ShowFeeOnAppointmentSlip;
+        s.AppointmentMaxDaysAhead = i.AppointmentMaxDaysAhead;
+        s.AppointmentSlipMessage = T(i.AppointmentSlipMessage, 120) ?? string.Empty;
+        s.AppointmentSlipContact = T(i.AppointmentSlipContact, 120);
+        s.UpdatedUtc = Now;
+        _audit.Add(AuditActions.RegistrationSettingsChanged, "RegistrationSettings", "1", "Appointment slip settings changed", old,
+            new { s.AppointmentTimeEnabled, s.ShowFeeOnAppointmentSlip, s.AppointmentMaxDaysAhead, s.AppointmentSlipMessage, s.AppointmentSlipContact });
         return await SaveAsync(ct);
     }
 

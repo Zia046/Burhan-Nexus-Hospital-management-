@@ -61,4 +61,13 @@ public static class AuditActions
     public const string DoctorSaved = "Doctor.Saved";
     public const string ServiceItemSaved = "ServiceItem.Saved";
     public const string EmergencyCategorySaved = "EmergencyCategory.Saved";
+    public const string AppointmentBooked = "Appointment.Booked";
+    public const string AppointmentUpdated = "Appointment.Updated";
+    public const string AppointmentCancelled = "Appointment.Cancelled";
+    public const string AppointmentSeen = "Appointment.Seen";
+    public const string AppointmentSlipPrinted = "Appointment.SlipPrinted";
+    public const string AppointmentSlipReprinted = "Appointment.SlipReprinted";
+    public const string AppointmentPrintFailed = "Appointment.PrintFailed";
+    public const string PrinterProfileSaved = "Printer.ProfileSaved";
+    public const string PrinterTestPrint = "Printer.TestPrint";
 }

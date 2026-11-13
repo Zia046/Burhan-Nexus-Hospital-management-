@@ -63,7 +63,7 @@ public sealed class SecurityHeadersMiddleware
         h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
         h["Content-Security-Policy"] =
             "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; " +
-            "font-src 'self'; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; object-src 'none'";
+            "font-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:*; frame-ancestors 'none'; form-action 'self'; base-uri 'self'; object-src 'none'";
         if (context.User.Identity?.IsAuthenticated == true)
             h["Cache-Control"] = "no-store";
         return _next(context);

@@ -36,6 +36,8 @@ public class HmsDbContext : DbContext
     public DbSet<ServiceItem> ServiceItems => Set<ServiceItem>();
     public DbSet<PrintedDocument> PrintedDocuments => Set<PrintedDocument>();
     public DbSet<RegistrationSettings> RegistrationSettings => Set<RegistrationSettings>();
+    public DbSet<Appointment> Appointments => Set<Appointment>();
+    public DbSet<PrinterProfile> PrinterProfiles => Set<PrinterProfile>();
 
     public const string PatientNumberSequence = "patient_number_seq";
     public const string OpdNumberSequence = "opd_number_seq";
@@ -272,6 +274,34 @@ public class HmsDbContext : DbContext
             e.ToTable("RegistrationSettings", t => t.HasCheckConstraint("CK_RegistrationSettings_Singleton", "\"Id\" = 1"));
             e.Property(x => x.Id).ValueGeneratedNever();
             e.Property(x => x.OpdTokenScope).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+        });
+
+        b.Entity<Appointment>(e =>
+        {
+            e.ToTable("Appointments");
+            // Doctor-wise independent daily token: the database itself rejects a duplicate token for the same doctor and date.
+            e.HasIndex(x => new { x.DoctorId, x.AppointmentDate, x.TokenNumber }).IsUnique().HasDatabaseName("UX_Appointments_Doctor_Date_Token");
+            e.HasIndex(x => new { x.AppointmentDate, x.DoctorId, x.Status });
+            e.HasIndex(x => x.PatientId);
+            e.HasIndex(x => x.EncounterId).IsUnique();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ConsultationFee).HasPrecision(12, 2);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.ToTable(t => t.HasCheckConstraint("CK_Appointments_Token_Positive", "\"TokenNumber\" > 0"));
+            e.HasOne(x => x.Patient).WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Doctor).WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Encounter).WithOne().HasForeignKey<Appointment>(x => x.EncounterId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ServiceItem).WithMany().HasForeignKey(x => x.ServiceItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<PrinterProfile>(e =>
+        {
+            e.ToTable("PrinterProfiles");
+            e.HasIndex(x => x.WorkstationName).IsUnique();
+            e.Property(x => x.Mode).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Alignment).HasConversion<string>().HasMaxLength(10);
+            e.Property(x => x.FontSize).HasConversion<string>().HasMaxLength(10);
             e.Property(x => x.RowVersion).IsRowVersion();
         });
 

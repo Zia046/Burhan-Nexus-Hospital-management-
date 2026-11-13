@@ -18,10 +18,14 @@ public class IndexModel : HmsPageModel
     private readonly IHospitalAdminService _hospital;
 
     private readonly IEncounterService _encounters;
+    private readonly IAppointmentService _appointments;
+    private readonly HospitalClock _clock;
 
     public IndexModel(IUserService users, ILicenseService license, ISystemStatusService status, IAuditQueryService audit, IHospitalAdminService hospital,
-        IEncounterService encounters)
+        IEncounterService encounters, IAppointmentService appointments, HospitalClock clock)
     {
+        _appointments = appointments;
+        _clock = clock;
         _encounters = encounters;
         _users = users;
         _license = license;
@@ -41,6 +45,8 @@ public class IndexModel : HmsPageModel
     public bool IsAdminView { get; private set; }
     public bool ShowDashboard { get; private set; }
     public ClinicalCounts? Clinical { get; private set; }
+    /// <summary>Private hospitals: today's doctor-wise appointments (null when not applicable).</summary>
+    public IReadOnlyList<DoctorAppointmentStats>? DoctorsToday { get; private set; }
     public IReadOnlyList<ModuleDefinition> AvailableModules { get; private set; } = Array.Empty<ModuleDefinition>();
 
     public async Task OnGetAsync()
@@ -62,6 +68,11 @@ public class IndexModel : HmsPageModel
 
         if (Perms.Contains(Perm.OpdView) || Perms.Contains(Perm.EmergencyView) || Perms.Contains(Perm.PatientsSearch))
             Clinical = await _encounters.CountsAsync();
+        if (Perms.Contains(Perm.AppointmentsView) && (await _hospital.GetConfigurationAsync()).HospitalType == HospitalType.Private)
+        {
+            var today = await _clock.TodayAsync();
+            DoctorsToday = (await _appointments.StatsAsync(today, today)).Where(d => d.Total > 0).ToList();
+        }
         AvailableModules = PermissionCatalog.Modules
             .Where(m => m.IsAvailable && m.Key is "Patients" or "Opd" or "Emergency")
             .Where(m => m.Actions.Any(a => Perms.Contains(m.PermissionKey(a.Key)) && a.Key is "View" or "Add" or "Search"))

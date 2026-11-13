@@ -44,6 +44,25 @@ else
             }
         </div>
     }
+    @if (Model.DoctorsToday is { } docs)
+    {
+        <div class="card" data-dashboard-appointments>
+            <div class="card-header"><h3><svg class="icon"><use href="#i-calendar" /></svg> Today's appointments by doctor</h3>
+                <a class="btn btn-light btn-sm" href="/Appointments">Open lists</a></div>
+            <div class="table-wrap">
+                <table class="table table-compact">
+                    <thead><tr><th>Doctor</th><th>Specialization</th><th class="num">Waiting</th><th class="num">Seen</th><th class="num">Cancelled</th><th class="num">Total</th></tr></thead>
+                    <tbody>
+                    @foreach (var d in docs)
+                    {
+                        <tr><td><a href="/Appointments?doctor=@d.DoctorId"><strong>@d.DoctorName</strong></a></td><td>@d.Specialty</td><td class="num">@d.Booked</td><td class="num">@d.Seen</td><td class="num">@d.Cancelled</td><td class="num"><strong>@d.Active</strong></td></tr>
+                    }
+                    @if (docs.Count == 0) { <tr><td colspan="6" class="empty">No appointments booked today yet.</td></tr> }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
     @if (Model.UserCounts is not null || Model.License is not null || Model.Health is not null)
     {
         <div class="kpi-grid" data-dashboard-live>

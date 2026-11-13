@@ -1,0 +1,7 @@
+@model AppointmentStatus
+@switch (Model)
+{
+    case AppointmentStatus.Booked: <span class="status status-warn">Waiting</span> break;
+    case AppointmentStatus.Seen: <span class="status status-ok">Seen</span> break;
+    default: <span class="status status-bad">Cancelled</span> break;
+}
