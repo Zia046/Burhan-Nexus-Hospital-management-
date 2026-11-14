@@ -168,6 +168,8 @@ else
             {
                 "Patients" => Model.Perms.Contains(Perm.PatientsSearch) ? "/Patients" : Model.Perms.Contains(Perm.PatientsAdd) ? "/Patients/Register" : null,
                 "Opd" => Model.Perms.Contains(Perm.OpdView) ? "/Opd" : "/Opd/Register",
+                "Laboratory" => Model.Perms.Contains(Perm.LabDashboard) ? "/Lab" : Model.Perms.Contains(Perm.LabBook) ? "/Lab/Book"
+                    : Model.Perms.Contains(Perm.LabEnterResults) ? "/Lab/Pending" : "/Lab/Results",
                 _ => Model.Perms.Contains(Perm.EmergencyView) ? "/Emergency" : "/Emergency/Register"
             };
             <a class="module-card available" href="@(link ?? "#")">

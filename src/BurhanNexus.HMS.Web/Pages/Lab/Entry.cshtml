@@ -1,0 +1,105 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Lab.EntryModel
+@{
+    var o = Model.Order;
+    var p = o.Patient!;
+    var c = Model.Current;
+    ViewData["Title"] = $"Result entry – {p.FullName}";
+    var age = AgeCalculator.Of(p, o.BusinessDate)?.Short ?? "—";
+    var editable = c is not null && (LabService.OpenStatuses.Contains(c.Status) || c.Status == LabOrderItemStatus.AwaitingVerification);
+    var allowed = c is not null && (BurhanNexus.HMS.Web.Pages.Lab.EntryModel.RequiredPermission(c) == Perm.LabEditResults ? Model.CanEdit : Model.CanEnter);
+}
+<partial name="_LabNav" />
+<div class="lab-entry-head card">
+    <div class="card-body lab-patient">
+        <div class="patient-id-box sm"><small>Patient ID</small><strong>@p.PatientNumber</strong></div>
+        <div><h2>@p.FullName</h2><span class="muted">@age / @p.Gender · <span class="mono">@o.OrderNumber</span> · @Fmt.Day(o.BusinessDate)@(o.ReferredBy is { Length: > 0 } refBy ? " · Ref: " + refBy : "")</span>
+            @if (o.ClinicalNotes is not null) { <div class="small">Notes: @o.ClinicalNotes</div> }</div>
+        <div class="actions"><a class="btn btn-light btn-sm" href="/Lab/Order/@o.Id">Visit</a> <a class="btn btn-light btn-sm" href="/Lab/Pending">Pending list</a></div>
+    </div>
+    <div class="lab-tabs" data-test-tabs>
+        @foreach (var i in o.Items.Where(i => i.Status != LabOrderItemStatus.Cancelled))
+        {
+            <a class="lab-tab @(i.Id == c?.Id ? "on" : "") s-@i.Status.ToString().ToLowerInvariant()" href="/Lab/Entry/@o.Id?item=@i.Id" data-tab="@i.TestCode">
+                <strong>@i.TestName</strong><small>@LabService.Label(i.Status)</small></a>
+        }
+    </div>
+</div>
+<partial name="_ValidationSummary" />
+@if (c is null)
+{
+    <div class="card"><div class="card-body empty">No tests in this visit.</div></div>
+}
+else
+{
+    <form method="post" asp-route-item="@c.Id" class="card" novalidate data-entry-form>
+        <input type="hidden" name="RowVersion" value="@Model.RowVersion" />
+        <div class="card-header">
+            <h3>@c.TestName <small class="muted">@c.TestCode · @c.SampleTypeName @(c.Method is null ? "" : "· " + c.Method)</small></h3>
+            <partial name="_LabStatus" model="c.Status" />
+        </div>
+        @if (c.CorrectionReason is not null && LabService.OpenStatuses.Contains(c.Status))
+        {
+            <div class="alert alert-danger"><svg class="icon"><use href="#i-alert" /></svg><div><strong>Correction requested:</strong> @c.CorrectionReason</div></div>
+        }
+        @if (c.Status == LabOrderItemStatus.SamplePending)
+        {
+            <div class="alert alert-warning"><svg class="icon"><use href="#i-info" /></svg><div>The @c.SampleTypeName sample (@c.Sample?.SampleNumber) has not been collected yet.
+                @if (c.SampleId is long sid) { <button bn-permission="@Perm.LabCollectSamples" class="btn btn-primary btn-sm" type="submit" asp-page-handler="Collect" asp-route-sampleId="@sid" formnovalidate data-test="entry-collect">Collect &amp; receive sample now</button> }</div></div>
+        }
+        <div class="table-wrap">
+            <table class="table lab-entry" data-entry>
+                <thead><tr><th>Parameter</th><th>Result</th><th>Unit</th><th>Reference range</th></tr></thead>
+                <tbody>
+                @{ var first = true; }
+                @foreach (var v in c.Values)
+                {
+                    Model.Values.TryGetValue(v.Id, out var val);
+                    var dis = !editable || !allowed || c.Status == LabOrderItemStatus.SamplePending;
+                    <tr data-param="@v.Name">
+                        <td><label for="v@(v.Id)"><strong>@v.Name</strong>@if (v.IsOptional) { <small class="muted"> (optional)</small> }</label></td>
+                        <td>
+                            @switch (v.ResultType)
+                            {
+                                case LabResultType.Numeric:
+                                    <input id="v@(v.Id)" name="Values[@v.Id]" value="@val" inputmode="decimal" autocomplete="off" class="result-input" disabled="@dis" autofocus="@first"
+                                           data-low="@v.RefLow?.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-high="@v.RefHigh?.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+                                    break;
+                                case LabResultType.PositiveNegative:
+                                    <select id="v@(v.Id)" name="Values[@v.Id]" class="result-input" disabled="@dis" autofocus="@first"><option value="">—</option>
+                                        <option selected="@(val == "Negative")">Negative</option><option selected="@(val == "Positive")">Positive</option></select>
+                                    break;
+                                case LabResultType.Options:
+                                    <select id="v@(v.Id)" name="Values[@v.Id]" class="result-input" disabled="@dis" autofocus="@first"><option value="">—</option>
+                                        @foreach (var opt in (v.Options ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) { <option selected="@(val == opt)">@opt</option> }</select>
+                                    break;
+                                default:
+                                    <input id="v@(v.Id)" name="Values[@v.Id]" value="@val" maxlength="200" autocomplete="off" class="result-input wide" disabled="@dis" autofocus="@first" placeholder="@v.RefText" />
+                                    break;
+                            }
+                            @if (v.Flag != LabFlag.None) { <span class="flag">@v.Flag</span> }
+                        </td>
+                        <td>@v.Unit</td>
+                        <td class="muted">@v.ReferenceDisplay</td>
+                    </tr>
+                    first = false;
+                }
+                </tbody>
+            </table>
+        </div>
+        <div class="card-body">
+            <div class="field"><label for="Comment">Comment / interpretation</label><textarea id="Comment" name="Comment" rows="2" maxlength="1000" disabled="@(!editable || !allowed)">@Model.Comment</textarea></div>
+            @if (c.ResultEnteredByUsername is not null) { <small class="muted">Entered by @c.ResultEnteredByUsername · @Fmt.DateTimeText(c.ResultEnteredUtc)</small> }
+            @if (!allowed && editable) { <div class="alert alert-warning"><svg class="icon"><use href="#i-info" /></svg><div>You need the “Edit Unverified Results” permission to change this result.</div></div> }
+            @if (!editable) { <div class="muted">This result is @LabService.Label(c.Status).ToLowerInvariant() and can no longer be edited here.</div> }
+        </div>
+        @if (editable && allowed && c.Status != LabOrderItemStatus.SamplePending)
+        {
+            <div class="card-footer form-actions">
+                <button class="btn btn-light" type="submit" name="Mode" value="draft">Save draft</button>
+                <button class="btn btn-light" type="submit" name="Mode" value="submit" data-test="entry-save">Save result</button>
+                <button class="btn btn-primary btn-lg" type="submit" name="Mode" value="next" data-test="entry-next">Save &amp; next test →</button>
+            </div>
+        }
+    </form>
+}

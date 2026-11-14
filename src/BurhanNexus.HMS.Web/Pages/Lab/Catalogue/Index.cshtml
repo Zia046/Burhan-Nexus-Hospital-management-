@@ -1,0 +1,72 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Lab.Catalogue.IndexModel
+@{ ViewData["Title"] = "Laboratory test catalogue"; }
+<partial name="_LabNav" />
+<div class="toolbar">
+    <input type="search" placeholder="Filter tests…" data-table-filter="#lab-tests" maxlength="60" />
+    <a class="btn btn-primary" href="/Lab/Catalogue/Test" data-test="new-test"><svg class="icon"><use href="#i-plus" /></svg> New test</a>
+</div>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-flask" /></svg> Tests</h2><span class="pill">@Model.Tests.Count(t => t.Test.IsActive) active · @Model.Tests.Count total</span></div>
+    <div class="table-wrap">
+        <table class="table" id="lab-tests" data-lab-tests>
+            <thead><tr><th>Code</th><th>Test</th><th>Category</th><th>Sample</th><th>Parameters</th>@if (Model.ShowFees) { <th class="num">Price</th> }<th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var r in Model.Tests)
+            {
+                var t = r.Test;
+                <tr data-test-row="@t.Code" class="@(t.IsActive ? "" : "row-muted")">
+                    <td class="mono">@t.Code</td>
+                    <td><strong>@t.Name</strong>@if (t.Method is not null) { <small class="muted block">@t.Method</small> }</td>
+                    <td>@t.Category?.Name</td>
+                    <td>@t.SampleType?.Name</td>
+                    <td>@r.ParameterCount</td>
+                    @if (Model.ShowFees) { <td class="num">@(r.Price == 0 ? "Free" : Fmt.Money(r.Price))</td> }
+                    <td>@if (t.IsActive) { <span class="status status-ok">Active</span> } else { <span class="status">Inactive</span> }</td>
+                    <td class="actions"><a class="btn btn-light btn-sm" href="/Lab/Catalogue/Test/@t.Id" data-test="edit-@t.Code">Edit</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-body small muted">Starter tests are created inactive and free: review parameters, reference ranges and price, then activate them. Prices are kept with the Phase 3 service fees (history is preserved).</div>
+</div>
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header"><h3>Categories</h3></div>
+        <div class="table-wrap"><table class="table table-compact">
+            <thead><tr><th>Name</th><th>Order</th><th>Active</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var c in Model.Categories)
+            {
+                <tr><td colspan="4"><form method="post" asp-page-handler="Category" asp-route-id="@c.Id" class="inline-form">
+                    <input name="name" value="@c.Name" maxlength="80" required /><input name="sortOrder" type="number" value="@c.SortOrder" class="w-xs" />
+                    <label class="check"><input type="checkbox" name="isActive" value="true" checked="@c.IsActive" /> Active</label>
+                    <button class="btn btn-light btn-sm" type="submit">Save</button></form></td></tr>
+            }
+            <tr><td colspan="4"><form method="post" asp-page-handler="Category" class="inline-form">
+                <input name="name" maxlength="80" placeholder="New category" required /><input name="sortOrder" type="number" value="0" class="w-xs" />
+                <input type="hidden" name="isActive" value="true" /><button class="btn btn-primary btn-sm" type="submit">Add</button></form></td></tr>
+            </tbody>
+        </table></div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3>Sample types</h3></div>
+        <div class="table-wrap"><table class="table table-compact">
+            <tbody>
+            @foreach (var s in Model.SampleTypes)
+            {
+                <tr><td><form method="post" asp-page-handler="SampleType" asp-route-id="@s.Id" class="inline-form">
+                    <input name="code" value="@s.Code" maxlength="20" class="w-xs" required /><input name="name" value="@s.Name" maxlength="60" required />
+                    <input name="container" value="@s.Container" maxlength="100" placeholder="Container / tube" />
+                    <label class="check"><input type="checkbox" name="isActive" value="true" checked="@s.IsActive" /> Active</label>
+                    <button class="btn btn-light btn-sm" type="submit">Save</button></form></td></tr>
+            }
+            <tr><td><form method="post" asp-page-handler="SampleType" class="inline-form">
+                <input name="code" maxlength="20" class="w-xs" placeholder="Code" required /><input name="name" maxlength="60" placeholder="New sample type" required />
+                <input name="container" maxlength="100" placeholder="Container / tube" /><input type="hidden" name="isActive" value="true" />
+                <button class="btn btn-primary btn-sm" type="submit">Add</button></form></td></tr>
+            </tbody>
+        </table></div>
+    </div>
+</div>

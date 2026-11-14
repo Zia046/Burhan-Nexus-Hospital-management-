@@ -1,0 +1,114 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Lab.BookModel
+@{
+    ViewData["Title"] = "New laboratory visit";
+    var p = Model.Patient;
+}
+<partial name="_LabNav" />
+@if (p is null)
+{
+    <div class="card card-medium">
+        <div class="card-header"><h2><svg class="icon"><use href="#i-flask" /></svg> New laboratory visit – find the patient</h2></div>
+        <div class="card-body">
+            <form method="get" class="search-main">
+                <div class="input-icon grow"><svg class="icon"><use href="#i-search" /></svg>
+                    <input name="q" value="@Model.Q" placeholder="Patient ID, name, phone or CNIC" autofocus autocomplete="off" maxlength="100" /></div>
+                <button class="btn btn-primary" type="submit">Search</button>
+                @if (Model.CanRegister) { <a class="btn btn-success" href="/Patients/Register?next=lab@(string.IsNullOrWhiteSpace(Model.Q) ? "" : "&name=" + Uri.EscapeDataString(Model.Q))"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New patient</a> }
+            </form>
+            @if (!string.IsNullOrWhiteSpace(Model.Q))
+            {
+                <div class="table-wrap">
+                    <table class="table table-compact" data-matches>
+                        <thead><tr><th>Patient ID</th><th>Name</th><th>Father / Husband</th><th>Age</th><th>Phone</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var m in Model.Matches)
+                        {
+                            <tr><td class="mono">@m.PatientNumber</td><td><strong>@m.FullName</strong></td><td>@m.GuardianName</td><td>@m.AgeText · @m.Gender</td><td>@m.MobileNumber</td>
+                                <td class="actions"><a class="btn btn-primary btn-sm" href="/Lab/Book?patientId=@m.Id">Select</a>
+                                    <a bn-permission="@Perm.LabViewPrevious" class="btn btn-light btn-sm" href="/Lab/Patient/@m.Id">Lab history</a></td></tr>
+                        }
+                        @if (Model.Matches.Count == 0) { <tr><td colspan="6" class="empty">No patient found – register a new patient.</td></tr> }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <form method="post" class="grid-side" novalidate data-lab-book>
+        <input type="hidden" name="Input.IdempotencyKey" value="@Model.Input.IdempotencyKey" />
+        <input type="hidden" name="PatientId" value="@p.Id" />
+        <input type="hidden" name="EncounterId" value="@Model.EncounterId" />
+        <div class="card">
+            <div class="card-header"><h2><svg class="icon"><use href="#i-flask" /></svg> Select tests</h2><span class="pill pill-blue" data-selected-count>0 selected</span></div>
+            <div class="card-body">
+                <partial name="_ValidationSummary" />
+                @if (Model.Tests.Count == 0) { <div class="alert alert-warning"><svg class="icon"><use href="#i-info" /></svg><div>No active tests. Activate tests in the <a href="/Lab/Catalogue">test catalogue</a>.</div></div> }
+                <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input type="search" placeholder="Filter tests…" data-test-filter aria-label="Filter tests" /></div>
+                @foreach (var g in Model.Tests.GroupBy(t => t.Test.Category!.Name))
+                {
+                    <h3 class="section-title">@g.Key</h3>
+                    <div class="test-picker">
+                        @foreach (var t in g)
+                        {
+                            <label class="test-choice" data-test-name="@t.Test.Name.ToLowerInvariant() @t.Test.Code.ToLowerInvariant()">
+                                <input type="checkbox" name="TestIds" value="@t.Test.Id" checked="@Model.TestIds.Contains(t.Test.Id)" data-price="@t.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+                                <span><strong>@t.Test.Name</strong> <small class="muted">@t.Test.Code · @t.Test.SampleType!.Name</small>
+                                    @if (Model.ShowFees) { <small class="block">@(t.Price == 0 ? "Free" : Fmt.Money(t.Price))</small> }</span>
+                                @if (Model.CanDiscount && t.Price > 0) { <input class="input-num" type="number" step="0.01" min="0" max="@t.Price" name="Discounts[@t.Test.Id]" placeholder="disc." aria-label="Discount" /> }
+                            </label>
+                        }
+                    </div>
+                }
+                <h3 class="section-title">Referral &amp; notes</h3>
+                <div class="grid-2">
+                    <div class="field"><label for="Input_ReferralType">Referred by</label>
+                        <select id="Input_ReferralType" name="Input.ReferralType" data-referral>
+                            <option value="None" selected="@(Model.Input.ReferralType == LabReferralType.None)">No referring doctor</option>
+                            <option value="HospitalDoctor" selected="@(Model.Input.ReferralType == LabReferralType.HospitalDoctor)">Hospital doctor</option>
+                            <option value="External" selected="@(Model.Input.ReferralType == LabReferralType.External)">External doctor</option>
+                        </select></div>
+                    <div class="field" data-referral-doctor><label for="Input_ReferringDoctorId">Hospital doctor</label>
+                        <select id="Input_ReferringDoctorId" name="Input.ReferringDoctorId"><option value="">—</option>
+                            @foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(Model.Input.ReferringDoctorId == d.Id)">@d.Name @(d.Specialty is null ? "" : "– " + d.Specialty)</option> }</select></div>
+                    <div class="field" data-referral-external><label for="Input_ExternalDoctorName">External doctor</label>
+                        <input id="Input_ExternalDoctorName" name="Input.ExternalDoctorName" value="@Model.Input.ExternalDoctorName" maxlength="150" placeholder="Dr. name, clinic" /></div>
+                    <div class="field"><label for="Input_ClinicalNotes">Clinical notes</label><input id="Input_ClinicalNotes" name="Input.ClinicalNotes" value="@Model.Input.ClinicalNotes" maxlength="1000" /></div>
+                    @if (Model.CanDiscount) { <div class="field"><label for="Input_DiscountReason">Discount reason</label><input id="Input_DiscountReason" name="Input.DiscountReason" value="@Model.Input.DiscountReason" maxlength="200" /></div> }
+                </div>
+                <label class="check"><input type="checkbox" name="Input.IsUrgent" value="true" checked="@Model.Input.IsUrgent" /> Urgent</label>
+            </div>
+            <div class="card-footer form-actions">
+                @if (Model.ShowFees) { <span class="collect-total">Total: <strong data-lab-total>0.00</strong></span> }
+                <a class="btn btn-light" href="/Lab/Book">Change patient</a>
+                <button class="btn btn-primary btn-lg" type="submit" data-test="lab-book-save" data-once>Save laboratory visit</button>
+            </div>
+        </div>
+        <div class="stack">
+            <div class="card patient-mini"><div class="card-body">
+                <div class="patient-id-box sm"><small>Patient ID</small><strong>@p.PatientNumber</strong></div>
+                <h3>@p.FullName</h3>
+                <dl class="kv kv-tight">
+                    <dt>Father / Husband</dt><dd>@(p.GuardianName ?? "—")</dd>
+                    <dt>Age / Gender</dt><dd>@Model.AgeText · @p.Gender</dd>
+                    <dt>Phone</dt><dd>@(p.MobileNumber ?? "—")</dd>
+                    <dt>Address</dt><dd>@(p.Address ?? p.CityOrVillage ?? "—")</dd>
+                </dl>
+                <a bn-permission="@Perm.PatientsView" href="/Patients/Profile/@p.Id">Open profile</a>
+            </div></div>
+            <div class="card">
+                <div class="card-header"><h3>Previous lab visits</h3><a bn-permission="@Perm.LabViewPrevious" class="btn btn-light btn-sm" href="/Lab/Patient/@p.Id">All</a></div>
+                <ul class="activity">
+                    @foreach (var o in Model.Previous)
+                    {
+                        <li><span class="activity-dot"></span><div><strong><a href="/Lab/Order/@o.Id">@o.OrderNumber</a> · @Fmt.Day(o.BusinessDate)</strong><small>@string.Join(", ", o.Items.Select(i => i.TestCode)) · @o.ReportStatus</small></div></li>
+                    }
+                    @if (Model.Previous.Count == 0) { <li class="empty">No earlier laboratory visits.</li> }
+                </ul>
+            </div>
+        </div>
+    </form>
+}

@@ -1,0 +1,55 @@
+/* Burhan Nexus – A4 laboratory report and lab order slip */
+@page { size: A4 portrait; margin: 12mm 12mm 14mm; }
+.lab-report-body { margin: 0; background: #e9edf3; font-family: "Segoe UI", Arial, sans-serif; color: #111; font-size: 12.5px; }
+.lr-toolbar { position: sticky; top: 0; z-index: 5; background: #0f2a4a; color: #fff; padding: 10px 16px; display: flex; flex-direction: column; gap: 8px; }
+.lr-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.lr-btn { background: #2563eb; color: #fff; border: 0; border-radius: 6px; padding: 7px 14px; font-weight: 600; cursor: pointer; text-decoration: none; font-size: 13px; }
+.lr-btn.light { background: #fff; color: #0f2a4a; }
+.lr-check { background: rgba(255,255,255,.12); border-radius: 6px; padding: 4px 8px; font-size: 13px; }
+.lr-msg.err { background: #fee2e2; color: #991b1b; padding: 5px 10px; border-radius: 6px; }
+.lr-status { font-size: 12px; opacity: .85; }
+.lr-page { position: relative; width: 186mm; min-height: 270mm; margin: 16px auto; background: #fff; padding: 10mm 12mm; box-shadow: 0 2px 12px rgba(0,0,0,.15); box-sizing: border-box; display: flex; flex-direction: column; }
+.lr-watermark { position: absolute; inset: 0; display: grid; place-items: center; font-size: 110px; font-weight: 800; color: rgba(220, 38, 38, .10); transform: rotate(-30deg); pointer-events: none; }
+.lr-head { display: flex; gap: 14px; align-items: center; border-bottom: 2px solid #0f2a4a; padding-bottom: 8px; }
+.lr-logo { max-height: 24mm; max-width: 40mm; object-fit: contain; }
+.lr-brand { flex: 1; text-align: center; }
+.lr-hosp { font-size: 20px; font-weight: 800; color: #0f2a4a; }
+.lr-lab { font-size: 14px; font-weight: 700; color: #2563eb; text-transform: uppercase; letter-spacing: .06em; }
+.lr-small { font-size: 11px; color: #444; }
+.lr-title { text-align: center; font-size: 15px; letter-spacing: .12em; margin: 8px 0; }
+.lr-info { width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; margin-bottom: 8px; }
+.lr-info th, .lr-info td { padding: 3px 6px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+.lr-info th { width: 16%; color: #475569; font-weight: 600; background: #f8fafc; }
+.mono { font-family: Consolas, "Courier New", monospace; }
+.lr-section { margin-top: 6px; }
+.lr-cat { font-size: 13px; background: #0f2a4a; color: #fff; padding: 3px 8px; margin: 8px 0 4px; text-transform: uppercase; letter-spacing: .05em; }
+.lr-test { break-inside: avoid; margin-bottom: 8px; }
+.lr-test h3 { font-size: 13.5px; margin: 6px 0 3px; color: #0f2a4a; }
+.lr-test h3 small { font-weight: 400; color: #555; }
+.lr-results { width: 100%; border-collapse: collapse; }
+.lr-results th { text-align: left; font-size: 11px; color: #475569; border-bottom: 1px solid #94a3b8; padding: 2px 6px; }
+.lr-results td { padding: 2.5px 6px; border-bottom: 1px dotted #cbd5e1; }
+.lr-results td.val { font-weight: 700; width: 18%; }
+.lr-results td.flag { width: 6%; font-weight: 800; color: #b91c1c; }
+.lr-results tr.abn td.val { color: #b91c1c; }
+.lr-comment, .lr-verified { margin: 3px 0; font-size: 11.5px; }
+.lr-verified { color: #475569; }
+.lr-pending { font-size: 11.5px; color: #92400e; margin-top: 8px; }
+.lr-legend { font-size: 10.5px; color: #64748b; margin-top: 6px; }
+.lr-foot { margin-top: auto; padding-top: 14px; }
+.lr-sign { float: right; text-align: center; min-width: 55mm; }
+.lr-sign img { max-height: 16mm; max-width: 50mm; }
+.lr-sign-line { border-top: 1px solid #111; padding-top: 2px; font-weight: 700; }
+.lr-footer-text { clear: both; font-size: 10.5px; color: #444; border-top: 1px solid #cbd5e1; padding-top: 4px; margin-top: 8px; }
+.lr-end { text-align: center; font-size: 10.5px; color: #64748b; margin-top: 4px; }
+.layout-compact .lr-test h3 { font-size: 12.5px; margin: 3px 0 1px; }
+.layout-compact .lr-results td { padding: 1px 6px; }
+.t-lines { width: 100%; border-collapse: collapse; }
+.t-lines td { padding: .3mm 0; vertical-align: top; }
+.t-lines td.r { text-align: right; white-space: nowrap; padding-left: 2mm; }
+@media print {
+  .no-print { display: none !important; }
+  .lab-report-body { background: #fff; }
+  .lr-page { margin: 0; width: auto; min-height: 271mm; box-shadow: none; padding: 0; }
+  .lr-cat { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

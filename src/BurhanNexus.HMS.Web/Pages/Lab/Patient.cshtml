@@ -1,0 +1,51 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Lab.PatientModel
+@{
+    var p = Model.Patient;
+    ViewData["Title"] = $"Lab history – {p.FullName}";
+    var trendOrders = Model.Orders.Where(o => Model.Trend.Any(t => t.ByOrder.ContainsKey(o.Id))).Take(8).Reverse().ToList();
+}
+<partial name="_LabNav" />
+<div class="card">
+    <div class="card-body lab-patient">
+        <div class="patient-id-box sm"><small>Patient ID</small><strong>@p.PatientNumber</strong></div>
+        <div><h2>@p.FullName</h2><span class="muted">@p.Gender@(p.MobileNumber is null ? "" : " · " + p.MobileNumber) · @Model.Orders.Count lab visit(s)</span></div>
+        <div class="actions"><a class="btn btn-primary btn-sm" bn-permission="@Perm.LabBook" href="/Lab/Book?patientId=@p.Id">New lab visit</a> <a class="btn btn-light btn-sm" href="/Patients/Profile/@p.Id">Patient profile</a></div>
+    </div>
+</div>
+@if (Model.Trend.Count > 0)
+{
+    <div class="card">
+        <div class="card-header"><h2><svg class="icon"><use href="#i-activity" /></svg> Results over time</h2><small class="muted">Verified values exactly as reported</small></div>
+        <div class="table-wrap"><table class="table table-compact" data-trend>
+            <thead><tr><th>Test / parameter</th><th>Unit</th>@foreach (var o in trendOrders) { <th class="nowrap">@Fmt.Day(o.BusinessDate)</th> }</tr></thead>
+            <tbody>@foreach (var t in Model.Trend)
+            {
+                <tr><td><small class="muted">@t.Test</small> @t.Parameter</td><td>@t.Unit</td>
+                    @foreach (var o in trendOrders) { <td>@if (t.ByOrder.TryGetValue(o.Id, out var v)) { <span class="@(v.Flag != LabFlag.None ? "abn-text" : "")">@v.Value</span> }</td> }</tr>
+            }</tbody>
+        </table></div>
+    </div>
+}
+@foreach (var o in Model.Orders)
+{
+    <section class="card" data-history-order="@o.OrderNumber">
+        <div class="card-header"><h3><a href="/Lab/Order/@o.Id" class="mono">@o.OrderNumber</a> <small class="muted">@Fmt.Day(o.BusinessDate)</small></h3>
+            <div class="actions">@if (o.Items.Any(i => i.Status is LabOrderItemStatus.Verified or LabOrderItemStatus.Released)) { <a class="btn btn-light btn-sm" bn-permission="@Perm.LabPrintReports" href="/Print/LabReport/@o.Id">Report</a> }</div></div>
+        <div class="card-body lab-history">
+            @foreach (var i in o.Items.Where(i => i.Status != LabOrderItemStatus.Cancelled).OrderBy(i => i.SortOrder))
+            {
+                <div class="lab-mini-result">
+                    <div><strong>@i.TestName</strong> <partial name="_LabStatus" model="i.Status" /></div>
+                    @if (i.Status is LabOrderItemStatus.Verified or LabOrderItemStatus.Released)
+                    {
+                        <table class="table table-compact"><tbody>@foreach (var v in i.Values.Where(v => v.Value != null).OrderBy(v => v.SortOrder))
+                        { <tr><td>@v.Name</td><td class="@(v.Flag != LabFlag.None ? "abn-text" : "")"><strong>@v.Value</strong> @v.Unit @if (v.Flag != LabFlag.None) { <span class="flag">@v.Flag</span> }</td><td class="muted">@v.ReferenceDisplay</td></tr> }</tbody></table>
+                    }
+                    else { <small class="muted">Result not final yet.</small> }
+                </div>
+            }
+        </div>
+    </section>
+}
+@if (Model.Orders.Count == 0) { <div class="card"><div class="card-body empty">No previous laboratory visits.</div></div> }

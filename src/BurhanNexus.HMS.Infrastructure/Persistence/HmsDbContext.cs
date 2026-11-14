@@ -57,6 +57,21 @@ public class HmsDbContext : DbContext
     public DbSet<FinancialAdjustment> FinancialAdjustments => Set<FinancialAdjustment>();
     public DbSet<DailyCashClosing> DailyCashClosings => Set<DailyCashClosing>();
     public DbSet<FinanceSettings> FinanceSettings => Set<FinanceSettings>();
+    // Phase 4 – laboratory
+    public DbSet<LabSampleType> LabSampleTypes => Set<LabSampleType>();
+    public DbSet<LabCategory> LabCategories => Set<LabCategory>();
+    public DbSet<LabTest> LabTests => Set<LabTest>();
+    public DbSet<LabTestParameter> LabTestParameters => Set<LabTestParameter>();
+    public DbSet<LabReferenceRange> LabReferenceRanges => Set<LabReferenceRange>();
+    public DbSet<LabOrder> LabOrders => Set<LabOrder>();
+    public DbSet<LabOrderItem> LabOrderItems => Set<LabOrderItem>();
+    public DbSet<LabResultValue> LabResultValues => Set<LabResultValue>();
+    public DbSet<LabSample> LabSamples => Set<LabSample>();
+    public DbSet<LabItemEvent> LabItemEvents => Set<LabItemEvent>();
+    public DbSet<LabResultRevision> LabResultRevisions => Set<LabResultRevision>();
+    public DbSet<LabReportPrint> LabReportPrints => Set<LabReportPrint>();
+    public DbSet<LabSettings> LabSettings => Set<LabSettings>();
+    public DbSet<LabInventoryItem> LabInventoryItems => Set<LabInventoryItem>();
 
     public const string PatientNumberSequence = "patient_number_seq";
     public const string OpdNumberSequence = "opd_number_seq";
@@ -67,6 +82,8 @@ public class HmsDbContext : DbContext
     public const string DepositNumberSequence = "deposit_number_seq";
     public const string SettlementNumberSequence = "settlement_number_seq";
     public const string AdjustmentNumberSequence = "adjustment_number_seq";
+    public const string LabOrderNumberSequence = "lab_order_number_seq";
+    public const string LabSampleNumberSequence = "lab_sample_number_seq";
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -75,7 +92,7 @@ public class HmsDbContext : DbContext
         b.HasSequence<long>(PatientNumberSequence).StartsAt(1).IncrementsBy(1);
         b.HasSequence<long>(OpdNumberSequence).StartsAt(1).IncrementsBy(1);
         b.HasSequence<long>(EmergencyNumberSequence).StartsAt(1).IncrementsBy(1);
-        foreach (var seq in new[] { ReceiptNumberSequence, ChargeNumberSequence, RefundNumberSequence, DepositNumberSequence, SettlementNumberSequence, AdjustmentNumberSequence })
+        foreach (var seq in new[] { LabOrderNumberSequence, LabSampleNumberSequence, ReceiptNumberSequence, ChargeNumberSequence, RefundNumberSequence, DepositNumberSequence, SettlementNumberSequence, AdjustmentNumberSequence })
             b.HasSequence<long>(seq).StartsAt(1).IncrementsBy(1);
 
         b.Entity<HospitalSettings>(e =>
@@ -337,6 +354,7 @@ public class HmsDbContext : DbContext
         });
 
         ConfigureFinance(b);
+        ConfigureLaboratory(b);
 
         b.Entity<BackupHistory>(e =>
         {
@@ -417,6 +435,8 @@ public class HmsDbContext : DbContext
             e.HasOne(x => x.Department).WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Doctor).WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Receipt>().WithMany().HasForeignKey(x => x.OriginReceiptId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<LabOrder>().WithMany().HasForeignKey(x => x.LabOrderId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.LabOrderId);
         });
         b.Entity<Receipt>(e =>
         {
@@ -529,6 +549,118 @@ public class HmsDbContext : DbContext
             e.ToTable("FinanceSettings", t => t.HasCheckConstraint("CK_FinanceSettings_Singleton", "\"Id\" = 1"));
             e.Property(x => x.Id).ValueGeneratedNever();
             e.Property(x => x.RowVersion).IsRowVersion();
+        });
+    }
+
+    private static void ConfigureLaboratory(ModelBuilder b)
+    {
+        b.Entity<LabSampleType>(e => { e.ToTable("LabSampleTypes"); e.HasIndex(x => x.Code).IsUnique(); e.HasIndex(x => x.Name).IsUnique(); });
+        b.Entity<LabCategory>(e => { e.ToTable("LabCategories"); e.HasIndex(x => x.Name).IsUnique(); });
+        b.Entity<LabTest>(e =>
+        {
+            e.ToTable("LabTests");
+            e.HasIndex(x => x.Code).IsUnique();
+            e.HasIndex(x => x.ServiceItemId).IsUnique();
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.SampleType).WithMany().HasForeignKey(x => x.SampleTypeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ServiceItem).WithMany().HasForeignKey(x => x.ServiceItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<LabTestParameter>(e =>
+        {
+            e.ToTable("LabTestParameters");
+            e.Property(x => x.ResultType).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => new { x.LabTestId, x.SortOrder });
+            e.HasOne(x => x.LabTest).WithMany(x => x.Parameters).HasForeignKey(x => x.LabTestId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<LabReferenceRange>(e =>
+        {
+            e.ToTable("LabReferenceRanges");
+            e.Property(x => x.Gender).HasConversion<string>().HasMaxLength(10);
+            foreach (var p in new[] { nameof(LabReferenceRange.Low), nameof(LabReferenceRange.High), nameof(LabReferenceRange.CriticalLow), nameof(LabReferenceRange.CriticalHigh) })
+                e.Property(p).HasPrecision(14, 4);
+            e.HasOne(x => x.Parameter).WithMany(x => x.Ranges).HasForeignKey(x => x.ParameterId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<LabOrder>(e =>
+        {
+            e.ToTable("LabOrders");
+            e.HasIndex(x => x.OrderNumber).IsUnique();
+            e.HasIndex(x => x.IdempotencyKey).IsUnique().HasDatabaseName("UX_LabOrders_Idempotency");
+            e.HasIndex(x => new { x.PatientId, x.BusinessDate });
+            e.HasIndex(x => x.BusinessDate);
+            e.Property(x => x.ReferralType).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.Ignore(x => x.ReferredBy);
+            e.HasOne(x => x.Patient).WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Encounter).WithMany().HasForeignKey(x => x.EncounterId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ReferringDoctor).WithMany().HasForeignKey(x => x.ReferringDoctorId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<LabOrderItem>(e =>
+        {
+            e.ToTable("LabOrderItems");
+            e.HasIndex(x => new { x.Status, x.LabOrderId });
+            e.HasIndex(x => x.ChargeId);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.Order).WithMany(x => x.Items).HasForeignKey(x => x.LabOrderId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.LabTest).WithMany().HasForeignKey(x => x.LabTestId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Sample).WithMany().HasForeignKey(x => x.SampleId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Charge).WithMany().HasForeignKey(x => x.ChargeId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<LabResultValue>(e =>
+        {
+            e.ToTable("LabResultValues");
+            e.Property(x => x.ResultType).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Flag).HasConversion<string>().HasMaxLength(20);
+            foreach (var p in new[] { nameof(LabResultValue.RefLow), nameof(LabResultValue.RefHigh), nameof(LabResultValue.CriticalLow), nameof(LabResultValue.CriticalHigh), nameof(LabResultValue.NumericValue) })
+                e.Property(p).HasPrecision(14, 4);
+            e.Ignore(x => x.ReferenceDisplay);
+            e.HasIndex(x => x.OrderItemId);
+            e.HasOne(x => x.OrderItem).WithMany(x => x.Values).HasForeignKey(x => x.OrderItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<LabSample>(e =>
+        {
+            e.ToTable("LabSamples");
+            e.HasIndex(x => x.SampleNumber).IsUnique();
+            e.HasIndex(x => new { x.LabOrderId, x.Status });
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.HasOne(x => x.Order).WithMany(x => x.Samples).HasForeignKey(x => x.LabOrderId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<LabItemEvent>(e =>
+        {
+            e.ToTable("LabItemEvents");
+            e.Property(x => x.EventType).HasConversion<string>().HasMaxLength(30);
+            e.HasIndex(x => x.OrderItemId);
+            e.HasIndex(x => new { x.EventType, x.BusinessDate });
+            e.HasOne<LabOrderItem>().WithMany().HasForeignKey(x => x.OrderItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<LabResultRevision>(e =>
+        {
+            e.ToTable("LabResultRevisions");
+            e.Property(x => x.Snapshot).HasColumnType("jsonb");
+            e.Property(x => x.PreviousStatus).HasConversion<string>().HasMaxLength(30);
+            e.HasIndex(x => new { x.OrderItemId, x.RevisionNo }).IsUnique();
+            e.HasOne<LabOrderItem>().WithMany().HasForeignKey(x => x.OrderItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<LabReportPrint>(e =>
+        {
+            e.ToTable("LabReportPrints");
+            e.HasIndex(x => new { x.LabOrderId, x.CopyNumber }).IsUnique();
+            e.HasOne<LabOrder>().WithMany().HasForeignKey(x => x.LabOrderId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<LabSettings>(e =>
+        {
+            e.ToTable("LabSettings", t => t.HasCheckConstraint("CK_LabSettings_Singleton", "\"Id\" = 1"));
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.Layout).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+        });
+        b.Entity<LabInventoryItem>(e =>
+        {
+            e.ToTable("LabInventoryItems");
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ReorderLevel).HasPrecision(14, 2);
         });
     }
 }

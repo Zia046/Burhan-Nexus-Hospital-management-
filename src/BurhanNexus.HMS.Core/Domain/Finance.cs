@@ -111,6 +111,8 @@ public class Charge
     public Patient? Patient { get; set; }
     public long? EncounterId { get; set; }
     public PatientEncounter? Encounter { get; set; }
+    /// <summary>Phase 4: laboratory order that created this charge.</summary>
+    public long? LabOrderId { get; set; }
     public int ServiceItemId { get; set; }
     public ServiceItem? ServiceItem { get; set; }
     public ServiceKind ServiceKind { get; set; }

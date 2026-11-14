@@ -9,13 +9,16 @@ namespace BurhanNexus.HMS.Web.Security;
 public sealed class HasPermissionAttribute : AuthorizeAttribute
 {
     public const string Prefix = "Perm:";
-    public HasPermissionAttribute(string permission) : base(Prefix + permission) { }
+    /// <summary>Requires the permission; with several permissions any one of them is enough.</summary>
+    public HasPermissionAttribute(params string[] permissions) : base(Prefix + string.Join("|", permissions)) { }
 }
 
 public sealed class PermissionRequirement : IAuthorizationRequirement
 {
     public PermissionRequirement(string permission) => Permission = permission;
+    /// <summary>One permission, or several separated by '|' (any of them).</summary>
     public string Permission { get; }
+    public IReadOnlyList<string> AnyOf => Permission.Split('|');
 }
 
 public sealed class PermissionPolicyProvider : IAuthorizationPolicyProvider
@@ -32,8 +35,9 @@ public sealed class PermissionPolicyProvider : IAuthorizationPolicyProvider
         if (policyName.StartsWith(HasPermissionAttribute.Prefix, StringComparison.Ordinal))
         {
             var permission = policyName[HasPermissionAttribute.Prefix.Length..];
-            if (!PermissionCatalog.AllKeys.Contains(permission))
-                throw new InvalidOperationException($"Unknown permission '{permission}'.");
+            foreach (var p in permission.Split('|'))
+                if (!PermissionCatalog.AllKeys.Contains(p))
+                    throw new InvalidOperationException($"Unknown permission '{p}'.");
             var policy = new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
                 .AddRequirements(new PermissionRequirement(permission))
@@ -52,7 +56,12 @@ public sealed class PermissionHandler : AuthorizationHandler<PermissionRequireme
 
     protected override async Task HandleRequirementAsync(AuthorizationHandlerContext context, PermissionRequirement requirement)
     {
-        if (context.User.Identity?.IsAuthenticated == true && await _permissions.HasAsync(requirement.Permission))
-            context.Succeed(requirement);
+        if (context.User.Identity?.IsAuthenticated != true) return;
+        foreach (var p in requirement.AnyOf)
+            if (await _permissions.HasAsync(p))
+            {
+                context.Succeed(requirement);
+                return;
+            }
     }
 }

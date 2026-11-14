@@ -241,6 +241,87 @@ try {
   await shot(page, "p3-11-daily-closing");
   await go("/Finance/Settings");
   await shot(page, "p3-12-finance-settings");
+
+  // ---- Phase 4: laboratory ----
+  await go("/Lab/Settings");
+  await page.fill("#Input_LaboratoryName", "Burhan Nexus Clinical Laboratory");
+  await page.fill("#Input_SignatoryName", "Dr. Ayesha Malik");
+  await page.fill("#Input_SignatoryDesignation", "Consultant Pathologist");
+  await page.check("#Input_AllowSelfVerification");
+  await submit("button[data-test='save-lab-settings']");
+  await shot(page, "p4-01-lab-settings");
+  for (const [code, price] of [["CBC", "800"], ["BSR", "250"]]) {
+    await go("/Lab/Catalogue");
+    await submit(`a[data-test='edit-${code}']`);
+    await page.check("#Input_IsActive");
+    await page.uncheck("#Input_IsFree");
+    await page.fill("#Input_Price", price);
+    if (code === "CBC") await shot(page, "p4-03-test-definition");
+    await submit("button[data-test='save-test']");
+  }
+  await go("/Lab/Catalogue");
+  await shot(page, "p4-02-test-catalogue");
+  await go(`/Lab/Book?patientId=${pid}`);
+  for (const code of ["cbc", "bsr"]) await page.check(`label.test-choice[data-test-name$=' ${code}'] input[type=checkbox]`);
+  await page.selectOption("#Input_ReferralType", "External");
+  await page.fill("#Input_ExternalDoctorName", "Dr. Kamran (City Clinic)");
+  await page.fill("#Input_ClinicalNotes", "Fever for 3 days");
+  await shot(page, "p4-04-lab-booking");
+  await submit("button[data-test='lab-book-save']");
+  const orderPath = new URL(page.url()).pathname;
+  const orderId = orderPath.split("/").pop();
+  step("lab order: " + orderPath);
+  await shot(page, "p4-05-lab-visit");
+  await pdf(`/Print/LabSlip/${orderId}`, "sample-lab-slip-80mm.pdf");
+  await go(`/Finance/Collect?patientId=${pid}&labOrderId=${orderId}`);
+  await shot(page, "p4-06-lab-payment-at-cashier");
+  await go(orderPath);
+  for (let i = 0; i < 4; i++) {
+    const btn = await page.$("button[data-test^='collect-']");
+    if (!btn) break;
+    await Promise.all([page.waitForNavigation(), btn.click()]);
+  }
+  await go("/Lab/Samples");
+  await shot(page, "p4-07-sample-collection");
+  await go("/Lab/Pending");
+  await shot(page, "p4-08-pending-tests");
+  await go(`/Lab/Entry/${orderId}`);
+  for (let round = 0; round < 4 && page.url().includes("/Lab/Entry/"); round++) {
+    const inputs = await page.$$(".result-input:not([disabled])");
+    let k = 0;
+    for (const el of inputs) {
+      const tag = await el.evaluate(e => e.tagName);
+      if (tag === "SELECT") { await el.selectOption({ index: 1 }); continue; }
+      const lo = parseFloat(await el.getAttribute("data-low") || "");
+      const hi = parseFloat(await el.getAttribute("data-high") || "");
+      let v = !isNaN(lo) && !isNaN(hi) ? (lo + hi) / 2 : !isNaN(hi) ? hi * 0.8 : !isNaN(lo) ? lo * 1.2 : 5;
+      if (k++ === 1 && !isNaN(hi)) v = hi * 1.25; // one abnormal value for the flag
+      await el.fill((Math.round(v * 10) / 10).toString());
+    }
+    if (round === 0) await shot(page, "p4-09-result-entry");
+    const next = await page.$("button[data-test='entry-next']");
+    if (!next) break;
+    await Promise.all([page.waitForNavigation(), next.click()]);
+  }
+  await go("/Lab/Verify");
+  await shot(page, "p4-10-verification-queue");
+  await go(`/Lab/Verify/${orderId}`);
+  await shot(page, "p4-11-patient-verification");
+  const all = await page.$("button[data-test='verify-all']");
+  if (all) await Promise.all([page.waitForNavigation(), all.click()]);
+  await go(`/Print/LabReport/${orderId}`);
+  await shot(page, "p4-12-lab-report-preview");
+  const printBtn = await page.$("button[data-test='lab-report-print']");
+  if (printBtn) await Promise.all([page.waitForNavigation(), printBtn.click()]);
+  await pdf(`/Print/LabReport/${orderId}`, "sample-lab-report-A4.pdf");
+  await go("/Lab/Results");
+  await shot(page, "p4-13-lab-results");
+  await go(`/Lab/Patient/${pid}`);
+  await shot(page, "p4-14-previous-results");
+  await go("/Lab");
+  await shot(page, "p4-15-lab-dashboard");
+  await go("/Lab/Reports");
+  await shot(page, "p4-16-lab-reports");
 } catch (e) {
   errors.push("SCRIPT FAILURE: " + (e && e.stack || e));
   try { await shot(page, "p2-zz-failure"); } catch {}

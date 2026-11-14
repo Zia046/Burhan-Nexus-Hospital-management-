@@ -15,7 +15,7 @@ public sealed class PatientApiController : ControllerBase
 
     /// <summary>Live duplicate check while registering (name, father's/husband's name, CNIC, mobile).</summary>
     [HttpGet("duplicates")]
-    [HasPermission(Perm.PatientsAdd)]
+    [HasPermission(Perm.PatientsAdd, Perm.LabRegisterPatient)]
     public async Task<IActionResult> Duplicates([FromQuery] string? name, [FromQuery] string? guardian, [FromQuery] string? cnic,
         [FromQuery] string? mobile, CancellationToken ct)
     {

@@ -1,0 +1,25 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Lab.SamplesModel
+@{ ViewData["Title"] = "Sample collection"; }
+<partial name="_LabNav" />
+<div class="toolbar">
+    <form method="get" class="filters"><div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Visit no., Patient ID, name or phone" maxlength="100" /></div><button class="btn btn-light" type="submit">Search</button></form>
+</div>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-flask" /></svg> Samples to collect</h2><span class="pill pill-blue">@Model.Orders.Count</span></div>
+    <div class="table-wrap">
+        <table class="table" data-sample-list>
+            <thead><tr><th>Visit</th><th>Patient</th><th>Samples needed</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var o in Model.Orders)
+            {
+                <tr class="@(o.IsUrgent ? "row-urgent" : "")"><td class="mono">@o.OrderNumber<small class="muted block">@Fmt.DateTimeText(o.BookedUtc)</small></td>
+                    <td><strong>@o.PatientName</strong><small class="muted block">@o.PatientNumber · @o.AgeGender</small></td>
+                    <td>@foreach (var g in o.Items.Where(i => i.Status == LabOrderItemStatus.SamplePending).GroupBy(i => i.SampleTypeName)) { <span class="chip chip-warn">@g.Key: @string.Join(", ", g.Select(i => i.TestCode))</span> }</td>
+                    <td class="actions"><a class="btn btn-primary btn-sm" href="/Lab/Order/@o.Id">Collect</a></td></tr>
+            }
+            @if (Model.Orders.Count == 0) { <tr><td colspan="4" class="empty">No samples waiting.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

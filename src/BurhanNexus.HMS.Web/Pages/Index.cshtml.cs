@@ -74,8 +74,10 @@ public class IndexModel : HmsPageModel
             DoctorsToday = (await _appointments.StatsAsync(today, today)).Where(d => d.Total > 0).ToList();
         }
         AvailableModules = PermissionCatalog.Modules
-            .Where(m => m.IsAvailable && m.Key is "Patients" or "Opd" or "Emergency")
-            .Where(m => m.Actions.Any(a => Perms.Contains(m.PermissionKey(a.Key)) && a.Key is "View" or "Add" or "Search" or "ViewOwnAccount"))
+            .Where(m => m.IsAvailable && m.Key is "Patients" or "Opd" or "Emergency" or "Laboratory")
+            .Where(m => m.Actions.Any(a => Perms.Contains(m.PermissionKey(a.Key))
+                                           && (a.Key is "View" or "Add" or "Search" or "ViewOwnAccount"
+                                               || (m.Key == "Laboratory" && a.Key is "Dashboard" or "Book" or "EnterResults" or "ViewResults"))))
             .ToList();
 
         // Future modules: shown as "coming soon" only if the user has been given access to them.

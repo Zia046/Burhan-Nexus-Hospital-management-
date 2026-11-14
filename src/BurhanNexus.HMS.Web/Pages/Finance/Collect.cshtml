@@ -49,6 +49,7 @@ else
         <input type="hidden" name="PatientId" value="@Model.PatientId" />
         <input type="hidden" name="EncounterId" value="@Model.EncounterId" />
         <input type="hidden" name="WalkIn" value="@(Model.WalkIn ? "true" : "false")" />
+        <input type="hidden" name="LabOrderId" value="@Model.LabOrderId" />
         <div class="stack">
             <div class="card">
                 <div class="card-header"><h2><svg class="icon"><use href="#i-wallet" /></svg> Collect payment</h2>
@@ -137,7 +138,8 @@ else
                                     var c = Model.OpenCharges[i];
                                     <tr><td class="mono">@c.ChargeNumber<input type="hidden" name="Balances[@i].ChargeId" value="@c.Id" /></td><td>@Fmt.Day(c.BusinessDate)</td><td>@c.ServiceName @(c.DoctorName is null ? "" : "– " + c.DoctorName)</td>
                                         <td class="num">@Fmt.Money(c.NetAmount)</td><td class="num">@Fmt.Money(c.PaidAmount)</td><td class="num"><strong>@Fmt.Money(c.Balance)</strong></td>
-                                        <td><input name="Balances[@i].PayNow" type="number" step="0.01" min="0" max="@c.Balance" class="input-num" data-balance-pay aria-label="Pay now" /></td></tr>
+                                        <td><input name="Balances[@i].PayNow" type="number" step="0.01" min="0" max="@c.Balance" class="input-num" data-balance-pay aria-label="Pay now"
+                                            value="@(Model.LabOrderId is long lo && c.LabOrderId == lo ? c.Balance.ToString(System.Globalization.CultureInfo.InvariantCulture) : null)" /></td></tr>
                                 }
                                 </tbody>
                             </table>

@@ -1,0 +1,27 @@
+@model (string Title, string Key, IReadOnlyList<LabOrderSummary> Orders, string Link, string Empty)
+<div class="card">
+    <div class="card-header"><h3>@Model.Title</h3><span class="pill pill-blue">@Model.Orders.Count</span></div>
+    <div class="table-wrap">
+        <table class="table table-compact" data-worklist="@Model.Key">
+            <thead><tr><th>Visit</th><th>Patient</th><th>Tests</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var o in Model.Orders)
+            {
+                var tests = Model.Key switch
+                {
+                    "pending" => o.Items.Where(i => LabService.OpenStatuses.Contains(i.Status)),
+                    "verification" => o.Items.Where(i => i.Status == LabOrderItemStatus.AwaitingVerification),
+                    _ => o.Items.Where(i => i.Status == LabOrderItemStatus.Verified),
+                };
+                <tr class="@(o.IsUrgent ? "row-urgent" : "")">
+                    <td class="mono nowrap">@o.OrderNumber @if (o.IsUrgent) { <span class="status status-bad">Urgent</span> }<small class="muted block">@Fmt.Day(o.BusinessDate)</small></td>
+                    <td><strong>@o.PatientName</strong> <small class="muted block">@o.PatientNumber · @o.AgeGender</small></td>
+                    <td>@foreach (var t in tests) { <span class="chip" title="@LabService.Label(t.Status)">@t.TestCode@(t.Status == LabOrderItemStatus.SamplePending ? " ⏳" : t.CorrectionReason is not null ? " ↩" : "")</span> }</td>
+                    <td class="actions"><a class="btn btn-light btn-sm" href="@string.Format(Model.Link, o.Id)">Open</a></td>
+                </tr>
+            }
+            @if (Model.Orders.Count == 0) { <tr><td colspan="4" class="empty">@Model.Empty</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

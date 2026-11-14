@@ -34,6 +34,8 @@ public class CollectModel : HmsPageModel
     [BindProperty(SupportsGet = true)] public long? EncounterId { get; set; }
     [BindProperty(SupportsGet = true, Name = "q")] public string? Q { get; set; }
     [BindProperty(SupportsGet = true)] public bool WalkIn { get; set; }
+    /// <summary>Phase 4: coming from a laboratory visit – its open test fees are pre-selected.</summary>
+    [BindProperty(SupportsGet = true)] public long? LabOrderId { get; set; }
     [BindProperty] public CollectInput Input { get; set; } = new();
     [BindProperty] public List<NewChargeLine> Lines { get; set; } = new();
     [BindProperty] public List<BalancePayment> Balances { get; set; } = new();

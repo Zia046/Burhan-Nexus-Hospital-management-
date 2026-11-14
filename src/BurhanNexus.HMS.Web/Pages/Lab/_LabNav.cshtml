@@ -1,0 +1,15 @@
+@{
+    var tab = ViewData["LabTab"] as string;
+    string Cls(string t) => t == tab ? "active" : "";
+}
+<nav class="subnav no-print">
+    <a bn-permission="@Perm.LabDashboard" class="@Cls("dashboard")" href="/Lab"><svg class="icon icon-sm"><use href="#i-chart" /></svg> Dashboard</a>
+    <a bn-permission="@Perm.LabBook" class="@Cls("book")" href="/Lab/Book"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New lab visit</a>
+    <a bn-permission="@Perm.LabCollectSamples" class="@Cls("samples")" href="/Lab/Samples"><svg class="icon icon-sm"><use href="#i-flask" /></svg> Samples</a>
+    <a bn-permission="@Perm.LabEnterResults" class="@Cls("pending")" href="/Lab/Pending"><svg class="icon icon-sm"><use href="#i-edit" /></svg> Pending tests</a>
+    <a bn-permission="@Perm.LabVerifyResults" class="@Cls("verify")" href="/Lab/Verify"><svg class="icon icon-sm"><use href="#i-check-circle" /></svg> Verification</a>
+    <a bn-permission="@Perm.LabViewResults" class="@Cls("results")" href="/Lab/Results"><svg class="icon icon-sm"><use href="#i-file" /></svg> Results</a>
+    <a bn-permission="@Perm.LabReports" class="@Cls("reports")" href="/Lab/Reports"><svg class="icon icon-sm"><use href="#i-chart" /></svg> Reports</a>
+    <a bn-permission="@Perm.LabManageCatalogue" class="@Cls("catalogue")" href="/Lab/Catalogue"><svg class="icon icon-sm"><use href="#i-sliders" /></svg> Test catalogue</a>
+    <a bn-permission="@Perm.LabSettings" class="@Cls("settings")" href="/Lab/Settings"><svg class="icon icon-sm"><use href="#i-settings" /></svg> Settings</a>
+</nav>

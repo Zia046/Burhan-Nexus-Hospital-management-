@@ -1,0 +1,57 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Lab.ReportsModel
+@using BurhanNexus.HMS.Web.Pages.Finance
+@{
+    ViewData["Title"] = "Laboratory reports";
+    var d = Model.Data;
+    var q = $"period={Model.PresetKey}&from={d.From:yyyy-MM-dd}&to={d.To:yyyy-MM-dd}&group={Model.Group}";
+}
+<partial name="_LabNav" />
+<form method="get" class="toolbar filters no-print">
+    <partial name="/Pages/Finance/_PeriodFilter.cshtml" model="(Model.PresetKey, d.From, d.To)" />
+    <select name="group" aria-label="Group by"><option value="day" selected="@(Model.Group == "day")">Daily</option><option value="month" selected="@(Model.Group == "month")">Monthly</option><option value="year" selected="@(Model.Group == "year")">Yearly</option></select>
+    <button class="btn btn-light" type="submit">Show</button>
+    <span class="spacer"></span>
+    <a class="btn btn-light" href="/Lab/Reports?handler=Export&format=xlsx&@q" data-test="lab-export-xlsx"><svg class="icon"><use href="#i-download" /></svg> Excel</a>
+    <a class="btn btn-light" href="/Lab/Reports?handler=Export&format=csv&@q">CSV</a>
+    <button class="btn btn-light" type="button" data-print><svg class="icon"><use href="#i-printer" /></svg> Print / PDF</button>
+</form>
+<h2 class="print-only">Laboratory report · @FinancePeriod.Label(d.From, d.To)</h2>
+<div class="kpi-grid">
+    <div class="kpi"><div><span class="kpi-label">Visits</span><strong class="kpi-value" data-kpi="visits">@d.Activity.Sum(a => a.Orders)</strong></div></div>
+    <div class="kpi"><div><span class="kpi-label">Tests booked</span><strong class="kpi-value" data-kpi="booked">@d.Activity.Sum(a => a.Booked)</strong></div></div>
+    <div class="kpi"><div><span class="kpi-label">Completed</span><strong class="kpi-value" data-kpi="completed">@d.Activity.Sum(a => a.Completed)</strong></div></div>
+    <div class="kpi"><div><span class="kpi-label">Cancelled</span><strong class="kpi-value">@d.Activity.Sum(a => a.Cancelled)</strong></div></div>
+    <div class="kpi"><div><span class="kpi-label">Rejected samples</span><strong class="kpi-value">@d.SampleRejections.Count</strong></div></div>
+    @if (d.Collection is { } col) { <div class="kpi"><div><span class="kpi-label">Lab collection (net)</span><strong class="kpi-value" data-kpi="collection">@Fmt.Money(col.Sum(c => c.Amount - c.Refunded))</strong></div></div> }
+</div>
+<div class="grid-2">
+    <div class="card"><div class="card-header"><h3>Activity</h3></div><div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>@(Model.Group == "day" ? "Date" : Model.Group == "month" ? "Month" : "Year")</th><th class="num">Visits</th><th class="num">Booked</th><th class="num">Completed</th><th class="num">Cancelled</th></tr></thead>
+        <tbody>@foreach (var a in d.Activity) { <tr><td>@Model.Label(a.Date)</td><td class="num">@a.Orders</td><td class="num">@a.Booked</td><td class="num">@a.Completed</td><td class="num">@a.Cancelled</td></tr> }
+        @if (d.Activity.Count == 0) { <tr><td colspan="5" class="empty">No laboratory activity.</td></tr> }</tbody></table></div></div>
+    @if (d.Collection is { } c2)
+    {
+        <div class="card"><div class="card-header"><h3>Laboratory collection <small class="muted">(Phase 3 receipts)</small></h3></div><div class="table-wrap"><table class="table table-compact">
+            <thead><tr><th>Date</th><th class="num">Receipts</th><th class="num">Collected</th><th class="num">Refunded</th></tr></thead>
+            <tbody>@foreach (var c in c2) { <tr><td>@Fmt.Day(c.Date)</td><td class="num">@c.Receipts</td><td class="num">@Fmt.Money(c.Amount)</td><td class="num">@Fmt.Money(c.Refunded)</td></tr> }</tbody></table></div></div>
+    }
+    @foreach (var (title, rows) in new[] { ("Test-wise", d.ByTest), ("Category-wise", d.ByCategory), ("Referring doctor", d.ByDoctor) })
+    {
+        <div class="card"><div class="card-header"><h3>@title</h3></div><div class="table-wrap"><table class="table table-compact" data-stat="@title">
+            <thead><tr><th>Name</th><th class="num">Booked</th><th class="num">Completed</th><th class="num">Pending</th><th class="num">Cancelled</th></tr></thead>
+            <tbody>@foreach (var r in rows) { <tr><td>@r.Name</td><td class="num">@r.Booked</td><td class="num">@r.Completed</td><td class="num">@r.Pending</td><td class="num">@r.Cancelled</td></tr> }
+            @if (rows.Count == 0) { <tr><td colspan="5" class="empty">—</td></tr> }</tbody></table></div></div>
+    }
+    <div class="card"><div class="card-header"><h3>Verification by user</h3></div><div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>User</th><th class="num">Verified</th><th class="num">Sent back</th><th class="num">Withdrawn</th></tr></thead>
+        <tbody>@foreach (var v in d.Verification) { <tr><td>@v.User</td><td class="num">@v.Verified</td><td class="num">@v.SentBack</td><td class="num">@v.Withdrawn</td></tr> }
+        @if (d.Verification.Count == 0) { <tr><td colspan="4" class="empty">—</td></tr> }</tbody></table></div></div>
+</div>
+@foreach (var (title, rows) in new[] { ("Cancelled tests", d.Cancelled), ("Rejected samples", d.SampleRejections) })
+{
+    <div class="card"><div class="card-header"><h3>@title</h3></div><div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>Date</th><th>Visit</th><th>Patient</th><th>Test / sample</th><th>Reason</th><th>By</th></tr></thead>
+        <tbody>@foreach (var r in rows) { <tr><td>@Fmt.Day(r.Date)</td><td><a class="mono" href="/Lab/Order/@r.OrderId">@r.OrderNumber</a></td><td>@r.PatientName <small class="muted">@r.PatientNumber</small></td><td>@r.Test</td><td>@r.Detail</td><td>@r.By</td></tr> }
+        @if (rows.Count == 0) { <tr><td colspan="6" class="empty">None.</td></tr> }</tbody></table></div></div>
+}

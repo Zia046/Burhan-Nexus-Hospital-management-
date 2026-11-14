@@ -191,6 +191,7 @@ public sealed class BillingService : IBillingService
                 if (c is null || c.PatientId != input.PatientId) errors.Add("Outstanding charge not found for this patient.");
                 else if (c.Status == ChargeStatus.Cancelled) errors.Add($"{c.ChargeNumber} was cancelled.");
                 else if (b.PayNow > c.NetAmount - c.PaidAmount) errors.Add($"{c.ServiceName}: only {c.NetAmount - c.PaidAmount:N2} is outstanding.");
+                else if (!c.AllowPartialPayment && b.PayNow < c.NetAmount - c.PaidAmount) errors.Add($"{c.ServiceName} must be paid in full ({c.NetAmount - c.PaidAmount:N2}).");
                 else if (balances.Count(x => x.ChargeId == b.ChargeId) > 1) errors.Add("The same balance was selected twice.");
             }
             if (errors.Count > 0)
