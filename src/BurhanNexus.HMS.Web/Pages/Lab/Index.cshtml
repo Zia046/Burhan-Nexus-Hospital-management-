@@ -6,7 +6,7 @@
 }
 <partial name="_LabNav" />
 <div class="toolbar">
-    <form method="get" class="filters wrap"><partial name="_PeriodFilter" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" /><button class="btn btn-light" type="submit">Show</button></form>
+    <form method="get" class="filters wrap"><partial name="/Pages/Finance/_PeriodFilter.cshtml" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" /><button class="btn btn-light" type="submit">Show</button></form>
     <div class="toolbar-actions"><a bn-permission="@Perm.LabBook" class="btn btn-primary" href="/Lab/Book"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New lab visit</a></div>
 </div>
 <div class="card">

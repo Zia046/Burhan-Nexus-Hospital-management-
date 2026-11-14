@@ -22,6 +22,7 @@
     <script src="~/js/lab-report.js" asp-append-version="true" defer></script>
 </head>
 <body class="lab-report-body layout-@s.Layout.ToString().ToLowerInvariant()" data-lab-report data-autoprint="@(Model.Print && released ? "1" : null)">
+@Html.AntiForgeryToken()
 <div class="lr-toolbar no-print">
     <div class="lr-row">
         <strong>Laboratory report @o.OrderNumber</strong>

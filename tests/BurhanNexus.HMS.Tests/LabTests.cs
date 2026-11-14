@@ -495,7 +495,8 @@ public partial class LabTests : Phase2TestBase
             Denied(await nobody.GetAsync(url), "No-permission user " + url);
         foreach (var url in new[] { "/Lab/Catalogue", "/Lab/Settings", "/Lab/Reports", "/Lab/Book", "/Lab/Verify", $"/Print/LabReport/{id}" })
             Denied(await tech.GetAsync(url), "Technician " + url);
-        Denied(await VerifyAsync(tech, id, "PER"), "Technician verification");
+        var perItem = await ItemAsync(id, "PER");
+        Denied(await tech.PostFormAsync($"/Lab/Order/{id}", Array.Empty<KeyValuePair<string, string>>(), $"/Lab/Verify/{id}?handler=Verify&itemId={perItem.Id}"), "Technician verification");
         Denied(await tech.PostFormAsync($"/Lab/Order/{id}", new[] { P("Reason", "x") }, $"/Lab/Order/{id}?handler=CancelItem&itemId={(await ItemAsync(id, "PER")).Id}"), "Technician cancel");
         Denied(await booker.GetAsync($"/Lab/Entry/{id}"), "Booker result entry");
 
