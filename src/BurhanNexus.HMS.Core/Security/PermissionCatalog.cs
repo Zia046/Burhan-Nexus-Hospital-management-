@@ -123,7 +123,35 @@ public static class PermissionCatalog
                 new(Actions.Refund, "Refund", "Reserved for the billing phase"),
                 new(Actions.FinancialAccess, "Financial Access", "Reserved for the billing phase"),
             }),
-        Future("Laboratory", "Laboratory Management", "Laboratory tests and reports", "flask"),
+        new(Modules_.Laboratory, "Laboratory Management", "Test booking, samples, result entry, verification and laboratory reports", "flask", true, "/Lab",
+            new PermissionAction[]
+            {
+                new(LabActions.Dashboard, "View Laboratory Dashboard", "Laboratory work-list and counts"),
+                new(LabActions.RegisterPatient, "Register Laboratory Patient", "Register new patients from the laboratory"),
+                new(LabActions.Book, "Book Tests", "Create laboratory orders"),
+                new(LabActions.EditOrders, "Edit Test Orders", "Add tests, change referral and notes"),
+                new(LabActions.CancelOrders, "Cancel Test Orders", "Cancel booked tests with a reason"),
+                new(LabActions.ViewResults, "View Patient Results", "Patient-based results page and reports on screen"),
+                new(LabActions.ManageCatalogue, "Manage Test Catalogue", "Add / edit / deactivate tests, categories and sample types"),
+                new(LabActions.ManageParameters, "Manage Test Parameters", "Parameters, units and result types"),
+                new(LabActions.ManageRanges, "Manage Reference Ranges", "Normal / reference ranges (gender and age specific)"),
+                new(LabActions.CollectSamples, "Collect Samples", "Mark samples collected / received"),
+                new(LabActions.RejectSamples, "Reject Samples", "Reject a sample with a reason"),
+                new(LabActions.EnterResults, "Enter Test Results", "Enter results of pending tests"),
+                new(LabActions.EditResults, "Edit Unverified Results", "Change results that are waiting for verification or were sent back"),
+                new(LabActions.VerifyResults, "Verify Results", "Verify or reject single test results"),
+                new(LabActions.VerifyOwnResults, "Verify Own Results", "Verify results one entered oneself (only if the laboratory settings allow it)"),
+                new(LabActions.ApproveReports, "Approve Reports", "Verify all completed tests of a visit together"),
+                new(LabActions.PrintReports, "Print Reports", "Print / release verified reports"),
+                new(LabActions.ReprintReports, "Reprint Reports", "Print further copies and previous reports"),
+                new(LabActions.ExportPdf, "Export PDF", "Save reports as PDF"),
+                new(LabActions.ViewPrevious, "View Previous Results", "Patient's earlier laboratory reports"),
+                new(LabActions.DeleteResults, "Delete / Withdraw Results", "Withdraw a completed or verified result with a reason (revision kept)"),
+                new(LabActions.Reports, "Laboratory Reports", "Laboratory statistics and exports"),
+                new(LabActions.Settings, "Manage Laboratory Settings", "Laboratory branding, signatory and report settings"),
+                new(LabActions.ViewFinancial, "View Laboratory Financial Information", "Laboratory fees, payment status and collection"),
+                new(LabActions.ManageFees, "Manage Laboratory Fees", "Set test prices (fee history kept)"),
+            }),
         Future("XRay", "X-Ray Management", "X-Ray department", "scan"),
         Future("Ultrasound", "Ultrasound Management", "Ultrasound department", "wave"),
         Future("Pharmacy", "Pharmacy Management", "Medicine inventory and dispensing", "pill"),
@@ -241,6 +269,36 @@ public static class PermissionCatalog
         public const string Emergency = "Emergency";
         public const string Appointments = "Appointments";
         public const string Finance = "Finance";
+        public const string Laboratory = "Laboratory";
+    }
+
+    public static class LabActions
+    {
+        public const string Dashboard = "Dashboard";
+        public const string RegisterPatient = "RegisterPatient";
+        public const string Book = "Book";
+        public const string EditOrders = "EditOrders";
+        public const string CancelOrders = "CancelOrders";
+        public const string ViewResults = "ViewResults";
+        public const string ManageCatalogue = "ManageCatalogue";
+        public const string ManageParameters = "ManageParameters";
+        public const string ManageRanges = "ManageRanges";
+        public const string CollectSamples = "CollectSamples";
+        public const string RejectSamples = "RejectSamples";
+        public const string EnterResults = "EnterResults";
+        public const string EditResults = "EditResults";
+        public const string VerifyResults = "VerifyResults";
+        public const string VerifyOwnResults = "VerifyOwnResults";
+        public const string ApproveReports = "ApproveReports";
+        public const string PrintReports = "PrintReports";
+        public const string ReprintReports = "ReprintReports";
+        public const string ExportPdf = "ExportPdf";
+        public const string ViewPrevious = "ViewPrevious";
+        public const string DeleteResults = "DeleteResults";
+        public const string Reports = "Reports";
+        public const string Settings = "Settings";
+        public const string ViewFinancial = "ViewFinancial";
+        public const string ManageFees = "ManageFees";
     }
 
     public static class FinanceActions
@@ -420,6 +478,31 @@ public static class Perm
     public const string FinanceAdjustments = "Finance.Adjustments";
     public const string FinanceExport = "Finance.Export";
     public const string FinanceSettings = "Finance.Settings";
+    public const string LabDashboard = "Laboratory.Dashboard";
+    public const string LabRegisterPatient = "Laboratory.RegisterPatient";
+    public const string LabBook = "Laboratory.Book";
+    public const string LabEditOrders = "Laboratory.EditOrders";
+    public const string LabCancelOrders = "Laboratory.CancelOrders";
+    public const string LabViewResults = "Laboratory.ViewResults";
+    public const string LabManageCatalogue = "Laboratory.ManageCatalogue";
+    public const string LabManageParameters = "Laboratory.ManageParameters";
+    public const string LabManageRanges = "Laboratory.ManageRanges";
+    public const string LabCollectSamples = "Laboratory.CollectSamples";
+    public const string LabRejectSamples = "Laboratory.RejectSamples";
+    public const string LabEnterResults = "Laboratory.EnterResults";
+    public const string LabEditResults = "Laboratory.EditResults";
+    public const string LabVerifyResults = "Laboratory.VerifyResults";
+    public const string LabVerifyOwnResults = "Laboratory.VerifyOwnResults";
+    public const string LabApproveReports = "Laboratory.ApproveReports";
+    public const string LabPrintReports = "Laboratory.PrintReports";
+    public const string LabReprintReports = "Laboratory.ReprintReports";
+    public const string LabExportPdf = "Laboratory.ExportPdf";
+    public const string LabViewPrevious = "Laboratory.ViewPrevious";
+    public const string LabDeleteResults = "Laboratory.DeleteResults";
+    public const string LabReports = "Laboratory.Reports";
+    public const string LabSettings = "Laboratory.Settings";
+    public const string LabViewFinancial = "Laboratory.ViewFinancial";
+    public const string LabManageFees = "Laboratory.ManageFees";
 
     public const string AuditView = "AuditLog.View";
     public const string AuditExport = "AuditLog.Export";

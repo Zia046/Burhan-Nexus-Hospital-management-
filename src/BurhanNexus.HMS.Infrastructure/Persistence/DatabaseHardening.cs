@@ -57,10 +57,26 @@ public static class DatabaseHardening
         END;
         $$;
 
+        -- Phase 4: a verified / released laboratory result can only change after a withdrawal (which first stores a revision
+        -- and moves the test back to "In progress"). Direct edits of verified values are refused by the database.
+        CREATE OR REPLACE FUNCTION bnhms_lab_value_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+        DECLARE st text;
+        BEGIN
+            SELECT "Status" INTO st FROM "LabOrderItems" WHERE "Id" = NEW."OrderItemId";
+            IF st IN ('Verified','Released') AND (NEW."Value" IS DISTINCT FROM OLD."Value" OR NEW."NumericValue" IS DISTINCT FROM OLD."NumericValue"
+               OR NEW."RefLow" IS DISTINCT FROM OLD."RefLow" OR NEW."RefHigh" IS DISTINCT FROM OLD."RefHigh" OR NEW."RefText" IS DISTINCT FROM OLD."RefText"
+               OR NEW."Unit" IS DISTINCT FROM OLD."Unit" OR NEW."Name" IS DISTINCT FROM OLD."Name") THEN
+                RAISE EXCEPTION 'Verified laboratory result cannot be changed directly. Withdraw it with a reason first.';
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+
         DO $$
         DECLARE t text;
         BEGIN
-            FOREACH t IN ARRAY ARRAY['CashierLedger','DoctorLedger','DoctorSettlements','FinancialAdjustments','DailyCashClosings','ReceiptPrints','ServiceFees'] LOOP
+            FOREACH t IN ARRAY ARRAY['CashierLedger','DoctorLedger','DoctorSettlements','FinancialAdjustments','DailyCashClosings','ReceiptPrints','ServiceFees',
+                                       'LabItemEvents','LabResultRevisions','LabReportPrints'] LOOP
                 IF to_regclass(format('%I', t)) IS NOT NULL THEN
                     EXECUTE format('DROP TRIGGER IF EXISTS trg_%s_immutable ON %I', lower(t), t);
                     EXECUTE format('CREATE TRIGGER trg_%s_immutable BEFORE UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION bnhms_finance_immutable()', lower(t), t);
@@ -68,7 +84,7 @@ public static class DatabaseHardening
                     EXECUTE format('CREATE TRIGGER trg_%s_no_truncate BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION bnhms_finance_immutable()', lower(t), t);
                 END IF;
             END LOOP;
-            FOREACH t IN ARRAY ARRAY['Receipts','ReceiptLines','Charges','Refunds','CashDeposits'] LOOP
+            FOREACH t IN ARRAY ARRAY['Receipts','ReceiptLines','Charges','Refunds','CashDeposits','LabOrders','LabOrderItems','LabResultValues','LabSamples'] LOOP
                 IF to_regclass(format('%I', t)) IS NOT NULL THEN
                     EXECUTE format('DROP TRIGGER IF EXISTS trg_%s_no_delete ON %I', lower(t), t);
                     EXECUTE format('CREATE TRIGGER trg_%s_no_delete BEFORE DELETE ON %I FOR EACH ROW EXECUTE FUNCTION bnhms_finance_immutable()', lower(t), t);
@@ -79,6 +95,10 @@ public static class DatabaseHardening
             IF to_regclass('"Receipts"') IS NOT NULL THEN
                 DROP TRIGGER IF EXISTS trg_receipts_guard ON "Receipts";
                 CREATE TRIGGER trg_receipts_guard BEFORE UPDATE ON "Receipts" FOR EACH ROW EXECUTE FUNCTION bnhms_receipt_guard();
+            END IF;
+            IF to_regclass('"LabResultValues"') IS NOT NULL THEN
+                DROP TRIGGER IF EXISTS trg_labresultvalues_guard ON "LabResultValues";
+                CREATE TRIGGER trg_labresultvalues_guard BEFORE UPDATE ON "LabResultValues" FOR EACH ROW EXECUTE FUNCTION bnhms_lab_value_guard();
             END IF;
             IF to_regclass('"Charges"') IS NOT NULL THEN
                 DROP TRIGGER IF EXISTS trg_charges_guard ON "Charges";

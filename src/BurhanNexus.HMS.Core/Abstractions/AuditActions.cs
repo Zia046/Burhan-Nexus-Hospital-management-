@@ -96,4 +96,22 @@ public static class AuditActions
     public const string FinanceSettingsChanged = "Finance.SettingsChanged";
     public const string FinanceExported = "Finance.Exported";
     public const string FinanceAccessDenied = "Finance.AccessDenied";
+
+    // Phase 4 – laboratory
+    public const string LabTestSaved = "Lab.TestSaved";
+    public const string LabCatalogueSaved = "Lab.CatalogueSaved";
+    public const string LabOrderBooked = "Lab.OrderBooked";
+    public const string LabOrderEdited = "Lab.OrderEdited";
+    public const string LabDuplicateOrderBlocked = "Lab.DuplicateOrderBlocked";
+    public const string LabTestCancelled = "Lab.TestCancelled";
+    public const string LabSampleCollected = "Lab.SampleCollected";
+    public const string LabSampleRejected = "Lab.SampleRejected";
+    public const string LabResultSaved = "Lab.ResultSaved";
+    public const string LabResultVerified = "Lab.ResultVerified";
+    public const string LabResultRejected = "Lab.ResultRejected";
+    public const string LabResultWithdrawn = "Lab.ResultWithdrawn";
+    public const string LabReportPrinted = "Lab.ReportPrinted";
+    public const string LabReportReprinted = "Lab.ReportReprinted";
+    public const string LabSettingsChanged = "Lab.SettingsChanged";
+    public const string LabExported = "Lab.Exported";
 }
