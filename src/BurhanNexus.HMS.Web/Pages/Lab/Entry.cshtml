@@ -13,7 +13,7 @@
 <div class="lab-entry-head card">
     <div class="card-body lab-patient">
         <div class="patient-id-box sm"><small>Patient ID</small><strong>@p.PatientNumber</strong></div>
-        <div><h2>@p.FullName</h2><span class="muted">@age / @p.Gender · <span class="mono">@o.OrderNumber</span> · @Fmt.Day(o.BusinessDate)@(o.ReferredBy is { Length: > 0 } r ? " · Ref: " + r : "")</span>
+        <div><h2>@p.FullName</h2><span class="muted">@age / @p.Gender · <span class="mono">@o.OrderNumber</span> · @Fmt.Day(o.BusinessDate)@(o.ReferredBy is { Length: > 0 } refBy ? " · Ref: " + refBy : "")</span>
             @if (o.ClinicalNotes is not null) { <div class="small">Notes: @o.ClinicalNotes</div> }</div>
         <div class="actions"><a class="btn btn-light btn-sm" href="/Lab/Order/@o.Id">Visit</a> <a class="btn btn-light btn-sm" href="/Lab/Pending">Pending list</a></div>
     </div>

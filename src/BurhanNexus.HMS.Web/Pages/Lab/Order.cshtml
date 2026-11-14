@@ -34,7 +34,7 @@
         <div><h3>@p.FullName</h3><span class="muted">@p.GuardianName · @age · @p.Gender · @p.MobileNumber</span></div>
         <dl class="kv kv-tight">
             <dt>Booked</dt><dd>@Fmt.DateTimeText(o.BookedUtc) by @o.BookedByUsername</dd>
-            <dt>Referred by</dt><dd>@(o.ReferredBy is { Length: > 0 } r ? r + (o.ReferralType == LabReferralType.External ? " (external)" : "") : "—")</dd>
+            <dt>Referred by</dt><dd>@(o.ReferredBy is { Length: > 0 } refBy ? refBy + (o.ReferralType == LabReferralType.External ? " (external)" : "") : "—")</dd>
             @if (o.ClinicalNotes is not null) { <dt>Clinical notes</dt><dd>@o.ClinicalNotes</dd> }
         </dl>
         <div class="actions"><a bn-permission="@Perm.LabViewPrevious" href="/Lab/Patient/@p.Id">Previous results</a></div>
