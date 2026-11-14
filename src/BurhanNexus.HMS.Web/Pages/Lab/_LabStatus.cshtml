@@ -1,0 +1,12 @@
+@model LabOrderItemStatus
+@{
+    var cls = Model switch
+    {
+        LabOrderItemStatus.SamplePending => "status-warn",
+        LabOrderItemStatus.SampleCollected or LabOrderItemStatus.SampleReceived or LabOrderItemStatus.InProgress => "status-info",
+        LabOrderItemStatus.AwaitingVerification => "status-warn",
+        LabOrderItemStatus.Verified or LabOrderItemStatus.Released => "status-ok",
+        _ => "status-bad",
+    };
+}
+<span class="status @cls" data-status="@Model">@LabService.Label(Model)</span>

@@ -1,0 +1,65 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Lab.SettingsModel
+@{ ViewData["Title"] = "Laboratory settings"; var s = Model.Settings; }
+<partial name="_LabNav" />
+<partial name="_ValidationSummary" />
+<form method="post" class="card">
+    <input type="hidden" asp-for="RowVersion" />
+    <div class="card-header"><h2><svg class="icon"><use href="#i-settings" /></svg> Report &amp; branding</h2><small class="muted">Empty fields use the hospital profile.</small></div>
+    <div class="card-body form-grid">
+        <div class="field span-2"><label for="Input_LaboratoryName">Laboratory name</label><input asp-for="Input.LaboratoryName" maxlength="150" placeholder="e.g. Clinical Laboratory" /></div>
+        <div class="field"><label for="Input_HospitalName">Hospital name on report</label><input asp-for="Input.HospitalName" maxlength="200" /></div>
+        <div class="field span-2"><label for="Input_Address">Address</label><input asp-for="Input.Address" maxlength="300" /></div>
+        <div class="field"><label for="Input_ContactNumber">Contact numbers</label><input asp-for="Input.ContactNumber" maxlength="100" /></div>
+        <div class="field"><label for="Input_Email">Email</label><input asp-for="Input.Email" maxlength="150" /></div>
+        <div class="field span-2"><label for="Input_ReportHeader">Header line</label><input asp-for="Input.ReportHeader" maxlength="300" placeholder="e.g. ISO certified · 24/7 service" /></div>
+        <div class="field span-3"><label for="Input_ReportFooter">Footer</label><textarea asp-for="Input.ReportFooter" rows="2" maxlength="500"></textarea></div>
+        <div class="field"><label for="Input_Layout">Layout</label><select asp-for="Input.Layout"><option value="Standard">Standard (one test per section)</option><option value="Compact">Compact</option></select></div>
+        <div class="field"><label for="Input_SignatoryName">Signatory name</label><input asp-for="Input.SignatoryName" maxlength="150" placeholder="e.g. Dr. A. Pathologist" /></div>
+        <div class="field"><label for="Input_SignatoryDesignation">Designation</label><input asp-for="Input.SignatoryDesignation" maxlength="150" placeholder="Consultant Pathologist" /></div>
+    </div>
+    <div class="card-body">
+        <label class="check"><input type="checkbox" asp-for="Input.ShowVerifiedBy" /> Show “verified by” on reports</label>
+        <label class="check"><input type="checkbox" asp-for="Input.AllowSelfVerification" /> Allow a person to verify results they entered (only users with “Verify Own Results”)</label>
+        <label class="check"><input type="checkbox" asp-for="Input.RequirePaymentBeforeRelease" /> Release (print) reports only for fully paid tests</label>
+    </div>
+    <div class="card-footer form-actions"><button class="btn btn-primary" type="submit" data-test="save-lab-settings">Save settings</button></div>
+</form>
+<div class="grid-2">
+    @foreach (var (kind, title, has) in new[] { ("logo", "Report logo", s.Logo is not null), ("signature", "Signature image", s.Signature is not null) })
+    {
+        <form method="post" asp-page-handler="Image" enctype="multipart/form-data" class="card">
+            <input type="hidden" name="kind" value="@kind" />
+            <div class="card-header"><h3>@title</h3></div>
+            <div class="card-body">
+                @if (has) { <img class="lab-image-preview" src="/Lab/Image/@kind?v=@s.UpdatedUtc.Ticks" alt="@title" /> } else { <p class="muted">@(kind == "logo" ? "Not set – the hospital logo is used." : "Not set.")</p> }
+                <input type="file" name="file" accept="image/png,image/jpeg" /> <small class="muted">PNG or JPEG, max 1 MB.</small>
+            </div>
+            <div class="card-footer form-actions"><button class="btn btn-primary btn-sm" type="submit">Upload</button>
+                @if (has) { <button class="btn btn-light btn-sm" type="submit" name="remove" value="true">Remove</button> }</div>
+        </form>
+    }
+</div>
+<div class="card" id="inventory">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-database" /></svg> Inventory items <small class="muted">foundation – stock movements come in a later phase</small></h2></div>
+    <div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>Code</th><th>Name</th><th>Kind</th><th>Unit</th><th>Supplier</th><th>Reorder level</th><th>Expiry</th><th>Active</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var i in Model.Inventory.Append(new BurhanNexus.HMS.Core.Domain.LabInventoryItem { Kind = LabInventoryKind.Reagent }))
+        {
+            var isNew = i.Id == 0;
+            <tr><td colspan="9"><form method="post" asp-page-handler="Inventory" asp-route-id="@(isNew ? null : i.Id)" class="inline-form">
+                <input name="Item.Code" value="@i.Code" maxlength="30" class="w-sm" placeholder="Code" required />
+                <input name="Item.Name" value="@i.Name" maxlength="150" placeholder="@(isNew ? "New item name" : "")" required />
+                <select name="Item.Kind">@foreach (var k in Enum.GetValues<LabInventoryKind>()) { <option value="@k" selected="@(k == i.Kind)">@k</option> }</select>
+                <input name="Item.Unit" value="@i.Unit" maxlength="30" class="w-xs" placeholder="Unit" />
+                <input name="Item.Supplier" value="@i.Supplier" maxlength="150" class="w-sm" placeholder="Supplier" />
+                <input name="Item.ReorderLevel" value="@i.ReorderLevel" inputmode="decimal" class="w-xs" placeholder="Reorder" />
+                <label class="check"><input type="checkbox" name="Item.TracksExpiry" value="true" checked="@i.TracksExpiry" /> Expiry</label>
+                <label class="check"><input type="checkbox" name="Item.IsActive" value="true" checked="@(isNew || i.IsActive)" /> Active</label><input type="hidden" name="Item.IsActive" value="false" />
+                <button class="btn @(isNew ? "btn-primary" : "btn-light") btn-sm" type="submit">@(isNew ? "Add" : "Save")</button>
+            </form></td></tr>
+        }
+        </tbody>
+    </table></div>
+</div>

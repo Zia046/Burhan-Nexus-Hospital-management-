@@ -1,0 +1,29 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Lab.Verify.IndexModel
+@{ ViewData["Title"] = "Verification queue"; }
+<partial name="_LabNav" />
+<div class="toolbar">
+    <form method="get" class="filters"><div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Visit no., Patient ID, name or phone" maxlength="100" /></div><button class="btn btn-light" type="submit">Search</button></form>
+</div>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-check-circle" /></svg> Awaiting verification</h2>
+        <span class="pill pill-blue" data-verify-count>@Model.Orders.Sum(o => o.AwaitingVerification) result(s) · @Model.Orders.Count patient visit(s)</span></div>
+    <div class="table-wrap">
+        <table class="table" data-verify-queue>
+            <thead><tr><th>Visit</th><th>Patient</th><th>Results to verify</th><th>Entered by</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var o in Model.Orders)
+            {
+                <tr class="@(o.IsUrgent ? "row-urgent" : "")" data-order="@o.OrderNumber">
+                    <td class="mono nowrap">@o.OrderNumber @if (o.IsUrgent) { <span class="status status-bad">Urgent</span> }<small class="muted block">@Fmt.DateTimeText(o.BookedUtc)</small></td>
+                    <td><strong>@o.PatientName</strong><small class="muted block">@o.PatientNumber · @o.AgeGender</small></td>
+                    <td>@foreach (var i in o.Items.Where(i => i.Status == LabOrderItemStatus.AwaitingVerification)) { <span class="chip" data-verify-test="@i.TestCode">@i.TestCode</span> }</td>
+                    <td class="small">@string.Join(", ", o.Items.Where(i => i.Status == LabOrderItemStatus.AwaitingVerification).Select(i => i.EnteredBy).Distinct())</td>
+                    <td class="actions"><a class="btn btn-primary btn-sm" href="/Lab/Verify/@o.Id">Review &amp; verify</a></td>
+                </tr>
+            }
+            @if (Model.Orders.Count == 0) { <tr><td colspan="5" class="empty">Nothing is waiting for verification.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

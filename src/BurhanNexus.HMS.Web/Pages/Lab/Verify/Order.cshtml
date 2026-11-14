@@ -1,0 +1,72 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Lab.Verify.OrderModel
+@{
+    var o = Model.Order;
+    var p = o.Patient!;
+    ViewData["Title"] = $"Verify – {p.FullName}";
+    var age = AgeCalculator.Of(p, o.BusinessDate)?.Short ?? "—";
+    var waiting = o.Items.Where(i => i.Status == LabOrderItemStatus.AwaitingVerification).ToList();
+}
+<partial name="_LabNav" />
+<div class="card">
+    <div class="card-body lab-patient">
+        <div class="patient-id-box sm"><small>Patient ID</small><strong>@p.PatientNumber</strong></div>
+        <div><h2>@p.FullName</h2><span class="muted">@age / @p.Gender · <span class="mono">@o.OrderNumber</span> · @Fmt.Day(o.BusinessDate)@(o.ReferredBy is { Length: > 0 } r ? " · Ref: " + r : "")</span>
+            @if (o.ClinicalNotes is not null) { <div class="small">Notes: @o.ClinicalNotes</div> }</div>
+        <div class="actions"><a class="btn btn-light btn-sm" href="/Lab/Order/@o.Id">Visit</a> <a class="btn btn-light btn-sm" href="/Lab/Patient/@p.Id" bn-permission="@Perm.LabViewPrevious">Previous results</a></div>
+    </div>
+</div>
+<partial name="_ValidationSummary" />
+@if (waiting.Count > 0 && Model.CanBulk)
+{
+    <form method="post" asp-page-handler="VerifyAll" class="card verify-bulk">
+        <div class="card-body form-actions">
+            <span><strong>@waiting.Count</strong> result(s) of this visit are ready. Review them below, then approve all at once.</span>
+            <button class="btn btn-primary" type="submit" data-test="verify-all"><svg class="icon"><use href="#i-check-circle" /></svg> Verify all completed results</button>
+        </div>
+    </form>
+}
+@foreach (var i in o.Items.Where(i => i.Status != LabOrderItemStatus.Cancelled))
+{
+    <section class="card verify-item" data-verify-item="@i.TestCode" data-status="@i.Status">
+        <div class="card-header">
+            <h3>@i.TestName <small class="muted">@i.TestCode · @i.SampleTypeName</small></h3>
+            <partial name="_LabStatus" model="i.Status" />
+        </div>
+        @if (i.Status is LabOrderItemStatus.AwaitingVerification or LabOrderItemStatus.Verified or LabOrderItemStatus.Released)
+        {
+            <div class="table-wrap"><table class="table table-compact lab-result">
+                <thead><tr><th>Parameter</th><th>Result</th><th>Unit</th><th>Reference range</th></tr></thead>
+                <tbody>@foreach (var v in i.Values.Where(v => v.Value is not null))
+                {
+                    <tr class="@(v.Flag != LabFlag.None ? "abn" : "")"><td>@v.Name</td><td><strong>@v.Value</strong> @if (v.Flag != LabFlag.None) { <span class="flag">@v.Flag</span> }</td><td>@v.Unit</td><td class="muted">@v.ReferenceDisplay</td></tr>
+                }</tbody>
+            </table></div>
+            <div class="card-body small">
+                @if (i.Comment is not null) { <div>Comment: @i.Comment</div> }
+                <span class="muted">Entered by @i.ResultEnteredByUsername · @Fmt.DateTimeText(i.ResultEnteredUtc)@(i.VerifiedByName is null ? "" : $" · Verified by {i.VerifiedByName} · {Fmt.DateTimeText(i.VerifiedUtc)}")</span>
+            </div>
+        }
+        else
+        {
+            <div class="card-body muted">@LabService.Label(i.Status) – no result to verify yet.</div>
+        }
+        @if (i.Status == LabOrderItemStatus.AwaitingVerification && Model.CanSingle)
+        {
+            <div class="card-footer form-actions">
+                @if (Model.IsOwn(i))
+                {
+                    <span class="muted">You entered this result – another person must verify it.</span>
+                }
+                else
+                {
+                    <form method="post" asp-page-handler="Verify" asp-route-itemId="@i.Id" class="inline"><button class="btn btn-primary btn-sm" type="submit" data-test="verify-@i.TestCode">Verify</button></form>
+                }
+                <form method="post" asp-page-handler="Reject" asp-route-itemId="@i.Id" class="inline-form">
+                    <input name="Reason" maxlength="300" placeholder="Reason for correction" required />
+                    <button class="btn btn-danger btn-sm" type="submit" data-test="reject-@i.TestCode">Send back</button>
+                </form>
+            </div>
+        }
+    </section>
+}

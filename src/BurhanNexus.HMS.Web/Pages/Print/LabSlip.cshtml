@@ -1,0 +1,66 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Print.LabSlipModel
+@{
+    Layout = null;
+    var o = Model.Order;
+    var p = o.Patient!;
+    var h = Model.Hospital;
+    var age = AgeCalculator.Of(p, o.BusinessDate)?.Short ?? "—";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Lab slip @o.OrderNumber</title>
+    <link rel="stylesheet" href="~/css/thermal.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/lab-report.css" asp-append-version="true" />
+    <script src="~/js/lab-report.js" asp-append-version="true" defer></script>
+</head>
+<body class="thermal-body w@(Model.Width)" data-lab-slip data-width="@Model.Width">
+<div class="t-toolbar no-print">
+    <div class="t-row">
+        <strong>Lab slip @o.OrderNumber</strong>
+        <a class="t-btn light" href="/Lab/Order/@o.Id">&larr; Visit</a>
+        <a class="t-btn light @(Model.Width == 58 ? "on" : "")" href="?width=58">58 mm</a>
+        <a class="t-btn light @(Model.Width == 80 ? "on" : "")" href="?width=80">80 mm</a>
+        <button type="button" class="t-btn" data-print-now>Print slip</button>
+    </div>
+</div>
+<main class="slip-wrap">
+    <article class="t-slip" data-lab-slip-order="@o.OrderNumber">
+        <div class="t-hosp">@h.HospitalName</div>
+        <div class="t-small">Laboratory</div>
+        <div class="t-sep"></div>
+        <div class="t-title">LAB ORDER@(o.IsUrgent ? " – URGENT" : "")</div>
+        <table class="t-kv">
+            <tr><td>Lab no.</td><td>@o.OrderNumber</td></tr>
+            <tr><td>Date</td><td>@Fmt.DateTimeText(o.BookedUtc)</td></tr>
+            <tr><td>Patient</td><td>@p.FullName</td></tr>
+            <tr><td>Patient ID</td><td>@p.PatientNumber</td></tr>
+            <tr><td>Age / Gender</td><td>@age / @p.Gender</td></tr>
+            @if (o.ReferredBy is { Length: > 0 } rb) { <tr><td>Referred by</td><td>@rb</td></tr> }
+        </table>
+        <div class="t-sep"></div>
+        <table class="t-lines">
+            @foreach (var i in o.Items.Where(i => i.Status != LabOrderItemStatus.Cancelled))
+            {
+                <tr><td>@i.TestName</td><td class="r">@i.SampleTypeName</td></tr>
+            }
+        </table>
+        <div class="t-sep"></div>
+        @foreach (var s in o.Samples.Where(s => s.Status != LabSampleStatus.Rejected))
+        {
+            <div class="t-small">Sample @s.SampleNumber – @s.SampleTypeName</div>
+        }
+        @if (Model.ShowFees && Model.Payment.Net > 0)
+        {
+            <div class="t-sep"></div>
+            <table class="t-kv"><tr><td>Total</td><td>@Fmt.Money(Model.Payment.Net)</td></tr><tr><td>Paid</td><td>@Fmt.Money(Model.Payment.Paid)</td></tr>
+                @if (Model.Payment.Balance > 0) { <tr><td><strong>Balance</strong></td><td><strong>@Fmt.Money(Model.Payment.Balance)</strong></td></tr> }</table>
+        }
+        <div class="t-sep"></div>
+        <div class="t-tiny">Please bring this slip to collect your report.</div>
+    </article>
+</main>
+</body>
+</html>

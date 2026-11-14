@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BurhanNexus.HMS.Web.Pages.Patients;
 
-[HasPermission(Perm.PatientsAdd)]
+[HasPermission(Perm.PatientsAdd, Perm.LabRegisterPatient)]
 public class RegisterModel : HmsPageModel
 {
     private readonly IPatientService _patients;
@@ -44,6 +44,7 @@ public class RegisterModel : HmsPageModel
 
         var p = result.Patient!;
         FlashSuccess = $"Patient registered. Patient ID: {p.PatientNumber}";
+        if (Next == "lab" && await CanAsync(Perm.LabBook)) return Redirect($"/Lab/Book?patientId={p.Id}");
         if (Next == "appointment" && await CanAsync(Perm.AppointmentsAdd)) return Redirect($"/Appointments/Book?patientId={p.Id}");
         if (Next == "opd" && await CanAsync(Perm.OpdAdd)) return Redirect($"/Opd/Register?patientId={p.Id}");
         if (Next == "emergency" && await CanAsync(Perm.EmergencyAdd)) return Redirect($"/Emergency/Register?patientId={p.Id}");

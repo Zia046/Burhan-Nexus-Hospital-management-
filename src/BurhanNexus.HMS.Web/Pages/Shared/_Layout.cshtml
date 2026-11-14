@@ -82,6 +82,47 @@
             }
         }
 
+        @if (Any(Perm.LabDashboard, Perm.LabBook, Perm.LabCollectSamples, Perm.LabEnterResults, Perm.LabVerifyResults, Perm.LabApproveReports, Perm.LabViewResults, Perm.LabReports, Perm.LabManageCatalogue, Perm.LabSettings))
+        {
+            <div class="nav-section">Laboratory</div>
+            @if (perms.Contains(Perm.LabDashboard))
+            {
+                <a class="nav-link @Active("lab-dashboard")" href="/Lab" data-nav="lab-dashboard"><svg class="icon"><use href="#i-flask" /></svg><span>Lab Dashboard</span></a>
+            }
+            @if (perms.Contains(Perm.LabBook))
+            {
+                <a class="nav-link @Active("lab-book")" href="/Lab/Book" data-nav="lab-book"><svg class="icon"><use href="#i-plus" /></svg><span>New Lab Visit</span></a>
+            }
+            @if (perms.Contains(Perm.LabCollectSamples))
+            {
+                <a class="nav-link @Active("lab-samples")" href="/Lab/Samples" data-nav="lab-samples"><svg class="icon"><use href="#i-scan" /></svg><span>Sample Collection</span></a>
+            }
+            @if (perms.Contains(Perm.LabEnterResults))
+            {
+                <a class="nav-link @Active("lab-pending")" href="/Lab/Pending" data-nav="lab-pending"><svg class="icon"><use href="#i-edit" /></svg><span>Pending Tests</span></a>
+            }
+            @if (Any(Perm.LabVerifyResults, Perm.LabApproveReports))
+            {
+                <a class="nav-link @Active("lab-verify")" href="/Lab/Verify" data-nav="lab-verify"><svg class="icon"><use href="#i-check-circle" /></svg><span>Verification</span></a>
+            }
+            @if (perms.Contains(Perm.LabViewResults))
+            {
+                <a class="nav-link @Active("lab-results")" href="/Lab/Results" data-nav="lab-results"><svg class="icon"><use href="#i-file" /></svg><span>Lab Results</span></a>
+            }
+            @if (perms.Contains(Perm.LabReports))
+            {
+                <a class="nav-link @Active("lab-reports")" href="/Lab/Reports" data-nav="lab-reports"><svg class="icon"><use href="#i-chart" /></svg><span>Lab Reports</span></a>
+            }
+            @if (perms.Contains(Perm.LabManageCatalogue))
+            {
+                <a class="nav-link @Active("lab-catalogue")" href="/Lab/Catalogue" data-nav="lab-catalogue"><svg class="icon"><use href="#i-sliders" /></svg><span>Test Catalogue</span></a>
+            }
+            @if (perms.Contains(Perm.LabSettings))
+            {
+                <a class="nav-link @Active("lab-settings")" href="/Lab/Settings" data-nav="lab-settings"><svg class="icon"><use href="#i-settings" /></svg><span>Lab Settings</span></a>
+            }
+        }
+
         @if (Any(Perm.FinanceViewOwnAccount, Perm.FinanceCollect, Perm.FinanceViewOwnReceipts, Perm.FinanceDashboard, Perm.FinanceConfirmDeposits, Perm.FinanceManageDoctorAccounts, Perm.FinanceCounterReports, Perm.FinanceManageServiceFees))
         {
             <div class="nav-section">Finance</div>

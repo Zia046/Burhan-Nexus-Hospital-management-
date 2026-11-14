@@ -1,0 +1,117 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Print.LabReportModel
+@{
+    Layout = null;
+    var o = Model.Order;
+    var p = o.Patient!;
+    var h = Model.Hospital;
+    var s = Model.Lab;
+    var age = AgeCalculator.Of(p, o.BusinessDate)?.ToString() ?? "—";
+    var released = Model.Selected.Count > 0 && Model.Selected.All(i => i.Status == LabOrderItemStatus.Released);
+    var hasLogo = s.Logo is not null || h.HasLogo;
+    var logo = s.Logo is not null ? $"/Lab/Image/logo?v={s.UpdatedUtc.Ticks}" : $"/branding/logo?v={h.LogoVersion}";
+    var groups = Model.Selected.GroupBy(i => i.CategoryName ?? "Laboratory").ToList();
+    var lastVerified = Model.Selected.Where(i => i.VerifiedUtc != null).OrderByDescending(i => i.VerifiedUtc).FirstOrDefault();
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Lab report @o.OrderNumber – @p.FullName</title>
+    <link rel="stylesheet" href="~/css/lab-report.css" asp-append-version="true" />
+    <script src="~/js/lab-report.js" asp-append-version="true" defer></script>
+</head>
+<body class="lab-report-body layout-@s.Layout.ToString().ToLowerInvariant()" data-lab-report data-autoprint="@(Model.Print && released ? "1" : null)">
+<div class="lr-toolbar no-print">
+    <div class="lr-row">
+        <strong>Laboratory report @o.OrderNumber</strong>
+        <a class="lr-btn light" href="/Lab/Order/@o.Id">&larr; Visit</a>
+        <a class="lr-btn light" href="/Lab/Results">Results</a>
+    </div>
+    @if (Model.FlashError is string err) { <div class="lr-msg err">@err</div> }
+    @if (Model.Final.Count == 0)
+    {
+        <div class="lr-msg err" data-no-final>No verified results yet – a final report cannot be printed.</div>
+    }
+    else
+    {
+        <form method="post" asp-page-handler="Record" class="lr-row" data-report-form>
+            <span>Tests:</span>
+            @foreach (var i in Model.Final)
+            {
+                <label class="lr-check"><input type="checkbox" name="ItemIds" value="@i.Id" checked="@Model.Selected.Contains(i)" data-report-item /> @i.TestName@(i.Status == LabOrderItemStatus.Released ? " ✓" : "")</label>
+            }
+            <button type="button" class="lr-btn light" data-report-preview>Preview selection</button>
+            @if (Model.Blocked is not null) { <span class="lr-msg err">@Model.Blocked</span> }
+            else if (Model.CanPrintNow)
+            {
+                <button type="submit" class="lr-btn" data-test="lab-report-print">@(Model.IsReprint ? $"Reprint (copy {Model.Prints.Count + 1})" : "Print final report")</button>
+            }
+            else { <span class="lr-msg err">@(Model.IsReprint ? "Already printed – you need “Reprint Laboratory Reports”." : "You need “Print Laboratory Reports”.")</span> }
+        </form>
+        <div class="lr-status">@(Model.Prints.Count == 0 ? "Not printed yet." : $"Printed {Model.Prints.Count} time(s), last {Fmt.DateTimeText(Model.Prints[^1].PrintedUtc)} by {Model.Prints[^1].PrintedByUsername}.") For a PDF choose “Save as PDF” in the print dialog.</div>
+    }
+</div>
+@if (Model.Selected.Count > 0)
+{
+<main class="lr-page @(released ? "" : "preview")" data-report="@o.OrderNumber">
+    @if (!released) { <div class="lr-watermark" aria-hidden="true">PREVIEW</div> }
+    <header class="lr-head">
+        @if (hasLogo) { <img class="lr-logo" src="@logo" alt="" /> }
+        <div class="lr-brand">
+            <div class="lr-hosp">@(s.HospitalName ?? h.HospitalName)</div>
+            <div class="lr-lab">@(s.LaboratoryName ?? "Clinical Laboratory")</div>
+            <div class="lr-small">@(s.Address ?? $"{h.Address}, {h.City}")</div>
+            <div class="lr-small">@(s.ContactNumber ?? h.ContactNumber)@((s.Email ?? h.Email) is { Length: > 0 } em ? " · " + em : "")</div>
+            @if ((s.ReportHeader ?? h.ReportHeader) is { Length: > 0 } hd) { <div class="lr-small">@hd</div> }
+        </div>
+    </header>
+    <h1 class="lr-title">LABORATORY REPORT</h1>
+    <table class="lr-info">
+        <tr><th>Patient</th><td data-field="patient"><strong>@p.FullName</strong></td><th>Patient ID</th><td class="mono" data-field="patient-id">@p.PatientNumber</td></tr>
+        <tr><th>Age / Gender</th><td>@age / @p.Gender</td><th>Lab no.</th><td class="mono" data-field="order">@o.OrderNumber</td></tr>
+        <tr><th>Referred by</th><td>@(o.ReferredBy is { Length: > 0 } rb ? rb : "Self")</td><th>Booked</th><td>@Fmt.DateTimeText(o.BookedUtc)</td></tr>
+        <tr><th>Sample(s)</th><td>@string.Join(", ", Model.Selected.Select(i => i.Sample).Where(x => x != null).DistinctBy(x => x!.Id).Select(x => $"{x!.SampleTypeName} {x.SampleNumber}"))</td>
+            <th>Collected</th><td>@Fmt.DateTimeText(Model.Selected.Select(i => i.Sample?.CollectedUtc).Where(x => x != null).Min())</td></tr>
+        <tr><th>Reported</th><td>@Fmt.DateTimeText(lastVerified?.VerifiedUtc)</td><th>Printed</th><td>@Fmt.DateTimeText(DateTime.UtcNow)@(Model.Prints.Count > 1 ? $" (copy {Model.Prints.Count})" : "")</td></tr>
+    </table>
+    @foreach (var g in groups)
+    {
+        <section class="lr-section">
+            <h2 class="lr-cat">@g.Key</h2>
+            @foreach (var i in g)
+            {
+                <div class="lr-test" data-report-test="@i.TestCode">
+                    <h3>@i.TestName @if (i.Method is not null) { <small>(@i.Method)</small> }</h3>
+                    <table class="lr-results">
+                        <thead><tr><th>Test</th><th>Result</th><th>Flag</th><th>Unit</th><th>Reference range</th></tr></thead>
+                        <tbody>
+                        @foreach (var v in i.Values.Where(v => v.Value != null).OrderBy(v => v.SortOrder))
+                        {
+                            <tr class="@(v.Flag != LabFlag.None ? "abn" : "")"><td>@v.Name</td><td class="val">@v.Value</td>
+                                <td class="flag">@(v.Flag switch { LabFlag.High => "H", LabFlag.Low => "L", LabFlag.CriticalHigh => "HH", LabFlag.CriticalLow => "LL", LabFlag.Abnormal => "*", _ => "" })</td>
+                                <td>@v.Unit</td><td>@v.ReferenceDisplay</td></tr>
+                        }
+                        </tbody>
+                    </table>
+                    @if (i.Comment is not null) { <p class="lr-comment"><strong>Comment:</strong> @i.Comment</p> }
+                    @if (s.ShowVerifiedBy && i.VerifiedByName is not null) { <p class="lr-verified">Verified by @i.VerifiedByName · @Fmt.DateTimeText(i.VerifiedUtc)</p> }
+                </div>
+            }
+        </section>
+    }
+    @if (Model.NotReady.Count > 0) { <p class="lr-pending">Pending (reported separately): @string.Join(", ", Model.NotReady.Select(i => i.TestName))</p> }
+    <p class="lr-legend">H = high · L = low · HH / LL = critical · * = abnormal</p>
+    <footer class="lr-foot">
+        <div class="lr-sign">
+            @if (s.Signature is not null) { <img src="/Lab/Image/signature?v=@s.UpdatedUtc.Ticks" alt="" /> }
+            <div class="lr-sign-line">@(s.SignatoryName ?? lastVerified?.VerifiedByName)</div>
+            <div class="lr-small">@(s.SignatoryDesignation ?? "Authorised signatory")</div>
+        </div>
+        <div class="lr-footer-text">@(s.ReportFooter ?? h.ReportFooter)</div>
+        <div class="lr-end">*** End of report ***</div>
+    </footer>
+</main>
+}
+</body>
+</html>

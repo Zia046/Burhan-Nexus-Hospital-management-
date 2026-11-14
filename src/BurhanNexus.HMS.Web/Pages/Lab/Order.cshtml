@@ -1,0 +1,183 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Lab.OrderModel
+@{
+    var o = Model.Order;
+    var p = o.Patient!;
+    ViewData["Title"] = $"Laboratory visit {o.OrderNumber}";
+    var active = o.Items.Where(i => i.Status != LabOrderItemStatus.Cancelled).ToList();
+    var printable = active.Where(i => i.Status is LabOrderItemStatus.Verified or LabOrderItemStatus.Released).ToList();
+    var canPrint = await PermCtx.HasAsync(Model.Prints.Count == 0 ? Perm.LabPrintReports : Perm.LabReprintReports);
+    var age = AgeCalculator.Of(p, o.BusinessDate)?.ToString() ?? "—";
+}
+<partial name="_LabNav" />
+<div class="toolbar">
+    <div><a class="btn btn-light" href="/Lab/Results">&larr; Results</a></div>
+    <div class="toolbar-actions">
+        @if (active.Any(i => LabService.OpenStatuses.Contains(i.Status) && i.Status != LabOrderItemStatus.SamplePending || i.Status == LabOrderItemStatus.AwaitingVerification))
+        {
+            <a bn-permission="@Perm.LabEnterResults" class="btn btn-primary" href="/Lab/Entry/@o.Id" data-test="lab-enter">Enter results</a>
+        }
+        @if (active.Any(i => i.Status == LabOrderItemStatus.AwaitingVerification)) { <a bn-permission="@Perm.LabVerifyResults" class="btn btn-light" href="/Lab/Verify/@o.Id">Verify</a> }
+        @if (printable.Count > 0 && canPrint) { <a class="btn btn-success" href="/Print/LabReport/@o.Id" data-test="lab-print"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Report</a> }
+        @if (Model.ShowFees && Model.Payment.Balance > 0) { <a bn-permission="@Perm.FinanceCollect" class="btn btn-light" href="/Finance/Collect?patientId=@p.Id&labOrderId=@o.Id" data-test="lab-collect"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Collect payment</a> }
+        <a bn-permission="@Perm.LabBook" class="btn btn-light" href="/Print/LabSlip/@o.Id" target="_blank">Order slip</a>
+    </div>
+</div>
+<partial name="_ValidationSummary" />
+<div class="card">
+    <div class="card-header">
+        <h2><svg class="icon"><use href="#i-flask" /></svg> <span class="mono">@o.OrderNumber</span> @if (o.IsUrgent) { <span class="status status-bad">Urgent</span> }</h2>
+        @if (Model.ShowFees) { <span class="pill pill-blue" data-payment="@Model.Payment.State">@Model.Payment.State · paid @Fmt.Money(Model.Payment.Paid) of @Fmt.Money(Model.Payment.Net)</span> }
+    </div>
+    <div class="card-body lab-patient">
+        <div class="patient-id-box sm"><small>Patient ID</small><strong>@p.PatientNumber</strong></div>
+        <div><h3>@p.FullName</h3><span class="muted">@p.GuardianName · @age · @p.Gender · @p.MobileNumber</span></div>
+        <dl class="kv kv-tight">
+            <dt>Booked</dt><dd>@Fmt.DateTimeText(o.BookedUtc) by @o.BookedByUsername</dd>
+            <dt>Referred by</dt><dd>@(o.ReferredBy is { Length: > 0 } r ? r + (o.ReferralType == LabReferralType.External ? " (external)" : "") : "—")</dd>
+            @if (o.ClinicalNotes is not null) { <dt>Clinical notes</dt><dd>@o.ClinicalNotes</dd> }
+        </dl>
+        <div class="actions"><a bn-permission="@Perm.LabViewPrevious" href="/Lab/Patient/@p.Id">Previous results</a></div>
+    </div>
+    <div class="table-wrap">
+        <table class="table" data-lab-items>
+            <thead><tr><th>Test</th><th>Sample</th><th>Status</th>@if (Model.ShowFees) { <th>Payment</th> }<th>Result</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var i in o.Items)
+            {
+                Model.Payments.TryGetValue(i.Id, out var pay);
+                <tr class="@(i.Status == LabOrderItemStatus.Cancelled ? "row-muted" : "")" data-item="@i.TestCode">
+                    <td><strong>@i.TestName</strong> <small class="muted block">@i.TestCode · @i.CategoryName · v@(i.DefinitionVersion)@(i.RevisionNo > 0 ? $" · revision {i.RevisionNo}" : "")</small>
+                        @if (i.CorrectionReason is not null && LabService.OpenStatuses.Contains(i.Status)) { <small class="text-danger block">↩ @i.CorrectionReason</small> }
+                        @if (i.CancelReason is not null) { <small class="block">Cancelled: @i.CancelReason</small> }</td>
+                    <td class="nowrap">@i.SampleTypeName <small class="muted block mono">@i.Sample?.SampleNumber</small></td>
+                    <td><partial name="_LabStatus" model="i.Status" />@if (i.VerifiedByName is not null) { <small class="muted block">by @i.VerifiedByName</small> }</td>
+                    @if (Model.ShowFees) { <td class="nowrap">@(pay is null ? "—" : $"{pay.State}") @if (pay is { Net: > 0 }) { <small class="muted block">@Fmt.Money(pay.Paid) / @Fmt.Money(pay.Net)</small> }</td> }
+                    <td class="lab-mini-result">
+                        @if (i.Status is LabOrderItemStatus.AwaitingVerification or LabOrderItemStatus.Verified or LabOrderItemStatus.Released)
+                        {
+                            foreach (var v in i.Values.Where(v => v.Value is not null).Take(4)) { <span class="@(v.Flag == LabFlag.None ? "" : "flag")">@v.Name: <strong>@v.Value</strong> @v.Unit</span> }
+                            if (i.Values.Count(v => v.Value is not null) > 4) { <span class="muted">…</span> }
+                        }
+                    </td>
+                    <td class="actions nowrap">
+                        @if (i.Status is not LabOrderItemStatus.Cancelled and not LabOrderItemStatus.Verified and not LabOrderItemStatus.Released)
+                        {
+                            <details bn-permission="@Perm.LabCancelOrders" class="inline-details"><summary class="btn btn-light btn-sm">Cancel</summary>
+                                <form method="post" asp-page-handler="CancelItem" asp-route-itemId="@i.Id" class="inline-form" novalidate>
+                                    <input name="Reason" maxlength="300" placeholder="Reason (required)" required aria-label="Reason" />
+                                    <button class="btn btn-danger btn-sm" type="submit" data-test="cancel-@i.TestCode">Cancel test</button></form></details>
+                        }
+                        @if (i.Status is LabOrderItemStatus.AwaitingVerification or LabOrderItemStatus.Verified or LabOrderItemStatus.Released)
+                        {
+                            <details bn-permission="@Perm.LabDeleteResults" class="inline-details"><summary class="btn btn-light btn-sm">Withdraw result</summary>
+                                <form method="post" asp-page-handler="Withdraw" asp-route-itemId="@i.Id" class="inline-form" novalidate>
+                                    <input name="Reason" maxlength="300" placeholder="Reason (required)" required aria-label="Reason" />
+                                    <button class="btn btn-danger btn-sm" type="submit" data-test="withdraw-@i.TestCode">Withdraw</button></form></details>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="grid-side">
+    <div class="stack">
+        <div class="card">
+            <div class="card-header"><h3>Samples</h3></div>
+            <div class="table-wrap">
+                <table class="table table-compact" data-samples>
+                    <thead><tr><th>Sample</th><th>Type</th><th>Status</th><th>Details</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var s in o.Samples)
+                    {
+                        var tests = o.Items.Where(i => i.SampleId == s.Id && i.Status != LabOrderItemStatus.Cancelled).Select(i => i.TestCode).ToList();
+                        <tr class="@(s.Status == LabSampleStatus.Rejected ? "row-muted" : "")" data-sample="@s.SampleNumber">
+                            <td class="mono">@s.SampleNumber</td><td>@s.SampleTypeName <small class="muted block">@string.Join(", ", tests)</small></td><td>@s.Status</td>
+                            <td><small>@(s.CollectedUtc is null ? "" : $"Collected {Fmt.DateTimeText(s.CollectedUtc)} by {s.CollectedByUsername}")
+                                @(s.ReceivedUtc is null ? "" : $" · received {Fmt.DateTimeText(s.ReceivedUtc)} by {s.ReceivedByUsername}")
+                                @(s.RejectedUtc is null ? "" : $"Rejected {Fmt.DateTimeText(s.RejectedUtc)} by {s.RejectedByUsername}: {s.RejectReason}")</small></td>
+                            <td class="actions nowrap">
+                                @if (s.Status == LabSampleStatus.Pending && tests.Count > 0)
+                                {
+                                    <form bn-permission="@Perm.LabCollectSamples" method="post" asp-page-handler="Collect" asp-route-sampleId="@s.Id" asp-route-receive="true" class="inline-form">
+                                        <button class="btn btn-primary btn-sm" type="submit" data-test="collect-@s.SampleTypeName">Collect &amp; receive</button></form>
+                                    <form bn-permission="@Perm.LabCollectSamples" method="post" asp-page-handler="Collect" asp-route-sampleId="@s.Id" asp-route-receive="false" class="inline-form">
+                                        <button class="btn btn-light btn-sm" type="submit">Collected only</button></form>
+                                }
+                                @if (s.Status == LabSampleStatus.Collected)
+                                {
+                                    <form bn-permission="@Perm.LabCollectSamples" method="post" asp-page-handler="Receive" asp-route-sampleId="@s.Id" class="inline-form"><button class="btn btn-light btn-sm" type="submit">Receive in lab</button></form>
+                                }
+                                @if (s.Status is LabSampleStatus.Collected or LabSampleStatus.Received)
+                                {
+                                    <details bn-permission="@Perm.LabRejectSamples" class="inline-details"><summary class="btn btn-light btn-sm">Reject</summary>
+                                        <form method="post" asp-page-handler="RejectSample" asp-route-sampleId="@s.Id" class="inline-form" novalidate>
+                                            <input name="Reason" maxlength="300" placeholder="Reason (haemolysed, clotted …)" required aria-label="Reason" />
+                                            <button class="btn btn-danger btn-sm" type="submit" data-test="reject-sample">Reject sample</button></form></details>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header"><h3>History</h3></div>
+            <ul class="activity" data-history>
+                @foreach (var e in Model.Events.Take(60))
+                {
+                    var item = o.Items.FirstOrDefault(i => i.Id == e.OrderItemId);
+                    <li><span class="activity-dot"></span><div><strong>@item?.TestCode · @e.EventType</strong><small>@Fmt.DateTimeText(e.CreatedUtc) · @e.Username @(e.Note is null ? "" : "– " + e.Note)</small></div></li>
+                }
+            </ul>
+        </div>
+    </div>
+    <div class="stack">
+        <div class="card">
+            <div class="card-header"><h3>Reports printed</h3><span class="pill pill-blue">@Model.Prints.Count</span></div>
+            <ul class="activity">
+                @foreach (var pr in Model.Prints) { <li><span class="activity-dot"></span><div><strong>Copy @pr.CopyNumber · @pr.Format</strong><small>@Fmt.DateTimeText(pr.PrintedUtc) · @pr.PrintedByUsername</small></div></li> }
+                @if (Model.Prints.Count == 0) { <li class="empty">Not printed yet.</li> }
+            </ul>
+        </div>
+        @if (Model.Revisions.Count > 0)
+        {
+            <div class="card">
+                <div class="card-header"><h3>Result revisions</h3></div>
+                <ul class="activity" data-revisions>
+                    @foreach (var r in Model.Revisions)
+                    {
+                        <li><span class="activity-dot"></span><div><strong>@o.Items.First(i => i.Id == r.OrderItemId).TestCode – revision @r.RevisionNo (was @r.PreviousStatus)</strong><small>@Fmt.DateTimeText(r.CreatedUtc) · @r.CreatedByUsername – @r.Reason</small>
+                            <details><summary class="small">Original values</summary><pre class="small">@r.Snapshot</pre></details></div></li>
+                    }
+                </ul>
+            </div>
+        }
+        @if (Model.Tests.Count > 0)
+        {
+            <form bn-permission="@Perm.LabEditOrders" method="post" asp-page-handler="AddTests" class="card" novalidate>
+                <div class="card-header"><h3>Add tests</h3></div>
+                <div class="card-body"><select name="AddTestIds" multiple size="6" aria-label="Tests">@foreach (var t in Model.Tests) { <option value="@t.Test.Id">@t.Test.Name (@t.Test.Code)</option> }</select></div>
+                <div class="card-footer"><button class="btn btn-light" type="submit">Add selected tests</button></div>
+            </form>
+            <form bn-permission="@Perm.LabEditOrders" method="post" asp-page-handler="Details" class="card" novalidate>
+                <div class="card-header"><h3>Referral &amp; notes</h3></div>
+                <div class="card-body">
+                    <div class="field"><label for="ReferralType">Referred by</label><select id="ReferralType" name="ReferralType">
+                        <option value="None" selected="@(Model.ReferralType == LabReferralType.None)">No referring doctor</option>
+                        <option value="HospitalDoctor" selected="@(Model.ReferralType == LabReferralType.HospitalDoctor)">Hospital doctor</option>
+                        <option value="External" selected="@(Model.ReferralType == LabReferralType.External)">External doctor</option></select></div>
+                    <div class="field"><label for="ReferringDoctorId">Hospital doctor</label><select id="ReferringDoctorId" name="ReferringDoctorId"><option value="">—</option>
+                        @foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(Model.ReferringDoctorId == d.Id)">@d.Name</option> }</select></div>
+                    <div class="field"><label for="ExternalDoctorName">External doctor</label><input id="ExternalDoctorName" name="ExternalDoctorName" value="@Model.ExternalDoctorName" maxlength="150" /></div>
+                    <div class="field"><label for="ClinicalNotes">Clinical notes</label><input id="ClinicalNotes" name="ClinicalNotes" value="@Model.ClinicalNotes" maxlength="1000" /></div>
+                    <label class="check"><input type="checkbox" name="IsUrgent" value="true" checked="@Model.IsUrgent" /> Urgent</label><input type="hidden" name="IsUrgent" value="false" />
+                </div>
+                <div class="card-footer"><button class="btn btn-light" type="submit">Save</button></div>
+            </form>
+        }
+    </div>
+</div>

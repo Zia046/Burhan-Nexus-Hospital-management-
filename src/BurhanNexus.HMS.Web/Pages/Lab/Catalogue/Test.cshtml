@@ -1,0 +1,98 @@
+@page "{id:int?}"
+@model BurhanNexus.HMS.Web.Pages.Lab.Catalogue.TestModel
+@{
+    var t = Model.Test;
+    ViewData["Title"] = t is null ? "New laboratory test" : $"Test – {t.Name}";
+    string N(decimal? d) => d?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) ?? "";
+}
+<partial name="_LabNav" />
+<partial name="_ValidationSummary" />
+<form method="post" class="card" data-lab-test-form>
+    <div class="card-header"><h2>@(t is null ? "New test" : t.Name) @if (t is not null) { <small class="muted">definition v@(t.DefinitionVersion)</small> }</h2>
+        <a class="btn btn-light btn-sm" href="/Lab/Catalogue">&larr; Catalogue</a></div>
+    <fieldset class="card-body form-grid" disabled="@(!Model.CanEdit)">
+        <div class="field"><label for="Input_Code">Code *</label><input asp-for="Input.Code" maxlength="30" required /></div>
+        <div class="field span-2"><label for="Input_Name">Test name *</label><input asp-for="Input.Name" maxlength="150" required /></div>
+        <div class="field"><label for="Input_CategoryId">Category *</label><select asp-for="Input.CategoryId"><option value="0">—</option>@foreach (var c in Model.Categories) { <option value="@c.Id">@c.Name</option> }</select></div>
+        <div class="field"><label for="Input_SampleTypeId">Sample type *</label><select asp-for="Input.SampleTypeId"><option value="0">—</option>@foreach (var s in Model.SampleTypes) { <option value="@s.Id">@s.Name</option> }</select></div>
+        <div class="field"><label for="Input_Method">Method</label><input asp-for="Input.Method" maxlength="100" /></div>
+        <div class="field"><label for="Input_TurnaroundHours">Turnaround (hours)</label><input asp-for="Input.TurnaroundHours" type="number" min="0" max="2000" /></div>
+        <div class="field"><label for="Input_SortOrder">Display order</label><input asp-for="Input.SortOrder" type="number" /></div>
+        <div class="field span-2"><label for="Input_CollectionInstructions">Collection / patient instructions</label><input asp-for="Input.CollectionInstructions" maxlength="500" /></div>
+        <div class="field span-3"><label for="Input_Interpretation">Default comment / interpretation (printed)</label><textarea asp-for="Input.Interpretation" rows="2" maxlength="1000"></textarea></div>
+        <label class="check"><input type="checkbox" asp-for="Input.IsActive" /> Active (bookable)</label>
+    </fieldset>
+    <fieldset class="card-body form-grid fee-box" disabled="@(!Model.CanFees || !Model.CanEdit)">
+        <legend>Price <small class="muted">(Phase 3 service fee@(t is null ? "" : " · " + t.ServiceItem?.Code))</small></legend>
+        <label class="check"><input type="checkbox" asp-for="Input.IsFree" /> Free test</label>
+        <div class="field"><label for="Input_Price">Price</label><input asp-for="Input.Price" type="number" min="0" step="0.01" /></div>
+        @if (t is not null) { <div class="field"><label for="Input_PriceEffectiveFrom">New price effective from</label><input asp-for="Input.PriceEffectiveFrom" type="date" /></div> }
+        <label class="check"><input type="checkbox" asp-for="Input.AllowPartialPayment" /> Allow partial payment</label>
+        @if (!Model.CanFees) { <small class="muted">Only users with “Manage Laboratory Fees” can change prices.</small> }
+    </fieldset>
+    @if (Model.CanEdit) { <div class="card-footer form-actions"><button class="btn btn-primary" type="submit" data-test="save-test">Save test</button></div> }
+</form>
+
+@if (t is not null)
+{
+    <div class="card">
+        <div class="card-header"><h2>Parameters &amp; reference ranges</h2><small class="muted">Orders already booked keep the definition they were booked with.</small></div>
+        <div class="card-body param-list">
+            @foreach (var p in t.Parameters)
+            {
+                <section class="param-card @(p.IsActive ? "" : "row-muted")" id="p@(p.Id)" data-param-card="@p.Name">
+                    <form method="post" asp-page-handler="Parameter" asp-route-parameterId="@p.Id" class="inline-form">
+                        <fieldset disabled="@(!Model.CanParams)" class="inline-form">
+                            <input name="Param.Name" value="@p.Name" maxlength="100" required title="Name" />
+                            <input name="Param.Unit" value="@p.Unit" maxlength="30" placeholder="Unit" class="w-sm" />
+                            <select name="Param.ResultType">@foreach (var rt in Enum.GetValues<LabResultType>()) { <option value="@rt" selected="@(rt == p.ResultType)">@rt</option> }</select>
+                            <input name="Param.Options" value="@p.Options" maxlength="500" placeholder="Choices a|b|c" class="w-md" />
+                            <input name="Param.Decimals" type="number" min="0" max="4" value="@p.Decimals" class="w-xs" title="Decimals" />
+                            <input name="Param.SortOrder" type="number" value="@p.SortOrder" class="w-xs" title="Order" />
+                            <input name="Param.DefaultValue" value="@p.DefaultValue" maxlength="60" placeholder="Default" class="w-sm" />
+                            <label class="check"><input type="checkbox" name="Param.IsOptional" value="true" checked="@p.IsOptional" /> Optional</label>
+                            <label class="check"><input type="checkbox" name="Param.IsActive" value="true" checked="@p.IsActive" /> Active</label><input type="hidden" name="Param.IsActive" value="false" />
+                            <button class="btn btn-light btn-sm" type="submit">Save</button>
+                        </fieldset>
+                    </form>
+                    <table class="table table-compact ranges">
+                        <thead><tr><th>Gender</th><th>Age from</th><th>Age to</th><th>Low</th><th>High</th><th>Critical low</th><th>Critical high</th><th>Normal text</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var r in p.Ranges.OrderBy(r => r.Gender == null ? 1 : 0).ThenBy(r => r.MinAgeDays ?? 0))
+                        {
+                            <tr data-range><td>@(r.Gender?.ToString() ?? "All")</td><td>@BurhanNexus.HMS.Web.Pages.Lab.Catalogue.TestModel.Age(r.MinAgeDays)</td><td>@BurhanNexus.HMS.Web.Pages.Lab.Catalogue.TestModel.Age(r.MaxAgeDays)</td>
+                                <td>@N(r.Low)</td><td>@N(r.High)</td><td>@N(r.CriticalLow)</td><td>@N(r.CriticalHigh)</td><td>@r.NormalText</td>
+                                <td>@if (Model.CanRanges) { <form method="post" asp-page-handler="DeleteRange" asp-route-rangeId="@r.Id" class="inline"><button class="btn btn-light btn-sm" type="submit" title="Remove">✕</button></form> }</td></tr>
+                        }
+                        @if (Model.CanRanges)
+                        {
+                            <tr><td colspan="9"><form method="post" asp-page-handler="Range" asp-route-parameterId="@p.Id" class="inline-form range-form">
+                                <select name="Range.Gender"><option value="">All</option><option>Male</option><option>Female</option></select>
+                                <input name="Range.MinAge" type="number" min="0" class="w-xs" placeholder="From" /><select name="Range.MinAgeUnit"><option>Years</option><option>Months</option><option>Days</option></select>
+                                <input name="Range.MaxAge" type="number" min="0" class="w-xs" placeholder="To" /><select name="Range.MaxAgeUnit"><option>Years</option><option>Months</option><option>Days</option></select>
+                                <input name="Range.Low" inputmode="decimal" class="w-xs" placeholder="Low" /><input name="Range.High" inputmode="decimal" class="w-xs" placeholder="High" />
+                                <input name="Range.CriticalLow" inputmode="decimal" class="w-xs" placeholder="Crit. low" /><input name="Range.CriticalHigh" inputmode="decimal" class="w-xs" placeholder="Crit. high" />
+                                <input name="Range.NormalText" maxlength="100" class="w-sm" placeholder="e.g. Negative" />
+                                <button class="btn btn-primary btn-sm" type="submit">Add range</button></form></td></tr>
+                        }
+                        </tbody>
+                    </table>
+                </section>
+            }
+            @if (Model.CanParams)
+            {
+                <form method="post" asp-page-handler="Parameter" class="param-card new inline-form" data-new-param>
+                    <strong>New parameter</strong>
+                    <input name="Param.Name" maxlength="100" placeholder="Name" required />
+                    <input name="Param.Unit" maxlength="30" placeholder="Unit" class="w-sm" />
+                    <select name="Param.ResultType">@foreach (var rt in Enum.GetValues<LabResultType>()) { <option value="@rt">@rt</option> }</select>
+                    <input name="Param.Options" maxlength="500" placeholder="Choices a|b|c" class="w-md" />
+                    <input name="Param.Decimals" type="number" min="0" max="4" value="1" class="w-xs" title="Decimals" />
+                    <input name="Param.SortOrder" type="number" value="@((t.Parameters.Count + 1) * 10)" class="w-xs" title="Order" />
+                    <input type="hidden" name="Param.IsActive" value="true" />
+                    <button class="btn btn-primary btn-sm" type="submit" data-test="add-param">Add parameter</button>
+                </form>
+            }
+        </div>
+    </div>
+}

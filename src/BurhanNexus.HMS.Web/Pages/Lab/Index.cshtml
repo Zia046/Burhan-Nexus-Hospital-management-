@@ -1,0 +1,37 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Lab.IndexModel
+@{
+    ViewData["Title"] = "Laboratory dashboard";
+    var d = Model.Data;
+}
+<partial name="_LabNav" />
+<div class="toolbar">
+    <form method="get" class="filters wrap"><partial name="_PeriodFilter" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" /><button class="btn btn-light" type="submit">Show</button></form>
+    <div class="toolbar-actions"><a bn-permission="@Perm.LabBook" class="btn btn-primary" href="/Lab/Book"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New lab visit</a></div>
+</div>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-flask" /></svg> Laboratory – @BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(d.From, d.To)</h2>
+        @if (d.Urgent > 0) { <span class="status status-bad">@d.Urgent urgent visit(s) open</span> }</div>
+    <div class="card-body">
+        <div class="kpi-grid lab-kpis" data-lab-kpis>
+            <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-users" /></svg></div><div><span class="kpi-label">Patients</span><strong class="kpi-value" data-kpi="patients">@d.Patients</strong></div></div>
+            <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-flask" /></svg></div><div><span class="kpi-label">Tests booked</span><strong class="kpi-value" data-kpi="tests">@d.Tests</strong></div></div>
+            <div class="kpi"><div class="kpi-icon red"><svg class="icon"><use href="#i-clock" /></svg></div><div><span class="kpi-label">Sample pending</span><strong class="kpi-value" data-kpi="sample-pending">@d.SamplePending</strong></div></div>
+            <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-check" /></svg></div><div><span class="kpi-label">Samples collected</span><strong class="kpi-value" data-kpi="collected">@d.SampleCollected</strong></div></div>
+            <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-edit" /></svg></div><div><span class="kpi-label">In progress</span><strong class="kpi-value" data-kpi="in-progress">@d.InProgress</strong></div></div>
+            <div class="kpi"><div class="kpi-icon red"><svg class="icon"><use href="#i-alert" /></svg></div><div><span class="kpi-label">Awaiting verification</span><strong class="kpi-value" data-kpi="awaiting">@d.AwaitingVerification</strong></div></div>
+            <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-check-circle" /></svg></div><div><span class="kpi-label">Verified</span><strong class="kpi-value" data-kpi="verified">@d.Verified</strong></div></div>
+            <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-printer" /></svg></div><div><span class="kpi-label">Reports released</span><strong class="kpi-value" data-kpi="released">@d.Released</strong></div></div>
+            <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-x" /></svg></div><div><span class="kpi-label">Cancelled · sample rejections</span><strong class="kpi-value" data-kpi="cancelled">@d.Cancelled · @d.SampleRejections</strong></div></div>
+            @if (d.Collection is decimal c)
+            {
+                <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-wallet" /></svg></div><div><span class="kpi-label">Laboratory collection</span><strong class="kpi-value" data-kpi="collection">@Fmt.Money(c)</strong></div></div>
+            }
+        </div>
+    </div>
+</div>
+<div class="grid-3">
+    @await Html.PartialAsync("_WorkList", ("Waiting for sample / result", "pending", Model.Pending, "/Lab/Entry/{0}", "No pending tests."))
+    @await Html.PartialAsync("_WorkList", ("Awaiting verification", "verification", Model.ToVerify, "/Lab/Verify/{0}", "Nothing to verify."))
+    @await Html.PartialAsync("_WorkList", ("Verified – ready to print", "print", Model.ToPrint, "/Lab/Order/{0}", "No reports waiting."))
+</div>

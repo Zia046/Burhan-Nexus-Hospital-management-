@@ -188,7 +188,8 @@ public sealed class LabCatalogService : ILabCatalogService
         if (!await _db.LabSampleTypes.AnyAsync(c => c.Id == i.SampleTypeId, ct)) errors.Add("Select the sample type.");
         if (code is not null && await _db.LabTests.AnyAsync(t => t.Id != id && t.Code == code, ct)) errors.Add("Another test already uses this code.");
         if (i.TurnaroundHours is < 0 or > 2000) errors.Add("Turnaround time is not valid.");
-        if (id is null && !canManageFees && !i.IsFree) errors.Add("You may not set test prices. Create the test as free, or ask a user with 'Manage Laboratory Fees'.");
+        if (id is null && !canManageFees) { i.IsFree = true; i.Price = 0; } // price is set later by a user with "Manage Laboratory Fees"
+        if (canManageFees && !i.IsFree && i.Price <= 0) errors.Add("Enter the test price, or mark the test as free.");
         if (errors.Count > 0) return ServiceResult<int>.Fail(errors.ToArray());
 
         var now = _clock.UtcNow;

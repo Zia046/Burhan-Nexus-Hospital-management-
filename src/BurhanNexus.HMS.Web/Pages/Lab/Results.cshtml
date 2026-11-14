@@ -1,0 +1,42 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Lab.ResultsModel
+@using BurhanNexus.HMS.Web.Pages.Finance
+@{ ViewData["Title"] = "Laboratory results"; }
+<partial name="_LabNav" />
+<form method="get" class="toolbar filters" data-period-form>
+    <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Visit no., Patient ID, name or phone (all dates)" maxlength="100" /></div>
+    <partial name="/Pages/Finance/_PeriodFilter.cshtml" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" />
+    <select name="Scope">
+        <option value="">All statuses</option>
+        <option value="pending" selected="@(Model.Scope == "pending")">Pending</option>
+        <option value="verification" selected="@(Model.Scope == "verification")">Awaiting verification</option>
+        <option value="verified" selected="@(Model.Scope == "verified")">Verified (not printed)</option>
+        <option value="released" selected="@(Model.Scope == "released")">Released</option>
+    </select>
+    <button class="btn btn-light" type="submit">Show</button>
+</form>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-file" /></svg> Results – @(string.IsNullOrWhiteSpace(Model.Q) ? FinancePeriod.Label(Model.From!.Value, Model.To!.Value) : $"search “{Model.Q}”")</h2>
+        <span class="pill">@Model.Orders.Count visit(s)</span></div>
+    <div class="table-wrap">
+        <table class="table" data-results>
+            <thead><tr><th>Visit</th><th>Patient</th><th>Tests</th><th>Verification</th><th>Report</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var o in Model.Orders)
+            {
+                <tr data-order="@o.OrderNumber">
+                    <td class="mono nowrap">@o.OrderNumber<small class="muted block">@Fmt.DateTimeText(o.BookedUtc)</small></td>
+                    <td><a href="/Lab/Patient/@o.PatientId"><strong>@o.PatientName</strong></a><small class="muted block">@o.PatientNumber · @o.AgeGender@(o.Mobile is null ? "" : " · " + o.Mobile)</small>
+                        @if (o.ReferredBy is not null) { <small class="muted block">Ref: @o.ReferredBy</small> }</td>
+                    <td>@foreach (var i in o.Items) { <span class="chip chip-@i.Status.ToString().ToLowerInvariant()" title="@i.TestName – @LabService.Label(i.Status)">@i.TestCode</span> }</td>
+                    <td data-verification>@o.VerificationStatus</td>
+                    <td data-report>@o.ReportStatus@(o.Printed > 0 ? $" · {o.Printed}×" : "")</td>
+                    <td class="actions nowrap"><a class="btn btn-light btn-sm" href="/Lab/Order/@o.Id">Open</a>
+                        @if (o.Verified + o.Released > 0) { <a class="btn btn-primary btn-sm" bn-permission="@Perm.LabPrintReports" href="/Print/LabReport/@o.Id" data-test="report-@o.OrderNumber">Report</a> }</td>
+                </tr>
+            }
+            @if (Model.Orders.Count == 0) { <tr><td colspan="6" class="empty">No laboratory visits found.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

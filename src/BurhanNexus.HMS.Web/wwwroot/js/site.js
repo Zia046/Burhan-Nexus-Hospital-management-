@@ -363,3 +363,80 @@
   });
   recalc();
 })();
+
+// ---------------- Phase 4: laboratory ----------------
+(function () {
+  "use strict";
+  const money = v => (Math.round(v * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // Simple row filter for tables: <input data-table-filter="#table-id">
+  document.querySelectorAll("[data-table-filter]").forEach(input => {
+    const table = document.querySelector(input.dataset.tableFilter);
+    if (!table) return;
+    input.addEventListener("input", () => {
+      const q = input.value.trim().toLowerCase();
+      table.querySelectorAll("tbody tr").forEach(tr => { tr.style.display = !q || tr.textContent.toLowerCase().includes(q) ? "" : "none"; });
+    });
+  });
+
+  // Booking: test filter, selected count, total and referral fields.
+  const book = document.querySelector("[data-lab-book]");
+  if (book) {
+    const choices = Array.from(book.querySelectorAll(".test-choice"));
+    const filter = book.querySelector("[data-test-filter]");
+    const count = book.querySelector("[data-selected-count]");
+    const total = book.querySelector("[data-lab-total]");
+    const recalc = () => {
+      let n = 0, sum = 0;
+      choices.forEach(c => {
+        const cb = c.querySelector("input[type=checkbox]");
+        c.classList.toggle("on", cb.checked);
+        if (!cb.checked) return;
+        n++;
+        const disc = c.querySelector("input[name^=Discounts]");
+        sum += Math.max(0, (parseFloat(cb.dataset.price || "0") || 0) - (disc ? parseFloat(disc.value || "0") || 0 : 0));
+      });
+      if (count) count.textContent = n + " selected";
+      if (total) total.textContent = money(sum);
+    };
+    choices.forEach(c => c.querySelectorAll("input").forEach(i => i.addEventListener(i.type === "checkbox" ? "change" : "input", recalc)));
+    if (filter) filter.addEventListener("input", () => {
+      const q = filter.value.trim().toLowerCase();
+      choices.forEach(c => { c.style.display = !q || (c.dataset.testName || "").includes(q) ? "" : "none"; });
+    });
+    const ref = book.querySelector("[data-referral]");
+    const refresh = () => {
+      if (!ref) return;
+      book.querySelectorAll("[data-referral-doctor]").forEach(e => e.style.display = ref.value === "HospitalDoctor" ? "" : "none");
+      book.querySelectorAll("[data-referral-external]").forEach(e => e.style.display = ref.value === "External" ? "" : "none");
+    };
+    if (ref) ref.addEventListener("change", refresh);
+    refresh();
+    recalc();
+  }
+
+  // Result entry: Enter moves to the next result box; live high/low hint for numeric values.
+  const entry = document.querySelector("[data-entry-form]");
+  if (entry) {
+    const inputs = Array.from(entry.querySelectorAll(".result-input:not([disabled])"));
+    inputs.forEach((el, idx) => {
+      el.addEventListener("keydown", e => {
+        if (e.key !== "Enter" || e.shiftKey) return;
+        e.preventDefault();
+        if (idx + 1 < inputs.length) inputs[idx + 1].focus();
+        else { const next = entry.querySelector("[data-test=entry-next]"); if (next) next.focus(); }
+      });
+      if (el.dataset.low !== undefined || el.dataset.high !== undefined) {
+        const check = () => {
+          const v = parseFloat(el.value);
+          const lo = el.dataset.low === "" || el.dataset.low === undefined ? NaN : parseFloat(el.dataset.low);
+          const hi = el.dataset.high === "" || el.dataset.high === undefined ? NaN : parseFloat(el.dataset.high);
+          el.classList.toggle("is-low", !isNaN(v) && !isNaN(lo) && v < lo);
+          el.classList.toggle("is-high", !isNaN(v) && !isNaN(hi) && v > hi);
+        };
+        el.addEventListener("input", check);
+        check();
+      }
+    });
+  }
+})();
