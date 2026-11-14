@@ -201,7 +201,7 @@ public sealed class LabCatalogService : ILabCatalogService
             var dept = await _db.Departments.Where(d => d.Name == "Laboratory").Select(d => (int?)d.Id).FirstOrDefaultAsync(ct);
             var svc = await _finance.SaveServiceAsync(null, new ServiceInput
             {
-                Code = "LAB-" + code, Name = name, Kind = ServiceKind.Laboratory, DepartmentId = dept, IsFree = i.IsFree, Fee = i.IsFree ? 0 : i.Price,
+                Code = "LT-" + code, Name = name, Kind = ServiceKind.Laboratory, DepartmentId = dept, IsFree = i.IsFree, Fee = i.IsFree ? 0 : i.Price,
                 AllowPartialPayment = i.AllowPartialPayment, IsActive = i.IsActive, Description = "Laboratory test"
             }, ct);
             if (!svc.Succeeded) return ServiceResult<int>.Fail(svc.Errors.ToArray());
@@ -409,7 +409,7 @@ public sealed class LabCatalogService : ILabCatalogService
         {
             var svc = new ServiceItem
             {
-                Code = "LAB-" + t.Code, Name = t.Name, Category = EncounterType.ServiceOnly, Kind = ServiceKind.Laboratory, DepartmentId = dept,
+                Code = "LT-" + t.Code, Name = t.Name, Category = EncounterType.ServiceOnly, Kind = ServiceKind.Laboratory, DepartmentId = dept,
                 DefaultFee = 0, IsActive = false, CreatedUtc = now, UpdatedUtc = now, Description = "Laboratory test (starter catalogue)"
             };
             if (await db.ServiceItems.AnyAsync(s => s.Code == svc.Code, ct)) continue;
