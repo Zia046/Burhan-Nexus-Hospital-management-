@@ -1,0 +1,40 @@
+landed on http://127.0.0.1:5080/Setup
+screenshot 01-setup-step1-empty
+screenshot 02-setup-step1-filled
+screenshot 03-setup-step2-type
+screenshot 04-setup-step3-admin
+screenshot 05-setup-step4-preferences
+screenshot 06-setup-step5-review
+after setup: http://127.0.0.1:5080/Account/Login
+screenshot 07-login
+screenshot 08-login-error
+after login: http://127.0.0.1:5080/
+screenshot 09-dashboard-admin
+screenshot 10-user-create
+user page: http://127.0.0.1:5080/Users/Edit/2
+screenshot 11-user-edit
+screenshot 12-responsibility-edit
+screenshot 13-responsibilities
+screenshot 14-permissions
+screenshot 15-users
+screenshot 16-departments
+screenshot 17-settings-hospital
+screenshot 18-settings-preferences
+screenshot 19-settings-printing
+screenshot 20-settings-type
+screenshot 21-settings-security
+screenshot 22-license
+screenshot 23-print-report
+screenshot 24-print-receipt
+screenshot 25-backup
+screenshot 26-restore-warning
+screenshot 27-audit
+screenshot 28-login-history
+screenshot 29-dashboard-receptionist
+receptionist /Users → http://127.0.0.1:5080/Account/AccessDenied?ReturnUrl=%2FUsers
+screenshot 30-access-denied
+screenshot 31-tablet-login
+screenshot 32-tablet-dashboard
+screenshot 33-tablet-menu
+
+ERRORS:

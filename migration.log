@@ -1,0 +1,10 @@
+You can invoke the tool using the following command: dotnet-ef
+Tool 'dotnet-ef' (version '10.0.15') was successfully installed.
+  Determining projects to restore...
+  Restored /home/runner/work/Burhan-Nexus-Hospital-management-/Burhan-Nexus-Hospital-management-/src/BurhanNexus.HMS.Core/BurhanNexus.HMS.Core.csproj (in 162 ms).
+  Restored /home/runner/work/Burhan-Nexus-Hospital-management-/Burhan-Nexus-Hospital-management-/tools/BurhanNexus.PrintAgent/BurhanNexus.PrintAgent.csproj (in 1.48 sec).
+  Restored /home/runner/work/Burhan-Nexus-Hospital-management-/Burhan-Nexus-Hospital-management-/src/BurhanNexus.HMS.Infrastructure/BurhanNexus.HMS.Infrastructure.csproj (in 1.48 sec).
+  Restored /home/runner/work/Burhan-Nexus-Hospital-management-/Burhan-Nexus-Hospital-management-/tools/BurhanNexus.LicenseGenerator/BurhanNexus.LicenseGenerator.csproj (in 1.29 sec).
+  Restored /home/runner/work/Burhan-Nexus-Hospital-management-/Burhan-Nexus-Hospital-management-/tests/BurhanNexus.HMS.Tests/BurhanNexus.HMS.Tests.csproj (in 1.51 sec).
+  Restored /home/runner/work/Burhan-Nexus-Hospital-management-/Burhan-Nexus-Hospital-management-/src/BurhanNexus.HMS.Web/BurhanNexus.HMS.Web.csproj (in 668 ms).
+Migration Phase4Laboratory already exists
