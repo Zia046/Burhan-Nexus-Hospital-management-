@@ -115,7 +115,7 @@ public partial class RadiologyTests : Phase2TestBase
         await SetupAsync("Private");
         var admin = await LoginAdminAsync();
         var cxr = await ServiceAsync(admin, "XR-CXR", "Chest X-Ray PA", "XRay", 800);
-        var usg = await ServiceAsync(admin, "US-ABD", "Ultrasound Abdomen", "Ultrasound", 1500);
+        var usg = await ServiceAsync(admin, "US-ABDO", "Ultrasound Abdomen", "Ultrasound", 1500);
         await using (var db = Factory.NewDb())
         {
             // The catalogue is data, not code: a starter catalogue (inactive, free) and templates were seeded; new services are Phase 3 services.
@@ -132,7 +132,7 @@ public partial class RadiologyTests : Phase2TestBase
         var order = await OrderIdAsync(await PostBookAsync(admin, pid, new[] { cxr, usg }, key));
         Assert.Equal(order, await OrderIdAsync(await PostBookAsync(admin, pid, new[] { cxr, usg }, key))); // double click → same order
         var x = await ExamAsync(order, "XR-CXR");
-        var u = await ExamAsync(order, "US-ABD");
+        var u = await ExamAsync(order, "US-ABDO");
         Assert.Equal((1, 1), (x.TokenNumber, u.TokenNumber)); // separate X-Ray and Ultrasound queues
         Assert.Equal(RadiologyExamStatus.Booked, x.Status);
         await using (var db = Factory.NewDb())
@@ -285,7 +285,7 @@ public partial class RadiologyTests : Phase2TestBase
         // A new report starts from the service's default template; nothing else is forced.
         Assert.Contains("Trachea is central.", await admin.GetHtmlAsync($"/Radiology/Report/{x.Id}"));
         var empty = await ReportAsync(admin, x.Id, true, findings: "", impression: "");
-        Assert.Contains("Enter the report", await empty.Content.ReadAsStringAsync());
+        Assert.Contains("Enter the findings or the impression", await empty.Content.ReadAsStringAsync());
 
         var reporter = await UserWithAsync(admin, "rad.reporter", Perm.DashboardView, Perm.RadViewXRay, Perm.RadEnterReport, Perm.RadSubmitReport);
         var verifier = await UserWithAsync(admin, "rad.verifier", RadiologistPerms);
@@ -343,9 +343,9 @@ public partial class RadiologyTests : Phase2TestBase
 
         // Cancelling: a verified examination cannot be cancelled; an open one needs a reason and stays in history; its unpaid charge is cancelled.
         Assert.Contains("cannot be cancelled", await (await StepAsync(admin, x.Id, "Cancel", ("Reason", "No"))).Content.ReadAsStringAsync());
-        var paid = await ServiceAsync(admin, "XR-KNEE", "Knee X-Ray", "XRay", 600);
+        var paid = await ServiceAsync(admin, "XR-KNEE2", "Knee X-Ray", "XRay", 600);
         var o2 = await OrderIdAsync(await PostBookAsync(admin, pid, new[] { paid }));
-        var k = await ExamAsync(o2, "XR-KNEE");
+        var k = await ExamAsync(o2, "XR-KNEE2");
         Assert.Contains("reason", await (await StepAsync(admin, k.Id, "Cancel", ("Reason", ""))).Content.ReadAsStringAsync());
         await Ok(await StepAsync(admin, k.Id, "Cancel", ("Reason", "Patient left")), "Cancel");
         await using (var db = Factory.NewDb())
@@ -549,7 +549,7 @@ public partial class RadiologyTests : Phase2TestBase
         Assert.Equal("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xlsx.Content.Headers.ContentType!.MediaType);
         var csv = await (await admin.GetAsync("/Radiology/Reports?handler=Export&format=csv&report=xray&period=today")).Content.ReadAsStringAsync();
         Assert.Contains("Report Patient", csv);
-        Assert.Single(await AuditAsync(AuditActions.RadExported));
+        Assert.Equal(2, (await AuditAsync(AuditActions.RadExported)).Count);
 
         // Every radiology page opens; earlier modules are unchanged.
         foreach (var url in new[] { "/Radiology", "/Radiology?view=XRay", "/Radiology/Book", $"/Radiology/Book?patientId={pid}", "/Radiology/Bookings", "/Radiology/Reporting",

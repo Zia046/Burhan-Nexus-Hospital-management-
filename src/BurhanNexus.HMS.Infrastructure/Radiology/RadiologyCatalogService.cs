@@ -309,6 +309,15 @@ public sealed class RadiologyCatalogService : IRadiologyCatalogService
         }
     }
 
+    /// <summary>Booking rule that follows the hospital type: Government books only against an OPD / Emergency visit, Private also other patients.</summary>
+    public static async Task ApplyHospitalTypeDefaultsAsync(HmsDbContext db, HospitalType type, CancellationToken ct = default)
+    {
+        var s = await db.RadiologySettings.FirstOrDefaultAsync(ct);
+        if (s is null) return;
+        s.AllowBookingWithoutVisit = type == HospitalType.Private;
+        await db.SaveChangesAsync(ct);
+    }
+
     private static IEnumerable<(string Code, string Name, RadiologyModality Modality, string Body, int Minutes, string? Template, string? Prep)> StarterCatalogue()
     {
         const RadiologyModality X = RadiologyModality.XRay, U = RadiologyModality.Ultrasound;

@@ -445,6 +445,71 @@ try {
   await shot(page, "p5-16-gross-profit");
   await go("/Pharmacy?period=today");
   await shot(page, "p5-17-dashboard-private");
+
+  // ---- Phase 6: radiology (X-Ray & Ultrasound) ----
+  for (const [code, fee] of [["XR-CXR-PA", "800"], ["US-ABD", "1500"]]) {
+    await go("/Radiology/Services");
+    await submit(`a[data-test='edit-${code}']`);
+    await page.check("[name='Input.IsActive'][type=checkbox]");
+    await page.uncheck("[name='Input.IsFree'][type=checkbox]");
+    await page.fill("#Input_Fee", fee);
+    await submit("button[data-test='rad-save-service']");
+  }
+  await go("/Radiology/Services");
+  await shot(page, "p6-01-services-and-templates");
+  await go("/Radiology/Settings");
+  await page.check("[name='Input.AllowSelfVerification'][type=checkbox]");
+  await page.fill("#Input_DefaultReportingDoctor", "Dr. Sana Gul");
+  await page.fill("#Input_DefaultDesignation", "Consultant Radiologist");
+  await shot(page, "p6-10-radiology-settings");
+  await submit("button[data-test='rad-save-settings']");
+  await go(`/Radiology/Book?encounterId=${visitId}`);
+  await page.check("[data-rad-service='XR-CXR-PA']");
+  await page.check("[data-rad-service='US-ABD']");
+  await page.fill("#Input_ClinicalIndication", "Cough and fever for 2 weeks; right upper abdominal pain (handwritten advice)");
+  await shot(page, "p6-02-booking");
+  await submit("button[data-test='rad-book-save']");
+  await shot(page, "p6-03-order");
+  const examHref = await page.getAttribute("[data-order-exams] tr[data-exam='XR-CXR-PA'] a", "href");
+  await go("/Radiology/Worklist/XRay");
+  await shot(page, "p6-04-xray-worklist");
+  await go("/Radiology/Worklist/Ultrasound");
+  await shot(page, "p6-09-ultrasound-worklist");
+  await go(examHref);
+  await submit("button[data-test='rad-arrive']");
+  await submit("button[data-test='rad-start']");
+  await page.fill("[data-exam-actions] input[name=PerformedBy]", "Tech Imran");
+  await page.fill("[data-exam-actions] input[name=TechnicalNotes]", "PA erect, good inspiration");
+  await shot(page, "p6-05-examination-in-progress");
+  await submit("button[data-test='rad-complete']");
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+  await page.setInputFiles("[data-upload] input[type=file]", { name: "chest-pa.png", mimeType: "image/png", buffer: png });
+  await page.fill("[data-upload] input[name=Description]", "Chest PA film (scanned)");
+  await submit("button[data-test='rad-upload']");
+  await submit("a[data-test='rad-write-report']");
+  await page.fill("#Input_Findings", "Trachea is central.\nPatchy consolidation in the right lower zone.\nLeft lung field is clear.\nCostophrenic angles are clear.\nCardiac size is within normal limits.");
+  await page.fill("#Input_Impression", "Right lower zone consolidation – likely pneumonia.");
+  await page.fill("#Input_Recommendations", "Clinical correlation and follow-up film after treatment.");
+  await shot(page, "p6-06-report-entry");
+  await submit("button[data-test='rad-submit']");
+  await go("/Radiology/Verify");
+  await shot(page, "p6-07-verification-queue");
+  await go(examHref);
+  await submit("button[data-test='rad-verify']");
+  await shot(page, "p6-08-examination-verified");
+  await go(examHref.replace("/Radiology/Exam/", "/Print/RadiologyReport/"));
+  await submit("button[data-test='rad-report-print']");
+  await pdf(examHref.replace("/Radiology/Exam/", "/Print/RadiologyReport/"), "sample-radiology-report-A4.pdf");
+  await go("/Radiology?period=today");
+  await shot(page, "p6-11-radiology-dashboard");
+  await go("/Radiology/Reports?report=services&period=today");
+  await shot(page, "p6-12-statistics");
+  await go(`/Radiology/Reporting`);
+  await shot(page, "p6-14-reporting-list");
+  await go(examHref);
+  const histHref = await page.getAttribute("a[href^='/Radiology/Patient/']", "href");
+  await go(histHref);
+  await shot(page, "p6-13-patient-radiology-history");
 } catch (e) {
   errors.push("SCRIPT FAILURE: " + (e && e.stack || e));
   try { await shot(page, "p2-zz-failure"); } catch {}
