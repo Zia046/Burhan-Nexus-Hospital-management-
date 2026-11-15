@@ -478,7 +478,7 @@ public partial class IpdTests : Phase2TestBase
         Assert.Contains("incoming nurse", await Refused(await ActAsync(nurse1, adm, "Acknowledge", ("ItemId", ho.ToString())), "Self acknowledgement"));
         await Ok(await ActAsync(nurse2, adm, "Acknowledge", ("ItemId", ho.ToString()), ("Note", "Received")), "Acknowledge");
         await using (var db = Factory.NewDb()) Assert.Equal("nurse.two", (await db.ShiftHandovers.SingleAsync(h => h.Id == ho)).AcknowledgedByUsername);
-        Assert.Contains("Acknowledged by nurse.two", await admin.GetHtmlAsync($"/Print/Ipd/handover/{ho}"));
+        Assert.Contains("by nurse.two Received", await admin.GetHtmlAsync($"/Print/Ipd/handover/{ho}"));
 
         // Permissions: nurses cannot discharge, enter orders, see finance or Gynae records, or configure wards.
         Denied(await ActAsync(nurse1, adm, "Discharge", Discharge), "Nurse discharge");
