@@ -49,13 +49,17 @@ public class LabTest
     public int SortOrder { get; set; }
     /// <summary>Increases with every definition change (shown on orders booked with it).</summary>
     public int DefinitionVersion { get; set; } = 1;
+    /// <summary>Update 9: added from the standard catalogue – the laboratory should review the method-dependent reference ranges and set the price.</summary>
+    public bool RequiresReview { get; set; }
     public DateTime CreatedUtc { get; set; }
     public DateTime UpdatedUtc { get; set; }
     public uint RowVersion { get; set; }
     public List<LabTestParameter> Parameters { get; set; } = new();
 }
 
-public enum LabResultType { Numeric = 1, Text = 2, PositiveNegative = 3, Options = 4 }
+public enum LabResultType { Numeric = 1, Text = 2, PositiveNegative = 3, Options = 4,
+    /// <summary>Update 9: culture – organism (or "No growth") plus an antibiotic sensitivity table (S / I / R).</summary>
+    Culture = 5 }
 
 public class LabTestParameter
 {
@@ -92,6 +96,8 @@ public class LabReferenceRange
     public decimal? CriticalHigh { get; set; }
     /// <summary>Expected / normal text (e.g. "Negative", "Not seen") or a free-text range shown on the report.</summary>
     [MaxLength(100)] public string? NormalText { get; set; }
+    /// <summary>Update 9: range used only for a pregnant patient (female with an ongoing pregnancy, or marked pregnant at booking).</summary>
+    public bool IsPregnancy { get; set; }
 }
 
 public enum LabReferralType { None = 0, HospitalDoctor = 1, External = 2 }
@@ -121,6 +127,8 @@ public class LabOrder
     public PatientEncounter? Encounter { get; set; }
     /// <summary>Phase 7: ordered for an inpatient admission.</summary>
     public long? IpdAdmissionId { get; set; }
+    /// <summary>Update 9: pregnancy-specific reference ranges apply (ongoing pregnancy record, or marked at booking).</summary>
+    public bool PatientPregnant { get; set; }
     public LabReferralType ReferralType { get; set; }
     public int? ReferringDoctorId { get; set; }
     public Doctor? ReferringDoctor { get; set; }
@@ -319,6 +327,8 @@ public class LabSettings
     public bool AllowSelfVerification { get; set; }
     /// <summary>Only release (print) reports of fully paid tests.</summary>
     public bool RequirePaymentBeforeRelease { get; set; }
+    /// <summary>Update 9: version of the standard catalogue already added (it is added once; later changes by the laboratory are kept).</summary>
+    public int StandardCatalogueVersion { get; set; }
     public DateTime UpdatedUtc { get; set; }
     public uint RowVersion { get; set; }
 }
@@ -338,4 +348,18 @@ public class LabInventoryItem
     public bool TracksExpiry { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedUtc { get; set; }
+}
+
+public enum SensitivityResult { Sensitive = 1, Intermediate = 2, Resistant = 3 }
+
+/// <summary>Update 9: one antibiotic line of a culture result (organism + interpretation, optional MIC / zone).</summary>
+public class LabCultureResult
+{
+    public long Id { get; set; }
+    public long ResultValueId { get; set; }
+    [MaxLength(150)] public string Organism { get; set; } = string.Empty;
+    [MaxLength(100)] public string Antibiotic { get; set; } = string.Empty;
+    public SensitivityResult Interpretation { get; set; }
+    [MaxLength(30)] public string? Mic { get; set; }
+    public int SortOrder { get; set; }
 }

@@ -1,0 +1,33 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.WardRequestsModel
+@{ ViewData["Title"] = "Ward medicine requests"; }
+<partial name="_PharmNav" />
+<div class="page-header">
+    <div><h1>Ward medicine requests</h1><p class="muted">Requests from nurses for admitted patients. Stock is deducted only when you issue.</p></div>
+    <div class="filters">
+        <a class="btn @(Model.All ? "btn-light" : "btn-primary")" href="/Pharmacy/WardRequests">Open</a>
+        <a class="btn @(Model.All ? "btn-primary" : "btn-light")" href="/Pharmacy/WardRequests?all=true">All / history</a>
+    </div>
+</div>
+<div class="card">
+    @if (Model.Rows.Count == 0) { <p class="muted" data-empty>No @(Model.All ? "" : "open ")requests.</p> }
+    else
+    {
+        <table class="table" data-ward-requests>
+            <thead><tr><th>Request</th><th>Patient</th><th>Admission</th><th>Ward / bed</th><th>Priority</th><th>Status</th><th class="num">Open lines</th><th>Requested</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr data-row="@r.Number">
+                    <td class="mono">@r.Number</td><td><strong>@r.PatientName</strong> <small class="muted">@r.PatientNumber</small></td><td class="mono">@r.AdmissionNumber</td>
+                    <td>@r.WardName @r.BedCode</td>
+                    <td>@if (r.Priority == MedicineRequestPriority.Urgent) { <span class="status status-warn">Urgent</span> } else { <span>Routine</span> }</td>
+                    <td><span class="status" data-status>@r.Status</span></td><td class="num">@r.OpenLines / @r.Lines</td>
+                    <td>@Fmt.DateTimeText(r.RequestedUtc) <small class="muted block">@r.RequestedBy</small></td>
+                    <td class="actions"><a class="btn btn-light btn-sm" href="/Pharmacy/WardRequest/@r.Id" data-test="open-@r.Number">Open</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+</div>

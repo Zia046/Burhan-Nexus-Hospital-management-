@@ -78,6 +78,10 @@ else
                     <div class="field" data-referral-external><label for="Input_ExternalDoctorName">External doctor</label>
                         <input id="Input_ExternalDoctorName" name="Input.ExternalDoctorName" value="@Model.Input.ExternalDoctorName" maxlength="150" placeholder="Dr. name, clinic" /></div>
                     <div class="field"><label for="Input_ClinicalNotes">Clinical notes</label><input id="Input_ClinicalNotes" name="Input.ClinicalNotes" value="@Model.Input.ClinicalNotes" maxlength="1000" /></div>
+                    @if (p?.Gender == Gender.Female)
+                    {
+                        <label class="check" data-pregnant><input type="checkbox" name="Input.Pregnant" value="true" checked="@Model.Input.Pregnant" /> Patient is pregnant (pregnancy reference ranges are used where defined)</label>
+                    }
                     @if (Model.CanDiscount) { <div class="field"><label for="Input_DiscountReason">Discount reason</label><input id="Input_DiscountReason" name="Input.DiscountReason" value="@Model.Input.DiscountReason" maxlength="200" /></div> }
                 </div>
                 <label class="check"><input type="checkbox" name="Input.IsUrgent" value="true" checked="@Model.Input.IsUrgent" /> Urgent</label>

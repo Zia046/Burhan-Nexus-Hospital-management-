@@ -74,6 +74,7 @@ public static class DependencyInjection
         services.AddScoped<Pharmacy.IPharmacyCatalogService, Pharmacy.PharmacyCatalogService>();
         services.AddScoped<Pharmacy.IPharmacyService, Pharmacy.PharmacyService>();
         services.AddScoped<Pharmacy.IPharmacyQueryService, Pharmacy.PharmacyQueryService>();
+        services.AddScoped<Pharmacy.IMedicineRequestService, Pharmacy.MedicineRequestService>();
         services.AddSingleton<Radiology.RadiologyFileStore>();
         services.AddScoped<Radiology.IRadiologyCatalogService, Radiology.RadiologyCatalogService>();
         services.AddScoped<Radiology.IRadiologyService, Radiology.RadiologyWorkflowService>();

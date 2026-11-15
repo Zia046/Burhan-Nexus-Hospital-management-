@@ -22,7 +22,7 @@
                     <td>@t.SampleType?.Name</td>
                     <td>@r.ParameterCount</td>
                     @if (Model.ShowFees) { <td class="num">@(r.Price == 0 ? "Free" : Fmt.Money(r.Price))</td> }
-                    <td>@if (t.IsActive) { <span class="status status-ok">Active</span> } else { <span class="status">Inactive</span> }</td>
+                    <td>@if (t.IsActive) { <span class="status status-ok">Active</span> } else { <span class="status">Inactive</span> }@if (t.RequiresReview) { <span class="status status-warn" data-review-required title="Standard catalogue: check the ranges against your method/analyser and set the price, then save the test">Review</span> }</td>
                     <td class="actions"><a class="btn btn-light btn-sm" href="/Lab/Catalogue/Test/@t.Id" data-test="edit-@t.Code">Edit</a></td>
                 </tr>
             }

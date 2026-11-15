@@ -186,21 +186,22 @@ public sealed class PharmacyService : IPharmacyService
             await _audit.LogAsync(AuditActions.PharmDuplicateBlocked, "Pharmacy", dup.Number, $"Repeated submission of {dup.Number} ignored (stock was not changed twice)", ct: ct);
             return ServiceResult<DocumentResult>.Ok(dup with { WasDuplicate = true });
         }
-        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        // Joins the caller's transaction when there is one (update 9: ward medicine requests issue inside their own transaction).
+        await using var tx = await TxScope.BeginAsync(_db, ct);
         try
         {
             var r = await work();
             if (!r.Succeeded)
             {
                 await tx.RollbackAsync(CancellationToken.None);
-                _db.ChangeTracker.Clear();
+                if (tx.Owned) _db.ChangeTracker.Clear();
                 return r;
             }
             await _db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
             return r;
         }
-        catch (DbUpdateException ex) when (FinanceDb.IsUniqueViolation(ex, uniqueIndex))
+        catch (DbUpdateException ex) when (tx.Owned && FinanceDb.IsUniqueViolation(ex, uniqueIndex))
         {
             await tx.RollbackAsync(CancellationToken.None);
             _db.ChangeTracker.Clear();
@@ -209,7 +210,7 @@ public sealed class PharmacyService : IPharmacyService
         catch
         {
             await tx.RollbackAsync(CancellationToken.None);
-            _db.ChangeTracker.Clear();
+            if (tx.Owned) _db.ChangeTracker.Clear();
             throw;
         }
     }

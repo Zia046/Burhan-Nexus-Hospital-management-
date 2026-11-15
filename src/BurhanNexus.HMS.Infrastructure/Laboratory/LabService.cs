@@ -10,6 +10,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BurhanNexus.HMS.Infrastructure.Laboratory;
 
+/// <summary>One antibiotic line of a culture result (update 9).</summary>
+public sealed record CultureLineInput(long ValueId, string? Organism, string? Antibiotic, SensitivityResult? Result, string? Mic);
+
 public sealed class LabBookingInput
 {
     public Guid IdempotencyKey { get; set; }
@@ -23,6 +26,8 @@ public sealed class LabBookingInput
     public string? ExternalDoctorName { get; set; }
     public string? ClinicalNotes { get; set; }
     public bool IsUrgent { get; set; }
+    /// <summary>Update 9: use pregnancy reference ranges (also set automatically for a female patient with an ongoing pregnancy record).</summary>
+    public bool Pregnant { get; set; }
     /// <summary>Optional discounts per test id (needs the Phase 3 "Give Discounts" permission).</summary>
     public Dictionary<int, decimal> Discounts { get; set; } = new();
     public string? DiscountReason { get; set; }
@@ -79,6 +84,8 @@ public interface ILabService
     Task<ServiceResult> RejectSampleAsync(long sampleId, string? reason, CancellationToken ct = default);
 
     Task<ServiceResult> SaveResultAsync(long itemId, IReadOnlyDictionary<long, string?> values, string? comment, bool submit, uint rowVersion, CancellationToken ct = default);
+    /// <summary>Update 9: results including the antibiotic sensitivity lines of culture parameters.</summary>
+    Task<ServiceResult> SaveResultAsync(long itemId, IReadOnlyDictionary<long, string?> values, IReadOnlyList<CultureLineInput> culture, string? comment, bool submit, uint rowVersion, CancellationToken ct = default);
     Task<ServiceResult<int>> VerifyAsync(IReadOnlyList<long> itemIds, bool canVerifyOwn, CancellationToken ct = default);
     Task<ServiceResult> RejectResultAsync(long itemId, string? reason, CancellationToken ct = default);
     Task<ServiceResult> WithdrawResultAsync(long itemId, string? reason, CancellationToken ct = default);
@@ -163,6 +170,7 @@ public sealed class LabService : ILabService
                 ReferringDoctorId = i.ReferralType == LabReferralType.HospitalDoctor ? i.ReferringDoctorId : null,
                 ExternalDoctorName = i.ReferralType == LabReferralType.External ? T(i.ExternalDoctorName, 150) : null,
                 ClinicalNotes = T(i.ClinicalNotes, 1000), IsUrgent = i.IsUrgent, BusinessDate = today, BookedUtc = now, UpdatedUtc = now,
+                PatientPregnant = patient.Gender == Gender.Female && (i.Pregnant || await _db.Pregnancies.AnyAsync(g => g.PatientId == patient.Id && g.Status == PregnancyStatus.Active, ct)),
                 BookedByUserId = _ctx.UserId, BookedByUsername = _ctx.Username, Workstation = T(_ctx.Workstation, 100)
             };
             _db.LabOrders.Add(order);
@@ -218,7 +226,10 @@ public sealed class LabService : ILabService
         if (errors.Count > 0) return ServiceResult.Fail(errors.Distinct().ToArray());
 
         var now = _clock.UtcNow;
-        var ageDays = patient.DateOfBirth is { } dob ? today.DayNumber - dob.DayNumber : (int?)null;
+        // Age for age-specific ranges: from the date of birth, else from the age entered at registration.
+        var ageDays = patient.DateOfBirth is { } dob ? today.DayNumber - dob.DayNumber
+            : patient.AgeAtRegistration is int ar && patient.AgeUnitAtRegistration is AgeUnit au
+                ? today.DayNumber - AgeCalculator.EstimateDateOfBirth(ar, au, DateOnly.FromDateTime(patient.CreatedUtc)).DayNumber : (int?)null;
         var samples = await _db.LabSamples.Where(s => s.LabOrderId == order.Id && s.Status != LabSampleStatus.Rejected).ToListAsync(ct);
         var sort = await _db.LabOrderItems.Where(x => x.LabOrderId == order.Id).MaxAsync(x => (int?)x.SortOrder, ct) ?? 0;
         var newItems = new List<(LabOrderItem Item, LabTest Test)>();
@@ -250,7 +261,7 @@ public sealed class LabService : ILabService
             };
             foreach (var p in t.Parameters)
             {
-                var range = ResolveRange(p.Ranges, patient.Gender, ageDays);
+                var range = ResolveRange(p.Ranges, patient.Gender, ageDays, order.PatientPregnant);
                 item.Values.Add(new LabResultValue
                 {
                     ParameterId = p.Id, Name = p.Name, Unit = p.Unit, ResultType = p.ResultType, Options = p.Options, Decimals = p.Decimals,
@@ -288,12 +299,13 @@ public sealed class LabService : ILabService
         return ServiceResult.Ok();
     }
 
-    /// <summary>Most specific matching range: gender-specific beats "both", narrower age band beats wider.</summary>
-    public static LabReferenceRange? ResolveRange(IEnumerable<LabReferenceRange> ranges, Gender gender, int? ageDays) =>
-        ranges.Where(r => (r.Gender is null || r.Gender == gender)
+    /// <summary>Most specific matching range: pregnancy range for a pregnant patient, gender-specific beats "both", narrower age band beats wider.</summary>
+    public static LabReferenceRange? ResolveRange(IEnumerable<LabReferenceRange> ranges, Gender gender, int? ageDays, bool pregnant = false) =>
+        ranges.Where(r => (!r.IsPregnancy || pregnant) && (r.Gender is null || r.Gender == gender)
                           && (r.MinAgeDays is null || (ageDays is int a && a >= r.MinAgeDays))
                           && (r.MaxAgeDays is null || (ageDays is int b && b < r.MaxAgeDays)))
-            .OrderByDescending(r => r.Gender is null ? 0 : 1)
+            .OrderByDescending(r => r.IsPregnancy ? 1 : 0)
+            .ThenByDescending(r => r.Gender is null ? 0 : 1)
             .ThenBy(r => (r.MaxAgeDays ?? 100_000) - (r.MinAgeDays ?? 0))
             .FirstOrDefault();
 
@@ -478,6 +490,9 @@ public sealed class LabService : ILabService
                 var choices = (v.Options ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                 if (!choices.Contains(raw, StringComparer.OrdinalIgnoreCase)) return (LabFlag.None, null, $"{v.Name}: choose one of {string.Join(", ", choices)}.");
                 return (v.RefText is { } e2 && !e2.Equals(raw, StringComparison.OrdinalIgnoreCase) ? LabFlag.Abnormal : LabFlag.None, null, null);
+            case LabResultType.Culture:
+                if (raw.Length > 200) return (LabFlag.None, null, $"{v.Name}: at most 200 characters.");
+                return (v.RefText is { } e3 && !e3.Equals(raw, StringComparison.OrdinalIgnoreCase) ? LabFlag.Abnormal : LabFlag.None, null, null);
             default:
                 return (LabFlag.None, null, raw.Length > 200 ? $"{v.Name}: at most 200 characters." : null);
         }
@@ -491,7 +506,10 @@ public sealed class LabService : ILabService
         _ => raw,
     };
 
-    public async Task<ServiceResult> SaveResultAsync(long itemId, IReadOnlyDictionary<long, string?> values, string? comment, bool submit, uint rowVersion, CancellationToken ct = default)
+    public Task<ServiceResult> SaveResultAsync(long itemId, IReadOnlyDictionary<long, string?> values, string? comment, bool submit, uint rowVersion, CancellationToken ct = default) =>
+        SaveResultAsync(itemId, values, Array.Empty<CultureLineInput>(), comment, submit, rowVersion, ct);
+
+    public async Task<ServiceResult> SaveResultAsync(long itemId, IReadOnlyDictionary<long, string?> values, IReadOnlyList<CultureLineInput> culture, string? comment, bool submit, uint rowVersion, CancellationToken ct = default)
     {
         var item = await _db.LabOrderItems.Include(x => x.Values).Include(x => x.Order).FirstOrDefaultAsync(x => x.Id == itemId, ct);
         if (item is null) return ServiceResult.Fail("Test not found.");
@@ -517,7 +535,27 @@ public sealed class LabService : ILabService
             v.Flag = flag;
         }
         if (!anyValue && errors.Count == 0) errors.Add("Enter at least one result.");
-        if (errors.Count > 0) return ServiceResult.Fail(errors.ToArray());
+        // Culture: antibiotic sensitivity lines (S / I / R) for each culture parameter – replaced as a whole while the result is still editable.
+        var cultureIds = item.Values.Where(v => v.ResultType == LabResultType.Culture).Select(v => v.Id).ToHashSet();
+        var lines = culture.Where(c => cultureIds.Contains(c.ValueId) && !string.IsNullOrWhiteSpace(c.Antibiotic)).ToList();
+        foreach (var c in lines)
+        {
+            if (c.Result is null || !Enum.IsDefined(c.Result.Value)) errors.Add($"{c.Antibiotic}: choose S, I or R.");
+            if (T(c.Organism, 150) is null && T(item.Values.First(v => v.Id == c.ValueId).Value, 150) is null) errors.Add($"{c.Antibiotic}: enter the organism.");
+        }
+        if (errors.Count > 0) return ServiceResult.Fail(errors.Distinct().ToArray());
+        if (cultureIds.Count > 0)
+        {
+            var old = await _db.LabCultureResults.Where(c => cultureIds.Contains(c.ResultValueId)).ToListAsync(ct);
+            _db.LabCultureResults.RemoveRange(old);
+            var n = 0;
+            foreach (var c in lines)
+                _db.LabCultureResults.Add(new LabCultureResult
+                {
+                    ResultValueId = c.ValueId, Organism = T(c.Organism, 150) ?? T(item.Values.First(v => v.Id == c.ValueId).Value, 150)!, Antibiotic = T(c.Antibiotic, 100)!,
+                    Interpretation = c.Result!.Value, Mic = T(c.Mic, 30), SortOrder = n += 10
+                });
+        }
         var today = await _clock.TodayAsync();
         var wasSubmitted = item.Status == LabOrderItemStatus.AwaitingVerification;
         item.Comment = T(comment, 1000);

@@ -98,6 +98,7 @@ public static class NavMenu
                 Perm.PharmViewStockReports, Perm.PharmViewDepartmentStock, Perm.PharmAdjustStock, Perm.PharmApproveAdjustments, Perm.PharmManageSuppliers, Perm.PharmSettings),
             (Has(Perm.PharmDashboard), new("pharm-dashboard", "/Pharmacy", "pill", "Pharmacy Dashboard")),
             (Has(Perm.PharmIssueToPatients), new("pharm-issue", "/Pharmacy/Issue", "users-round", "Patient Issue")),
+            (Has(Perm.PharmProcessWardRequests), new("pharm-ward", "/Pharmacy/WardRequests", "file", "Ward Requests")),
             (Has(Perm.PharmRetailSales) && isPrivate, new("pharm-sale", "/Pharmacy/Sale", "wallet", "Retail Sale", PrivateOnly: true)),
             (Has(Perm.PharmReceiveStock), new("pharm-receive", "/Pharmacy/Receive", "download", "Receive Stock")),
             (Has(Perm.PharmTransferStock), new("pharm-transfer", "/Pharmacy/Transfer", "refresh", "Stock Transfer")),

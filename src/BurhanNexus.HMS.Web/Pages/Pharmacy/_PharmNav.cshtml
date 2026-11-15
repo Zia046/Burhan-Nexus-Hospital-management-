@@ -6,6 +6,7 @@
 <nav class="subnav no-print">
     <a bn-permission="@Perm.PharmDashboard" class="@Cls("dashboard")" href="/Pharmacy"><svg class="icon icon-sm"><use href="#i-chart" /></svg> Dashboard</a>
     <a bn-permission="@Perm.PharmIssueToPatients" class="@Cls("issue")" href="/Pharmacy/Issue"><svg class="icon icon-sm"><use href="#i-users-round" /></svg> Patient issue</a>
+    <a bn-permission="@Perm.PharmProcessWardRequests" class="@Cls("ward")" href="/Pharmacy/WardRequests" data-nav="ward-requests"><svg class="icon icon-sm"><use href="#i-file" /></svg> Ward requests</a>
     @if (isPrivate) { <a bn-permission="@Perm.PharmRetailSales" class="@Cls("sale")" href="/Pharmacy/Sale"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Retail sale</a> }
     <a bn-permission="@Perm.PharmReceiveStock" class="@Cls("receive")" href="/Pharmacy/Receive"><svg class="icon icon-sm"><use href="#i-download" /></svg> Receive stock</a>
     <a bn-permission="@Perm.PharmTransferStock" class="@Cls("transfer")" href="/Pharmacy/Transfer"><svg class="icon icon-sm"><use href="#i-refresh" /></svg> Transfer</a>

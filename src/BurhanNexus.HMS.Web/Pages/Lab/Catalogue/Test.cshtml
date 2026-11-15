@@ -21,6 +21,10 @@
         <div class="field span-2"><label for="Input_CollectionInstructions">Collection / patient instructions</label><input asp-for="Input.CollectionInstructions" maxlength="500" /></div>
         <div class="field span-3"><label for="Input_Interpretation">Default comment / interpretation (printed)</label><textarea asp-for="Input.Interpretation" rows="2" maxlength="1000"></textarea></div>
         <label class="check"><input type="checkbox" asp-for="Input.IsActive" /> Active (bookable)</label>
+        @if (Model.Test?.RequiresReview == true)
+        {
+            <label class="check" data-review-box><input type="checkbox" name="Input.MarkReviewed" value="true" /> Ranges, units and price checked for our method / analyser (removes the "Review" mark)</label>
+        }
     </fieldset>
     <fieldset class="card-body form-grid fee-box" disabled="@(!Model.CanFees || !Model.CanEdit)">
         <legend>Price <small class="muted">(Phase 3 service fee@(t is null ? "" : " · " + t.ServiceItem?.Code))</small></legend>
@@ -60,7 +64,7 @@
                         <tbody>
                         @foreach (var r in p.Ranges.OrderBy(r => r.Gender == null ? 1 : 0).ThenBy(r => r.MinAgeDays ?? 0))
                         {
-                            <tr data-range><td>@(r.Gender?.ToString() ?? "All")</td><td>@BurhanNexus.HMS.Web.Pages.Lab.Catalogue.TestModel.Age(r.MinAgeDays)</td><td>@BurhanNexus.HMS.Web.Pages.Lab.Catalogue.TestModel.Age(r.MaxAgeDays)</td>
+                            <tr data-range><td>@(r.Gender?.ToString() ?? "All")@if (r.IsPregnancy) { <span class="pill" data-pregnancy-range>Pregnancy</span> }</td><td>@BurhanNexus.HMS.Web.Pages.Lab.Catalogue.TestModel.Age(r.MinAgeDays)</td><td>@BurhanNexus.HMS.Web.Pages.Lab.Catalogue.TestModel.Age(r.MaxAgeDays)</td>
                                 <td>@N(r.Low)</td><td>@N(r.High)</td><td>@N(r.CriticalLow)</td><td>@N(r.CriticalHigh)</td><td>@r.NormalText</td>
                                 <td>@if (Model.CanRanges) { <form method="post" asp-page-handler="DeleteRange" asp-route-rangeId="@r.Id" class="inline"><button class="btn btn-light btn-sm" type="submit" title="Remove">✕</button></form> }</td></tr>
                         }
@@ -73,6 +77,7 @@
                                 <input name="Range.Low" inputmode="decimal" class="w-xs" placeholder="Low" /><input name="Range.High" inputmode="decimal" class="w-xs" placeholder="High" />
                                 <input name="Range.CriticalLow" inputmode="decimal" class="w-xs" placeholder="Crit. low" /><input name="Range.CriticalHigh" inputmode="decimal" class="w-xs" placeholder="Crit. high" />
                                 <input name="Range.NormalText" maxlength="100" class="w-sm" placeholder="e.g. Negative" />
+                                <label class="check-inline"><input type="checkbox" name="Range.IsPregnancy" value="true" /> Pregnancy</label>
                                 <button class="btn btn-primary btn-sm" type="submit">Add range</button></form></td></tr>
                         }
                         </tbody>

@@ -707,3 +707,5 @@ form.inline { display: inline; }
 .pay-waived { background: var(--amber-100); color: var(--amber-600); }
 .pay-none { background: var(--line-2); color: var(--muted); }
 .kpi-icon.amber { background: var(--amber-100); color: var(--amber-600); }
+.sensitivity-table input, .sensitivity-table select { width: 100%; min-width: 0; }
+.culture-row > td { background: var(--blue-50); }

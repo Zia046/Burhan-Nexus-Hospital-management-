@@ -32,6 +32,8 @@
 }
 else
 {
+    <datalist id="lab-organisms">@foreach (var o in BurhanNexus.HMS.Web.Pages.Lab.EntryModel.Organisms) { <option value="@o"></option> }</datalist>
+    <datalist id="lab-antibiotics">@foreach (var o in BurhanNexus.HMS.Web.Pages.Lab.EntryModel.Antibiotics) { <option value="@o"></option> }</datalist>
     <form method="post" asp-route-item="@c.Id" class="card" novalidate data-entry-form>
         <input type="hidden" name="RowVersion" value="@Model.RowVersion" />
         <div class="card-header">
@@ -73,6 +75,9 @@ else
                                     <select id="v@(v.Id)" name="Values[@v.Id]" class="result-input" disabled="@dis" autofocus="@first"><option value="">—</option>
                                         @foreach (var opt in (v.Options ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) { <option selected="@(val == opt)">@opt</option> }</select>
                                     break;
+                                case LabResultType.Culture:
+                                    <input id="v@(v.Id)" name="Values[@v.Id]" value="@val" maxlength="200" autocomplete="off" class="result-input wide" disabled="@dis" autofocus="@first" list="lab-organisms" placeholder="Organism isolated, or No growth" data-culture-organism />
+                                    break;
                                 default:
                                     <input id="v@(v.Id)" name="Values[@v.Id]" value="@val" maxlength="200" autocomplete="off" class="result-input wide" disabled="@dis" autofocus="@first" placeholder="@v.RefText" />
                                     break;
@@ -82,6 +87,30 @@ else
                         <td>@v.Unit</td>
                         <td class="muted">@v.ReferenceDisplay</td>
                     </tr>
+                    @if (v.ResultType == LabResultType.Culture)
+                    {
+                        var existing = Model.CultureLines.GetValueOrDefault(v.Id) ?? new List<LabCultureResult>();
+                        var rows = Math.Max(existing.Count + 4, 10);
+                        <tr class="culture-row" data-culture="@v.Id"><td colspan="4">
+                            <table class="table table-compact sensitivity-table">
+                                <thead><tr><th>Antibiotic</th><th>S / I / R</th><th>MIC / zone</th><th>Organism (if different)</th></tr></thead>
+                                <tbody>
+                                @for (var k = 0; k < rows; k++)
+                                {
+                                    var line = k < existing.Count ? existing[k] : null;
+                                    var idx = Model.CultureIndex++;
+                                    <tr><td><input type="hidden" name="Culture[@idx].ValueId" value="@v.Id" /><input name="Culture[@idx].Antibiotic" value="@(line?.Antibiotic)" list="lab-antibiotics" maxlength="100" disabled="@dis" aria-label="Antibiotic" /></td>
+                                        <td><select name="Culture[@idx].Result" disabled="@dis" aria-label="Sensitivity"><option value="">—</option>
+                                            <option value="Sensitive" selected="@(line?.Interpretation == SensitivityResult.Sensitive)">S – Sensitive</option>
+                                            <option value="Intermediate" selected="@(line?.Interpretation == SensitivityResult.Intermediate)">I – Intermediate</option>
+                                            <option value="Resistant" selected="@(line?.Interpretation == SensitivityResult.Resistant)">R – Resistant</option></select></td>
+                                        <td><input name="Culture[@idx].Mic" value="@(line?.Mic)" maxlength="30" disabled="@dis" aria-label="MIC" /></td>
+                                        <td><input name="Culture[@idx].Organism" value="@(line is not null && line.Organism != val ? line.Organism : null)" list="lab-organisms" maxlength="150" disabled="@dis" aria-label="Organism" /></td></tr>
+                                }
+                                </tbody>
+                            </table>
+                        </td></tr>
+                    }
                     first = false;
                 }
                 </tbody>
