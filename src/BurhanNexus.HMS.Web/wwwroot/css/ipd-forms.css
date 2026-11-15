@@ -23,3 +23,7 @@
 .ipd-chart .c-limit { stroke: #b45309; stroke-width: .8; stroke-dasharray: 4 3; }
 .ipd-chart .c-limit-t { font-size: 7.5px; fill: #b45309; }
 .ipd-chart .c-empty { font-size: 10px; fill: #94a3b8; }
+
+/* OT specimen labels */
+.f-labels { display: flex; flex-wrap: wrap; gap: 4mm; }
+.f-label { border: 1px dashed #555; width: 62mm; padding: 2mm 3mm; font-size: 9pt; line-height: 1.35; break-inside: avoid; }

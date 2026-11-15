@@ -1,0 +1,31 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ot.RecoveryModel
+@{ ViewData["Title"] = "Recovery room / PACU"; }
+<partial name="_OtNav" />
+<div class="card" data-pacu-board>
+    <div class="card-header"><h2>Patients in recovery (@Model.Open.Count)</h2></div>
+    <div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>Patient</th><th>Surgery</th><th>Theatre</th><th>Status</th><th>Arrived</th><th>Nurse</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Open)
+        {
+            var su = r.Surgery!;
+            <tr data-pacu="@su.Number"><td><strong>@su.Patient!.FullName</strong><small class="block muted">@su.Patient.PatientNumber</small></td><td class="mono">@su.Number<small class="block">@su.ProcedureName</small></td>
+                <td>@su.Theatre?.Name</td><td><span class="status @(r.Status == RecoveryStatus.ReadyForTransfer ? "status-ok" : "status-info")">@r.Status</span></td><td>@Fmt.DateTimeText(r.ArrivalUtc ?? r.CreatedUtc)</td><td>@r.Nurse</td>
+                <td><a class="btn btn-light btn-sm" href="/Ot/Surgery/@su.Id?tab=recovery">Open</a></td></tr>
+        }
+        @if (Model.Open.Count == 0) { <tr><td colspan="7" class="empty">No patient in recovery.</td></tr> }
+        </tbody></table></div>
+</div>
+<div class="card" data-pacu-transferred>
+    <div class="card-header"><h2>Transferred today</h2></div>
+    <div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>Patient</th><th>Surgery</th><th>Transferred</th><th>To</th><th>Handover</th><th>Decided by</th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Transferred)
+        {
+            <tr><td>@r.Surgery!.Patient!.FullName</td><td><a href="/Ot/Surgery/@r.SurgeryId?tab=recovery">@r.Surgery.Number</a></td><td>@Fmt.DateTimeText(r.TransferUtc)</td><td>@r.Status · @r.Destination</td><td>@r.HandoverStaff</td><td>@r.DecisionBy</td></tr>
+        }
+        @if (Model.Transferred.Count == 0) { <tr><td colspan="6" class="empty">None today.</td></tr> }
+        </tbody></table></div>
+</div>

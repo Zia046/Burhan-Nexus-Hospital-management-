@@ -68,6 +68,18 @@ public static class NavMenu
             (Any(Perm.IpdManageWards, Perm.IpdManageRooms, Perm.IpdManageBeds), new("ipd-wards", "/Ipd/Wards", "sliders", "Wards & Beds")),
             (Has(Perm.IpdSettings), new("ipd-settings", "/Ipd/Settings", "settings", "IPD Settings")));
 
+        Add("ot", "Operation Theatre", "scissors", Any(Perm.OtDashboard, Perm.OtCreateBooking, Perm.OtManageRecovery, Perm.OtManageCssd, Perm.OtViewStatistics,
+                Perm.OtManageTheatres, Perm.OtManageCatalogue, Perm.OtSettings),
+            (Has(Perm.OtDashboard), new("ot-dashboard", "/Ot", "scissors", "OT Dashboard")),
+            (Has(Perm.OtCreateBooking), new("ot-book", "/Ot/Book", "plus", "Book Surgery")),
+            (Has(Perm.OtDashboard), new("ot-schedule", "/Ot/Schedule", "calendar", "OT Schedule")),
+            (Has(Perm.OtManageRecovery), new("ot-recovery", "/Ot/Recovery", "activity", "Recovery / PACU")),
+            (Has(Perm.OtManageCssd), new("ot-cssd", "/Ot/Cssd", "refresh", "CSSD")),
+            (Has(Perm.OtViewStatistics), new("ot-reports", "/Ot/Reports", "chart", "OT Reports")),
+            (Has(Perm.OtManageTheatres), new("ot-theatres", "/Ot/Theatres", "hospital", "OT Rooms & Equipment")),
+            (Has(Perm.OtManageCatalogue), new("ot-procedures", "/Ot/Procedures", "sliders", "Surgery Catalogue")),
+            (Any(Perm.OtSettings, Perm.OtManageCatalogue), new("ot-setup", "/Ot/Setup", "settings", "OT Settings")));
+
         Add("radiology", "Radiology", "scan", Any(Perm.RadDashboard, Perm.RadCreateBooking, Perm.RadViewXRay, Perm.RadViewUltrasound, Perm.RadEnterReport, Perm.RadEditDraft, Perm.RadVerifyReport,
                 Perm.RadViewHistory, Perm.RadViewStatistics, Perm.RadManageServices, Perm.RadManageTemplates, Perm.RadSettings),
             (Has(Perm.RadDashboard), new("rad-dashboard", "/Radiology", "scan", "Radiology Dashboard")),

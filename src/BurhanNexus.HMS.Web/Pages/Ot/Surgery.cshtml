@@ -287,7 +287,8 @@
                 </div>
             </div>
             <div class="card-footer"><button class="btn btn-light btn-sm" type="submit">Save times</button>
-                <a bn-permission="@Perm.OtPrintDocuments" class="btn btn-light btn-sm" href="/Print/Ot/anesthesia/@s.Id" target="_blank">Print anesthesia assessment &amp; record</a></div>
+                <a bn-permission="@Perm.OtPrintDocuments" class="btn btn-light btn-sm" href="/Print/Ot/anesthesia/@s.Id" target="_blank">Print pre-anesthesia assessment</a>
+                <a bn-permission="@Perm.OtPrintDocuments" class="btn btn-light btn-sm" href="/Print/Ot/anesthesia-record/@s.Id" target="_blank">Print anesthesia record</a></div>
         </form>
         @await Html.PartialAsync("_Drugs", (Model.Drugs.Where(d => d.Phase == "Anesthesia").ToList(), "Anesthesia", s.Id, Perm.OtEnterAnesthesia))
     </div>

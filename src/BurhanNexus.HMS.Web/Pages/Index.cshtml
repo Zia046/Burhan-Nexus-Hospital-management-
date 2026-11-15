@@ -173,6 +173,7 @@ else
                     : Model.Perms.Contains(Perm.RadEnterReport) ? "/Radiology/Reporting" : Model.Perms.Contains(Perm.RadVerifyReport) ? "/Radiology/Verify" : "/Radiology/History",
                 "Ipd" => Model.Perms.Contains(Perm.IpdDashboard) ? "/Ipd" : Model.Perms.Contains(Perm.IpdViewPatients) ? "/Ipd/Admissions" : Model.Perms.Contains(Perm.IpdRegisterAdmission) ? "/Ipd/Admit"
                     : Model.Perms.Contains(Perm.IpdViewGynae) ? "/Ipd/Gynae" : Model.Perms.Contains(Perm.IpdManageLabour) ? "/Ipd/Labour" : Model.Perms.Contains(Perm.IpdManageNicu) ? "/Ipd/Nicu" : "/Ipd/Nursing",
+                "Ot" => Model.Perms.Contains(Perm.OtDashboard) ? "/Ot" : Model.Perms.Contains(Perm.OtCreateBooking) ? "/Ot/Book" : Model.Perms.Contains(Perm.OtManageRecovery) ? "/Ot/Recovery" : "/Ot/Cssd",
                 "Pharmacy" => Model.Perms.Contains(Perm.PharmDashboard) ? "/Pharmacy" : Model.Perms.Contains(Perm.PharmIssueToPatients) ? "/Pharmacy/Issue" : "/Pharmacy/Medicines",
                 "Laboratory" => Model.Perms.Contains(Perm.LabDashboard) ? "/Lab" : Model.Perms.Contains(Perm.LabBook) ? "/Lab/Book"
                     : Model.Perms.Contains(Perm.LabEnterResults) ? "/Lab/Pending" : "/Lab/Results",

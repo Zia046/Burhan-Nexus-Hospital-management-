@@ -1,0 +1,125 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ot.CssdModel
+@{ ViewData["Title"] = "CSSD – sterilisation"; var setEdit = Model.EditSet is not null; var instEdit = Model.EditInstrument is not null; }
+<partial name="_OtNav" />
+<partial name="_ValidationSummary" />
+
+<div class="card" data-cssd-sets>
+    <div class="card-header"><h2>Instrument sets</h2></div>
+    <div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>Code</th><th>Set</th><th>Contents</th><th>Status</th><th>Sterile until</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var s in Model.Sets)
+        {
+            var expired = s.Status == CssdSetStatus.Sterile && s.SterileUntil is DateOnly u && u < Model.Today;
+            <tr class="@(s.IsActive ? "" : "row-muted")" data-set="@s.Code" data-set-status="@s.Status"><td class="mono">@s.Code</td><td>@s.Name</td>
+                <td class="small">@string.Join(", ", s.Items.Select(i => $"{i.Quantity}× {i.Instrument?.Name}"))</td>
+                <td><span class="status @(s.Status switch { CssdSetStatus.Sterile => expired ? "status-bad" : "status-ok", CssdSetStatus.Quarantined => "status-bad", CssdSetStatus.Issued => "status-info", _ => "status-warn" })">@(expired ? "Expired" : s.Status.ToString())</span></td>
+                <td>@(s.SterileUntil is DateOnly su ? Fmt.Day(su) : "—")</td>
+                <td class="actions">
+                    @if (s.Status == CssdSetStatus.Sterile && !expired)
+                    {
+                        <form method="post" asp-page-handler="Issue" class="inline-form"><input type="hidden" name="ItemId" value="@s.Id" /><input name="IssuedTo" placeholder="Issued to" maxlength="150" /><button class="btn btn-light btn-sm" type="submit">Issue</button></form>
+                    }
+                    @if (s.Status is not (CssdSetStatus.Quarantined or CssdSetStatus.Issued))
+                    {
+                        <details><summary class="btn btn-light btn-sm">Quarantine</summary><form method="post" asp-page-handler="Quarantine" class="inline-form"><input type="hidden" name="ItemId" value="@s.Id" /><input name="Reason" placeholder="Reason *" maxlength="300" /><button class="btn btn-light btn-sm" type="submit">Quarantine</button></form></details>
+                    }
+                    <a class="btn btn-light btn-sm" href="/Ot/Cssd?set=@s.Id">Edit</a></td></tr>
+        }
+        @if (Model.Sets.Count == 0) { <tr><td colspan="6" class="empty">No instrument sets yet.</td></tr> }
+        </tbody></table></div>
+</div>
+
+<div class="grid-2">
+    <form method="post" asp-page-handler="Batch" class="card" novalidate data-batch-form>
+        <div class="card-header"><h3>Start sterilisation cycle</h3></div>
+        <div class="card-body">
+            <div class="grid-3">
+                <div class="field"><label for="B_Method">Method *</label><input id="B_Method" name="Batch.Method" maxlength="60" placeholder="Steam autoclave / …" /></div>
+                <div class="field"><label for="B_Ster">Steriliser</label><input id="B_Ster" name="Batch.Steriliser" maxlength="60" /></div>
+                <div class="field"><label for="B_Cycle">Cycle number</label><input id="B_Cycle" name="Batch.CycleNumber" maxlength="30" /></div>
+                <div class="field"><label for="B_Start">Start</label><input id="B_Start" type="datetime-local" name="Batch.StartLocal" /></div>
+                <div class="field span-2"><label for="B_Staff">Responsible staff</label><input id="B_Staff" name="Batch.ResponsibleStaff" maxlength="150" /></div>
+            </div>
+            <div class="field"><label for="B_Par">Cycle parameters (as recorded by the steriliser)</label><input id="B_Par" name="Batch.Parameters" maxlength="500" /></div>
+            <fieldset class="inline-form wrap"><legend>Sets in this load (not sterile only)</legend>
+                @foreach (var s in Model.Sets.Where(x => x.IsActive && x.Status == CssdSetStatus.NotSterile)) { <label class="check"><input type="checkbox" name="Batch.SetIds" value="@s.Id" /> @s.Code @s.Name</label> }
+            </fieldset>
+        </div>
+        <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="start-batch">Start cycle</button></div>
+    </form>
+    <div class="card" data-issued>
+        <div class="card-header"><h3>Issued sets (not yet returned)</h3></div>
+        <table class="table table-compact"><tbody>
+        @foreach (var i in Model.Issues)
+        {
+            <tr><td>@i.Set!.Code @i.Set.Name</td><td>@Fmt.DateTimeText(i.IssuedUtc) → @i.IssuedTo @if (i.SurgeryId is long sid) { <a href="/Ot/Surgery/@sid">surgery</a> }</td>
+                <td><form method="post" asp-page-handler="Return" class="inline-form"><input type="hidden" name="ItemId" value="@i.Id" /><input name="Reason" placeholder="Note" maxlength="300" /><button class="btn btn-light btn-sm" type="submit">Return</button></form></td></tr>
+        }
+        @if (Model.Issues.Count == 0) { <tr><td class="empty">None.</td></tr> }
+        </tbody></table>
+    </div>
+</div>
+
+<div class="card" data-batches>
+    <div class="card-header"><h2>Sterilisation batches</h2></div>
+    <div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>Batch</th><th>Method / cycle</th><th>Started</th><th>Sets</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var b in Model.Batches)
+        {
+            <tr data-batch="@b.Number" data-batch-status="@b.Status"><td class="mono">@b.Number</td><td>@b.Method @b.Steriliser @b.CycleNumber<small class="block muted">@b.Parameters</small></td><td>@Fmt.DateTimeText(b.StartUtc)<small class="block">@b.ResponsibleStaff</small></td>
+                <td class="small">@string.Join(", ", b.Sets.Select(x => x.Set?.Code))</td>
+                <td><span class="status @(b.Status switch { CssdBatchStatus.Failed => "status-bad", CssdBatchStatus.Released => "status-ok", CssdBatchStatus.Passed => "status-info", _ => "status-warn" })">@b.Status</span>
+                    @if (b.FailReason is not null) { <small class="block">@b.FailReason</small> } @if (b.ExpiryDate is DateOnly ex) { <small class="block">Sterile until @Fmt.Day(ex)</small> }</td>
+                <td class="actions">
+                    @if (b.Status == CssdBatchStatus.InProgress)
+                    {
+                        <form method="post" asp-page-handler="Result" class="inline-form wrap" novalidate><input type="hidden" name="ItemId" value="@b.Id" />
+                            <select name="Passed" aria-label="Result"><option value="true">Passed</option><option value="false">Failed</option></select>
+                            <input type="date" name="Expiry" aria-label="Sterile until" /><input type="datetime-local" name="EndLocal" aria-label="End" /><input name="Reason" placeholder="Failure reason" maxlength="300" />
+                            <button class="btn btn-light btn-sm" type="submit" data-test="batch-result">Record result</button></form>
+                    }
+                    else if (b.Status == CssdBatchStatus.Passed)
+                    {
+                        <form method="post" asp-page-handler="Release" class="inline-form"><input type="hidden" name="ItemId" value="@b.Id" /><button class="btn btn-primary btn-sm" type="submit" data-test="release-batch">Release</button></form>
+                    }
+                </td></tr>
+        }
+        @if (Model.Batches.Count == 0) { <tr><td colspan="6" class="empty">No batches.</td></tr> }
+        </tbody></table></div>
+</div>
+
+<div class="grid-2">
+    <form method="post" asp-page-handler="Set" asp-route-set="@Model.EditSet" class="card" novalidate data-set-form>
+        <div class="card-header"><h3>@(setEdit ? "Edit instrument set" : "New instrument set")</h3></div>
+        <div class="card-body">
+            <div class="grid-2">
+                <div class="field"><label for="S_Code">Code *</label><input id="S_Code" name="Code" value="@(setEdit ? Model.Code : "")" maxlength="30" /></div>
+                <div class="field"><label for="S_Name">Name *</label><input id="S_Name" name="Name" value="@(setEdit ? Model.Name : "")" maxlength="150" /></div>
+                <div class="field"><label for="S_Ot">Theatre</label><select id="S_Ot" name="TheatreId"><option value="">—</option>@foreach (var t in Model.Theatres) { <option value="@t.Id" selected="@(setEdit && Model.TheatreId == t.Id)">@t.Name</option> }</select></div>
+                <div class="field"><label for="S_Desc">Description</label><input id="S_Desc" name="Description" value="@(setEdit ? Model.Description : "")" maxlength="500" /></div>
+            </div>
+            <table class="table table-compact"><thead><tr><th>Instrument</th><th>Qty</th></tr></thead><tbody>
+            @foreach (var ins in Model.Instruments.Where(x => x.IsActive)) { <tr><td>@ins.Name <small class="muted">@ins.Code</small></td><td><input type="number" min="0" max="500" name="Qty[@ins.Id]" value="@(Model.Qty.GetValueOrDefault(ins.Id))" aria-label="Quantity of @ins.Name" /></td></tr> }
+            @if (Model.Instruments.Count == 0) { <tr><td colspan="2" class="empty">Add instruments first.</td></tr> }
+            </tbody></table>
+            <label class="check"><input type="checkbox" name="Active" value="true" checked="@(!setEdit || Model.Active)" /> Active</label><input type="hidden" name="Active" value="false" />
+        </div>
+        <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="save-set">Save set</button></div>
+    </form>
+    <div class="card">
+        <form method="post" asp-page-handler="Instrument" asp-route-inst="@Model.EditInstrument" novalidate data-instrument-form>
+            <div class="card-header"><h3>@(instEdit ? "Edit instrument" : "New instrument")</h3></div>
+            <div class="card-body grid-3">
+                <div class="field"><label for="N_Code">Code *</label><input id="N_Code" name="Code" value="@(instEdit ? Model.Code : "")" maxlength="30" /></div>
+                <div class="field"><label for="N_Name">Name *</label><input id="N_Name" name="Name" value="@(instEdit ? Model.Name : "")" maxlength="150" /></div>
+                <div class="field"><label for="N_Cat">Category</label><input id="N_Cat" name="Category" value="@(instEdit ? Model.Category : "")" maxlength="60" /></div>
+                <label class="check"><input type="checkbox" name="Active" value="true" checked="@(!instEdit || Model.Active)" /> Active</label><input type="hidden" name="Active" value="false" />
+            </div>
+            <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="save-instrument">Save instrument</button></div>
+        </form>
+        <table class="table table-compact"><tbody>@foreach (var ins in Model.Instruments) { <tr class="@(ins.IsActive ? "" : "row-muted")"><td class="mono">@ins.Code</td><td>@ins.Name</td><td>@ins.Category</td><td><a class="btn btn-light btn-sm" href="/Ot/Cssd?inst=@ins.Id">Edit</a></td></tr> }</tbody></table>
+    </div>
+</div>

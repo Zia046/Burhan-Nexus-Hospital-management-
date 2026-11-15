@@ -1,0 +1,281 @@
+@page "/Print/Ot/{form}/{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Print.Ot.FormModel
+@{
+    Layout = null;
+    var h = Model.Hospital; var st = Model.Settings; var s = Model.S; var p = Model.P;
+    string V(string? x) => string.IsNullOrWhiteSpace(x) ? "—" : x;
+    string D(DateTime? utc) => utc is null ? "—" : Fmt.DateTimeText(utc);
+    string Nr(string? x) => string.IsNullOrWhiteSpace(x) ? "not recorded" : x;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>@Model.Title@(p is null ? "" : " – " + p.FullName)</title>
+    <link rel="stylesheet" href="~/css/lab-report.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/radiology-report.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/ipd-forms.css" asp-append-version="true" />
+    <script src="~/js/lab-report.js" asp-append-version="true" defer></script>
+</head>
+<body class="lab-report-body ipd-form-body" data-ot-form="@Model.Form">
+<div class="lr-toolbar no-print">
+    <div class="lr-row">
+        <strong>@Model.Title</strong>
+        <button type="button" class="lr-btn" data-print-now data-test="print-form">Print</button>
+        @if (s is not null) { <a class="lr-btn light" href="/Ot/Surgery/@s.Id">&larr; Surgery</a> } else { <a class="lr-btn light" href="/Ot/Schedule">&larr; Schedule</a> }
+    </div>
+    <div class="lr-status">For a PDF choose “Save as PDF” in the print dialog. Reprinting only reads the stored record – nothing is created. @(st.PrintHeader ? "" : "Header off – printing on the hospital letterhead.")</div>
+</div>
+<main class="lr-page rr-page" data-form-page>
+    @if (st.PrintHeader)
+    {
+        <header class="lr-head" data-form-header>
+            @if (h.HasLogo) { <img class="lr-logo" src="/branding/logo?v=@h.LogoVersion" alt="" /> }
+            <div class="lr-brand">
+                <div class="lr-hosp">@h.HospitalName</div>
+                <div class="lr-small">@h.Address, @h.City · @h.ContactNumber</div>
+                @if (h.ReportHeader is { Length: > 0 } hd) { <div class="lr-small">@hd</div> }
+            </div>
+        </header>
+    }
+    else { <div class="rr-letterhead" style="height:@(st.LetterheadTopMarginMm)mm" data-letterhead-space></div> }
+    <h1 class="lr-title">@Model.Title.ToUpperInvariant()</h1>
+
+    @if (s is not null && p is not null)
+    {
+        <table class="lr-info">
+            <tr><th>Patient</th><td><strong>@p.FullName</strong></td><th>Patient ID</th><td class="mono">@p.PatientNumber</td></tr>
+            <tr><th>Age / Gender</th><td>@Model.AgeText / @p.Gender</td><th>Father / Husband</th><td>@V(p.GuardianName)</td></tr>
+            <tr><th>Surgery no.</th><td class="mono">@s.Number · @s.Priority</td><th>IPD admission</th><td class="mono">@V(s.IpdAdmission?.AdmissionNumber)</td></tr>
+            <tr><th>Procedure</th><td>@s.ProcedureName @(s.Site is null ? "" : $"({s.Site})")</td><th>Theatre / date</th><td>@s.Theatre?.Name · @D(s.PlannedStartUtc)</td></tr>
+            <tr><th>Surgeon</th><td>@Model.Member(OtRole.PrimarySurgeon)</td><th>Anesthetist</th><td>@Model.Member(OtRole.Anesthetist)</td></tr>
+            <tr><th>Allergies</th><td colspan="3" class="@(string.IsNullOrWhiteSpace(s.IpdAdmission?.Allergies) ? "" : "f-allergy")">@Nr(s.IpdAdmission?.Allergies)</td></tr>
+        </table>
+    }
+
+    @switch (Model.Form)
+    {
+        case "schedule":
+            <p>@Fmt.Day(Model.ScheduleFrom)@(Model.ScheduleTo == Model.ScheduleFrom ? "" : " – " + Fmt.Day(Model.ScheduleTo))</p>
+            <table class="lr-results" data-schedule-print>
+                <thead><tr><th>Theatre</th><th>Time</th><th>Surgery</th><th>Patient</th><th>Procedure</th><th>Surgeon</th><th>Anesthetist</th><th>Anesthesia</th><th>Priority</th><th>Status</th></tr></thead>
+                <tbody>
+                @foreach (var r in Model.Schedule)
+                {
+                    <tr><td>@r.Theatre</td><td class="nowrap">@D(r.PlannedStartUtc) – @Fmt.ToLocal(r.PlannedEndUtc).ToString("HH:mm")</td><td class="mono">@r.Number</td><td>@r.PatientName<br /><small>@r.PatientNumber · @r.AgeGender</small></td>
+                        <td>@r.Procedure</td><td>@V(r.Surgeon)</td><td>@V(r.Anesthetist)</td><td>@(r.Anesthesia?.ToString() ?? "—")</td><td>@r.Priority</td><td>@SurgeryService.Label(r.Status)</td></tr>
+                }
+                @if (Model.Schedule.Count == 0) { <tr><td colspan="10">No surgeries scheduled.</td></tr> }
+                </tbody>
+            </table>
+            break;
+
+        case "booking":
+            <section class="rr-section"><h3>Booking</h3>
+                <table class="f-kv">
+                    <tr><th>Diagnosis</th><td colspan="3">@V(s!.Diagnosis)</td></tr>
+                    <tr><th>Planned</th><td>@D(s.PlannedStartUtc) – @D(s.PlannedEndUtc)</td><th>Duration</th><td>@s.DurationMinutes min</td></tr>
+                    <tr><th>Department</th><td>@V(s.Department?.Name)</td><th>Anesthesia</th><td>@(s.AnesthesiaType?.ToString() ?? "to be decided") @s.AnesthesiaDetail</td></tr>
+                    <tr><th>Status</th><td>@SurgeryService.Label(s.Status)</td><th>Booked by</th><td>@s.CreatedByUsername · @D(s.CreatedUtc)</td></tr>
+                    @if (s.Priority == SurgeryPriority.Emergency) { <tr><th>Emergency reason</th><td colspan="3">@s.EmergencyReason</td></tr> }
+                    <tr><th>Clinical notes</th><td colspan="3" class="prewrap">@V(s.ClinicalNotes)</td></tr>
+                </table>
+            </section>
+            <section class="rr-section"><h3>Surgical team</h3>
+                <table class="f-kv">@foreach (var m in Model.Team) { <tr><th>@m.Role</th><td colspan="3">@m.Name</td></tr> }</table>
+                <p class="small">Patient to report on time, fasting as instructed by the doctor. Bring this slip and previous reports.</p>
+            </section>
+            break;
+
+        case "consent":
+            <section class="rr-section"><h3>@Model.Consent!.ConsentTypeName</h3>
+                <p class="prewrap" data-consent-text>@(string.IsNullOrWhiteSpace(Model.ConsentText) ? "(No template text configured for this consent type – write the explanation given to the patient below.)" : Model.ConsentText)</p>
+                <table class="f-kv">
+                    <tr><th>Given by</th><td>@Model.Consent.GivenBy @(Model.Consent.Relation is null ? "" : $"({Model.Consent.Relation})")</td><th>Date / time</th><td>@D(Model.Consent.ConsentUtc)</td></tr>
+                    <tr><th>Status</th><td>@Model.Consent.Status</td><th>Responsible staff</th><td>@V(Model.Consent.ResponsibleStaff)</td></tr>
+                    <tr><th>Witness</th><td>@V(Model.Consent.Witness)</td><th>Notes</th><td>@V(Model.Consent.Notes)</td></tr>
+                </table>
+                <div class="f-sign-row"><div>Patient / representative signature &amp; thumb</div><div>Witness</div><div>Doctor obtaining consent</div></div>
+            </section>
+            break;
+
+        case "preop":
+        case "checklist":
+            @foreach (var (stage, items) in Model.Items)
+            {
+                var done = Model.Stages.FirstOrDefault(x => x.Stage == stage);
+                <section class="rr-section" data-print-checklist="@stage"><h3>@(stage switch { ChecklistStage.PreOp => "Pre-operative checklist", ChecklistStage.SignIn => "Sign In – before induction of anesthesia", ChecklistStage.TimeOut => "Time Out – before skin incision", _ => "Sign Out – before the patient leaves the OT" })</h3>
+                    <table class="lr-results"><thead><tr><th>Item</th><th>Answer</th><th>Remarks</th><th>By / time</th></tr></thead><tbody>
+                    @foreach (var it in items)
+                    {
+                        var e = Model.Latest.GetValueOrDefault(it.Id);
+                        <tr><td>@it.Label @(it.IsMandatory ? "*" : "")</td><td>@(e is null ? "☐ pending" : e.Answer == ChecklistAnswer.Done ? "☑ done" : e.Answer == ChecklistAnswer.NotApplicable ? "N/A" : "☐ pending")</td><td>@e?.Remarks</td><td>@(e is null ? "" : $"{e.Username} {D(e.RecordedUtc)}")</td></tr>
+                    }
+                    </tbody></table>
+                    <p class="small">@(done is null ? "Not completed." : $"Completed {D(done.CompletedUtc)} by {done.Username}" + (done.IsException ? $" – EXCEPTION: {done.ExceptionReason} (pending: {done.PendingItems})" : ""))</p>
+                </section>
+            }
+            @if (Model.Form == "preop") { <section class="rr-section"><h3>Consent</h3><p>@(Model.Consents.Count == 0 ? "No consent documented." : string.Join("; ", Model.Consents.Select(c => $"{c.ConsentTypeName}: {c.Status} ({c.GivenBy})")))</p></section> }
+            @if (Model.Form == "checklist") { <div class="f-sign-row"><div>Surgeon</div><div>Anesthetist</div><div>Nurse</div></div> }
+            break;
+
+        case "anesthesia-record":
+            <section class="rr-section"><h3>Anesthesia</h3>
+                <table class="f-kv">
+                    <tr><th>Type</th><td>@(s!.AnesthesiaType?.ToString() ?? "not recorded") @s.AnesthesiaDetail</td><th>Provider</th><td>@V(s.AnesthesiaProvider)</td></tr>
+                    <tr><th>Start</th><td>@D(s.AnesthesiaStartUtc)</td><th>End</th><td>@D(s.AnesthesiaEndUtc)</td></tr>
+                </table>
+            </section>
+            break;
+
+        case "opnote":
+        case "intraop":
+        case "postop":
+            var n = Model.Note;
+            if (n is null) { <p>No operation note has been written yet.</p> }
+            else
+            {
+                <p class="small">@(n.Status == NoteStatus.Final ? $"Final version {n.Version} – finalized {D(n.FinalizedUtc)} by {n.FinalizedBy}" : $"DRAFT version {n.Version} – not finalized")@(n.AmendReason is null ? "" : $" · amendment: {n.AmendReason}")</p>
+                <section class="rr-section"><h3>@(Model.Form == "postop" ? "Operation" : "Details")</h3>
+                    <table class="f-kv">
+                        <tr><th>Actual start</th><td>@D(s!.ActualStartUtc)</td><th>Actual end</th><td>@D(s.ActualEndUtc)</td></tr>
+                        <tr><th>Procedure performed</th><td colspan="3">@V(n.ProcedurePerformed)</td></tr>
+                        @if (Model.Form != "postop")
+                        {
+                            <tr><th>Pre-op diagnosis</th><td colspan="3">@V(n.PreOpDiagnosis)</td></tr>
+                            <tr><th>Post-op diagnosis</th><td colspan="3">@V(n.PostOpDiagnosis)</td></tr>
+                            <tr><th>Positioning</th><td>@V(n.Positioning)</td><th>Site</th><td>@V(n.Site)</td></tr>
+                            <tr><th>Assistant(s)</th><td>@Model.Member(OtRole.AssistantSurgeon)</td><th>Scrub nurse</th><td>@Model.Member(OtRole.ScrubNurse)</td></tr>
+                        }
+                    </table>
+                </section>
+                @if (Model.Form == "opnote")
+                {
+                    <section class="rr-section"><h3>Findings</h3><p class="prewrap">@Nr(n.OperativeFindings)</p></section>
+                    <section class="rr-section"><h3>Technique</h3><p class="prewrap">@Nr(n.Technique)</p></section>
+                    <table class="f-kv">
+                        <tr><th>Implants</th><td colspan="3" class="prewrap">@V(n.Implants)</td></tr>
+                        <tr><th>Specimens</th><td colspan="3" class="prewrap">@V(n.Specimens)</td></tr>
+                        <tr><th>Complications</th><td colspan="3" class="prewrap">@V(n.Complications)</td></tr>
+                        <tr><th>Additional procedures</th><td colspan="3" class="prewrap">@V(n.AdditionalProcedures)</td></tr>
+                        <tr><th>Surgeon notes</th><td colspan="3" class="prewrap">@V(n.SurgeonNotes)</td></tr>
+                    </table>
+                }
+                @if (Model.Form == "intraop")
+                {
+                    <table class="f-kv">
+                        <tr><th>Estimated blood loss</th><td>@(n.BloodLossMl is int bl ? $"{bl} ml" : "not recorded")</td><th>Implants</th><td>@V(n.Implants)</td></tr>
+                        <tr><th>IV fluids</th><td colspan="3" class="prewrap">@V(n.IvFluids)</td></tr>
+                        <tr><th>Drugs administered</th><td colspan="3" class="prewrap">@V(n.DrugsAdministered)</td></tr>
+                        <tr><th>Complications</th><td colspan="3" class="prewrap">@V(n.Complications)</td></tr>
+                        <tr><th>Observations</th><td colspan="3" class="prewrap">@V(n.Observations)</td></tr>
+                    </table>
+                    @if (Model.Consumption.Count > 0)
+                    {
+                        <section class="rr-section"><h3>OT consumables used</h3><table class="lr-results"><tbody>@foreach (var c in Model.Consumption) { <tr><td>@c.MedicineName</td><td>@c.BatchNumber</td><td>@(c.Kind == OtConsumptionKind.Return ? "returned " : "")@c.Quantity</td></tr> }</tbody></table></section>
+                    }
+                }
+                <section class="rr-section"><h3>Post-operative instructions</h3><p class="prewrap" data-postop-instructions>@Nr(n.PostOpInstructions)</p></section>
+                <div class="f-sign-row"><div>Surgeon: @V(n.SurgeonName)</div><div>Signature</div><div>Date</div></div>
+            }
+            break;
+
+        case "specimen":
+            <section class="rr-section"><h3>Specimens</h3>
+                <table class="lr-results"><thead><tr><th>#</th><th>Specimen</th><th>Type</th><th>Collected</th><th>By</th><th>Destination</th><th>Lab order</th><th>Status</th></tr></thead><tbody>
+                @{ var idx = 0; }
+                @foreach (var x in Model.Specimens) { idx++; <tr><td>@idx</td><td>@x.Name</td><td>@x.Type</td><td>@D(x.CollectedUtc)</td><td>@x.CollectedBy</td><td>@x.Destination</td><td>@(x.LabOrder?.OrderNumber)</td><td>@x.Status @x.ReceivedBy</td></tr> }
+                @if (Model.Specimens.Count == 0) { <tr><td colspan="8">No specimens recorded.</td></tr> }
+                </tbody></table>
+                <p class="small">Clinical details: @V(Model.Note?.PostOpDiagnosis ?? s!.Diagnosis)</p>
+                <div class="f-sign-row"><div>Dispatched by</div><div>Received by (laboratory)</div><div>Date / time</div></div>
+            </section>
+            <section class="rr-section"><h3>Labels</h3>
+                <div class="f-labels">
+                @foreach (var x in Model.Specimens)
+                {
+                    <div class="f-label" data-specimen-label><strong>@p!.FullName</strong><br />@p.PatientNumber · @Model.AgeText / @p.Gender<br />@s!.Number · @x.Name @x.Type<br />@D(x.CollectedUtc)</div>
+                }
+                </div>
+            </section>
+            break;
+
+        case "pacu":
+        case "handover":
+            var r = Model.Recovery;
+            <section class="rr-section"><h3>Recovery</h3>
+                @if (r is null) { <p>The patient has not reached recovery.</p> }
+                else
+                {
+                    <table class="f-kv">
+                        <tr><th>Arrival</th><td>@D(r.ArrivalUtc)</td><th>Recovery nurse</th><td>@V(r.Nurse)</td></tr>
+                        <tr><th>Anesthesia</th><td colspan="3">@V(r.AnesthesiaSummary)</td></tr>
+                        <tr><th>Status</th><td>@r.Status</td><th>Transfer</th><td>@D(r.TransferUtc)</td></tr>
+                        <tr><th>Destination</th><td>@V(r.Destination)</td><th>Handover to</th><td>@V(r.HandoverStaff)</td></tr>
+                        <tr><th>Decision by (clinician)</th><td colspan="3">@V(r.DecisionBy)</td></tr>
+                        <tr><th>Handover notes</th><td colspan="3" class="prewrap">@V(r.HandoverNotes)</td></tr>
+                    </table>
+                }
+                @if (Model.Form == "handover") { <div class="f-sign-row"><div>Handed over by</div><div>Received by</div><div>Date / time</div></div> }
+            </section>
+            break;
+
+        case "bill":
+            <section class="rr-section"><h3>Charges</h3>
+                <table class="lr-results"><thead><tr><th>Date</th><th>Charge</th><th>Service</th><th>Type</th><th class="num">Fee</th><th class="num">Discount</th><th class="num">Net</th><th class="num">Paid</th><th>Status</th></tr></thead><tbody>
+                @foreach (var l in Model.Bill) { <tr><td>@Fmt.Day(l.Date)</td><td class="mono">@l.ChargeNumber</td><td>@l.Service</td><td>@l.Kind</td><td class="num">@Fmt.Money(l.Fee)</td><td class="num">@Fmt.Money(l.Discount)</td><td class="num">@Fmt.Money(l.Net)</td><td class="num">@Fmt.Money(l.Paid)</td><td>@l.Status</td></tr> }
+                @if (Model.Bill.Count == 0) { <tr><td colspan="9">No OT charges.</td></tr> }
+                </tbody>
+                <tfoot><tr><th colspan="6">Total</th><th class="num" data-bill-total>@Fmt.Money(Model.Bill.Where(b => b.Status != ChargeStatus.Cancelled).Sum(b => b.Net))</th><th class="num">@Fmt.Money(Model.Bill.Sum(b => b.Paid))</th><th>Balance @Fmt.Money(Model.Bill.Sum(b => b.Balance))</th></tr></tfoot></table>
+                <p class="small">Amounts are from the hospital's Phase 3 billing. Receipts are issued by the cashier.</p>
+            </section>
+            break;
+    }
+
+    @foreach (var (kind, recs) in Model.Records)
+    {
+        var fields = Model.Fields[kind];
+        var used = fields.Where(f => recs.Any(rv => rv.Values.ContainsKey(f.Key))).ToList();
+        var charted = Model.Form is "pacu" or "anesthesia-record" or "intraop";
+        <section class="rr-section" data-print-records="@kind"><h3>@BurhanNexus.HMS.Web.Pages.Ipd.IpdPageModel.Title(kind)</h3>
+            @if (charted)
+            {
+                var numeric = fields.Where(x => x.Type == FieldType.Number && x.IsActive).ToList();
+                var withData = numeric.Where(x => recs.Any(rv => rv.Values.ContainsKey(x.Key))).ToList();
+                foreach (var f in withData) { @Model.Chart(recs, f) }
+                if (numeric.Count > withData.Count) { <p class="small">Not recorded: @string.Join(", ", numeric.Except(withData).Select(x => x.Label))</p> }
+                <p class="small">Charts show only recorded values; gaps mean “not recorded”. Dashed lines (if any) are the hospital's configured protocol limits.</p>
+            }
+            <table class="lr-results f-records">
+                <thead><tr><th>Time</th>@foreach (var f in used) { <th>@f.Label @(f.Unit is null ? "" : $"({f.Unit})")</th> }<th>Notes</th><th>By</th></tr></thead>
+                <tbody>
+                @foreach (var rv in recs.OrderBy(x => x.Record.RecordedUtc))
+                {
+                    <tr><td class="nowrap">@D(rv.Record.RecordedUtc)@(rv.Record.CorrectsRecordId is null ? "" : " (corrected)")</td>
+                        @foreach (var f in used) { <td>@(rv.Values.TryGetValue(f.Key, out var v) ? v : "—")</td> }
+                        <td class="prewrap">@rv.Record.Notes</td><td>@(rv.Record.ResponsibleName ?? rv.Record.Username)</td></tr>
+                }
+                @if (recs.Count == 0) { <tr><td colspan="@(used.Count + 3)">Nothing recorded.</td></tr> }
+                </tbody>
+            </table>
+        </section>
+    }
+
+    @if (Model.Drugs.Count > 0)
+    {
+        <section class="rr-section"><h3>Drugs &amp; fluids</h3>
+            <table class="lr-results"><thead><tr><th>Time</th><th>Name</th><th>Dose</th><th>Route</th><th>Given by</th><th>Notes</th></tr></thead><tbody>
+            @foreach (var d in Model.Drugs) { <tr><td>@D(d.GivenUtc)</td><td>@d.Name (@d.Kind)</td><td>@d.Dose</td><td>@d.Route</td><td>@d.GivenBy</td><td>@d.Notes</td></tr> }
+            </tbody></table>
+        </section>
+    }
+    @if (Model.Form is "anesthesia" or "anesthesia-record") { <div class="f-sign-row"><div>Anesthetist: @Model.Member(OtRole.Anesthetist)</div><div>Signature</div><div>Date</div></div> }
+    @if (Model.Form is "preop") { <div class="f-sign-row"><div>Surgeon</div><div>Nurse</div><div>Date</div></div> }
+
+    <footer class="lr-foot">
+        <div class="lr-footer-text">@(st.FormFooter ?? h.ReportFooter)</div>
+        <div class="lr-end">Printed @Fmt.DateTimeText(DateTime.UtcNow) · @Model.Title</div>
+    </footer>
+</main>
+</body>
+</html>
