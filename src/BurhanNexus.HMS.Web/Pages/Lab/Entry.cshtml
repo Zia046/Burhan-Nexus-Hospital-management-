@@ -32,8 +32,8 @@
 }
 else
 {
-    <datalist id="lab-organisms">@foreach (var o in BurhanNexus.HMS.Web.Pages.Lab.EntryModel.Organisms) { <option value="@o"></option> }</datalist>
-    <datalist id="lab-antibiotics">@foreach (var o in BurhanNexus.HMS.Web.Pages.Lab.EntryModel.Antibiotics) { <option value="@o"></option> }</datalist>
+    <datalist id="lab-organisms">@foreach (var dl in BurhanNexus.HMS.Web.Pages.Lab.EntryModel.Organisms) { <option value="@dl"></option> }</datalist>
+    <datalist id="lab-antibiotics">@foreach (var dl in BurhanNexus.HMS.Web.Pages.Lab.EntryModel.Antibiotics) { <option value="@dl"></option> }</datalist>
     <form method="post" asp-route-item="@c.Id" class="card" novalidate data-entry-form>
         <input type="hidden" name="RowVersion" value="@Model.RowVersion" />
         <div class="card-header">
