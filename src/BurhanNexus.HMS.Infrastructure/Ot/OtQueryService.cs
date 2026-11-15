@@ -156,7 +156,7 @@ public sealed class OtQueryService : IOtQueryService
         var def = Reports.FirstOrDefault(r => r.Key == key);
         if (def.Key is null) return Array.Empty<OtReport>();
         if (def.Financial && !finance) return Array.Empty<OtReport>();
-        var (from, to) = await UtcRangeAsync(f);
+        var (fromUtc, toUtc) = await UtcRangeAsync(f);
         var zone = await _clock.ZoneAsync();
         string L(DateTime? u) => u is DateTime x ? TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(x, DateTimeKind.Utc), zone).ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture) : "—";
         var rows = key is "consumption" or "stock" or "cssd" or "revenue" ? new List<SurgeryRow>() : (await SurgeriesAsync(f, ct)).ToList();
@@ -220,7 +220,7 @@ public sealed class OtQueryService : IOtQueryService
             {
                 var q = from c in _db.OtConsumptions.AsNoTracking()
                         join s in _db.Surgeries.AsNoTracking() on c.SurgeryId equals s.Id
-                        where c.CreatedUtc >= from && c.CreatedUtc < to && (f.TheatreId == null || s.TheatreId == f.TheatreId)
+                        where c.CreatedUtc >= fromUtc && c.CreatedUtc < toUtc && (f.TheatreId == null || s.TheatreId == f.TheatreId)
                         select new { c.MedicineName, c.Kind, c.Quantity };
                 var list = await q.ToListAsync(ct);
                 return new[] { new OtReport(key, def.Title, new[] { "Medicine / consumable", "Used", "Returned", "Net used" },
@@ -240,7 +240,7 @@ public sealed class OtQueryService : IOtQueryService
             }
             case "cssd":
             {
-                var batches = await _db.CssdBatches.AsNoTracking().Include(b => b.Sets).ThenInclude(s => s.Set).Where(b => b.StartUtc >= from && b.StartUtc < to).OrderBy(b => b.StartUtc).ToListAsync(ct);
+                var batches = await _db.CssdBatches.AsNoTracking().Include(b => b.Sets).ThenInclude(s => s.Set).Where(b => b.StartUtc >= fromUtc && b.StartUtc < toUtc).OrderBy(b => b.StartUtc).ToListAsync(ct);
                 return new[] { new OtReport(key, def.Title, new[] { "Batch", "Started", "Method", "Steriliser / cycle", "Sets", "Result", "Expiry", "Released by" },
                     batches.Select(b => R(b.Number, L(b.StartUtc), b.Method, $"{b.Steriliser} {b.CycleNumber}", string.Join(", ", b.Sets.Select(s => s.Set!.Code)),
                         b.Status + (b.FailReason is null ? "" : $" – {b.FailReason}"), b.ExpiryDate?.ToString("dd MMM yyyy", CultureInfo.InvariantCulture), b.ReleasedBy)).ToList(),
