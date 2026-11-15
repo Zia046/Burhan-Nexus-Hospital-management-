@@ -1,0 +1,16 @@
+@{
+    var tab = ViewData["IpdTab"] as string;
+    string Cls(string t) => t == tab ? "active" : "";
+}
+<nav class="subnav no-print" data-ipd-nav>
+    <a bn-permission="@Perm.IpdDashboard" class="@Cls("dashboard")" href="/Ipd"><svg class="icon icon-sm"><use href="#i-chart" /></svg> Dashboard</a>
+    <a bn-permission="@Perm.IpdRegisterAdmission" class="@Cls("admit")" href="/Ipd/Admit"><svg class="icon icon-sm"><use href="#i-plus" /></svg> Admit</a>
+    <a bn-permission="@Perm.IpdViewPatients" class="@Cls("patients")" href="/Ipd/Admissions"><svg class="icon icon-sm"><use href="#i-users" /></svg> Inpatients</a>
+    <a bn-permission="@Perm.IpdViewPatients|@Perm.IpdAllocateBed|@Perm.IpdManageBeds" class="@Cls("beds")" href="/Ipd/Beds"><svg class="icon icon-sm"><use href="#i-hospital" /></svg> Bed map</a>
+    <a bn-permission="@Perm.IpdViewGynae" class="@Cls("gynae")" href="/Ipd/Gynae"><svg class="icon icon-sm"><use href="#i-stethoscope" /></svg> Gynae &amp; ANC</a>
+    <a bn-permission="@Perm.IpdManageLabour|@Perm.IpdLabourObservations" class="@Cls("labour")" href="/Ipd/Labour"><svg class="icon icon-sm"><use href="#i-activity" /></svg> Labour Room</a>
+    <a bn-permission="@Perm.IpdManageNicu|@Perm.IpdNicuObservations" class="@Cls("nicu")" href="/Ipd/Nicu"><svg class="icon icon-sm"><use href="#i-users-round" /></svg> NICU</a>
+    <a bn-permission="@Perm.IpdManageNursing|@Perm.IpdNursingNotes|@Perm.IpdRecordMedication|@Perm.IpdHandover" class="@Cls("nursing")" href="/Ipd/Nursing"><svg class="icon icon-sm"><use href="#i-check-circle" /></svg> Nursing</a>
+    <a bn-permission="@Perm.IpdManageWards|@Perm.IpdManageRooms|@Perm.IpdManageBeds" class="@Cls("wards")" href="/Ipd/Wards"><svg class="icon icon-sm"><use href="#i-sliders" /></svg> Wards &amp; beds</a>
+    <a bn-permission="@Perm.IpdSettings" class="@Cls("settings")" href="/Ipd/Settings"><svg class="icon icon-sm"><use href="#i-settings" /></svg> Settings</a>
+</nav>

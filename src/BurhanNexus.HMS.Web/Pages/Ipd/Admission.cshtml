@@ -1,0 +1,526 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Ipd.AdmissionModel
+@using BurhanNexus.HMS.Infrastructure.Ipd
+@{
+    var a = Model.A; var p = Model.P;
+    ViewData["Title"] = $"{a.AdmissionNumber} – {p.FullName}";
+    var tab = Model.Tab;
+    string Cls(string t) => t == tab ? "active" : "";
+    var bed = a.CurrentBed is { } cb ? $"{a.CurrentWard?.Name} / {cb.Room?.Name} / {cb.Code}" : a.CurrentWard?.Name ?? "No bed allocated";
+    var recordAction = $"/Ipd/Admission/{a.Id}?handler=Record";
+    var closed = !a.IsActive;
+}
+<partial name="_IpdNav" />
+<partial name="_ValidationSummary" />
+
+<div class="card patient-banner" data-admission="@a.Id" data-status="@a.Status">
+    <div class="card-body banner-row">
+        <div class="patient-id-box sm"><small>Admission</small><strong data-adm-number>@a.AdmissionNumber</strong></div>
+        <div class="grow">
+            <h2>@p.FullName <small class="muted">@p.PatientNumber · @Model.AgeText · @p.Gender</small></h2>
+            <div class="small">
+                <partial name="_AdmStatus" model="a.Status" /> · @a.Kind · <strong data-adm-bed>@bed</strong> · admitted @Fmt.DateTimeText(a.AdmittedUtc)
+                @if (a.Department is not null) { <span> · @a.Department.Name</span> }
+                @if ((a.AdmittingDoctor?.Name ?? a.AdmittingDoctorName) is string dn) { <span> · Dr @dn</span> }
+            </div>
+            @if (!string.IsNullOrWhiteSpace(a.Allergies)) { <div class="alert alert-danger compact" data-allergy><strong>Allergies:</strong> @a.Allergies</div> }
+            else { <div class="small muted" data-allergy>Allergies: not recorded</div> }
+            @if (a.NeedsAttention) { <div class="alert alert-warning compact" data-attention>⚑ Needs attention @(a.AttentionNote is null ? "" : "– " + a.AttentionNote)</div> }
+            @if (Model.Mother is { } mo) { <div class="small">Mother: <a href="/Ipd/Admission/@mo.Id" data-mother-link>@mo.Patient!.FullName (@mo.AdmissionNumber)</a> @(a.Kind == AdmissionKind.Newborn ? "· rooming-in with the mother" : "")</div> }
+            @if (Model.Babies.Count > 0) { <div class="small" data-babies>Babies: @foreach (var b in Model.Babies) { <a class="chip" href="/Ipd/Admission/@b.Id">@b.Patient!.FullName · @b.Kind · @(b.CurrentBed?.Code ?? "—") · @b.Status</a> }</div> }
+        </div>
+        <div class="banner-actions no-print">
+            <a bn-permission="@Perm.IpdPrintForms" class="btn btn-light btn-sm" href="/Print/Ipd/admission/@a.Id" target="_blank">Print admission form</a>
+            @if (closed) { <a bn-permission="@Perm.IpdPrintForms" class="btn btn-light btn-sm" href="/Print/Ipd/discharge/@a.Id" target="_blank" data-test="print-discharge">Discharge summary</a> }
+        </div>
+    </div>
+</div>
+
+<nav class="tabs no-print" data-adm-tabs>
+    <a class="@Cls("overview")" href="@Model.Url("overview")">Overview</a>
+    <a class="@Cls("notes")" href="@Model.Url("notes")">Progress &amp; vitals</a>
+    <a class="@Cls("nursing")" href="@Model.Url("nursing")">Nursing</a>
+    <a class="@Cls("mar")" href="@Model.Url("mar")">Medication (MAR)</a>
+    <a bn-permission="@Perm.IpdViewInvestigations" class="@Cls("investigations")" href="@Model.Url("investigations")">Investigations</a>
+    @if (Model.CanSeeGynae && (a.Kind is AdmissionKind.Gynae or AdmissionKind.Labour || p.Gender == Gender.Female && !Model.IsBaby)) { <a class="@Cls("gynae")" href="@Model.Url("gynae")">Gynae</a> }
+    @if (Model.IsMaternity) { <a class="@Cls("labour")" href="@Model.Url("labour")">Labour &amp; delivery</a> }
+    @if (Model.Deliveries.Count > 0) { <a class="@Cls("postnatal")" href="@Model.Url("postnatal")">Postnatal</a> }
+    @if (Model.IsBaby) { <a class="@Cls("nicu")" href="@Model.Url("nicu")">@(a.Kind == AdmissionKind.Nicu ? "NICU" : "Newborn care")</a> }
+    @if (Model.CanSeeFinance) { <a class="@Cls("billing")" href="@Model.Url("billing")">Billing</a> }
+    <a class="@Cls("transfer")" href="@Model.Url("transfer")">Bed &amp; transfer</a>
+    <a class="@Cls("discharge")" href="@Model.Url("discharge")">Discharge</a>
+    <a class="@Cls("history")" href="@Model.Url("history")">History</a>
+</nav>
+
+@if (tab == "overview")
+{
+    <div class="grid-2">
+        <div class="card"><div class="card-header"><h3>Admission</h3></div><div class="card-body">
+            <dl class="kv kv-tight">
+                <dt>Source</dt><dd>@a.Source @(a.SourceEncounter is { } se ? $"({se.EncounterNumber})" : "")</dd>
+                <dt>Referring doctor</dt><dd>@(a.ReferringDoctor ?? "—")</dd>
+                <dt>Admission diagnosis</dt><dd>@(a.AdmissionDiagnosis ?? "—")</dd>
+                <dt>Initial condition</dt><dd>@(a.InitialCondition ?? "—")</dd>
+                <dt>Medical history</dt><dd class="prewrap">@(a.MedicalHistory ?? "—")</dd>
+                <dt>Attendant</dt><dd>@(a.AttendantName ?? "—") @a.AttendantRelation @a.AttendantPhone</dd>
+                <dt>Entered by</dt><dd>@a.CreatedByUsername</dd>
+            </dl>
+        </div></div>
+        <div class="card"><div class="card-header"><h3>Today</h3></div><div class="card-body">
+            <p><strong>@Model.Tasks.Count(t => t.Status == NursingTaskStatus.Pending)</strong> pending nursing tasks · <strong>@Model.Doses.Count(d => d.Status is DoseStatus.Scheduled or DoseStatus.Pending && d.ScheduledUtc <= DateTime.UtcNow)</strong> doses due / overdue
+                · <strong>@Model.Orders.Count(o => o.Status == MedicationOrderStatus.Active)</strong> active medication orders · <strong>@Model.Investigations.Count</strong> investigations</p>
+            @if (Model.Handovers.FirstOrDefault(h => h.AcknowledgedUtc is null) is { } open) { <p class="text-warning">Shift handover by @open.OutgoingUsername (@Fmt.DateTimeText(open.CreatedUtc)) is waiting to be acknowledged.</p> }
+            @if (!closed)
+            {
+                <form bn-permission="@Perm.IpdProgressNotes" method="post" asp-page-handler="Attention" asp-route-id="@a.Id" class="inline-form wrap" novalidate>
+                    <input type="hidden" name="Attention" value="@(a.NeedsAttention ? "false" : "true")" />
+                    @if (!a.NeedsAttention) { <input name="Note" placeholder="Why does the patient need attention?" maxlength="200" /> }
+                    <button class="btn btn-light btn-sm" type="submit" data-test="attention">@(a.NeedsAttention ? "Clear attention flag" : "Flag: needs attention")</button>
+                </form>
+            }
+        </div></div>
+    </div>
+    @if (!closed)
+    {
+        <details bn-permission="@Perm.IpdEditAdmission" class="card" data-edit-admission>
+            <summary class="card-header"><h3>Edit admission details</h3></summary>
+            <form method="post" asp-page-handler="Edit" asp-route-id="@a.Id" class="card-body" novalidate>
+                <div class="grid-3">
+                    <div class="field"><label>Department</label><select name="Edit.DepartmentId"><option value="">—</option>@foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(Model.Edit.DepartmentId == d.Id)">@d.Name</option> }</select></div>
+                    <div class="field"><label>Admitting doctor (name)</label><input name="Edit.AdmittingDoctorName" value="@Model.Edit.AdmittingDoctorName" maxlength="150" /><input type="hidden" name="Edit.AdmittingDoctorId" value="@Model.Edit.AdmittingDoctorId" /></div>
+                    <div class="field"><label>Referring doctor</label><input name="Edit.ReferringDoctor" value="@Model.Edit.ReferringDoctor" maxlength="150" /></div>
+                    <div class="field"><label>Admission diagnosis</label><input name="Edit.AdmissionDiagnosis" value="@Model.Edit.AdmissionDiagnosis" maxlength="500" /></div>
+                    <div class="field"><label>Initial condition</label><input name="Edit.InitialCondition" value="@Model.Edit.InitialCondition" maxlength="500" /></div>
+                    <div class="field"><label>Allergies</label><input name="Edit.Allergies" value="@Model.Edit.Allergies" maxlength="500" /></div>
+                    <div class="field"><label>Attendant</label><input name="Edit.AttendantName" value="@Model.Edit.AttendantName" maxlength="150" /></div>
+                    <div class="field"><label>Relation</label><input name="Edit.AttendantRelation" value="@Model.Edit.AttendantRelation" maxlength="50" /></div>
+                    <div class="field"><label>Phone</label><input name="Edit.AttendantPhone" value="@Model.Edit.AttendantPhone" maxlength="30" /></div>
+                </div>
+                <div class="field"><label>Medical history</label><textarea name="Edit.MedicalHistory" rows="2" maxlength="2000">@Model.Edit.MedicalHistory</textarea></div>
+                <button class="btn btn-primary" type="submit" data-test="save-edit">Save details</button>
+            </form>
+            <form method="post" asp-page-handler="Cancel" asp-route-id="@a.Id" class="card-body inline-form wrap" novalidate>
+                <input name="Reason" placeholder="Reason for cancelling (wrong entry)" maxlength="300" />
+                <button class="btn btn-danger btn-sm" type="submit" data-confirm="Cancel this admission? Only possible when nothing was recorded.">Cancel admission</button>
+            </form>
+        </details>
+    }
+}
+
+@if (Model.Records.Count > 0)
+{
+    foreach (var (kind, recs) in Model.Records)
+    {
+        var fields = Model.Fields[kind];
+        var original = Model.CorrectId is long cid ? recs.FirstOrDefault(r => r.Record.Id == cid) : null;
+        <section class="record-section" data-section="@kind">
+            <h2 class="section-title">@BurhanNexus.HMS.Web.Pages.Ipd.IpdPageModel.Title(kind)</h2>
+            @if (!closed || original is not null)
+            {
+                <div bn-permission="@BurhanNexus.HMS.Web.Pages.Ipd.IpdPageModel.WritePermission(kind)">
+                    @await Html.PartialAsync("_RecordForm", (kind, fields, recordAction, original?.Record.Id, original, false))
+                </div>
+            }
+            @await Html.PartialAsync("_RecordList", (kind, fields, recs, (string?)Model.Url(tab)))
+        </section>
+    }
+    if (tab == "labour" && Model.Records.TryGetValue(RecordKind.LabourObservation, out var obs) && obs.Count > 0)
+    {
+        <p class="no-print"><a bn-permission="@Perm.IpdPartograph" class="btn btn-light" href="/Print/Ipd/partograph/@a.Id" target="_blank" data-test="partograph">Open partograph chart</a></p>
+    }
+    if (tab == "nicu")
+    {
+        <p class="no-print"><a bn-permission="@Perm.IpdPrintForms" class="btn btn-light" href="/Print/Ipd/nicu-chart/@a.Id" target="_blank">NICU observation chart</a>
+            <a bn-permission="@Perm.IpdPrintForms" class="btn btn-light" href="/Print/Ipd/feeding/@a.Id" target="_blank">Feeding / IO chart</a></p>
+    }
+}
+
+@if (tab == "nursing")
+{
+    <div class="grid-2">
+        <div class="card" data-tasks>
+            <div class="card-header"><h3>Nursing tasks</h3></div>
+            @if (!closed)
+            {
+                <form bn-permission="@Perm.IpdManageNursing" method="post" asp-page-handler="Task" asp-route-id="@a.Id" class="card-body inline-form wrap" novalidate>
+                    <select name="TaskType" aria-label="Task type">@foreach (var t in Enum.GetValues<NursingTaskType>()) { <option value="@t">@t</option> }</select>
+                    <input name="Note" placeholder="Task description" maxlength="300" />
+                    <input type="datetime-local" name="DueLocal" aria-label="Due" />
+                    <button class="btn btn-primary btn-sm" type="submit" data-test="add-task">Add task</button>
+                </form>
+            }
+            <table class="table table-compact">
+                <tbody>
+                @foreach (var t in Model.Tasks)
+                {
+                    <tr class="@(t.Status != NursingTaskStatus.Pending ? "row-muted" : t.DueUtc < DateTime.UtcNow ? "row-warn" : "")"><td>@Fmt.DateTimeText(t.DueUtc)</td><td>@t.Type – @t.Description</td>
+                        <td>@t.Status @(t.CompletedBy is null ? "" : $"by {t.CompletedBy}")</td>
+                        <td class="actions">@if (t.Status == NursingTaskStatus.Pending) {
+                            <form bn-permission="@Perm.IpdManageNursing" method="post" asp-page-handler="CompleteTask" asp-route-id="@a.Id" class="inline-form"><input type="hidden" name="ItemId" value="@t.Id" />
+                                <button class="btn btn-light btn-sm" name="Attention" value="false" type="submit">Done</button><button class="btn btn-light btn-sm" name="Attention" value="true" type="submit">Cancel</button></form> }</td></tr>
+                }
+                @if (Model.Tasks.Count == 0) { <tr><td class="empty">No tasks.</td></tr> }
+                </tbody>
+            </table>
+        </div>
+        <div class="card" data-handovers>
+            <div class="card-header"><h3>Shift handover</h3></div>
+            @if (!closed)
+            {
+                <details bn-permission="@Perm.IpdHandover" class="card-body"><summary>New handover (outgoing nurse)</summary>
+                    <form method="post" asp-page-handler="Handover" asp-route-id="@a.Id" novalidate>
+                        <div class="grid-2">
+                            <div class="field"><label>Shift</label><select name="Handover.Shift"><option>Morning</option><option>Evening</option><option>Night</option></select></div>
+                            <div class="field"><label>Diagnosis</label><input name="Handover.Diagnosis" value="@a.AdmissionDiagnosis" maxlength="500" /></div>
+                        </div>
+                        <div class="field"><label>Patient condition</label><textarea name="Handover.PatientCondition" rows="2" maxlength="1000"></textarea></div>
+                        <div class="grid-2">
+                            <div class="field"><label>Pending investigations</label><input name="Handover.PendingInvestigations" maxlength="500" /></div>
+                            <div class="field"><label>Medication due</label><input name="Handover.MedicationDue" maxlength="500" /></div>
+                            <div class="field"><label>IV fluids</label><input name="Handover.IvFluids" maxlength="500" /></div>
+                            <div class="field"><label>Pending procedures</label><input name="Handover.PendingProcedures" maxlength="500" /></div>
+                            <div class="field"><label>Special care</label><input name="Handover.SpecialCare" maxlength="500" /></div>
+                            <div class="field"><label>Outstanding tasks</label><input name="Handover.OutstandingTasks" maxlength="500" /></div>
+                        </div>
+                        <div class="field"><label>Important observations</label><textarea name="Handover.ImportantObservations" rows="2" maxlength="1000"></textarea></div>
+                        <button class="btn btn-primary btn-sm" type="submit" data-test="save-handover">Save handover</button>
+                    </form>
+                </details>
+            }
+            @foreach (var h in Model.Handovers)
+            {
+                <div class="card-body handover @(h.AcknowledgedUtc is null ? "pending" : "")" data-handover="@h.Id">
+                    <strong>@h.Shift handover</strong> by @h.OutgoingUsername · @Fmt.DateTimeText(h.CreatedUtc)
+                    <dl class="kv kv-tight small">
+                        <dt>Condition</dt><dd class="prewrap">@h.PatientCondition</dd><dt>Medication due</dt><dd>@h.MedicationDue</dd><dt>IV fluids</dt><dd>@h.IvFluids</dd>
+                        <dt>Pending</dt><dd>@h.PendingInvestigations @h.PendingProcedures</dd><dt>Special care</dt><dd>@h.SpecialCare</dd><dt>Tasks</dt><dd>@h.OutstandingTasks</dd><dt>Observations</dt><dd class="prewrap">@h.ImportantObservations</dd>
+                    </dl>
+                    @if (h.AcknowledgedUtc is DateTime ack) { <p class="small text-success">Acknowledged by @h.AcknowledgedByUsername at @Fmt.DateTimeText(ack) @h.AcknowledgeNote</p> }
+                    else
+                    {
+                        <form bn-permission="@Perm.IpdHandover" method="post" asp-page-handler="Acknowledge" asp-route-id="@a.Id" class="inline-form wrap"><input type="hidden" name="ItemId" value="@h.Id" />
+                            <input name="Note" placeholder="Note (incoming nurse)" maxlength="300" /><button class="btn btn-primary btn-sm" type="submit" data-test="ack-handover">Acknowledge (incoming nurse)</button></form>
+                    }
+                    <a bn-permission="@Perm.IpdPrintForms" class="small" href="/Print/Ipd/handover/@h.Id" target="_blank">Print</a>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@if (tab == "mar")
+{
+    @if (!closed)
+    {
+        <details bn-permission="@Perm.IpdMedicationOrders" class="card" data-order-form>
+            <summary class="card-header"><h3><svg class="icon"><use href="#i-plus" /></svg> Enter medication order (from the doctor's handwritten prescription)</h3></summary>
+            <form method="post" asp-page-handler="Order" asp-route-id="@a.Id" class="card-body" novalidate>
+                <div class="grid-3">
+                    <div class="field span-2"><label>Medicine (pharmacy catalogue) *</label><select name="Order.MedicineId"><option value="0">— select —</option>@foreach (var m in Model.Medicines) { <option value="@m.Id">@m.Name @(m.GenericName is null ? "" : $"({m.GenericName})") · @m.Code</option> }</select></div>
+                    <div class="field"><label>Order source</label><select name="Order.Source">@foreach (var s in Enum.GetValues<OrderSource>()) { <option value="@s">@s</option> }</select></div>
+                    <div class="field"><label>Dose *</label><input name="Order.Dose" maxlength="60" placeholder="as written" /></div>
+                    <div class="field"><label>Route *</label><input name="Order.Route" maxlength="40" placeholder="as written" /></div>
+                    <div class="field"><label>Frequency *</label><input name="Order.Frequency" maxlength="60" placeholder="as written" /></div>
+                    <div class="field"><label>Administration times * (HH:mm, comma separated)</label><input name="Order.Times" maxlength="100" placeholder="08:00, 20:00" /></div>
+                    <div class="field"><label>Duration (days)</label><input type="number" min="1" max="60" name="Order.DurationDays" /></div>
+                    <div class="field"><label>Start</label><input type="datetime-local" name="Order.StartLocal" /></div>
+                    <div class="field"><label>Prescribing doctor *</label><input name="Order.Prescriber" maxlength="150" value="@(a.AdmittingDoctor?.Name ?? a.AdmittingDoctorName)" /></div>
+                    <div class="field"><label>Ward stock units per dose (0 = not from ward stock)</label><input type="number" min="0" name="Order.StockUnitsPerDose" value="0" /></div>
+                </div>
+                <div class="field"><label>Instructions</label><input name="Order.Instructions" maxlength="500" /></div>
+                <p class="small muted">The system records the order exactly as prescribed. It does not suggest medicines or doses.</p>
+                <button class="btn btn-primary" type="submit" data-test="save-order">Save order</button>
+            </form>
+        </details>
+    }
+    <div class="card" data-mar>
+        <div class="card-header"><h3>Medication administration record</h3><a bn-permission="@Perm.IpdPrintForms" class="btn btn-light btn-sm" href="/Print/Ipd/mar/@a.Id" target="_blank">Print MAR</a></div>
+        @foreach (var o in Model.Orders)
+        {
+            <div class="card-body mar-order @(o.Status != MedicationOrderStatus.Active ? "row-muted" : "")" data-order="@o.Id">
+                <div class="banner-row"><div class="grow"><strong>@o.MedicineName</strong> · @o.Dose · @o.Route · @o.Frequency (@o.Times) · Dr @o.Prescriber · @o.Source
+                    <small class="block muted">from @Fmt.DateTimeText(o.StartUtc) @(o.DurationDays is int dd ? $"for {dd} days" : "") · entered by @o.EnteredBy · @o.Status @(o.StopReason is null ? "" : $"– {o.StopReason} ({o.StoppedBy})")</small>
+                    @if (o.Instructions is not null) { <small class="block">@o.Instructions</small> }</div>
+                    @if (o.Status == MedicationOrderStatus.Active)
+                    {
+                        <form bn-permission="@Perm.IpdMedicationOrders" method="post" asp-page-handler="Stop" asp-route-id="@a.Id" class="inline-form"><input type="hidden" name="ItemId" value="@o.Id" />
+                            <input name="Reason" placeholder="Reason to stop" maxlength="300" /><button class="btn btn-light btn-sm" type="submit">Stop</button></form>
+                    }
+                </div>
+                <table class="table table-compact">
+                    <thead><tr><th>Scheduled</th><th>Status</th><th>Given</th><th>By</th><th>Reason / remarks</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var d in Model.Doses.Where(x => x.OrderId == o.Id))
+                    {
+                        var due = d.Status is DoseStatus.Scheduled or DoseStatus.Pending;
+                        <tr class="@(due && d.ScheduledUtc < DateTime.UtcNow ? "row-warn" : "")" data-dose="@d.Id" data-dose-status="@d.Status">
+                            <td>@Fmt.DateTimeText(d.ScheduledUtc)</td><td>@d.Status</td>
+                            <td>@(d.GivenUtc is DateTime g ? Fmt.DateTimeText(g) : "") @d.DoseGiven @d.RouteGiven</td>
+                            <td>@(d.Nurse ?? d.RecordedBy)</td><td>@d.Reason @d.Remarks</td>
+                            <td>@if (due && !closed)
+                            {
+                                <details bn-permission="@Perm.IpdRecordMedication"><summary class="btn btn-light btn-sm">Record</summary>
+                                    <form method="post" asp-page-handler="Dose" asp-route-id="@a.Id" class="dose-form" novalidate><input type="hidden" name="ItemId" value="@d.Id" />
+                                        <select name="Dose.Status"><option value="Administered">Administered</option><option value="Missed">Missed</option><option value="Withheld">Withheld</option><option value="Pending">Pending</option></select>
+                                        <input type="datetime-local" name="Dose.GivenLocal" aria-label="Time given" />
+                                        <input name="Dose.DoseGiven" value="@o.Dose" maxlength="60" aria-label="Dose given" />
+                                        <input name="Dose.RouteGiven" value="@o.Route" maxlength="40" aria-label="Route" />
+                                        <input name="Dose.Reason" placeholder="Reason (missed / withheld)" maxlength="300" />
+                                        <input name="Dose.Remarks" placeholder="Remarks" maxlength="300" />
+                                        @if (Model.Settings.RequireMarConfirmations)
+                                        {
+                                            <div class="small confirm-list">Confirm:
+                                                @foreach (var c in new[] { ("ConfirmPatient", "right patient"), ("ConfirmMedicine", "right medicine"), ("ConfirmDose", "right dose"), ("ConfirmRoute", "right route"), ("ConfirmTime", "right time") })
+                                                { <label class="check"><input type="checkbox" name="Dose.@c.Item1" value="true" /> @c.Item2</label> }
+                                                @if (!string.IsNullOrWhiteSpace(a.Allergies)) { <strong class="text-danger block">Allergies: @a.Allergies</strong> }
+                                            </div>
+                                        }
+                                        <button class="btn btn-primary btn-sm" type="submit" data-test="save-dose">Save</button>
+                                    </form>
+                                </details>
+                            }</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+        @if (Model.Orders.Count == 0) { <div class="card-body empty">No medication orders.</div> }
+    </div>
+}
+
+@if (tab == "investigations")
+{
+    <div class="card" data-investigations>
+        <div class="card-header"><h3>Investigations linked to this admission</h3>
+            <div class="no-print">
+                <a bn-permission="@Perm.LabBook" class="btn btn-light btn-sm" href="/Lab/Book?patientId=@a.PatientId&admissionId=@a.Id">Order laboratory test</a>
+                <a bn-permission="@Perm.RadCreateBooking" class="btn btn-light btn-sm" href="/Radiology/Book?patientId=@a.PatientId&admissionId=@a.Id">Order X-ray / ultrasound</a>
+                <a bn-permission="@Perm.PharmIssueToPatients" class="btn btn-light btn-sm" href="/Pharmacy/Issue?patientId=@a.PatientId&admissionId=@a.Id">Issue medicines</a>
+            </div>
+        </div>
+        <table class="table table-compact">
+            <thead><tr><th>Date</th><th>Type</th><th>Order</th><th>Test</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var i in Model.Investigations) { <tr><td>@Fmt.DateTimeText(i.Utc)</td><td>@i.Kind</td><td class="mono">@i.Number</td><td>@i.Name</td><td>@i.Status</td><td><a href="@i.Link">Open</a></td></tr> }
+            @if (Model.Investigations.Count == 0) { <tr><td colspan="6" class="empty">No investigations ordered for this admission.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (tab == "gynae" && Model.CanSeeGynae)
+{
+    <div class="card"><div class="card-body">
+        @if (Model.Pregnancy is { } pg) { <p>Pregnancy <a href="/Ipd/Pregnancy/@pg.Id">@pg.Number</a> · LMP @(pg.Lmp?.ToString("dd MMM yyyy") ?? "—") · EDD @(pg.Edd?.ToString("dd MMM yyyy") ?? "—") @(pg.IsHighRisk ? "· HIGH RISK" : "")</p> }
+        <a class="btn btn-light btn-sm" href="/Ipd/Gynae/Patient/@a.PatientId">Open Gynae / ANC record</a>
+    </div></div>
+}
+
+@if (tab == "labour")
+{
+    if (Model.LabourRec is { } lr)
+    {
+        <div class="card" data-labour="@lr.Id" data-labour-status="@lr.Status">
+            <div class="card-header"><h3>Labour – @lr.Status</h3>
+                <form bn-permission="@Perm.IpdManageLabour" method="post" asp-page-handler="LabourStatus" asp-route-id="@a.Id" class="inline-form no-print">
+                    <select name="LabourStatusValue">@foreach (var s in new[] { LabourStatus.Admitted, LabourStatus.UnderObservation, LabourStatus.EarlyLabour, LabourStatus.ActiveLabour }) { <option value="@s" selected="@(lr.Status == s)">@MaternityService.Label(s)</option> }</select>
+                    <input name="Note" placeholder="Note" maxlength="300" /><button class="btn btn-light btn-sm" type="submit" data-test="labour-status">Set status</button></form>
+            </div>
+            <form bn-permission="@Perm.IpdManageLabour" method="post" asp-page-handler="Labour" asp-route-id="@a.Id" class="card-body" novalidate>
+                <div class="grid-3">
+                    <div class="field"><label>Gestational age</label><input name="Labour.GestationalAge" value="@Model.Labour.GestationalAge" maxlength="20" /></div>
+                    <div class="field"><label>Onset of labour</label><input type="datetime-local" name="Labour.OnsetLocal" value="@Model.Labour.OnsetLocal?.ToString("yyyy-MM-ddTHH:mm")" /></div>
+                    <div class="field"><label>Onset information</label><input name="Labour.OnsetInfo" value="@Model.Labour.OnsetInfo" maxlength="200" /></div>
+                    <div class="field"><label>Membrane status</label><input name="Labour.MembraneStatus" value="@Model.Labour.MembraneStatus" maxlength="100" /></div>
+                    <div class="field"><label>Membranes ruptured</label><input type="datetime-local" name="Labour.MembranesRupturedLocal" value="@Model.Labour.MembranesRupturedLocal?.ToString("yyyy-MM-ddTHH:mm")" /></div>
+                    <div class="field"><label>Responsible staff</label><input name="Labour.ResponsibleStaff" value="@Model.Labour.ResponsibleStaff" maxlength="150" /></div>
+                </div>
+                <div class="grid-3">
+                    <div class="field"><label>Presenting complaints</label><textarea name="Labour.PresentingComplaints" rows="2" maxlength="1000">@Model.Labour.PresentingComplaints</textarea></div>
+                    <div class="field"><label>Clinical history</label><textarea name="Labour.ClinicalHistory" rows="2" maxlength="1000">@Model.Labour.ClinicalHistory</textarea></div>
+                    <div class="field"><label>Initial assessment</label><textarea name="Labour.InitialAssessment" rows="2" maxlength="1000">@Model.Labour.InitialAssessment</textarea></div>
+                </div>
+                <input type="hidden" name="Labour.PregnancyId" value="@Model.Labour.PregnancyId" />
+                <button class="btn btn-primary btn-sm" type="submit">Save labour details</button>
+                <a bn-permission="@Perm.IpdPrintForms" class="btn btn-light btn-sm" href="/Print/Ipd/labour/@a.Id" target="_blank">Print labour record</a>
+            </form>
+            @if (lr.Status is not (LabourStatus.DeliveryCompleted or LabourStatus.Referred or LabourStatus.Transferred or LabourStatus.Discharged) && !closed)
+            {
+                <div class="card-footer"><a bn-permission="@Perm.IpdEnterDelivery" class="btn btn-primary" href="/Ipd/Delivery/New/@a.Id" data-test="record-delivery">Record delivery</a></div>
+            }
+        </div>
+    }
+    else if (!closed && p.Gender == Gender.Female)
+    {
+        <form bn-permission="@Perm.IpdManageLabour" method="post" asp-page-handler="MoveToLabour" asp-route-id="@a.Id" class="card" novalidate data-move-labour>
+            <div class="card-header"><h3>Move to the Labour Room</h3></div>
+            <div class="card-body">
+                @await Html.PartialAsync("_BedSelect", (Model.FreeBeds.Where(b => b.Ward!.Type == WardType.LabourRoom || b.Type == BedType.Labour).ToList(), "BedId", (int?)null, true))
+                <div class="grid-3">
+                    <div class="field"><label>Presenting complaints</label><input name="Labour.PresentingComplaints" maxlength="1000" /></div>
+                    <div class="field"><label>Membrane status</label><input name="Labour.MembraneStatus" maxlength="100" /></div>
+                    <div class="field"><label>Responsible staff</label><input name="Labour.ResponsibleStaff" maxlength="150" /></div>
+                </div>
+                <input type="hidden" name="Labour.PregnancyId" value="@(a.PregnancyId)" />
+            </div>
+            <div class="card-footer"><button class="btn btn-primary" type="submit">Move to Labour Room</button></div>
+        </form>
+    }
+    foreach (var d in Model.Deliveries)
+    {
+        <div class="card" data-delivery="@d.Id">
+            <div class="card-header"><h3>Delivery @d.Number – @MaternityService.Label(d.Type) · @Fmt.DateTimeText(d.DeliveredUtc) · @d.BabyCount baby(ies)</h3>
+                <a class="btn btn-light btn-sm" href="/Ipd/Delivery/@d.Id">Open</a></div>
+            <table class="table table-compact"><tbody>
+            @foreach (var n in d.Newborns.OrderBy(n => n.BirthOrder))
+            {
+                <tr><td>Baby @n.BirthOrder</td><td>@n.Sex</td><td>@(n.BirthWeightGrams is int w ? $"{w} g" : "weight not recorded")</td><td>@n.Condition</td>
+                    <td>@if (n.NewbornPatient is { } np) { <a href="/Patients/Profile/@np.Id">@np.PatientNumber · @np.FullName</a> }</td>
+                    <td>@n.Placement @if (n.NewbornAdmissionId is long na) { <a href="/Ipd/Admission/@na">admission</a> }</td></tr>
+            }
+            </tbody></table>
+        </div>
+    }
+}
+
+@if (tab == "postnatal")
+{
+    <p class="no-print"><a bn-permission="@Perm.IpdPrintForms" class="btn btn-light btn-sm" href="/Print/Ipd/postnatal/@a.Id" target="_blank">Print postnatal record</a></p>
+}
+
+@if (tab == "nicu")
+{
+    <div class="card" data-nicu>
+        <div class="card-body">
+            @if (Model.Birth is { } br) { <p>Born @Fmt.DateTimeText(br.BirthUtc) · delivery <a href="/Ipd/Delivery/@br.DeliveryId">@br.Delivery?.Number</a> · birth weight @(br.BirthWeightGrams is int bw ? $"{bw} g" : "not recorded") · APGAR @(br.Apgar1?.ToString() ?? "—")/@(br.Apgar5?.ToString() ?? "—")/@(br.Apgar10?.ToString() ?? "—")</p> }
+            @if (Model.Nicu is { } n) { <p>NICU reason: @(n.Reason ?? "—") · condition: @(n.ClinicalCondition ?? "—") · admission weight @(n.AdmissionWeightGrams is int aw ? $"{aw} g" : "not recorded") · clinician @(n.ResponsibleClinician ?? "—")</p> }
+            @if (!closed && a.Kind == AdmissionKind.Nicu && Model.Mother is not null)
+            {
+                <form bn-permission="@Perm.IpdManageNicu" method="post" asp-page-handler="ReturnToMother" asp-route-id="@a.Id" class="inline-form wrap"><input name="Reason" placeholder="Reason" maxlength="300" />
+                    <button class="btn btn-light btn-sm" type="submit" data-test="return-mother">Return to mother (rooming-in)</button></form>
+            }
+            @if (!closed && a.Kind == AdmissionKind.Newborn)
+            {
+                <a bn-permission="@Perm.IpdManageNicu" class="btn btn-light btn-sm" href="/Ipd/Nicu/Admit?patientId=@a.PatientId">Shift to NICU</a>
+            }
+        </div>
+    </div>
+}
+
+@if (tab == "billing" && Model.CanSeeFinance)
+{
+    var total = Model.Bill.Where(b => b.Status != ChargeStatus.Cancelled).Sum(b => b.Net);
+    var paid = Model.Bill.Sum(b => b.Paid);
+    <div class="card" data-ipd-bill>
+        <div class="card-header"><h3>IPD bill</h3>
+            <div class="no-print">
+                <form bn-permission="@Perm.IpdManageBilling" method="post" asp-page-handler="BedCharges" asp-route-id="@a.Id" class="inline-form"><button class="btn btn-light btn-sm" type="submit" data-test="post-bed">Post bed charges</button></form>
+                <a bn-permission="@Perm.FinanceCollect" class="btn btn-primary btn-sm" href="/Finance/Collect?patientId=@a.PatientId&ipdAdmissionId=@a.Id" data-test="collect">Collect payment</a>
+                <a bn-permission="@Perm.IpdPrintForms" class="btn btn-light btn-sm" href="/Print/Ipd/daily-bill/@a.Id" target="_blank">Daily bill</a>
+                <a bn-permission="@Perm.IpdPrintForms" class="btn btn-light btn-sm" href="/Print/Ipd/bill/@a.Id" target="_blank" data-test="final-bill">Final bill</a>
+            </div>
+        </div>
+        <table class="table table-compact">
+            <thead><tr><th>Date</th><th>Charge</th><th>Service</th><th>Source</th><th class="num">Fee</th><th class="num">Discount</th><th class="num">Net</th><th class="num">Paid</th><th>Status</th></tr></thead>
+            <tbody>
+            @foreach (var l in Model.Bill)
+            {
+                <tr class="@(l.Status == ChargeStatus.Cancelled ? "row-muted" : "")"><td>@Fmt.Day(l.Date)</td><td class="mono">@l.ChargeNumber</td><td>@l.Service</td><td>@l.Source</td>
+                    <td class="num">@Fmt.Money(l.Fee)</td><td class="num">@Fmt.Money(l.Discount)</td><td class="num">@Fmt.Money(l.Net)</td><td class="num">@Fmt.Money(l.Paid)</td><td>@l.Status</td></tr>
+            }
+            @if (Model.Bill.Count == 0) { <tr><td colspan="9" class="empty">No charges yet.</td></tr> }
+            </tbody>
+            <tfoot><tr><th colspan="6">Total</th><th class="num" data-bill-total>@Fmt.Money(total)</th><th class="num" data-bill-paid>@Fmt.Money(paid)</th><th data-bill-balance>Balance @Fmt.Money(Model.Bill.Sum(b => b.Balance))</th></tr></tfoot>
+        </table>
+        @if (!closed)
+        {
+            <form bn-permission="@Perm.IpdManageBilling" method="post" asp-page-handler="Charge" asp-route-id="@a.Id" class="card-body inline-form wrap no-print" novalidate>
+                <select name="ServiceItemId" aria-label="Service"><option value="">— service / procedure —</option>@foreach (var s in Model.Services) { <option value="@s.Item.Id">@s.Item.Name · @Fmt.Money(s.CurrentFee)</option> }</select>
+                <input type="number" name="Quantity" value="1" min="1" max="100" aria-label="Quantity" />
+                <input bn-permission="@Perm.FinanceDiscount" type="number" step="0.01" min="0" name="Discount" value="0" aria-label="Discount" />
+                <input name="Reason" placeholder="Discount reason" maxlength="300" />
+                <button class="btn btn-light btn-sm" type="submit" data-test="add-charge">Add charge</button>
+            </form>
+            <p class="card-body small muted">Laboratory, radiology and medicine charges are added automatically when ordered / issued for this admission.</p>
+        }
+    </div>
+}
+
+@if (tab == "transfer")
+{
+    <div class="grid-2">
+        @if (!closed)
+        {
+            <form bn-permission="@Perm.IpdTransferPatient|@Perm.IpdAllocateBed" method="post" asp-page-handler="@(a.CurrentBedId is null ? "Allocate" : "Transfer")" asp-route-id="@a.Id" class="card" novalidate data-transfer-form>
+                <div class="card-header"><h3>@(a.CurrentBedId is null ? "Allocate bed" : "Transfer (bed / room / ward / department)")</h3></div>
+                <div class="card-body">
+                    @await Html.PartialAsync("_BedSelect", (Model.FreeBeds, "BedId", (int?)null, false))
+                    <div class="field"><label>Department (optional)</label><select name="DepartmentId"><option value="">— unchanged —</option>@foreach (var d in Model.Departments) { <option value="@d.Id">@d.Name</option> }</select></div>
+                    <div class="field"><label>Reason *</label><input name="Reason" maxlength="300" /></div>
+                    <div class="field"><label>Receiving staff</label><input name="Receiving" maxlength="150" /></div>
+                </div>
+                <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="transfer">@(a.CurrentBedId is null ? "Allocate" : "Transfer")</button></div>
+            </form>
+        }
+        <div class="card"><div class="card-header"><h3>Bed history</h3></div>
+            <table class="table table-compact"><tbody>
+            @foreach (var al in Model.Allocations) { <tr><td>@al.Bed?.Code</td><td>@Fmt.DateTimeText(al.FromUtc) → @(al.ToUtc is DateTime t ? Fmt.DateTimeText(t) : "now")</td><td>@(al.IsShared ? "shared with mother" : "")</td></tr> }
+            </tbody></table>
+        </div>
+    </div>
+    <div class="card"><div class="card-header"><h3>Transfers</h3></div>
+        <table class="table table-compact"><thead><tr><th>When</th><th>Type</th><th>From</th><th>To</th><th>Reason</th><th>By / receiving</th><th></th></tr></thead><tbody>
+        @foreach (var t in Model.Transfers) { <tr><td>@Fmt.DateTimeText(t.TransferUtc)</td><td>@t.Kind</td><td>@t.FromText</td><td>@t.ToText</td><td>@t.Reason</td><td>@t.Username @t.ReceivingDepartment</td><td><a bn-permission="@Perm.IpdPrintForms" href="/Print/Ipd/transfer/@t.Id" target="_blank">Print</a></td></tr> }
+        @if (Model.Transfers.Count == 0) { <tr><td colspan="7" class="empty">No transfers.</td></tr> }
+        </tbody></table>
+    </div>
+}
+
+@if (tab == "discharge")
+{
+    <form method="post" asp-route-id="@a.Id" class="card" novalidate data-discharge-form>
+        <div class="card-header"><h3>Discharge @(a.DischargeRequestedUtc is DateTime rq ? $"(requested by {a.DischargeRequestedBy} on {Fmt.DateTimeText(rq)})" : "")</h3></div>
+        <div class="card-body">
+            <div class="grid-3">
+                <div class="field"><label>Discharge type *</label><select name="Discharge.Type" disabled="@closed"><option value="">— select —</option>@foreach (var t in Enum.GetValues<DischargeType>()) { <option value="@t" selected="@(Model.Discharge.Type == t)">@(t == DischargeType.Lama ? "LAMA (left against medical advice)" : t.ToString())</option> }</select></div>
+                <div class="field"><label>Final diagnosis *</label><input name="Discharge.FinalDiagnosis" value="@Model.Discharge.FinalDiagnosis" maxlength="1000" /></div>
+                <div class="field"><label>Condition at discharge *</label><input name="Discharge.ConditionAtDischarge" value="@Model.Discharge.ConditionAtDischarge" maxlength="500" /></div>
+                <div class="field"><label>Referred to</label><input name="Discharge.ReferredTo" value="@Model.Discharge.ReferredTo" maxlength="200" /></div>
+                <div class="field"><label>Discharging doctor</label><input name="Discharge.DischargeDoctor" value="@Model.Discharge.DischargeDoctor" maxlength="150" /></div>
+            </div>
+            <div class="grid-2">
+                <div class="field"><label>Treatment summary</label><textarea name="Discharge.TreatmentSummary" rows="3" maxlength="4000">@Model.Discharge.TreatmentSummary</textarea></div>
+                <div class="field"><label>Procedures</label><textarea name="Discharge.Procedures" rows="3" maxlength="2000">@Model.Discharge.Procedures</textarea></div>
+                <div class="field"><label>Investigation summary</label><textarea name="Discharge.InvestigationSummary" rows="3" maxlength="2000">@Model.Discharge.InvestigationSummary</textarea></div>
+                <div class="field"><label>Discharge medications (as prescribed)</label><textarea name="Discharge.DischargeMedications" rows="3" maxlength="2000">@Model.Discharge.DischargeMedications</textarea></div>
+            </div>
+            <div class="field"><label>Follow-up instructions</label><textarea name="Discharge.FollowUp" rows="2" maxlength="2000">@Model.Discharge.FollowUp</textarea></div>
+            @if (Model.Babies.Any(b => b.IsActive)) { <p class="text-warning">Babies linked to this admission must be discharged or transferred first.</p> }
+            @if (Model.Settings.RequireBillClearanceForDischarge && Model.Private) { <p class="small muted">The final bill must be cleared before discharge (hospital setting).</p> }
+        </div>
+        @if (!closed)
+        {
+            <div class="card-footer form-actions">
+                <button bn-permission="@Perm.IpdRequestDischarge" class="btn btn-light" type="submit" asp-page-handler="RequestDischarge" data-test="request-discharge">Request discharge</button>
+                <button bn-permission="@Perm.IpdDischargePatient" class="btn btn-primary" type="submit" asp-page-handler="Discharge" data-test="discharge" data-confirm="Complete the discharge? The bed will be released for cleaning.">Complete discharge</button>
+            </div>
+        }
+        else
+        {
+            <div class="card-footer">Discharged @(a.DischargedUtc is DateTime du ? Fmt.DateTimeText(du) : "") by @a.DischargedBy · @a.DischargeType
+                <a bn-permission="@Perm.IpdPrintForms" class="btn btn-light btn-sm" href="/Print/Ipd/discharge/@a.Id" target="_blank">Print discharge summary</a>
+                @if (a.Kind == AdmissionKind.Nicu) { <a bn-permission="@Perm.IpdPrintForms" class="btn btn-light btn-sm" href="/Print/Ipd/nicu-discharge/@a.Id" target="_blank">NICU discharge summary</a> }</div>
+        }
+    </form>
+}
+
+@if (tab == "history")
+{
+    <div class="card"><div class="card-header"><h3>Admission history</h3></div>
+        <table class="table table-compact" data-events><thead><tr><th>When</th><th>Category</th><th>Event</th><th>From → to</th><th>Note</th><th>By</th></tr></thead><tbody>
+        @foreach (var e in Model.Events) { <tr><td>@Fmt.DateTimeText(e.CreatedUtc)</td><td>@e.Category</td><td>@e.Event</td><td>@e.FromValue @(e.ToValue is null ? "" : "→ " + e.ToValue)</td><td>@e.Note</td><td>@e.Username</td></tr> }
+        </tbody></table>
+    </div>
+}
+@section Scripts { <script src="~/js/ipd.js" asp-append-version="true"></script> }

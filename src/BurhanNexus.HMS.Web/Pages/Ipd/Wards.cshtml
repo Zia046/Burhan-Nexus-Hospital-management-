@@ -1,0 +1,88 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ipd.WardsModel
+@{ ViewData["Title"] = "Wards, rooms & beds"; }
+<partial name="_IpdNav" />
+<partial name="_ValidationSummary" />
+<div class="grid-3">
+    <form bn-permission="@Perm.IpdManageWards" method="post" asp-page-handler="Ward" asp-route-ward="@Model.EditWard" class="card" novalidate data-ward-form>
+        <div class="card-header"><h3>@(Model.EditWard is null ? "New ward" : "Edit ward")</h3></div>
+        <div class="card-body">
+            <div class="grid-2">
+                <div class="field"><label for="Ward_Code">Code</label><input id="Ward_Code" name="Ward.Code" value="@Model.Ward.Code" maxlength="20" /></div>
+                <div class="field"><label for="Ward_Name">Name</label><input id="Ward_Name" name="Ward.Name" value="@Model.Ward.Name" maxlength="100" /></div>
+                <div class="field"><label for="Ward_Type">Type</label><select id="Ward_Type" name="Ward.Type">@foreach (var t in Enum.GetValues<WardType>()) { <option value="@t" selected="@(Model.Ward.Type == t)">@t</option> }</select></div>
+                <div class="field"><label for="Ward_DepartmentId">Department</label><select id="Ward_DepartmentId" name="Ward.DepartmentId"><option value="">—</option>@foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(Model.Ward.DepartmentId == d.Id)">@d.Name</option> }</select></div>
+                <div class="field"><label for="Ward_Location">Floor / location</label><input id="Ward_Location" name="Ward.Location" value="@Model.Ward.Location" maxlength="100" /></div>
+                <div class="field"><label for="Ward_Capacity">Capacity</label><input id="Ward_Capacity" type="number" min="0" name="Ward.Capacity" value="@Model.Ward.Capacity" /></div>
+            </div>
+            <div class="field"><label for="Ward_ResponsibleStaff">Responsible staff</label><input id="Ward_ResponsibleStaff" name="Ward.ResponsibleStaff" value="@Model.Ward.ResponsibleStaff" maxlength="200" /></div>
+            <div class="field"><label for="Ward_BedChargeServiceItemId">Bed charge per night (Phase 3 service)</label><select id="Ward_BedChargeServiceItemId" name="Ward.BedChargeServiceItemId"><option value="">No bed charge</option>
+                @foreach (var s in Model.Services) { <option value="@s.Item.Id" selected="@(Model.Ward.BedChargeServiceItemId == s.Item.Id)">@s.Item.Name</option> }</select></div>
+            <div class="field"><label for="Ward_StockLocationId">Ward stock (pharmacy department location)</label><select id="Ward_StockLocationId" name="Ward.StockLocationId"><option value="">No ward stock</option>
+                @foreach (var l in Model.Locations) { <option value="@l.Id" selected="@(Model.Ward.StockLocationId == l.Id)">@l.Name</option> }</select></div>
+            <label class="check"><input type="checkbox" name="Ward.IsActive" value="true" checked="@Model.Ward.IsActive" /> Active</label><input type="hidden" name="Ward.IsActive" value="false" />
+        </div>
+        <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="save-ward">Save ward</button></div>
+    </form>
+    <form bn-permission="@Perm.IpdManageRooms" method="post" asp-page-handler="Room" asp-route-room="@Model.EditRoom" class="card" novalidate data-room-form>
+        <div class="card-header"><h3>@(Model.EditRoom is null ? "New room" : "Edit room")</h3></div>
+        <div class="card-body">
+            <div class="field"><label for="Room_WardId">Ward</label><select id="Room_WardId" name="Room.WardId">@foreach (var w in Model.Wards) { <option value="@w.Id" selected="@(Model.Room.WardId == w.Id)">@w.Name</option> }</select></div>
+            <div class="grid-2">
+                <div class="field"><label for="Room_Name">Room number / name</label><input id="Room_Name" name="Room.Name" value="@Model.Room.Name" maxlength="50" /></div>
+                <div class="field"><label for="Room_Type">Room type</label><select id="Room_Type" name="Room.Type">@foreach (var t in Enum.GetValues<RoomType>()) { <option value="@t" selected="@(Model.Room.Type == t)">@t</option> }</select></div>
+                <div class="field"><label for="Room_BedCapacity">Bed capacity</label><input id="Room_BedCapacity" type="number" min="0" name="Room.BedCapacity" value="@Model.Room.BedCapacity" /></div>
+                <div class="field"><label for="Room_Notes">Notes</label><input id="Room_Notes" name="Room.Notes" value="@Model.Room.Notes" maxlength="200" /></div>
+            </div>
+            <label class="check"><input type="checkbox" name="Room.IsActive" value="true" checked="@Model.Room.IsActive" /> Active</label><input type="hidden" name="Room.IsActive" value="false" />
+        </div>
+        <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="save-room">Save room</button></div>
+    </form>
+    <form bn-permission="@Perm.IpdManageBeds" method="post" asp-page-handler="Bed" asp-route-bed="@Model.EditBed" class="card" novalidate data-bed-form>
+        <div class="card-header"><h3>@(Model.EditBed is null ? "New bed / cot / incubator" : "Edit bed")</h3></div>
+        <div class="card-body">
+            <div class="field"><label for="Bed_RoomId">Room</label><select id="Bed_RoomId" name="Bed.RoomId">@foreach (var r in Model.Rooms) { <option value="@r.Id" selected="@(Model.Bed.RoomId == r.Id)">@r.Ward!.Name / @r.Name</option> }</select></div>
+            <div class="grid-2">
+                <div class="field"><label for="Bed_Code">Bed number (unique)</label><input id="Bed_Code" name="Bed.Code" value="@Model.Bed.Code" maxlength="30" /></div>
+                <div class="field"><label for="Bed_Type">Type</label><select id="Bed_Type" name="Bed.Type">@foreach (var t in Enum.GetValues<BedType>()) { <option value="@t" selected="@(Model.Bed.Type == t)">@t</option> }</select></div>
+                <div class="field"><label for="Bed_EquipmentId">Equipment ID (incubator / cot)</label><input id="Bed_EquipmentId" name="Bed.EquipmentId" value="@Model.Bed.EquipmentId" maxlength="60" /></div>
+                <div class="field"><label for="Bed_SortOrder">Sort order</label><input id="Bed_SortOrder" type="number" name="Bed.SortOrder" value="@Model.Bed.SortOrder" /></div>
+            </div>
+            <label class="check"><input type="checkbox" name="Bed.IsActive" value="true" checked="@Model.Bed.IsActive" /> Active</label><input type="hidden" name="Bed.IsActive" value="false" />
+        </div>
+        <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="save-bed">Save bed</button></div>
+    </form>
+</div>
+<div class="card" data-ward-list>
+    <div class="card-header"><h2><svg class="icon"><use href="#i-hospital" /></svg> Wards</h2></div>
+    <div class="table-wrap">
+        <table class="table table-compact">
+            <thead><tr><th>Ward</th><th>Type</th><th>Department</th><th>Rooms · beds</th><th>Bed charge</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var w in Model.Wards)
+            {
+                <tr class="@(w.IsActive ? "" : "row-muted")"><td><strong>@w.Name</strong> <small class="mono muted">@w.Code</small><small class="block muted">@w.Location @w.ResponsibleStaff</small></td><td>@w.Type</td><td>@w.Department?.Name</td>
+                    <td>@string.Join(", ", Model.Rooms.Where(r => r.WardId == w.Id).Select(r => $"{r.Name} ({Model.Beds.Count(b => b.RoomId == r.Id)})"))</td>
+                    <td>@(w.BedChargeServiceItem?.Name ?? "—")</td><td>@(w.IsActive ? "Active" : "Inactive")</td>
+                    <td class="actions"><a class="btn btn-light btn-sm" href="/Ipd/Wards?ward=@w.Id">Edit</a></td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header"><h2>Rooms &amp; beds</h2></div>
+    <div class="table-wrap">
+        <table class="table table-compact">
+            <thead><tr><th>Ward / room</th><th>Type</th><th>Beds</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var r in Model.Rooms)
+            {
+                <tr class="@(r.IsActive ? "" : "row-muted")"><td>@r.Ward!.Name / <strong>@r.Name</strong></td><td>@r.Type (capacity @r.BedCapacity)</td>
+                    <td>@foreach (var b in Model.Beds.Where(b => b.RoomId == r.Id)) { <a class="chip" href="/Ipd/Wards?bed=@b.Id" title="@b.Status">@b.Code</a> }</td>
+                    <td class="actions"><a class="btn btn-light btn-sm" href="/Ipd/Wards?room=@r.Id">Edit</a></td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

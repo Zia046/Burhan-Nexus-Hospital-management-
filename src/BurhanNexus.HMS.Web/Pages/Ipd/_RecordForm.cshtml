@@ -1,0 +1,49 @@
+@model (RecordKind Kind, IReadOnlyList<ClinicalFormField> Fields, string Action, long? CorrectsId, BurhanNexus.HMS.Infrastructure.Ipd.RecordView? Original, bool Open)
+@{
+    var title = BurhanNexus.HMS.Web.Pages.Ipd.IpdPageModel.Title(Model.Kind);
+    var now = DateTime.UtcNow;
+}
+<details class="card record-form" data-record-form="@Model.Kind" open="@(Model.Open || Model.CorrectsId is not null)">
+    <summary class="card-header"><h3><svg class="icon"><use href="#i-plus" /></svg> @(Model.CorrectsId is null ? "New " + title.ToLowerInvariant() : "Correct " + title.ToLowerInvariant())</h3></summary>
+    <form method="post" action="@Model.Action" asp-antiforgery="true" class="card-body" novalidate>
+        <input type="hidden" name="Record.Kind" value="@Model.Kind" />
+        @if (Model.CorrectsId is long cid)
+        {
+            <input type="hidden" name="Record.CorrectsRecordId" value="@cid" />
+            <div class="field"><label>Reason for the correction *</label><input name="Record.CorrectionReason" maxlength="300" required /></div>
+        }
+        <div class="grid-3">
+            <div class="field"><label>Date / time of observation</label><input type="datetime-local" name="Record.RecordedLocal" value="@Fmt.ToLocal(Model.Original?.Record.RecordedUtc ?? now).ToString("yyyy-MM-ddTHH:mm")" /></div>
+            <div class="field"><label>Responsible clinician / nurse</label><input name="Record.ResponsibleName" maxlength="150" value="@Model.Original?.Record.ResponsibleName" placeholder="default: you" /></div>
+        </div>
+        @foreach (var g in Model.Fields.GroupBy(f => f.Section ?? ""))
+        {
+            if (g.Key.Length > 0) { <h4 class="section-title">@g.Key</h4> }
+            <div class="grid-3">
+                @foreach (var f in g)
+                {
+                    var v = Model.Original is { } o && o.Values.TryGetValue(f.Key, out var ov) ? ov : null;
+                    var name = $"Record.Values[{f.Key}]";
+                    <div class="field @(f.Type == FieldType.LongText ? "span-3" : "")" data-field="@f.Key">
+                        <label>@f.Label @(f.Unit is null ? "" : $"({f.Unit})") @(f.IsRequired ? "*" : "")</label>
+                        @switch (f.Type)
+                        {
+                            case FieldType.Number: <input type="number" step="any" name="@name" value="@v" /> break;
+                            case FieldType.LongText: <textarea name="@name" rows="2" maxlength="4000">@v</textarea> break;
+                            case FieldType.Choice:
+                                <select name="@name"><option value="">— not recorded —</option>@foreach (var c in (f.Choices ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)) { <option value="@c" selected="@(v == c)">@c</option> }</select>
+                                break;
+                            case FieldType.YesNo:
+                                <select name="@name"><option value="">— not recorded —</option><option selected="@(v == "Yes")">Yes</option><option selected="@(v == "No")">No</option></select>
+                                break;
+                            default: <input name="@name" value="@v" maxlength="300" /> break;
+                        }
+                    </div>
+                }
+            </div>
+        }
+        <div class="field"><label>Notes</label><textarea name="Record.Notes" rows="2" maxlength="4000">@Model.Original?.Record.Notes</textarea></div>
+        <p class="small muted">Empty fields are saved as “not recorded” – never as normal. Entries cannot be overwritten: a correction is saved as a new version with the reason.</p>
+        <button class="btn btn-primary" type="submit" data-test="save-@Model.Kind">@(Model.CorrectsId is null ? "Save" : "Save correction")</button>
+    </form>
+</details>

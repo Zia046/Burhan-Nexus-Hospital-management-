@@ -1,0 +1,24 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ipd.AdmissionsModel
+@{ ViewData["Title"] = "Inpatients"; }
+<partial name="_IpdNav" />
+<div class="toolbar">
+    <form method="get" class="filters wrap">
+        <select name="scope" aria-label="Status" data-autosubmit>
+            <option value="active" selected="@(Model.Scope == "active")">Currently admitted</option>
+            <option value="attention" selected="@(Model.Scope == "attention")">Requiring attention</option>
+            <option value="discharge" selected="@(Model.Scope == "discharge")">Awaiting discharge</option>
+            <option value="discharged" selected="@(Model.Scope == "discharged")">Discharged / referred</option>
+            <option value="all" selected="@(Model.Scope == "all")">All admissions</option>
+        </select>
+        <select name="kind" aria-label="Unit"><option value="">All units</option>@foreach (var k in Enum.GetValues<AdmissionKind>()) { <option value="@k" selected="@(Model.Kind == k)">@k</option> }</select>
+        <select name="wardId" aria-label="Ward"><option value="">All wards</option>@foreach (var w in Model.Wards) { <option value="@w.Id" selected="@(Model.WardId == w.Id)">@w.Name</option> }</select>
+        <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Admission no., Patient ID, name, phone, CNIC" maxlength="100" /></div>
+        <button class="btn btn-light" type="submit">Search</button>
+    </form>
+    <div class="toolbar-actions"><a bn-permission="@Perm.IpdRegisterAdmission" class="btn btn-primary" href="/Ipd/Admit">Admit patient</a></div>
+</div>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-users" /></svg> Inpatients</h2><span class="pill pill-blue" data-count>@Model.Rows.Count</span></div>
+    @await Html.PartialAsync("_AdmissionTable", (Model.Rows, "No admissions."))
+</div>

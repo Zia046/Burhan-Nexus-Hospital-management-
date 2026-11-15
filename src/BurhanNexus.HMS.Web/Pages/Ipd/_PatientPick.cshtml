@@ -1,0 +1,27 @@
+@model (string Title, string? Q, IReadOnlyList<BurhanNexus.HMS.Infrastructure.Patients.PatientListItem> Matches, string SelectUrl, string Extra)
+<div class="card card-medium">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-search" /></svg> @Model.Title</h2></div>
+    <div class="card-body">
+        <form method="get" class="search-main">
+            @Html.Raw(Model.Extra)
+            <div class="input-icon grow"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Patient ID, name, phone or CNIC" autofocus maxlength="100" /></div>
+            <button class="btn btn-primary" type="submit">Search</button>
+            <a bn-permission="@Perm.PatientsAdd" class="btn btn-success" href="/Patients/Register">Register new patient</a>
+        </form>
+        <p class="small muted">Search first – the existing patient record and Patient ID are used; no duplicate records are created.</p>
+        @if (!string.IsNullOrWhiteSpace(Model.Q))
+        {
+            <table class="table table-compact" data-matches>
+                <thead><tr><th>Patient ID</th><th>Name</th><th>Father / Husband</th><th>Age</th><th>Phone</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var m in Model.Matches)
+                {
+                    <tr><td class="mono">@m.PatientNumber</td><td><strong>@m.FullName</strong></td><td>@m.GuardianName</td><td>@m.AgeText · @m.Gender</td><td>@m.MobileNumber</td>
+                        <td class="actions"><a class="btn btn-primary btn-sm" href="@string.Format(Model.SelectUrl, m.Id)" data-test="pick-patient">Select</a></td></tr>
+                }
+                @if (Model.Matches.Count == 0) { <tr><td colspan="6" class="empty">No patient found.</td></tr> }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>

@@ -1,0 +1,30 @@
+@model (RecordKind Kind, IReadOnlyList<ClinicalFormField> Fields, IReadOnlyList<BurhanNexus.HMS.Infrastructure.Ipd.RecordView> Records, string? CorrectUrl)
+@{
+    var used = Model.Fields.Where(f => Model.Records.Any(r => r.Values.ContainsKey(f.Key))).ToList();
+}
+<div class="table-wrap" data-record-list="@Model.Kind">
+    <table class="table table-compact record-table">
+        <thead><tr><th>Time</th>@foreach (var f in used) { <th>@f.Label @(f.Unit is null ? "" : $"({f.Unit})")</th> }<th>Notes</th><th>By</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Records.OrderByDescending(x => x.Record.RecordedUtc).ThenByDescending(x => x.Record.Id))
+        {
+            <tr class="@(r.IsSuperseded ? "row-muted" : "")" data-record="@r.Record.Id">
+                <td class="nowrap">@Fmt.DateTimeText(r.Record.RecordedUtc)
+                    @if (r.IsSuperseded) { <small class="block text-warning">corrected (see newer version)</small> }
+                    @if (r.Record.CorrectsRecordId is not null) { <small class="block muted">correction: @r.Record.CorrectionReason</small> }</td>
+                @foreach (var f in used)
+                {
+                    var has = r.Values.TryGetValue(f.Key, out var v);
+                    var alert = f.Type == FieldType.Number && has && r.Number(f.Key) is decimal n && (f.AlertLow is decimal lo && n < lo || f.AlertHigh is decimal hi && n > hi);
+                    <td class="@(alert ? "flag-cell" : "") @(f.Type == FieldType.LongText ? "prewrap" : "")" title="@(alert ? $"Outside the configured limits ({f.AlertLow}–{f.AlertHigh}, {f.AlertSource})" : null)">@(has ? v : "—")@(alert ? " ⚑" : "")</td>
+                }
+                <td class="prewrap small">@r.Record.Notes</td>
+                <td class="small">@(r.Record.ResponsibleName ?? r.Record.Username)<small class="muted block">entered @Fmt.DateTimeText(r.Record.EnteredUtc) by @r.Record.Username</small></td>
+                <td class="actions">@if (Model.CorrectUrl is not null && !r.IsSuperseded) { <a bn-permission="@Perm.IpdCorrectRecords" class="btn btn-light btn-sm" href="@(Model.CorrectUrl)&correct=@r.Record.Id">Correct</a> }</td>
+            </tr>
+        }
+        @if (Model.Records.Count == 0) { <tr><td colspan="@(used.Count + 4)" class="empty">Nothing recorded yet.</td></tr> }
+        </tbody>
+    </table>
+    @if (Model.Fields.Any(f => f.AlertLow is not null || f.AlertHigh is not null)) { <p class="small muted">⚑ = outside the limits configured by the clinical administrator (approved protocol). The system does not interpret values.</p> }
+</div>
