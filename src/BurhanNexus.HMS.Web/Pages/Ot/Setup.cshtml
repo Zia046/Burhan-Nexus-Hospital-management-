@@ -1,0 +1,84 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ot.SetupModel
+@{
+    ViewData["Title"] = "OT settings";
+    var i = Model.Input;
+    var fees = new (string Name, string Label, int? Value)[]
+    {
+        ("SurgeonFeeItemId", "Surgeon fee", i.SurgeonFeeItemId), ("AssistantFeeItemId", "Assistant surgeon fee", i.AssistantFeeItemId),
+        ("AnesthesiaFeeItemId", "Anesthesia fee", i.AnesthesiaFeeItemId), ("AnesthesiaSuppliesItemId", "Anesthesia supplies", i.AnesthesiaSuppliesItemId),
+        ("RecoveryItemId", "Recovery room charge", i.RecoveryItemId), ("EquipmentItemId", "Equipment charge", i.EquipmentItemId), ("ConsumablesItemId", "OT consumables charge", i.ConsumablesItemId),
+    };
+}
+<partial name="_OtNav" />
+<partial name="_ValidationSummary" />
+<form bn-permission="@Perm.OtSettings" method="post" class="card" novalidate data-ot-settings>
+    <input type="hidden" name="RowVersion" value="@Model.RowVersion" />
+    <div class="card-header"><h3>OT billing &amp; print settings</h3><span class="status status-info">@(Model.IsPrivate ? "Private hospital mode" : "Government hospital mode")</span></div>
+    <div class="card-body">
+        <p class="small muted">Fees are Phase 3 services (Services &amp; Fees) – amounts and fee history are maintained there. The theatre charge is set per theatre and the procedure charge per catalogue entry. @(Model.IsPrivate ? "" : "In Government mode only the services the hospital has configured are charged; no profit or retail price is calculated.")</p>
+        <div class="grid-3">
+            @foreach (var f in fees)
+            {
+                <div class="field"><label for="S_@(f.Name)">@f.Label</label><select id="S_@(f.Name)" name="Input.@f.Name"><option value="">Not charged</option>@foreach (var s in Model.Services) { <option value="@s.Item.Id" selected="@(f.Value == s.Item.Id)">@s.Item.Name · @Fmt.Money(s.CurrentFee)</option> }</select></div>
+            }
+            <div class="field"><label for="S_Clean">Default cleaning interval (min)</label><input id="S_Clean" type="number" min="0" max="240" name="Input.DefaultCleaningMinutes" value="@i.DefaultCleaningMinutes" /></div>
+            <div class="field"><label for="S_Upload">Max scan upload (MB)</label><input id="S_Upload" type="number" min="1" max="50" name="Input.MaxUploadMb" value="@i.MaxUploadMb" /></div>
+            <div class="field"><label for="S_Margin">Letterhead top margin (mm, when header is off)</label><input id="S_Margin" type="number" min="0" max="120" name="Input.LetterheadTopMarginMm" value="@i.LetterheadTopMarginMm" /></div>
+        </div>
+        <label class="check"><input type="checkbox" name="Input.PrintHeader" value="true" checked="@i.PrintHeader" /> Print hospital header on OT forms</label><input type="hidden" name="Input.PrintHeader" value="false" />
+        <div class="field"><label for="S_Footer">Form footer</label><input id="S_Footer" name="Input.FormFooter" value="@i.FormFooter" maxlength="300" /></div>
+    </div>
+    <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="save-ot-settings">Save settings</button></div>
+</form>
+
+<div class="grid-2">
+    <form bn-permission="@Perm.OtSettings" method="post" asp-page-handler="Consent" asp-route-consent="@Model.EditConsent" class="card" novalidate data-consent-type-form>
+        <div class="card-header"><h3>@(Model.EditConsent is null ? "New consent type" : "Edit consent type")</h3></div>
+        <div class="card-body">
+            <div class="grid-2">
+                <div class="field"><label for="C_Name">Name *</label><input id="C_Name" name="ConsentName" value="@Model.ConsentName" maxlength="100" /></div>
+                <div class="field"><label for="C_Sort">Sort order</label><input id="C_Sort" type="number" name="ConsentSort" value="@Model.ConsentSort" /></div>
+            </div>
+            <div class="field"><label for="C_Text">Printable template – placeholders {patient} {procedure} {hospital}</label><textarea id="C_Text" name="ConsentTemplate" rows="6" maxlength="4000">@Model.ConsentTemplate</textarea></div>
+            <label class="check"><input type="checkbox" name="ConsentActive" value="true" checked="@Model.ConsentActive" /> Active</label><input type="hidden" name="ConsentActive" value="false" />
+            <p class="small muted">The template wording must be approved by the hospital (and its legal adviser). The starter text is only an example.</p>
+        </div>
+        <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="save-consent-type">Save consent type</button></div>
+    </form>
+    <form bn-permission="@Perm.OtSettings" method="post" asp-page-handler="Item" asp-route-item="@Model.EditItem" class="card" novalidate data-checklist-item-form>
+        <div class="card-header"><h3>@(Model.EditItem is null ? "New checklist item" : "Edit checklist item")</h3></div>
+        <div class="card-body">
+            <div class="grid-2">
+                <div class="field"><label for="I_Stage">Checklist</label><select id="I_Stage" name="ItemStage">@foreach (var st in Enum.GetValues<ChecklistStage>()) { <option value="@st" selected="@(Model.ItemStage == st)">@st</option> }</select></div>
+                <div class="field"><label for="I_Sort">Sort order</label><input id="I_Sort" type="number" name="ItemSort" value="@Model.ItemSort" /></div>
+            </div>
+            <div class="field"><label for="I_Label">Item *</label><input id="I_Label" name="ItemLabel" value="@Model.ItemLabel" maxlength="200" /></div>
+            <label class="check"><input type="checkbox" name="ItemMandatory" value="true" checked="@Model.ItemMandatory" /> Mandatory</label><input type="hidden" name="ItemMandatory" value="false" />
+            <label class="check"><input type="checkbox" name="ItemActive" value="true" checked="@Model.ItemActive" /> Active</label><input type="hidden" name="ItemActive" value="false" />
+        </div>
+        <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="save-checklist-item">Save item</button></div>
+    </form>
+</div>
+
+<div class="grid-2">
+    <div class="card" data-consent-types><div class="card-header"><h2>Consent types</h2></div>
+        <table class="table table-compact"><tbody>
+        @foreach (var c in Model.ConsentTypes) { <tr class="@(c.IsActive ? "" : "row-muted")"><td>@c.Name</td><td>@(c.IsActive ? "Active" : "Inactive")</td><td><a bn-permission="@Perm.OtSettings" class="btn btn-light btn-sm" href="/Ot/Setup?consent=@c.Id">Edit</a></td></tr> }
+        </tbody></table></div>
+    <div class="card" data-checklist-items><div class="card-header"><h2>Checklists</h2></div>
+        <table class="table table-compact"><tbody>
+        @foreach (var g in Model.Items.GroupBy(x => x.Stage))
+        {
+            <tr><th colspan="3">@g.Key</th></tr>
+            @foreach (var it in g) { <tr class="@(it.IsActive ? "" : "row-muted")"><td>@it.Label</td><td>@(it.IsMandatory ? "Mandatory" : "Optional") @(it.IsActive ? "" : "· inactive")</td><td><a bn-permission="@Perm.OtSettings" class="btn btn-light btn-sm" href="/Ot/Setup?item=@it.Id">Edit</a></td></tr> }
+        }
+        </tbody></table></div>
+</div>
+
+<div class="card" data-ot-forms><div class="card-header"><h2>Clinical OT forms</h2></div>
+    <div class="card-body">
+        <p class="small muted">The pre-operative, anesthesia, intra-operative monitoring, recovery (PACU) and post-operative forms use the configurable clinical form engine. Fields, units and choices are edited in the clinical form editor (permission: IPD settings). No clinical alert limits are pre-set – the hospital adds them only from its own approved protocol.</p>
+        @foreach (var k in BurhanNexus.HMS.Web.Pages.Ot.SetupModel.OtForms) { <a bn-permission="@Perm.IpdSettings" class="btn btn-light btn-sm" href="/Ipd/Settings?kind=@k">@BurhanNexus.HMS.Web.Pages.Ipd.IpdPageModel.Title(k)</a> }
+    </div>
+</div>

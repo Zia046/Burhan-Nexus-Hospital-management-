@@ -41,6 +41,7 @@ public class ProfileModel : HmsPageModel
     public IReadOnlyList<BurhanNexus.HMS.Infrastructure.Radiology.RadiologyExamRow>? Radiology { get; private set; }
     /// <summary>Phase 7: IPD admissions (only with "View Inpatient Records"; limited to the user's wards).</summary>
     public IReadOnlyList<BurhanNexus.HMS.Infrastructure.Ipd.AdmissionRow>? Admissions { get; private set; }
+    public IReadOnlyList<Surgery>? Surgeries { get; private set; }
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -61,6 +62,11 @@ public class ProfileModel : HmsPageModel
             var wards = await ipdQuery.VisibleWardIdsAsync(CurrentUserId, await CanAsync(Perm.IpdViewAllWards));
             Admissions = await ipdQuery.AdmissionsAsync("all", null, null, null, wards, patientId: Id, take: 10);
         }
+        if (await CanAsync(Perm.OtDashboard))
+            Surgeries = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+                HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Persistence.HmsDbContext>().Surgeries
+                    .Where(s => s.PatientId == Id).OrderByDescending(s => s.PlannedStartUtc).Take(10).Select(s => new Surgery
+                    { Id = s.Id, Number = s.Number, ProcedureName = s.ProcedureName, PlannedStartUtc = s.PlannedStartUtc, Status = s.Status, Priority = s.Priority }));
         if (CanSeeVisits)
         {
             EncounterType? type = TypeFilter switch { "opd" => EncounterType.Opd, "emergency" => EncounterType.Emergency, _ => null };

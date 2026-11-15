@@ -153,7 +153,7 @@ public class StockBalance
 public enum InventoryTxnType
 {
     Receipt = 1, PatientIssue = 2, Sale = 3, TransferOut = 4, TransferIn = 5, AdjustmentIncrease = 6, AdjustmentDecrease = 7,
-    SaleReturn = 8, IssueReturn = 9, SupplierReturn = 10, WardAdministration = 11
+    SaleReturn = 8, IssueReturn = 9, SupplierReturn = 10, WardAdministration = 11, OtConsumption = 12, OtReturn = 13
 }
 
 /// <summary>Permanent stock movement (insert-only). Quantity is signed: + into the location, − out of it.</summary>

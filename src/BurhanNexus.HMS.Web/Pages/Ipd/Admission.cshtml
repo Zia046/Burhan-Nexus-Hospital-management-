@@ -54,6 +54,13 @@
 
 @if (tab == "overview")
 {
+    @if (Model.Surgeries.Count > 0)
+    {
+        <div class="card" data-admission-surgeries><div class="card-header"><h3><svg class="icon"><use href="#i-scissors" /></svg> Surgeries</h3></div>
+            <table class="table table-compact"><tbody>
+            @foreach (var su in Model.Surgeries) { <tr><td class="small nowrap">@Fmt.DateTimeText(su.PlannedStartUtc)</td><td><a href="/Ot/Surgery/@su.Id">@su.Number</a></td><td>@su.ProcedureName</td><td><partial name="/Pages/Ot/_SurgeryStatus.cshtml" model="su.Status" /></td></tr> }
+            </tbody></table></div>
+    }
     <div class="grid-2">
         <div class="card"><div class="card-header"><h3>Admission</h3></div><div class="card-body">
             <dl class="kv kv-tight">

@@ -1,0 +1,43 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ot.IndexModel
+@{ ViewData["Title"] = "Operation Theatre"; var d = Model.Data; }
+<partial name="_OtNav" />
+<div class="toolbar">
+    <form method="get" class="filters wrap">
+        <partial name="/Pages/Finance/_PeriodFilter.cshtml" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" />
+        <select name="theatreId" aria-label="Theatre"><option value="">All theatres</option>@foreach (var t in Model.Theatres) { <option value="@t.Id" selected="@(Model.TheatreId == t.Id)">@t.Name</option> }</select>
+        <select name="surgeonId" aria-label="Surgeon"><option value="">All surgeons</option>@foreach (var s in Model.Surgeons) { <option value="@s.Id" selected="@(Model.SurgeonId == s.Id)">@s.Name</option> }</select>
+        <button class="btn btn-light" type="submit">Show</button>
+    </form>
+    <div class="toolbar-actions"><a bn-permission="@Perm.OtCreateBooking" class="btn btn-primary" href="/Ot/Book"><svg class="icon icon-sm"><use href="#i-plus" /></svg> Book surgery</a></div>
+</div>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-scissors" /></svg> Surgeries – @BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(d.From, d.To)</h2></div>
+    <div class="card-body">
+        <div class="kpi-grid lab-kpis" data-ot-kpis>
+            <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-calendar" /></svg></div><div><span class="kpi-label">Scheduled</span><strong class="kpi-value" data-kpi="scheduled">@d.Scheduled</strong></div></div>
+            <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-check" /></svg></div><div><span class="kpi-label">Completed</span><strong class="kpi-value" data-kpi="completed">@d.Completed</strong></div></div>
+            <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-activity" /></svg></div><div><span class="kpi-label">In progress</span><strong class="kpi-value" data-kpi="progress">@d.InProgress</strong></div></div>
+            <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-clock" /></svg></div><div><span class="kpi-label">Upcoming</span><strong class="kpi-value" data-kpi="upcoming">@d.Upcoming</strong></div></div>
+            <div class="kpi"><div class="kpi-icon red"><svg class="icon"><use href="#i-alert" /></svg></div><div><span class="kpi-label">Emergency</span><strong class="kpi-value" data-kpi="emergency">@d.Emergency</strong></div></div>
+            <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-lock" /></svg></div><div><span class="kpi-label">Cancelled · postponed</span><strong class="kpi-value" data-kpi="cancelled">@d.Cancelled · @d.Postponed</strong></div></div>
+            <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-users" /></svg></div><div><span class="kpi-label">Waiting for surgery</span><strong class="kpi-value" data-kpi="waiting">@d.Waiting</strong></div></div>
+            <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-hospital" /></svg></div><div><span class="kpi-label">In recovery</span><strong class="kpi-value" data-kpi="recovery">@d.InRecovery</strong></div></div>
+            <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-check-circle" /></svg></div><div><span class="kpi-label">Theatres available · occupied</span><strong class="kpi-value" data-kpi="theatres">@d.TheatresAvailable · @d.TheatresOccupied</strong></div></div>
+            <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-chart" /></svg></div><div><span class="kpi-label">Booked utilization</span><strong class="kpi-value" data-kpi="utilization">@d.Utilization%</strong></div></div>
+        </div>
+    </div>
+</div>
+<div class="card" data-theatre-board><div class="card-header"><h3>Theatres</h3><a class="btn btn-light btn-sm" href="/Ot/Schedule">Schedule</a></div>
+    <div class="bed-grid">@foreach (var t in d.Theatres) { <div class="bed-tile @(t.Occupied ? "st-occupied" : t.Available ? "st-available" : "st-undermaintenance")" data-theatre="@t.Name"><strong>@t.Name</strong><small>@t.Type · @t.Booked booked</small><small>@(t.Occupied ? "In use" : t.Available ? "Available" : "Unavailable")</small></div> }
+        @if (d.Theatres.Count == 0) { <p class="empty">No operation theatres configured yet – add them under OT rooms.</p> }</div>
+</div>
+@foreach (var (key, title) in new[] { ("scheduled", "Scheduled surgeries"), ("emergency", "Emergency surgeries"), ("preop", "Pre-operative patients"), ("progress", "In-progress surgeries"),
+                                      ("completed", "Completed surgeries"), ("recovery", "Recovery room / PACU"), ("cancelled", "Cancelled / postponed surgeries") })
+{
+    var rows = Model.Section(key);
+    <details class="card" open="@(rows.Count > 0)" data-section="@key">
+        <summary class="card-header"><h3>@title <span class="pill">@rows.Count</span></h3></summary>
+        @await Html.PartialAsync("_SurgeryTable", (rows, "None."))
+    </details>
+}

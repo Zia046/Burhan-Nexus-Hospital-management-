@@ -1,0 +1,86 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ot.TheatresModel
+@{ ViewData["Title"] = "Operation theatres & equipment"; var th = Model.Theatre; var eq = Model.Equipment; }
+<partial name="_OtNav" />
+<partial name="_ValidationSummary" />
+<div class="grid-2">
+    <form method="post" asp-page-handler="Theatre" asp-route-ot="@Model.EditTheatre" class="card" novalidate data-theatre-form>
+        <div class="card-header"><h3>@(Model.EditTheatre is null ? "New operation theatre" : "Edit operation theatre")</h3></div>
+        <div class="card-body">
+            <div class="grid-3">
+                <div class="field"><label for="T_Code">Code *</label><input id="T_Code" name="Theatre.Code" value="@th.Code" maxlength="20" /></div>
+                <div class="field"><label for="T_Name">Name *</label><input id="T_Name" name="Theatre.Name" value="@th.Name" maxlength="100" /></div>
+                <div class="field"><label for="T_Type">Type</label><select id="T_Type" name="Theatre.Type">@foreach (var t in Enum.GetValues<OtType>()) { <option value="@t" selected="@(th.Type == t)">@t</option> }</select></div>
+                <div class="field"><label for="T_Location">Location</label><input id="T_Location" name="Theatre.Location" value="@th.Location" maxlength="100" /></div>
+                <div class="field"><label for="T_Opens">Opens at (blank = 24 h)</label><input id="T_Opens" type="time" name="Theatre.OpensAt" value="@(th.OpensAt?.ToString("HH:mm"))" /></div>
+                <div class="field"><label for="T_Closes">Closes at</label><input id="T_Closes" type="time" name="Theatre.ClosesAt" value="@(th.ClosesAt?.ToString("HH:mm"))" /></div>
+                <div class="field"><label for="T_Clean">Cleaning / preparation (min)</label><input id="T_Clean" type="number" min="0" max="240" name="Theatre.CleaningMinutes" value="@th.CleaningMinutes" /></div>
+                <div class="field"><label for="T_Sort">Sort order</label><input id="T_Sort" type="number" name="Theatre.SortOrder" value="@th.SortOrder" /></div>
+                <div class="field"><label for="T_Stock">OT stock location (pharmacy)</label><select id="T_Stock" name="Theatre.StockLocationId"><option value="">No OT stock</option>@foreach (var l in Model.Locations) { <option value="@l.Id" selected="@(th.StockLocationId == l.Id)">@l.Name</option> }</select></div>
+                <div class="field span-2"><label for="T_Charge">Theatre charge (Phase 3 service)</label><select id="T_Charge" name="Theatre.ChargeServiceItemId"><option value="">No theatre charge</option>@foreach (var s in Model.Services) { <option value="@s.Item.Id" selected="@(th.ChargeServiceItemId == s.Item.Id)">@s.Item.Name · @Fmt.Money(s.CurrentFee)</option> }</select></div>
+            </div>
+            <div class="field"><label for="T_Desc">Description</label><input id="T_Desc" name="Theatre.Description" value="@th.Description" maxlength="500" /></div>
+            <div class="field"><label for="T_Eq">Available equipment (free text)</label><textarea id="T_Eq" name="Theatre.Equipment" rows="2" maxlength="1000">@th.Equipment</textarea></div>
+            <div class="inline-form wrap">
+                <label class="check"><input type="checkbox" name="Theatre.IsAvailable" value="true" checked="@th.IsAvailable" /> Available for booking</label><input type="hidden" name="Theatre.IsAvailable" value="false" />
+                <input name="Theatre.UnavailableReason" value="@th.UnavailableReason" placeholder="Reason if unavailable (maintenance, cleaning…)" maxlength="200" />
+                <label class="check"><input type="checkbox" name="Theatre.IsActive" value="true" checked="@th.IsActive" /> Active</label><input type="hidden" name="Theatre.IsActive" value="false" />
+            </div>
+            <p class="small muted">The Minor OT keeps its existing pharmacy-transfer workflow; give a major theatre its own stock location to record patient-wise consumption.</p>
+        </div>
+        <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="save-theatre">Save theatre</button> @if (Model.EditTheatre is not null) { <a class="btn btn-light" href="/Ot/Theatres">New</a> }</div>
+    </form>
+    <form method="post" asp-page-handler="Equipment" asp-route-eq="@Model.EditEquipment" class="card" novalidate data-equipment-form>
+        <div class="card-header"><h3>@(Model.EditEquipment is null ? "New OT equipment" : "Edit OT equipment")</h3></div>
+        <div class="card-body">
+            <div class="grid-3">
+                <div class="field"><label for="E_Code">Code *</label><input id="E_Code" name="Equipment.Code" value="@eq.Code" maxlength="30" /></div>
+                <div class="field span-2"><label for="E_Name">Name *</label><input id="E_Name" name="Equipment.Name" value="@eq.Name" maxlength="150" /></div>
+                <div class="field"><label for="E_Ot">Theatre</label><select id="E_Ot" name="Equipment.TheatreId"><option value="">— shared —</option>@foreach (var t in Model.Theatres) { <option value="@t.Id" selected="@(eq.TheatreId == t.Id)">@t.Name</option> }</select></div>
+                <div class="field"><label for="E_Status">Status</label><select id="E_Status" name="Equipment.Status">@foreach (var x in Enum.GetValues<EquipmentStatus>()) { <option value="@x" selected="@(eq.Status == x)">@x</option> }</select></div>
+                <div class="field"><label for="E_Last">Last maintenance</label><input id="E_Last" type="date" name="Equipment.LastMaintenance" value="@(eq.LastMaintenance?.ToString("yyyy-MM-dd"))" /></div>
+                <div class="field"><label for="E_Next">Next maintenance</label><input id="E_Next" type="date" name="Equipment.NextMaintenance" value="@(eq.NextMaintenance?.ToString("yyyy-MM-dd"))" /></div>
+            </div>
+            <div class="field"><label for="E_Notes">Service history / notes</label><textarea id="E_Notes" name="Equipment.ServiceNotes" rows="2" maxlength="1000">@eq.ServiceNotes</textarea></div>
+            <div class="field"><label for="E_Note">Note for this change</label><input id="E_Note" name="Equipment.Note" maxlength="500" /></div>
+            <label class="check"><input type="checkbox" name="Equipment.IsActive" value="true" checked="@eq.IsActive" /> Active</label><input type="hidden" name="Equipment.IsActive" value="false" />
+        </div>
+        <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="save-equipment">Save equipment</button> @if (Model.EditEquipment is not null) { <a class="btn btn-light" href="/Ot/Theatres">New</a> }</div>
+    </form>
+</div>
+<div class="card" data-theatre-list>
+    <div class="card-header"><h2>Operation theatres</h2></div>
+    <div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Hours</th><th>Cleaning</th><th>OT stock</th><th>Charge</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var t in Model.Theatres)
+        {
+            <tr class="@(t.IsActive ? "" : "row-muted")" data-theatre="@t.Code"><td class="mono">@t.Code</td><td>@t.Name<small class="block muted">@t.Location</small></td><td>@t.Type</td>
+                <td>@(t.OpensAt is null ? "24 h" : $"{t.OpensAt:HH:mm} – {t.ClosesAt:HH:mm}")</td><td>@t.CleaningMinutes min</td><td>@(t.StockLocation?.Name ?? "—")</td><td>@(t.ChargeServiceItem?.Name ?? "—")</td>
+                <td>@if (!t.IsActive) { <span class="status status-bad">Inactive</span> } else if (!t.IsAvailable) { <span class="status status-warn">Unavailable</span> <small>@t.UnavailableReason</small> } else { <span class="status status-ok">Available</span> }</td>
+                <td><a class="btn btn-light btn-sm" href="/Ot/Theatres?ot=@t.Id">Edit</a></td></tr>
+        }
+        @if (Model.Theatres.Count == 0) { <tr><td colspan="9" class="empty">No operation theatre configured yet – add the first one above.</td></tr> }
+        </tbody></table></div>
+</div>
+<div class="card" data-equipment-list>
+    <div class="card-header"><h2>OT equipment register</h2></div>
+    <div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>Code</th><th>Equipment</th><th>Theatre</th><th>Status</th><th>Last service</th><th>Next service</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var e in Model.EquipmentList)
+        {
+            var due = e.NextMaintenance is DateOnly n && n <= Model.Today;
+            <tr class="@(e.IsActive ? "" : "row-muted") @(due ? "row-warn" : "")"><td class="mono">@e.Code</td><td>@e.Name<small class="block muted">@e.ServiceNotes</small></td><td>@(e.Theatre?.Name ?? "Shared")</td><td>@e.Status</td>
+                <td>@(e.LastMaintenance is DateOnly l ? Fmt.Day(l) : "—")</td><td>@(e.NextMaintenance is DateOnly nx ? Fmt.Day(nx) : "—") @if (due) { <span class="status status-warn">Due</span> }</td>
+                <td><a class="btn btn-light btn-sm" href="/Ot/Theatres?eq=@e.Id">Edit</a></td></tr>
+        }
+        @if (Model.EquipmentList.Count == 0) { <tr><td colspan="7" class="empty">No equipment registered.</td></tr> }
+        </tbody></table></div>
+    @if (Model.Logs.Count > 0)
+    {
+        <details class="card-body"><summary>Recent equipment history</summary>
+            <table class="table table-compact"><tbody>@foreach (var lg in Model.Logs) { <tr><td>@Fmt.DateTimeText(lg.CreatedUtc)</td><td>@(Model.EquipmentList.FirstOrDefault(x => x.Id == lg.EquipmentId)?.Code)</td><td>@lg.Event</td><td>@lg.FromValue → @lg.ToValue</td><td>@lg.Note</td><td>@lg.Username</td></tr> }</tbody></table>
+        </details>
+    }
+</div>

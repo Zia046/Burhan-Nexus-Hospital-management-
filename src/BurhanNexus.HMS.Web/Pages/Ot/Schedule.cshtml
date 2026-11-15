@@ -1,0 +1,40 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ot.ScheduleModel
+@{ ViewData["Title"] = "OT schedule"; }
+<partial name="_OtNav" />
+<div class="toolbar no-print">
+    <form method="get" class="filters wrap">
+        <input type="date" name="date" value="@Model.Date?.ToString("yyyy-MM-dd")" aria-label="Date" />
+        <select name="view" aria-label="View"><option value="day" selected="@(Model.View == "day")">Day</option><option value="week" selected="@(Model.View == "week")">Week</option></select>
+        <select name="theatreId" aria-label="Theatre"><option value="">All theatres</option>@foreach (var t in Model.Theatres) { <option value="@t.Id" selected="@(Model.TheatreId == t.Id)">@t.Name</option> }</select>
+        <button class="btn btn-light" type="submit">Show</button>
+        <a class="btn btn-light" href="/Ot/Schedule?view=@Model.View&date=@Model.From.AddDays(Model.View == "week" ? -7 : -1).ToString("yyyy-MM-dd")">&larr;</a>
+        <a class="btn btn-light" href="/Ot/Schedule?view=@Model.View&date=@Model.To.AddDays(1).ToString("yyyy-MM-dd")">&rarr;</a>
+    </form>
+    <div class="toolbar-actions">
+        <a bn-permission="@Perm.OtPrintDocuments" class="btn btn-light" href="/Print/Ot/schedule/0?date=@Model.From.ToString("yyyy-MM-dd")&view=@Model.View" target="_blank">Print schedule</a>
+        <a bn-permission="@Perm.OtCreateBooking" class="btn btn-primary" href="/Ot/Book">Book surgery</a>
+    </div>
+</div>
+<div class="grid-auto" data-schedule>
+@foreach (var t in Model.Theatres)
+{
+    var mine = Model.Rows.Where(r => r.TheatreId == t.Id).OrderBy(r => r.PlannedStartUtc).ToList();
+    <div class="card" data-schedule-theatre="@t.Name">
+        <div class="card-header"><h3>@t.Name <small class="muted">@t.Type @(t.OpensAt is { } o ? $"· {o:HH:mm}–{t.ClosesAt:HH:mm}" : "· 24 h") · cleaning @t.CleaningMinutes min</small></h3>
+            @if (!t.IsAvailable) { <span class="status status-bad">Unavailable – @t.UnavailableReason</span> }</div>
+        <ul class="slot-list">
+        @foreach (var r in mine)
+        {
+            <li class="slot @(r.Priority == SurgeryPriority.Emergency ? "slot-emergency" : "") st-@r.Status.ToString().ToLowerInvariant()">
+                <a href="/Ot/Surgery/@r.Id"><strong>@Fmt.DateTimeText(r.PlannedStartUtc)</strong> – @Fmt.ToLocal(r.PlannedEndUtc).ToString("HH:mm") · @r.Number</a>
+                <span class="block">@r.PatientName · @r.Procedure</span>
+                <small class="block muted">@(r.Surgeon ?? "surgeon not assigned") · @r.Priority · @SurgeryService.Label(r.Status) · +@r.CleaningMinutes min preparation / cleaning</small>
+            </li>
+        }
+        @if (mine.Count == 0) { <li class="empty">Free</li> }
+        </ul>
+    </div>
+}
+@if (Model.Theatres.Count == 0) { <p class="empty">No operation theatres configured.</p> }
+</div>

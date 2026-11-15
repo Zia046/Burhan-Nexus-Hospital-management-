@@ -648,6 +648,168 @@ try {
   await pdf(admUrl.replace("/Ipd/Admission/", "/Print/Ipd/mar/"), "sample-ipd-mar-A4.pdf");
   await go("/Ipd");
   await shot(page, "p7-18-ipd-dashboard");
+
+  // ---- Phase 8: Operation Theatre ----
+  await go("/Ot/Theatres");
+  await page.fill("#T_Code", "OT1");
+  await page.fill("#T_Name", "Main OT 1");
+  await page.fill("#T_Location", "First floor");
+  await submit("button[data-test='save-theatre']");
+  await go("/Ot/Theatres");
+  await page.fill("#T_Code", "OT2");
+  await page.fill("#T_Name", "Gynae OT");
+  await page.selectOption("#T_Type", "Gynaecology");
+  await submit("button[data-test='save-theatre']");
+  await go("/Ot/Theatres");
+  await page.fill("#E_Code", "EQ-01");
+  await page.fill("#E_Name", "Anesthesia machine");
+  await submit("button[data-test='save-equipment']");
+  await shot(page, "p8-01-theatres-and-equipment");
+  await go("/Ot/Procedures");
+  await shot(page, "p8-02-surgery-catalogue");
+  for (const n of ["Dr. Imran Surgeon", "Dr. Sana Anesthetist"]) {
+    await go("/Opd/Setup");
+    await page.fill("#dn", n);
+    await submit("button:has-text('Add doctor')");
+  }
+  const otPatient = ahmadId; // the discharged IPD patient now needs surgery (existing Patient ID, no new registration)
+  await go(`/Ot/Book?patientId=${otPatient}&emergency=true`);
+  await page.selectOption("#Input_ProcedureId", { index: 1 });
+  await page.selectOption("#Input_Priority", "Emergency");
+  await page.fill("#Input_EmergencyReason", "Suspected perforated appendix (surgeon on call)");
+  await page.selectOption("#Input_TheatreId", { label: "Main OT 1 · General" }).catch(async () => page.selectOption("#Input_TheatreId", { index: 1 }));
+  await page.selectOption("#Input_SurgeonDoctorId", { label: "Dr. Imran Surgeon" });
+  await page.selectOption("#Input_AnesthetistDoctorId", { label: "Dr. Sana Anesthetist" });
+  await page.fill("#Input_Diagnosis", "Acute appendicitis (surgeon's diagnosis)");
+  await shot(page, "p8-03-booking-form");
+  await submit("button[data-test='book-surgery']");
+  const sUrl = new URL(page.url()).pathname;
+  step("surgery: " + sUrl);
+  await shot(page, "p8-04-surgery-booking-and-team");
+  const sid = sUrl.split("/").pop();
+  await go(sUrl + "?tab=preop");
+  await page.fill("[name='Record.Values[history]']", "Pain right iliac fossa for 2 days");
+  await submit("button[data-test='save-PreOpAssessment']");
+  await go(sUrl + "?tab=preop");
+  await page.$$eval("[data-checklist='PreOp'] select", els => els.forEach(e => { e.value = "Done"; }));
+  await submit("button[data-test='complete-PreOp']");
+  await shot(page, "p8-05-preop-assessment-and-checklist");
+  await go(sUrl + "?tab=consent");
+  await page.selectOption("[name='Consent.ConsentTypeId']", { index: 1 });
+  await page.fill("[name='Consent.ResponsibleStaff']", "Dr. Imran Surgeon");
+  await page.fill("[name='Consent.Witness']", "Staff nurse Rubina");
+  await submit("button[data-test='save-consent']");
+  await shot(page, "p8-06-consent");
+  const consentId = await page.getAttribute("[data-consent]", "data-consent");
+  await go(sUrl + "?tab=anesthesia");
+  await page.fill("[data-record-form='AnesthesiaAssessment'] [name='Record.Values[airway]']", "Mallampati II (anesthetist)");
+  await submit("button[data-test='save-AnesthesiaAssessment']");
+  await go(sUrl + "?tab=safety");
+  for (const st of ["SignIn", "TimeOut"]) {
+    await page.$$eval(`[data-checklist='${st}'] select`, els => els.forEach(e => { e.value = "Done"; }));
+    await submit(`button[data-test='complete-${st}']`);
+  }
+  await shot(page, "p8-07-safety-checklist");
+  await go(sUrl + "?tab=intraop");
+  await submit("button[data-test='start-surgery']");
+  await go(sUrl + "?tab=anesthesia");
+  await page.fill("[data-record-form='IntraOpMonitoring'] [name='Record.Values[pulse]']", "86");
+  await page.fill("[data-record-form='IntraOpMonitoring'] [name='Record.Values[bp_sys]']", "120");
+  await submit("button[data-test='save-IntraOpMonitoring']");
+  await page.fill("[data-drug-form] [name='Drug.Name']", "Propofol");
+  await page.fill("[data-drug-form] [name='Drug.Dose']", "120 mg");
+  await submit("button[data-test='save-drug-Anesthesia']");
+  await shot(page, "p8-08-anesthesia-record");
+  await go(sUrl + "?tab=intraop");
+  await page.fill("[name='Note.OperativeFindings']", "Inflamed, non-perforated appendix");
+  await page.fill("[name='Note.Technique']", "Grid-iron incision, appendicectomy, haemostasis secured");
+  await page.fill("[name='Note.PostOpDiagnosis']", "Acute appendicitis");
+  await page.fill("[name='Note.BloodLossMl']", "50");
+  await page.fill("[name='Note.PostOpInstructions']", "NPO for 6 hours, then sips; analgesia as prescribed by the surgeon");
+  await page.fill("[name='Note.SurgeonName']", "Dr. Imran Surgeon");
+  await submit("button[data-test='save-note']");
+  page.once("dialog", d => d.accept());
+  await submit("button[data-test='finalize-note']");
+  await page.fill("[data-specimen-form] [name='Specimen.Name']", "Appendix");
+  await page.fill("[data-specimen-form] [name='Specimen.Destination']", "Histopathology laboratory");
+  await submit("button[data-test='save-specimen']");
+  await shot(page, "p8-09-operation-note-final");
+  await go(sUrl + "?tab=safety");
+  await page.$$eval("[data-checklist='SignOut'] select", els => els.forEach(e => { e.value = "Done"; }));
+  await submit("button[data-test='complete-SignOut']");
+  await go(sUrl + "?tab=intraop");
+  await submit("button[data-test='end-surgery']");
+  await go(sUrl + "?tab=recovery");
+  await page.selectOption("[name='Recovery.Status']", "InRecovery");
+  await page.fill("[name='Recovery.Nurse']", "Nurse PACU Hina");
+  await submit("button[data-test='save-recovery']");
+  await go(sUrl + "?tab=recovery");
+  await page.fill("[data-record-form='PacuObservation'] [name='Record.Values[pulse]']", "90");
+  await page.fill("[data-record-form='PacuObservation'] [name='Record.Values[pain]']", "3");
+  await submit("button[data-test='save-PacuObservation']");
+  await go("/Ot/Recovery");
+  await shot(page, "p8-10-recovery-board");
+  await go(sUrl + "?tab=recovery");
+  await page.selectOption("[name='Recovery.Status']", "TransferredWard");
+  await page.fill("[name='Recovery.Destination']", "Surgical ward");
+  await page.fill("[name='Recovery.HandoverStaff']", "Charge nurse Saima");
+  await page.fill("[name='Recovery.DecisionBy']", "Dr. Sana Anesthetist");
+  await submit("button[data-test='save-recovery']");
+  await shot(page, "p8-11-recovery-transfer");
+  await go(sUrl + "?tab=billing");
+  await shot(page, "p8-12-ot-billing");
+  await go(sUrl + "?tab=history");
+  await shot(page, "p8-13-surgery-history");
+  await go("/Ot/Cssd");
+  await page.fill("#N_Code", "INS-01");
+  await page.fill("#N_Name", "Artery forceps");
+  await submit("button[data-test='save-instrument']");
+  await go("/Ot/Cssd");
+  await page.fill("#S_Code", "SET-APP");
+  await page.fill("#S_Name", "Appendicectomy set");
+  await page.fill("[name^='Qty[']", "6");
+  await submit("button[data-test='save-set']");
+  await go("/Ot/Cssd");
+  await page.fill("#B_Method", "Steam autoclave");
+  await page.fill("#B_Staff", "CSSD technician Rafiq");
+  await page.check("[name='Batch.SetIds']");
+  await submit("button[data-test='start-batch']");
+  await shot(page, "p8-14-cssd");
+  await go("/Ot");
+  await shot(page, "p8-15-ot-dashboard");
+  await go("/Ot/Schedule?view=week");
+  await shot(page, "p8-16-ot-schedule");
+  await go("/Ot/Reports?report=daily&period=today");
+  await shot(page, "p8-17-ot-reports");
+  for (const [f, file] of [["booking", "sample-ot-booking-slip-A4.pdf"], ["preop", "sample-ot-preop-checklist-A4.pdf"], ["anesthesia-record", "sample-ot-anesthesia-record-A4.pdf"],
+                           ["checklist", "sample-ot-safety-checklist-A4.pdf"], ["opnote", "sample-ot-operation-notes-A4.pdf"], ["intraop", "sample-ot-intraop-record-A4.pdf"],
+                           ["specimen", "sample-ot-specimen-dispatch-A4.pdf"], ["pacu", "sample-ot-pacu-chart-A4.pdf"], ["postop", "sample-ot-postop-instructions-A4.pdf"],
+                           ["handover", "sample-ot-recovery-handover-A4.pdf"], ["bill", "sample-ot-bill-A4.pdf"], ["anesthesia", "sample-ot-preanesthesia-assessment-A4.pdf"]])
+    await pdf(`/Print/Ot/${f}/${sid}`, file);
+  if (consentId) await pdf(`/Print/Ot/consent/${consentId}`, "sample-ot-consent-form-A4.pdf");
+  await pdf(`/Print/Ot/schedule/0?view=week`, "sample-ot-schedule-A4.pdf");
+  await go("/");
+  await page.click("[data-adm-cat='ot'] > summary").catch(() => {});
+  await shot(page, "p8-18-taskbar-ot-menu", false);
+
+  // ---- Navigation: administrator sidebar (11 pages) + top taskbar categories ----
+  await go("/");
+  await shot(page, "nav-01-admin-sidebar-and-taskbar", false);
+  await page.click("[data-adm-cat='lab'] > summary");
+  await shot(page, "nav-02-taskbar-laboratory-menu", false);
+  await page.click("[data-adm-cat='ipd'] > summary");
+  await shot(page, "nav-03-taskbar-ipd-menu", false);
+  await go("/Radiology");
+  await shot(page, "nav-04-active-category-highlight", false);
+  await page.setViewportSize({ width: 820, height: 1000 });
+  await go("/");
+  await page.click("[data-adm-cat='pharmacy'] > summary");
+  await shot(page, "nav-05-tablet", false);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await go("/");
+  await page.click("[data-adm-cat='finance'] > summary");
+  await shot(page, "nav-06-mobile", false);
+  await page.setViewportSize({ width: 1440, height: 900 });
 } catch (e) {
   errors.push("SCRIPT FAILURE: " + (e && e.stack || e));
   try { await shot(page, "p2-zz-failure"); } catch {}

@@ -272,6 +272,36 @@ public static class PermissionCatalog
                 new(IpdActions.ExportPdf, "Export PDF", "Save forms as PDF"),
                 new(IpdActions.Settings, "Manage IPD Settings", "Clinical form fields, alert limits, charges and printing"),
             }),
+        new(Modules_.Ot, "Operation Theatre", "Theatres, surgery booking, pre-op, consent, anesthesia, safety checklist, operation notes, recovery, CSSD and OT billing", "scissors", true, "/Ot",
+            new PermissionAction[]
+            {
+                new(OtActions.Dashboard, "View OT Dashboard", "Daily surgeries, theatres, recovery and schedule"),
+                new(OtActions.ManageTheatres, "Manage OT Rooms", "Theatres, operating hours, availability and OT equipment"),
+                new(OtActions.ManageCatalogue, "Manage Surgery Catalogue", "Procedures, consent types and checklist items"),
+                new(OtActions.CreateBooking, "Create Surgery Booking", "Book surgeries (elective, urgent, emergency) for registered patients"),
+                new(OtActions.EditBooking, "Edit Surgery Booking", "Reschedule, change status and booking details"),
+                new(OtActions.CancelSurgery, "Cancel Surgery", "Cancel or postpone a surgery with a reason"),
+                new(OtActions.ViewPreOp, "View Pre-Operative Assessment", "Open the pre-operative assessment, investigations and checklist"),
+                new(OtActions.EnterPreOp, "Enter Pre-Operative Assessment", "Record pre-operative assessment and checklist"),
+                new(OtActions.ManageConsent, "Manage Surgical Consent", "Document consent and upload signed / scanned forms"),
+                new(OtActions.ManageTeam, "Manage Surgical Team", "Assign surgeons, anesthetists, nurses and technicians"),
+                new(OtActions.EnterAnesthesia, "Enter Anesthesia Records", "Pre-anesthesia assessment, anesthesia record, drugs and monitoring"),
+                new(OtActions.EnterIntraOp, "Enter Intra-Operative Records", "Start / end surgery, intra-operative record, operation notes and specimens"),
+                new(OtActions.FinalizeNotes, "Finalize & Amend Operation Notes", "Finalize operation notes and record amendments"),
+                new(OtActions.CompleteChecklist, "Complete Surgical Safety Checklist", "Sign In, Time Out and Sign Out"),
+                new(OtActions.AuthorizeException, "Authorize Safety Exceptions", "Complete a checklist / start an emergency surgery with mandatory items pending (reason required)"),
+                new(OtActions.ManageStock, "Manage OT Stock", "View OT stock, receive transfers and returns"),
+                new(OtActions.RecordConsumption, "Record Major OT Consumption", "Patient-linked medicine / consumable use from OT stock"),
+                new(OtActions.ManageRecovery, "Manage Recovery Room", "PACU observations, status, transfer and handover"),
+                new(OtActions.EnterPostOp, "Enter Post-Operative Records", "Post-operative records and instructions"),
+                new(OtActions.ManageCssd, "Manage CSSD", "Instruments, sets, sterilization batches, release, issue and return"),
+                new(OtActions.ViewBilling, "View OT Billing", "Charges, payments and balance of a surgery"),
+                new(OtActions.ManageCharges, "Manage OT Charges", "Post OT charges and set the OT fee services"),
+                new(OtActions.PrintDocuments, "Print Documents", "Print OT documents and forms"),
+                new(OtActions.ExportReports, "Export Reports", "Export OT reports"),
+                new(OtActions.ViewStatistics, "View OT Statistics", "OT reports and statistics"),
+                new(OtActions.Settings, "Manage OT Settings", "Charges, printing and clinical form fields of the OT"),
+            }),
         Future("MinorOt", "Minor OT", "Minor operation theatre settings", "scissors"),
         Future("Doctors", "Doctor Management", "Doctors, schedules and shares", "user-cross"),
         new(Modules_.Finance, "Financial Management", "Cashier counters, receipts, deposits, refunds, doctor accounts and financial reports", "wallet", true, "/Finance",
@@ -371,6 +401,37 @@ public static class PermissionCatalog
         public const string Pharmacy = "Pharmacy";
         public const string Radiology = "Radiology";
         public const string Ipd = "Ipd";
+        public const string Ot = "Ot";
+    }
+
+    public static class OtActions
+    {
+        public const string Dashboard = "Dashboard";
+        public const string ManageTheatres = "ManageTheatres";
+        public const string ManageCatalogue = "ManageCatalogue";
+        public const string CreateBooking = "CreateBooking";
+        public const string EditBooking = "EditBooking";
+        public const string CancelSurgery = "CancelSurgery";
+        public const string ViewPreOp = "ViewPreOp";
+        public const string EnterPreOp = "EnterPreOp";
+        public const string ManageConsent = "ManageConsent";
+        public const string ManageTeam = "ManageTeam";
+        public const string EnterAnesthesia = "EnterAnesthesia";
+        public const string EnterIntraOp = "EnterIntraOp";
+        public const string FinalizeNotes = "FinalizeNotes";
+        public const string CompleteChecklist = "CompleteChecklist";
+        public const string AuthorizeException = "AuthorizeException";
+        public const string ManageStock = "ManageStock";
+        public const string RecordConsumption = "RecordConsumption";
+        public const string ManageRecovery = "ManageRecovery";
+        public const string EnterPostOp = "EnterPostOp";
+        public const string ManageCssd = "ManageCssd";
+        public const string ViewBilling = "ViewBilling";
+        public const string ManageCharges = "ManageCharges";
+        public const string PrintDocuments = "PrintDocuments";
+        public const string ExportReports = "ExportReports";
+        public const string ViewStatistics = "ViewStatistics";
+        public const string Settings = "Settings";
     }
 
     public static class IpdActions
@@ -717,6 +778,32 @@ public static class Perm
     public const string IpdPrintForms = "Ipd.PrintForms";
     public const string IpdExportPdf = "Ipd.ExportPdf";
     public const string IpdSettings = "Ipd.Settings";
+    public const string OtDashboard = "Ot.Dashboard";
+    public const string OtManageTheatres = "Ot.ManageTheatres";
+    public const string OtManageCatalogue = "Ot.ManageCatalogue";
+    public const string OtCreateBooking = "Ot.CreateBooking";
+    public const string OtEditBooking = "Ot.EditBooking";
+    public const string OtCancelSurgery = "Ot.CancelSurgery";
+    public const string OtViewPreOp = "Ot.ViewPreOp";
+    public const string OtEnterPreOp = "Ot.EnterPreOp";
+    public const string OtManageConsent = "Ot.ManageConsent";
+    public const string OtManageTeam = "Ot.ManageTeam";
+    public const string OtEnterAnesthesia = "Ot.EnterAnesthesia";
+    public const string OtEnterIntraOp = "Ot.EnterIntraOp";
+    public const string OtFinalizeNotes = "Ot.FinalizeNotes";
+    public const string OtCompleteChecklist = "Ot.CompleteChecklist";
+    public const string OtAuthorizeException = "Ot.AuthorizeException";
+    public const string OtManageStock = "Ot.ManageStock";
+    public const string OtRecordConsumption = "Ot.RecordConsumption";
+    public const string OtManageRecovery = "Ot.ManageRecovery";
+    public const string OtEnterPostOp = "Ot.EnterPostOp";
+    public const string OtManageCssd = "Ot.ManageCssd";
+    public const string OtViewBilling = "Ot.ViewBilling";
+    public const string OtManageCharges = "Ot.ManageCharges";
+    public const string OtPrintDocuments = "Ot.PrintDocuments";
+    public const string OtExportReports = "Ot.ExportReports";
+    public const string OtViewStatistics = "Ot.ViewStatistics";
+    public const string OtSettings = "Ot.Settings";
     public const string RadDashboard = "Radiology.Dashboard";
     public const string RadViewXRay = "Radiology.ViewXRayWorklist";
     public const string RadViewUltrasound = "Radiology.ViewUltrasoundWorklist";

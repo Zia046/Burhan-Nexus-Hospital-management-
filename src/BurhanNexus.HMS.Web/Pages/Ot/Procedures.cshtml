@@ -1,0 +1,42 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ot.ProceduresModel
+@{ ViewData["Title"] = "Surgery / procedure catalogue"; var i = Model.Input; }
+<partial name="_OtNav" />
+<partial name="_ValidationSummary" />
+<form method="post" asp-route-edit="@Model.EditId" class="card" novalidate data-procedure-form>
+    <div class="card-header"><h3>@(Model.EditId is null ? "New procedure" : "Edit procedure")</h3></div>
+    <div class="card-body">
+        <div class="grid-3">
+            <div class="field"><label for="P_Code">Code *</label><input id="P_Code" name="Input.Code" value="@i.Code" maxlength="20" /></div>
+            <div class="field span-2"><label for="P_Name">Procedure name *</label><input id="P_Name" name="Input.Name" value="@i.Name" maxlength="150" /></div>
+            <div class="field"><label for="P_Dept">Department</label><select id="P_Dept" name="Input.DepartmentId"><option value="">—</option>@foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(i.DepartmentId == d.Id)">@d.Name</option> }</select></div>
+            <div class="field"><label for="P_Spec">Specialty</label><input id="P_Spec" name="Input.Specialty" value="@i.Specialty" maxlength="60" /></div>
+            <div class="field"><label for="P_Cat">Category</label><input id="P_Cat" name="Input.Category" value="@i.Category" maxlength="60" placeholder="Major / minor / …" /></div>
+            <div class="field"><label for="P_Dur">Expected duration (min)</label><input id="P_Dur" type="number" min="5" max="1440" name="Input.DurationMinutes" value="@i.DurationMinutes" /></div>
+            <div class="field"><label for="P_Ot">Default theatre type</label><select id="P_Ot" name="Input.DefaultOtType"><option value="">—</option>@foreach (var t in Enum.GetValues<OtType>()) { <option value="@t" selected="@(i.DefaultOtType == t)">@t</option> }</select></div>
+            <div class="field"><label for="P_Svc">Procedure charge (Phase 3 service)</label><select id="P_Svc" name="Input.ServiceItemId"><option value="">No procedure charge</option>@foreach (var s in Model.Services) { <option value="@s.Item.Id" selected="@(i.ServiceItemId == s.Item.Id)">@s.Item.Name · @Fmt.Money(s.CurrentFee)</option> }</select></div>
+            <div class="field"><label for="P_Sort">Sort order</label><input id="P_Sort" type="number" name="Input.SortOrder" value="@i.SortOrder" /></div>
+        </div>
+        <fieldset class="inline-form wrap"><legend>Suitable anesthesia</legend>
+            @foreach (var a in Enum.GetValues<AnesthesiaType>()) { <label class="check"><input type="checkbox" name="Input.AnesthesiaTypes" value="@a" checked="@i.AnesthesiaTypes.Contains(a)" /> @a</label> }
+        </fieldset>
+        <div class="field"><label for="P_Desc">Description</label><input id="P_Desc" name="Input.Description" value="@i.Description" maxlength="500" /></div>
+        <label class="check"><input type="checkbox" name="Input.IsActive" value="true" checked="@i.IsActive" /> Active</label><input type="hidden" name="Input.IsActive" value="false" />
+    </div>
+    <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="save-procedure">Save procedure</button> @if (Model.EditId is not null) { <a class="btn btn-light" href="/Ot/Procedures">New</a> }</div>
+</form>
+<div class="card" data-procedure-list>
+    <div class="card-header"><h2>Catalogue (@Model.Procedures.Count)</h2>
+        <form method="get" class="inline-form"><input name="Q" value="@Model.Q" placeholder="Search code / name / specialty" aria-label="Search" /><button class="btn btn-light btn-sm" type="submit">Search</button></form></div>
+    <div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>Code</th><th>Procedure</th><th>Specialty</th><th>Duration</th><th>Anesthesia</th><th>Charge</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var p in Model.Procedures)
+        {
+            <tr class="@(p.IsActive ? "" : "row-muted")" data-procedure="@p.Code"><td class="mono">@p.Code</td><td>@p.Name<small class="block muted">@p.Category @(p.Department is null ? "" : "· " + p.Department.Name)</small></td><td>@p.Specialty</td>
+                <td>@p.DurationMinutes min</td><td class="small">@p.AnesthesiaTypes</td><td>@(p.ServiceItem?.Name ?? "—")</td><td>@(p.IsActive ? "Active" : "Inactive")</td>
+                <td><a class="btn btn-light btn-sm" href="/Ot/Procedures?edit=@p.Id">Edit</a></td></tr>
+        }
+        @if (Model.Procedures.Count == 0) { <tr><td colspan="8" class="empty">No procedures.</td></tr> }
+        </tbody></table></div>
+</div>

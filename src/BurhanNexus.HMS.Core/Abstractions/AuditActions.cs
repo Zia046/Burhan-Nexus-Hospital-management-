@@ -169,6 +169,45 @@ public static class AuditActions
     public const string IpdDoseRecorded = "Ipd.DoseRecorded";
     public const string IpdChargePosted = "Ipd.ChargePosted";
     public const string IpdFormPrinted = "Ipd.FormPrinted";
+    public const string OtTheatreSaved = "Ot.TheatreSaved";
+    public const string OtProcedureSaved = "Ot.ProcedureSaved";
+    public const string OtConsentTypeSaved = "Ot.ConsentTypeSaved";
+    public const string OtChecklistItemSaved = "Ot.ChecklistItemSaved";
+    public const string OtEquipmentSaved = "Ot.EquipmentSaved";
+    public const string OtSettingsChanged = "Ot.SettingsChanged";
+    public const string OtSurgeryBooked = "Ot.SurgeryBooked";
+    public const string OtSurgeryDuplicateBlocked = "Ot.SurgeryDuplicateBlocked";
+    public const string OtSurgeryRescheduled = "Ot.SurgeryRescheduled";
+    public const string OtSurgeryStatusChanged = "Ot.SurgeryStatusChanged";
+    public const string OtSurgeryCancelled = "Ot.SurgeryCancelled";
+    public const string OtSurgeryPostponed = "Ot.SurgeryPostponed";
+    public const string OtEmergencyBooked = "Ot.EmergencyBooked";
+    public const string OtTeamChanged = "Ot.TeamChanged";
+    public const string OtConsentRecorded = "Ot.ConsentRecorded";
+    public const string OtConsentChanged = "Ot.ConsentChanged";
+    public const string OtDocumentUploaded = "Ot.DocumentUploaded";
+    public const string OtChecklistAnswered = "Ot.ChecklistAnswered";
+    public const string OtChecklistCompleted = "Ot.ChecklistCompleted";
+    public const string OtSafetyException = "Ot.SafetyException";
+    public const string OtRecordAdded = "Ot.RecordAdded";
+    public const string OtDrugRecorded = "Ot.DrugRecorded";
+    public const string OtSurgeryStarted = "Ot.SurgeryStarted";
+    public const string OtSurgeryEnded = "Ot.SurgeryEnded";
+    public const string OtNoteSaved = "Ot.NoteSaved";
+    public const string OtNoteFinalized = "Ot.NoteFinalized";
+    public const string OtNoteAmended = "Ot.NoteAmended";
+    public const string OtSpecimenRecorded = "Ot.SpecimenRecorded";
+    public const string OtSpecimenStatus = "Ot.SpecimenStatus";
+    public const string OtConsumptionRecorded = "Ot.ConsumptionRecorded";
+    public const string OtConsumptionReturned = "Ot.ConsumptionReturned";
+    public const string OtRecoveryChanged = "Ot.RecoveryChanged";
+    public const string OtRecoveryTransferred = "Ot.RecoveryTransferred";
+    public const string OtCssdSaved = "Ot.CssdSaved";
+    public const string OtCssdBatch = "Ot.CssdBatch";
+    public const string OtCssdIssue = "Ot.CssdIssue";
+    public const string OtChargePosted = "Ot.ChargePosted";
+    public const string OtFormPrinted = "Ot.FormPrinted";
+    public const string OtReportExported = "Ot.ReportExported";
 
 
     // Phase 5 – pharmacy

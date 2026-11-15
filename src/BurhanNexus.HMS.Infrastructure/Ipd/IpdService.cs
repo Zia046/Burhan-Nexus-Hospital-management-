@@ -55,6 +55,8 @@ public sealed class RecordInput
     public long PatientId { get; set; }
     public long? AdmissionId { get; set; }
     public long? PregnancyId { get; set; }
+    /// <summary>Phase 8: surgery the record belongs to.</summary>
+    public long? SurgeryId { get; set; }
     public DateTime? RecordedLocal { get; set; }
     public Dictionary<string, string?> Values { get; set; } = new();
     public string? Notes { get; set; }
@@ -681,6 +683,7 @@ public sealed class IpdService : IIpdService
         if (!await _db.Patients.AnyAsync(p => p.Id == i.PatientId, ct)) return ServiceResult<long>.Fail("Patient not found.");
         if (i.AdmissionId is long aid && !await _db.IpdAdmissions.AnyAsync(a => a.Id == aid && a.PatientId == i.PatientId, ct)) return ServiceResult<long>.Fail("The admission does not belong to this patient.");
         if (i.PregnancyId is long pid && !await _db.Pregnancies.AnyAsync(p => p.Id == pid && p.PatientId == i.PatientId, ct)) return ServiceResult<long>.Fail("The pregnancy does not belong to this patient.");
+        if (i.SurgeryId is long sid && !await _db.Surgeries.AnyAsync(x => x.Id == sid && x.PatientId == i.PatientId, ct)) return ServiceResult<long>.Fail("The surgery does not belong to this patient.");
         var fields = await _setup.FieldsAsync(i.Kind, activeOnly: true, ct);
         var errors = new List<string>();
         var values = new Dictionary<string, object?>();
@@ -732,7 +735,7 @@ public sealed class IpdService : IIpdService
         if (recordedUtc > now.AddMinutes(5)) return ServiceResult<long>.Fail("The observation time cannot be in the future.");
         var r = new ClinicalRecord
         {
-            Kind = i.Kind, PatientId = i.PatientId, AdmissionId = i.AdmissionId ?? original?.AdmissionId, PregnancyId = i.PregnancyId ?? original?.PregnancyId,
+            Kind = i.Kind, PatientId = i.PatientId, AdmissionId = i.AdmissionId ?? original?.AdmissionId, PregnancyId = i.PregnancyId ?? original?.PregnancyId, SurgeryId = i.SurgeryId ?? original?.SurgeryId,
             RecordedUtc = recordedUtc, EnteredUtc = now, UserId = _ctx.UserId, Username = _ctx.Username, ResponsibleName = T(i.ResponsibleName, 150),
             Values = JsonSerializer.Serialize(values), Notes = notes, CorrectsRecordId = i.CorrectsRecordId, CorrectionReason = T(i.CorrectionReason, 300)
         };

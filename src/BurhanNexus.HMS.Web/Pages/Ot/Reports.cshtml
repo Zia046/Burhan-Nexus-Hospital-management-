@@ -1,0 +1,41 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ot.ReportsModel
+@{
+    ViewData["Title"] = "OT reports";
+    var qs = $"report={Model.Report}&from={Model.From:yyyy-MM-dd}&to={Model.To:yyyy-MM-dd}&theatreId={Model.TheatreId}&surgeonId={Model.SurgeonId}&departmentId={Model.DepartmentId}&procedureId={Model.ProcedureId}&status={Model.Status}";
+}
+<partial name="_OtNav" />
+<div class="toolbar no-print">
+    <form method="get" class="filters wrap" data-ot-report-filter>
+        <select name="report" aria-label="Report" data-autosubmit>
+            @foreach (var c in OtQueryService.Reports.Where(c => !c.Financial || Model.Financial)) { <option value="@c.Key" selected="@(Model.Report == c.Key)">@c.Title</option> }
+        </select>
+        <partial name="/Pages/Finance/_PeriodFilter.cshtml" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" />
+        <select name="theatreId" aria-label="Theatre"><option value="">All theatres</option>@foreach (var t in Model.Theatres) { <option value="@t.Id" selected="@(Model.TheatreId == t.Id)">@t.Name</option> }</select>
+        <select name="surgeonId" aria-label="Surgeon"><option value="">All surgeons</option>@foreach (var d in Model.Surgeons) { <option value="@d.Id" selected="@(Model.SurgeonId == d.Id)">@d.Name</option> }</select>
+        <select name="departmentId" aria-label="Department"><option value="">All departments</option>@foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(Model.DepartmentId == d.Id)">@d.Name</option> }</select>
+        <select name="procedureId" aria-label="Procedure"><option value="">All procedures</option>@foreach (var p in Model.Procedures) { <option value="@p.Id" selected="@(Model.ProcedureId == p.Id)">@p.Name</option> }</select>
+        <select name="status" aria-label="Status"><option value="">All statuses</option>@foreach (var st in Enum.GetValues<SurgeryStatus>()) { <option value="@st" selected="@(Model.Status == st)">@st</option> }</select>
+        <button class="btn btn-light" type="submit">Show</button>
+    </form>
+    <div class="toolbar-actions">
+        <button type="button" class="btn btn-light" data-print><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print / PDF</button>
+        <a bn-permission="@Perm.OtExportReports" class="btn btn-light" href="?handler=Export&format=xlsx&@qs" data-test="ot-export-xlsx">Excel</a>
+        <a bn-permission="@Perm.OtExportReports" class="btn btn-light" href="?handler=Export&format=csv&@qs">CSV</a>
+    </div>
+</div>
+@foreach (var t in Model.Data)
+{
+    <div class="card" data-ot-report="@t.Key">
+        <div class="card-header"><h2><svg class="icon"><use href="#i-chart" /></svg> @t.Title</h2><span class="muted">@BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(Model.From!.Value, Model.To!.Value)</span></div>
+        <div class="table-wrap"><table class="table table-compact">
+            <thead><tr>@foreach (var h in t.Columns) { <th>@h</th> }</tr></thead>
+            <tbody>
+            @foreach (var row in t.Rows) { <tr>@foreach (var c in row) { <td>@c</td> }</tr> }
+            @if (t.Rows.Count == 0) { <tr><td colspan="@t.Columns.Count" class="empty">No data for this period.</td></tr> }
+            </tbody>
+            @if (t.Totals is not null) { <tfoot><tr>@foreach (var c in t.Totals) { <th>@c</th> }</tr></tfoot> }
+        </table></div>
+    </div>
+}
+@if (Model.Data.Count == 0) { <div class="card"><p class="card-body empty">No data.</p></div> }

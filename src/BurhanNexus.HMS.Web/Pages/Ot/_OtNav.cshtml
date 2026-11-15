@@ -1,0 +1,15 @@
+@{
+    var tab = ViewData["OtTab"] as string;
+    string Cls(string t) => t == tab ? "active" : "";
+}
+<nav class="subnav no-print" data-ot-nav>
+    <a bn-permission="@Perm.OtDashboard" class="@Cls("dashboard")" href="/Ot"><svg class="icon icon-sm"><use href="#i-chart" /></svg> Dashboard</a>
+    <a bn-permission="@Perm.OtCreateBooking" class="@Cls("book")" href="/Ot/Book"><svg class="icon icon-sm"><use href="#i-plus" /></svg> Book surgery</a>
+    <a bn-permission="@Perm.OtDashboard" class="@Cls("schedule")" href="/Ot/Schedule"><svg class="icon icon-sm"><use href="#i-calendar" /></svg> OT schedule</a>
+    <a bn-permission="@Perm.OtManageRecovery" class="@Cls("recovery")" href="/Ot/Recovery"><svg class="icon icon-sm"><use href="#i-activity" /></svg> Recovery / PACU</a>
+    <a bn-permission="@Perm.OtManageCssd" class="@Cls("cssd")" href="/Ot/Cssd"><svg class="icon icon-sm"><use href="#i-refresh" /></svg> CSSD</a>
+    <a bn-permission="@Perm.OtViewStatistics" class="@Cls("reports")" href="/Ot/Reports"><svg class="icon icon-sm"><use href="#i-file" /></svg> Reports</a>
+    <a bn-permission="@Perm.OtManageTheatres" class="@Cls("theatres")" href="/Ot/Theatres"><svg class="icon icon-sm"><use href="#i-hospital" /></svg> OT rooms &amp; equipment</a>
+    <a bn-permission="@Perm.OtManageCatalogue" class="@Cls("procedures")" href="/Ot/Procedures"><svg class="icon icon-sm"><use href="#i-sliders" /></svg> Surgery catalogue</a>
+    <a bn-permission="@Perm.OtSettings|@Perm.OtManageCatalogue" class="@Cls("setup")" href="/Ot/Setup"><svg class="icon icon-sm"><use href="#i-settings" /></svg> OT settings</a>
+</nav>

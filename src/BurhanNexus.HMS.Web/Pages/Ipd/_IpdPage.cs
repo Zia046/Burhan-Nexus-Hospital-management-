@@ -41,6 +41,10 @@ public abstract class IpdPageModel : HmsPageModel
         RecordKind.AncVisit => Perm.IpdManageAnc,
         RecordKind.LabourAssessment or RecordKind.LabourObservation => Perm.IpdLabourObservations,
         RecordKind.PostnatalAssessment => Perm.IpdPostnatal,
+        RecordKind.PreOpAssessment => Perm.OtEnterPreOp,
+        RecordKind.AnesthesiaAssessment or RecordKind.IntraOpMonitoring => Perm.OtEnterAnesthesia,
+        RecordKind.PacuObservation => Perm.OtManageRecovery,
+        RecordKind.PostOpRecord => Perm.OtEnterPostOp,
         _ => Perm.IpdNicuObservations,
     };
 
@@ -64,6 +68,11 @@ public abstract class IpdPageModel : HmsPageModel
         RecordKind.NicuFeeding => "Feeding & intake / output",
         RecordKind.NicuCare => "NICU care (oxygen, phototherapy, incubator)",
         RecordKind.NicuProgress => "NICU daily progress",
+        RecordKind.PreOpAssessment => "Pre-operative assessment",
+        RecordKind.AnesthesiaAssessment => "Pre-anesthesia assessment",
+        RecordKind.IntraOpMonitoring => "Intra-operative monitoring",
+        RecordKind.PacuObservation => "Recovery (PACU) observations",
+        RecordKind.PostOpRecord => "Post-operative record",
         _ => k.ToString(),
     };
 }

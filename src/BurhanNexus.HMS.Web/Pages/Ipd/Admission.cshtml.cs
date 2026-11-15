@@ -61,6 +61,7 @@ public class AdmissionModel : IpdPageModel
     public IReadOnlyList<IpdBedAllocation> Allocations { get; private set; } = Array.Empty<IpdBedAllocation>();
     public IReadOnlyList<IpdTransfer> Transfers { get; private set; } = Array.Empty<IpdTransfer>();
     public IReadOnlyList<IpdEvent> Events { get; private set; } = Array.Empty<IpdEvent>();
+    public IReadOnlyList<Surgery> Surgeries { get; private set; } = Array.Empty<Surgery>();
     public Dictionary<RecordKind, IReadOnlyList<RecordView>> Records { get; } = new();
     public Dictionary<RecordKind, IReadOnlyList<ClinicalFormField>> Fields { get; } = new();
     public IReadOnlyList<NursingTask> Tasks { get; private set; } = Array.Empty<NursingTask>();
@@ -155,6 +156,8 @@ public class AdmissionModel : IpdPageModel
             FreeBeds = (await Setup.BedsAsync(null, activeOnly: true)).Where(b => b.Id != A.CurrentBedId && b.Status is BedStatus.Available or BedStatus.Reserved && b.Ward!.IsActive).ToList();
             Departments = await _db.Departments.AsNoTracking().Where(d => d.IsActive).OrderBy(d => d.Name).ToListAsync();
         }
+        if (Tab == "overview" && await CanAsync(Perm.OtDashboard))
+            Surgeries = await _db.Surgeries.AsNoTracking().Where(s => s.IpdAdmissionId == Id).OrderBy(s => s.PlannedStartUtc).ToListAsync();
         if (Tab == "overview" || Tab == "edit")
         {
             Departments = await _db.Departments.AsNoTracking().Where(d => d.IsActive).OrderBy(d => d.Name).ToListAsync();

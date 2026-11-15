@@ -120,6 +120,8 @@ public class Charge
     public long? RadiologyOrderId { get; set; }
     /// <summary>Phase 7: inpatient admission this charge belongs to (admission, bed, services, investigations, medicines).</summary>
     public long? IpdAdmissionId { get; set; }
+    /// <summary>Phase 8: OT charge of this surgery.</summary>
+    public long? SurgeryId { get; set; }
     public int ServiceItemId { get; set; }
     public ServiceItem? ServiceItem { get; set; }
     public ServiceKind ServiceKind { get; set; }
