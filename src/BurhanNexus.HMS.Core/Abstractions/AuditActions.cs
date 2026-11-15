@@ -114,4 +114,26 @@ public static class AuditActions
     public const string LabReportReprinted = "Lab.ReportReprinted";
     public const string LabSettingsChanged = "Lab.SettingsChanged";
     public const string LabExported = "Lab.Exported";
+
+    // Phase 5 – pharmacy
+    public const string PharmMedicineSaved = "Pharmacy.MedicineSaved";
+    public const string PharmMedicinePriceChanged = "Pharmacy.MedicinePriceChanged";
+    public const string PharmLookupSaved = "Pharmacy.LookupSaved";
+    public const string PharmSupplierSaved = "Pharmacy.SupplierSaved";
+    public const string PharmLocationSaved = "Pharmacy.LocationSaved";
+    public const string PharmStockReceived = "Pharmacy.StockReceived";
+    public const string PharmMedicineIssued = "Pharmacy.MedicineIssued";
+    public const string PharmSale = "Pharmacy.Sale";
+    public const string PharmTransfer = "Pharmacy.Transfer";
+    public const string PharmFefoOverride = "Pharmacy.FefoOverride";
+    public const string PharmAdjustmentRequested = "Pharmacy.AdjustmentRequested";
+    public const string PharmAdjustmentApproved = "Pharmacy.AdjustmentApproved";
+    public const string PharmAdjustmentRejected = "Pharmacy.AdjustmentRejected";
+    public const string PharmReturn = "Pharmacy.Return";
+    public const string PharmSupplierReturn = "Pharmacy.SupplierReturn";
+    public const string PharmSupplierPayment = "Pharmacy.SupplierPayment";
+    public const string PharmDuplicateBlocked = "Pharmacy.DuplicateBlocked";
+    public const string PharmSettingsChanged = "Pharmacy.SettingsChanged";
+    public const string PharmExported = "Pharmacy.Exported";
+    public const string PharmSlipPrinted = "Pharmacy.SlipPrinted";
 }

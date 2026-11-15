@@ -1,0 +1,79 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.IssueModel
+@using BurhanNexus.HMS.Core.Domain
+@{
+    ViewData["Title"] = "Issue medicines to a patient";
+    var p = Model.Patient;
+}
+<partial name="_PharmNav" />
+<partial name="_ValidationSummary" />
+@if (p is null)
+{
+    <div class="card card-medium">
+        <div class="card-header"><h2><svg class="icon"><use href="#i-pill" /></svg> Issue medicines – find the registered patient</h2></div>
+        <div class="card-body">
+            <form method="get" class="search-main">
+                <div class="input-icon grow"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Patient ID, name, phone or CNIC" autofocus autocomplete="off" maxlength="100" /></div>
+                <button class="btn btn-primary" type="submit">Search</button>
+            </form>
+            @if (!Model.IsPrivate) { <p class="muted small">Government hospital: medicines are issued only to registered patients against their OPD / Emergency visit.</p> }
+            @if (!string.IsNullOrWhiteSpace(Model.Q))
+            {
+                <div class="table-wrap"><table class="table table-compact" data-matches>
+                    <thead><tr><th>Patient ID</th><th>Name</th><th>Father / Husband</th><th>Age</th><th>Phone</th><th></th></tr></thead>
+                    <tbody>@foreach (var m in Model.Matches)
+                    { <tr><td class="mono">@m.PatientNumber</td><td><strong>@m.FullName</strong></td><td>@m.GuardianName</td><td>@m.AgeText · @m.Gender</td><td>@m.MobileNumber</td>
+                        <td class="actions"><a class="btn btn-primary btn-sm" href="/Pharmacy/Issue?patientId=@m.Id">Select</a></td></tr> }
+                    @if (Model.Matches.Count == 0) { <tr><td colspan="6" class="empty">No registered patient found.</td></tr> }</tbody>
+                </table></div>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <form method="post" class="card" data-issue-form novalidate>
+        <input type="hidden" asp-for="Input.IdempotencyKey" />
+        <input type="hidden" name="Input.PatientId" value="@p.Id" />
+        <div class="card-body lab-patient">
+            <div class="patient-id-box sm"><small>Patient ID</small><strong>@p.PatientNumber</strong></div>
+            <div><h2>@p.FullName</h2><span class="muted">@Model.AgeText · @p.Gender@(p.GuardianName is null ? "" : " · " + p.GuardianName)@(p.MobileNumber is null ? "" : " · " + p.MobileNumber)</span></div>
+            <div class="actions"><a class="btn btn-light btn-sm" href="/Pharmacy/Issue">Change patient</a></div>
+        </div>
+        <div class="card-body">
+            <label class="field-label">OPD / Emergency visit @(Model.IsPrivate ? "(optional)" : "*")</label>
+            <div class="choice-list" data-encounters>
+                @if (Model.IsPrivate) { <label class="choice"><input type="radio" name="Input.EncounterId" value="" checked="@(Model.Input.EncounterId is null)" /> No visit (registered patient)</label> }
+                @foreach (var e in Model.Encounters)
+                {
+                    <label class="choice" data-encounter="@e.EncounterNumber"><input type="radio" name="Input.EncounterId" value="@e.Id" checked="@(Model.Input.EncounterId == e.Id)" />
+                        <span><strong class="mono">@e.EncounterNumber</strong> · @(e.Type == EncounterType.Opd ? "OPD" : "Emergency") · @Fmt.Day(e.EncounterDate)@(e.Department is null ? "" : " · " + e.Department.Name)@(e.Doctor is null ? "" : " · " + e.Doctor.Name)</span></label>
+                }
+                @if (Model.Encounters.Count == 0)
+                {
+                    <div class="alert alert-warning" data-no-visit><svg class="icon"><use href="#i-info" /></svg><div>No OPD / Emergency visit in the last @Model.ValidDays day(s).@(Model.IsPrivate ? "" : " Register the patient at OPD or Emergency first.")
+                        <a bn-permission="@Perm.OpdAdd" href="/Opd/Register?patientId=@p.Id">OPD registration</a></div></div>
+                }
+            </div>
+        </div>
+        @await Html.PartialAsync("_MedicineLines", ("issue", Model.IsPrivate, Model.CanDiscount, Model.LocationId, (IEnumerable<BurhanNexus.HMS.Infrastructure.Pharmacy.StockLineInput>)Model.Input.Lines))
+        <div class="card-body form-grid">
+            @if (Model.CanDiscount) { <div class="field span-2"><label for="Input_DiscountReason">Discount reason</label><input asp-for="Input.DiscountReason" maxlength="200" /></div> }
+            <div class="field span-2"><label for="Input_Notes">Notes</label><input asp-for="Input.Notes" maxlength="500" placeholder="e.g. as per handwritten prescription of Dr. …" /></div>
+        </div>
+        <div class="card-footer form-actions">
+            @if (Model.IsPrivate) { <span class="muted">Charges go to the cash counter (Phase 3) for payment.</span> }
+            <button class="btn btn-primary btn-lg" type="submit" data-test="save-issue">Issue medicines</button>
+        </div>
+    </form>
+    @if (Model.History.Count > 0)
+    {
+        <div class="card">
+            <div class="card-header"><h3><svg class="icon"><use href="#i-history" /></svg> Previous medicines</h3><a class="btn btn-light btn-sm" href="/Pharmacy/PatientHistory/@p.Id">All</a></div>
+            <div class="table-wrap"><table class="table table-compact"><tbody>
+                @foreach (var h in Model.History) { <tr><td class="small nowrap">@Fmt.Day(h.BusinessDate)</td><td>@h.MedicineName</td><td class="num">@h.Quantity</td><td class="mono small">@h.BatchNumber</td><td class="small">@h.EncounterNumber</td><td class="small">@h.Instructions</td></tr> }
+            </tbody></table></div>
+        </div>
+    }
+}
+@section Scripts { <script src="~/js/pharmacy.js" asp-append-version="true"></script> }

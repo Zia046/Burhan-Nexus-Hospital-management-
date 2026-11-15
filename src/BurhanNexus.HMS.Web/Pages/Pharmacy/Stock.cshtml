@@ -1,0 +1,31 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.StockModel
+@using BurhanNexus.HMS.Infrastructure.Pharmacy
+@{ ViewData["Title"] = "Stock & batches"; }
+<partial name="_PharmNav" />
+<form method="get" class="toolbar filters">
+    <select name="Location" aria-label="Location"><option value="">All locations</option>@foreach (var l in Model.Locations) { <option value="@l.Id" selected="@(l.Id == Model.Location)">@l.Name</option> }</select>
+    <select name="Expiry" aria-label="Expiry"><option value="">All batches</option><option value="usable" selected="@(Model.Expiry == "usable")">Not expired</option>
+        <option value="near" selected="@(Model.Expiry == "near")">Near expiry</option><option value="expired" selected="@(Model.Expiry == "expired")">Expired</option></select>
+    <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Medicine or batch" maxlength="60" /></div>
+    <button class="btn btn-light" type="submit">Show</button>
+</form>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-database" /></svg> Batch-wise stock</h2><span class="pill">@Model.Rows.Sum(r => r.Quantity).ToString("N0") units · @Model.Rows.Count batch(es)</span></div>
+    <div class="table-wrap"><table class="table table-compact" data-stock>
+        <thead><tr><th>Location</th><th>Medicine</th><th>Batch</th><th>Expiry</th><th class="num">Quantity</th><th>Unit</th><th>Supplier</th>@if (Model.ShowPrices) { <th class="num">Cost</th><th class="num">Sale</th> }<th></th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            <tr data-stock-row="@r.LocationName|@r.BatchNumber" class="@(r.State == ExpiryState.Expired ? "row-expired" : "")">
+                <td>@r.LocationName</td><td><a href="/Pharmacy/Medicines/@r.MedicineId">@r.MedicineName</a></td><td class="mono">@r.BatchNumber</td>
+                <td>@Fmt.Day(r.Expiry) @if (r.State != ExpiryState.Ok) { <span class="status @(r.State == ExpiryState.Expired ? "status-bad" : "status-warn")">@(r.State == ExpiryState.Expired ? "Expired" : "Near expiry")</span> }</td>
+                <td class="num" data-qty>@r.Quantity</td><td>@r.Unit</td><td class="small">@r.Supplier</td>
+                @if (Model.ShowPrices) { <td class="num">@(r.UnitCost?.ToString("N2") ?? "—")</td><td class="num">@(r.SalePrice?.ToString("N2") ?? "—")</td> }
+                <td class="actions"><a bn-permission="@Perm.PharmAdjustStock" class="btn btn-light btn-sm" href="/Pharmacy/Adjustments?location=@r.LocationId&batch=@r.BatchId">Adjust</a></td>
+            </tr>
+        }
+        @if (Model.Rows.Count == 0) { <tr><td colspan="10" class="empty">No stock.</td></tr> }
+        </tbody>
+    </table></div>
+</div>

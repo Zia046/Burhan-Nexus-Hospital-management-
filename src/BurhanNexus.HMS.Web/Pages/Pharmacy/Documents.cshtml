@@ -1,0 +1,23 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.DocumentsModel
+@{ ViewData["Title"] = "Pharmacy documents"; }
+<partial name="_PharmNav" />
+<form method="get" class="toolbar filters">
+    <select name="Type" aria-label="Document type">@foreach (var (k, n) in Model.Types) { <option value="@k" selected="@(k == Model.Type)">@n</option> }</select>
+    <partial name="/Pages/Finance/_PeriodFilter.cshtml" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" />
+    <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Number, patient, customer, supplier (all dates)" maxlength="60" /></div>
+    <button class="btn btn-light" type="submit">Show</button>
+</form>
+<div class="card">
+    <div class="table-wrap"><table class="table" data-documents>
+        <thead><tr><th>Number</th><th>Date / time</th><th>Party</th><th>Details</th><th class="num">Units</th>@if (Model.ShowPrices) { <th class="num">Amount</th> }<th>By</th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            <tr data-doc="@r.Number"><td class="mono"><a href="/Pharmacy/Doc/@r.Type/@r.Id">@r.Number</a></td><td class="small nowrap">@Fmt.DateTimeText(r.CreatedUtc)</td><td>@r.Party</td><td class="small">@r.Detail</td>
+                <td class="num">@r.Units</td>@if (Model.ShowPrices) { <td class="num">@(r.Amount is decimal a ? a.ToString("N2") : "—")</td> }<td class="small">@r.By</td></tr>
+        }
+        @if (Model.Rows.Count == 0) { <tr><td colspan="7" class="empty">No documents.</td></tr> }
+        </tbody>
+    </table></div>
+</div>

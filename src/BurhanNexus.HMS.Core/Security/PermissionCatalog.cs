@@ -154,7 +154,35 @@ public static class PermissionCatalog
             }),
         Future("XRay", "X-Ray Management", "X-Ray department", "scan"),
         Future("Ultrasound", "Ultrasound Management", "Ultrasound department", "wave"),
-        Future("Pharmacy", "Pharmacy Management", "Medicine inventory and dispensing", "pill"),
+        new(Modules_.Pharmacy, "Pharmacy Management", "Medicine catalogue, stock, batches & expiry, patient issue, retail sales, department transfers and reports", "pill", true, "/Pharmacy",
+            new PermissionAction[]
+            {
+                new(PharmacyActions.Dashboard, "View Pharmacy Dashboard", "Pharmacy dashboard, alerts and stock overview"),
+                new(PharmacyActions.ViewCatalogue, "View Medicine Catalogue", "Search medicines and see their stock"),
+                new(PharmacyActions.AddMedicine, "Add Medicine", "Add new medicines to the catalogue"),
+                new(PharmacyActions.EditMedicine, "Edit Medicine", "Change medicine details, activate / deactivate"),
+                new(PharmacyActions.ManageCategories, "Manage Medicine Categories", "Categories, manufacturers, dosage forms, strengths, pack sizes and units"),
+                new(PharmacyActions.ManageSuppliers, "Manage Suppliers", "Add / edit / deactivate suppliers and stock sources"),
+                new(PharmacyActions.ReceiveStock, "Receive Stock", "Record stock receiving (batch, expiry, quantity)"),
+                new(PharmacyActions.ManagePurchases, "Manage Purchases", "Private: purchase prices, invoices, supplier balances and payments"),
+                new(PharmacyActions.IssueToPatients, "Issue Medicine to Patients", "Issue medicines to registered OPD / Emergency patients"),
+                new(PharmacyActions.RetailSales, "Manage Retail Sales", "Private: walk-in medicine sales with receipt"),
+                new(PharmacyActions.ApplyDiscount, "Apply Discount", "Private: discounts on sales / issues within the medicine's limit"),
+                new(PharmacyActions.SelectBatch, "Select Another Batch (FEFO override)", "Issue / sell / transfer a batch other than the earliest-expiring one"),
+                new(PharmacyActions.TransferStock, "Transfer Stock", "Transfer stock between the pharmacy and departments"),
+                new(PharmacyActions.ViewDepartmentStock, "View Department Stock", "See Minor OT and other department stock balances"),
+                new(PharmacyActions.ManageOtStock, "Manage Department Stock Locations", "Configure Minor OT and other departments that keep stock"),
+                new(PharmacyActions.AdjustStock, "Adjust Stock", "Request stock corrections with a reason"),
+                new(PharmacyActions.ApproveAdjustments, "Approve Stock Adjustments", "Approve or reject stock corrections and write-offs"),
+                new(PharmacyActions.ProcessReturns, "Process Returns", "Customer / patient returns and supplier returns"),
+                new(PharmacyActions.ViewStockReports, "View Stock Reports", "Current stock, batch-wise stock and movement history"),
+                new(PharmacyActions.ViewExpiryReports, "View Expiry Reports", "Near-expiry and expired medicines"),
+                new(PharmacyActions.ViewLowStockReports, "View Low-Stock Reports", "Medicines below their minimum level"),
+                new(PharmacyActions.ViewPatientHistory, "View Patient Medicine History", "Medicines issued to a patient"),
+                new(PharmacyActions.ViewFinancialReports, "View Pharmacy Financial Reports", "Private: prices, sales, purchases, profit and stock value"),
+                new(PharmacyActions.ManagePrices, "Manage Medicine Prices", "Private: change purchase / sale prices (history kept)"),
+                new(PharmacyActions.Settings, "Manage Pharmacy Settings", "Expiry warning period, slip text and pharmacy charges"),
+            }),
         new(Modules_.Appointments, "Appointments", "Private hospital doctor appointments and thermal token slips", "calendar", true, "/Appointments",
             new PermissionAction[]
             {
@@ -270,6 +298,36 @@ public static class PermissionCatalog
         public const string Appointments = "Appointments";
         public const string Finance = "Finance";
         public const string Laboratory = "Laboratory";
+        public const string Pharmacy = "Pharmacy";
+    }
+
+    public static class PharmacyActions
+    {
+        public const string Dashboard = "Dashboard";
+        public const string ViewCatalogue = "ViewCatalogue";
+        public const string AddMedicine = "AddMedicine";
+        public const string EditMedicine = "EditMedicine";
+        public const string ManageCategories = "ManageCategories";
+        public const string ManageSuppliers = "ManageSuppliers";
+        public const string ReceiveStock = "ReceiveStock";
+        public const string ManagePurchases = "ManagePurchases";
+        public const string IssueToPatients = "IssueToPatients";
+        public const string RetailSales = "RetailSales";
+        public const string ApplyDiscount = "ApplyDiscount";
+        public const string SelectBatch = "SelectBatch";
+        public const string TransferStock = "TransferStock";
+        public const string ViewDepartmentStock = "ViewDepartmentStock";
+        public const string ManageOtStock = "ManageOtStock";
+        public const string AdjustStock = "AdjustStock";
+        public const string ApproveAdjustments = "ApproveAdjustments";
+        public const string ProcessReturns = "ProcessReturns";
+        public const string ViewStockReports = "ViewStockReports";
+        public const string ViewExpiryReports = "ViewExpiryReports";
+        public const string ViewLowStockReports = "ViewLowStockReports";
+        public const string ViewPatientHistory = "ViewPatientHistory";
+        public const string ViewFinancialReports = "ViewFinancialReports";
+        public const string ManagePrices = "ManagePrices";
+        public const string Settings = "Settings";
     }
 
     public static class LabActions
@@ -503,6 +561,31 @@ public static class Perm
     public const string LabSettings = "Laboratory.Settings";
     public const string LabViewFinancial = "Laboratory.ViewFinancial";
     public const string LabManageFees = "Laboratory.ManageFees";
+    public const string PharmDashboard = "Pharmacy.Dashboard";
+    public const string PharmViewCatalogue = "Pharmacy.ViewCatalogue";
+    public const string PharmAddMedicine = "Pharmacy.AddMedicine";
+    public const string PharmEditMedicine = "Pharmacy.EditMedicine";
+    public const string PharmManageCategories = "Pharmacy.ManageCategories";
+    public const string PharmManageSuppliers = "Pharmacy.ManageSuppliers";
+    public const string PharmReceiveStock = "Pharmacy.ReceiveStock";
+    public const string PharmManagePurchases = "Pharmacy.ManagePurchases";
+    public const string PharmIssueToPatients = "Pharmacy.IssueToPatients";
+    public const string PharmRetailSales = "Pharmacy.RetailSales";
+    public const string PharmApplyDiscount = "Pharmacy.ApplyDiscount";
+    public const string PharmSelectBatch = "Pharmacy.SelectBatch";
+    public const string PharmTransferStock = "Pharmacy.TransferStock";
+    public const string PharmViewDepartmentStock = "Pharmacy.ViewDepartmentStock";
+    public const string PharmManageOtStock = "Pharmacy.ManageOtStock";
+    public const string PharmAdjustStock = "Pharmacy.AdjustStock";
+    public const string PharmApproveAdjustments = "Pharmacy.ApproveAdjustments";
+    public const string PharmProcessReturns = "Pharmacy.ProcessReturns";
+    public const string PharmViewStockReports = "Pharmacy.ViewStockReports";
+    public const string PharmViewExpiryReports = "Pharmacy.ViewExpiryReports";
+    public const string PharmViewLowStockReports = "Pharmacy.ViewLowStockReports";
+    public const string PharmViewPatientHistory = "Pharmacy.ViewPatientHistory";
+    public const string PharmViewFinancialReports = "Pharmacy.ViewFinancialReports";
+    public const string PharmManagePrices = "Pharmacy.ManagePrices";
+    public const string PharmSettings = "Pharmacy.Settings";
 
     public const string AuditView = "AuditLog.View";
     public const string AuditExport = "AuditLog.Export";

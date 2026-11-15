@@ -1,0 +1,69 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.IndexModel
+@using BurhanNexus.HMS.Infrastructure.Pharmacy
+@{
+    ViewData["Title"] = "Pharmacy dashboard";
+    var d = Model.Data;
+}
+<partial name="_PharmNav" />
+<div class="toolbar">
+    <form method="get" class="filters wrap"><partial name="/Pages/Finance/_PeriodFilter.cshtml" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" /><button class="btn btn-light" type="submit">Show</button></form>
+    <div class="toolbar-actions">
+        <a bn-permission="@Perm.PharmIssueToPatients" class="btn btn-primary" href="/Pharmacy/Issue"><svg class="icon icon-sm"><use href="#i-plus" /></svg> Issue to patient</a>
+        @if (Model.IsPrivate) { <a bn-permission="@Perm.PharmRetailSales" class="btn btn-success" href="/Pharmacy/Sale"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> New sale</a> }
+    </div>
+</div>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-pill" /></svg> Pharmacy – @BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(d.From, d.To)</h2>
+        <span class="pill">@(Model.IsPrivate ? "Private hospital pharmacy" : "Government hospital pharmacy")</span></div>
+    <div class="card-body">
+        <div class="kpi-grid" data-pharm-kpis>
+            <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-pill" /></svg></div><div><span class="kpi-label">Active medicines</span><strong class="kpi-value" data-kpi="medicines">@d.ActiveMedicines</strong></div></div>
+            <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-database" /></svg></div><div><span class="kpi-label">Units in stock</span><strong class="kpi-value" data-kpi="units">@d.TotalUnits.ToString("N0")</strong></div></div>
+            <div class="kpi"><div class="kpi-icon red"><svg class="icon"><use href="#i-alert" /></svg></div><div><span class="kpi-label">Low stock</span><strong class="kpi-value" data-kpi="low">@d.LowStock</strong></div></div>
+            <div class="kpi"><div class="kpi-icon red"><svg class="icon"><use href="#i-clock" /></svg></div><div><span class="kpi-label">Near expiry (batches)</span><strong class="kpi-value" data-kpi="near">@d.NearExpiry</strong></div></div>
+            <div class="kpi"><div class="kpi-icon red"><svg class="icon"><use href="#i-x" /></svg></div><div><span class="kpi-label">Expired (batches)</span><strong class="kpi-value" data-kpi="expired">@d.Expired</strong></div></div>
+            <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-users-round" /></svg></div><div><span class="kpi-label">Patient issues · units</span><strong class="kpi-value" data-kpi="issues">@d.Issues · @d.IssueUnits</strong></div></div>
+            @if (Model.IsPrivate) { <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-wallet" /></svg></div><div><span class="kpi-label">Retail sales</span><strong class="kpi-value" data-kpi="sales">@d.Sales</strong></div></div> }
+            <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-download" /></svg></div><div><span class="kpi-label">Stock receipts · transfers</span><strong class="kpi-value" data-kpi="receipts">@d.Receipts · @d.Transfers</strong></div></div>
+            <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-sliders" /></svg></div><div><span class="kpi-label">Adjustments waiting</span><strong class="kpi-value" data-kpi="pending-adjustments">@d.PendingAdjustments</strong></div></div>
+            @if (d.SalesAmount is decimal sa)
+            {
+                <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-wallet" /></svg></div><div><span class="kpi-label">Sales amount</span><strong class="kpi-value" data-kpi="sales-amount">@Fmt.Money(sa)</strong></div></div>
+                <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-download" /></svg></div><div><span class="kpi-label">Purchases</span><strong class="kpi-value" data-kpi="purchases">@Fmt.Money(d.PurchaseAmount ?? 0)</strong></div></div>
+                <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-chart" /></svg></div><div><span class="kpi-label">Estimated gross profit</span><strong class="kpi-value" data-kpi="profit">@Fmt.Money(d.GrossProfit ?? 0)</strong></div></div>
+                <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-database" /></svg></div><div><span class="kpi-label">Stock value (cost)</span><strong class="kpi-value" data-kpi="stock-value">@Fmt.Money(d.StockValue ?? 0)</strong></div></div>
+            }
+        </div>
+    </div>
+</div>
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header"><h3><svg class="icon"><use href="#i-alert" /></svg> Low stock</h3><a bn-permission="@Perm.PharmViewLowStockReports" class="btn btn-light btn-sm" href="/Pharmacy/Reports?report=low-stock">Report</a></div>
+        <div class="table-wrap"><table class="table table-compact" data-low-stock>
+            <thead><tr><th>Medicine</th><th class="num">Usable</th><th class="num">Minimum</th></tr></thead>
+            <tbody>@foreach (var r in d.LowStockList) { <tr data-low="@r.Code"><td><a href="/Pharmacy/Medicines/@r.MedicineId">@r.Name</a></td><td class="num abn-text">@r.Usable</td><td class="num">@r.MinimumStock</td></tr> }
+            @if (d.LowStockList.Count == 0) { <tr><td colspan="3" class="empty">No medicine below its minimum level.</td></tr> }</tbody>
+        </table></div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3><svg class="icon"><use href="#i-clock" /></svg> Expired &amp; near expiry</h3><a bn-permission="@Perm.PharmViewExpiryReports" class="btn btn-light btn-sm" href="/Pharmacy/Reports?report=near-expiry">Report</a></div>
+        <div class="table-wrap"><table class="table table-compact" data-expiry-list>
+            <thead><tr><th>Medicine</th><th>Batch</th><th>Location</th><th>Expiry</th><th class="num">Qty</th></tr></thead>
+            <tbody>@foreach (var b in d.ExpiryList)
+            { <tr data-expiry-batch="@b.BatchNumber"><td>@b.MedicineName</td><td class="mono">@b.BatchNumber</td><td>@b.LocationName</td>
+                <td><span class="status @(b.State == ExpiryState.Expired ? "status-bad" : "status-warn")">@(b.State == ExpiryState.Expired ? "Expired" : "Near") @Fmt.Day(b.Expiry)</span></td><td class="num">@b.Quantity</td></tr> }
+            @if (d.ExpiryList.Count == 0) { <tr><td colspan="5" class="empty">No expired or near-expiry stock.</td></tr> }</tbody>
+        </table></div>
+    </div>
+    @foreach (var (title, rows, link) in new[] { ("Today's patient issues", d.RecentIssues, "/Pharmacy/Documents?type=issues"), ("Recent stock receipts", d.RecentReceipts, "/Pharmacy/Documents?type=receipts"), ("Recent stock transfers", d.RecentTransfers, "/Pharmacy/Documents?type=transfers") })
+    {
+        <div class="card">
+            <div class="card-header"><h3>@title</h3><a class="btn btn-light btn-sm" href="@link">All</a></div>
+            <div class="table-wrap"><table class="table table-compact">
+                <tbody>@foreach (var r in rows) { <tr><td class="mono nowrap"><a href="/Pharmacy/Doc/@r.Type/@r.Id">@r.Number</a></td><td>@r.Party</td><td class="num">@r.Units</td><td class="small muted nowrap">@Fmt.DateTimeText(r.CreatedUtc)</td></tr> }
+                @if (rows.Count == 0) { <tr><td class="empty">None.</td></tr> }</tbody>
+            </table></div>
+        </div>
+    }
+</div>

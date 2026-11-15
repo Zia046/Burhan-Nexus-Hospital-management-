@@ -1,0 +1,55 @@
+@page "{id:int?}"
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.Medicines.EditModel
+@using BurhanNexus.HMS.Core.Domain
+@{
+    var m = Model.Medicine;
+    ViewData["Title"] = m is null ? "Add medicine" : $"Edit {m.Name}";
+    IEnumerable<PharmacyLookup> L(PharmacyLookupKind k) => Model.Lookups.Where(l => l.Kind == k);
+}
+<partial name="_PharmNav" />
+<partial name="_ValidationSummary" />
+@if (Model.Similar.Count > 0)
+{
+    <div class="card" data-similar>
+        <div class="card-header"><h3><svg class="icon"><use href="#i-alert" /></svg> Similar medicines</h3></div>
+        <div class="table-wrap"><table class="table table-compact">
+            <tbody>@foreach (var s in Model.Similar) { <tr data-similar-row="@s.Code"><td class="mono">@s.Code</td><td><a href="/Pharmacy/Medicines/@s.Id" target="_blank">@s.DisplayName</a></td><td>@s.GenericName</td><td>@s.BrandName</td><td class="muted">@s.Why@(s.IsActive ? "" : " · inactive")</td></tr> }</tbody>
+        </table></div>
+    </div>
+}
+<form method="post" class="card" data-medicine-form>
+    <div class="card-header"><h2>@(m is null ? "Add medicine" : $"{m.Code} – {m.Name}")</h2><a class="btn btn-light btn-sm" href="@(m is null ? "/Pharmacy/Medicines" : $"/Pharmacy/Medicines/{m.Id}")">Back</a></div>
+    <div class="card-body form-grid">
+        <div class="field span-2"><label for="Input_Name">Medicine name *</label><input asp-for="Input.Name" maxlength="150" required autofocus /></div>
+        <div class="field"><label for="Input_GenericName">Generic name</label><input asp-for="Input.GenericName" maxlength="150" /></div>
+        <div class="field"><label for="Input_BrandName">Brand name</label><input asp-for="Input.BrandName" maxlength="150" /></div>
+        <div class="field"><label for="Input_ManufacturerId">Manufacturer</label><select asp-for="Input.ManufacturerId"><option value="">—</option>@foreach (var l in L(PharmacyLookupKind.Manufacturer)) { <option value="@l.Id">@l.Name</option> }</select></div>
+        <div class="field"><label for="Input_CategoryId">Category</label><select asp-for="Input.CategoryId"><option value="">—</option>@foreach (var l in L(PharmacyLookupKind.Category)) { <option value="@l.Id">@l.Name</option> }</select></div>
+        <div class="field"><label for="Input_DosageFormId">Dosage form</label><select asp-for="Input.DosageFormId"><option value="">—</option>@foreach (var l in L(PharmacyLookupKind.DosageForm)) { <option value="@l.Id">@l.Name</option> }</select></div>
+        <div class="field"><label for="Input_Strength">Strength</label><input asp-for="Input.Strength" maxlength="50" list="dl-strength" placeholder="e.g. 500 mg" /></div>
+        <div class="field"><label for="Input_PackSize">Pack size</label><input asp-for="Input.PackSize" maxlength="50" list="dl-pack" placeholder="e.g. 10 x 10" /></div>
+        <div class="field"><label for="Input_Unit">Stock unit *</label><input asp-for="Input.Unit" maxlength="30" list="dl-unit" placeholder="Tablet, Bottle, Vial…" /></div>
+        <div class="field"><label for="Input_UnitsPerPack">Units per pack</label><input asp-for="Input.UnitsPerPack" type="number" min="1" max="10000" /></div>
+        <div class="field"><label for="Input_MinimumStock">Minimum stock (units)</label><input asp-for="Input.MinimumStock" type="number" min="0" /></div>
+        <div class="field span-2"><label for="Input_StorageInstructions">Storage instructions</label><input asp-for="Input.StorageInstructions" maxlength="300" placeholder="e.g. Store below 25 °C, keep refrigerated" /></div>
+        <label class="check"><input type="checkbox" asp-for="Input.IsActive" /> Active</label>
+    </div>
+    @if (Model.IsPrivate)
+    {
+        <fieldset class="card-body form-grid fee-box" disabled="@(!Model.CanPrices)" data-price-fields>
+            <legend>Prices (per stock unit)</legend>
+            <div class="field"><label for="Input_PurchasePrice">Purchase price</label><input asp-for="Input.PurchasePrice" type="number" min="0" step="0.0001" /></div>
+            <div class="field"><label for="Input_SalePrice">Sale price</label><input asp-for="Input.SalePrice" type="number" min="0" step="0.01" /></div>
+            <label class="check"><input type="checkbox" asp-for="Input.AllowDiscount" /> Discount allowed</label>
+            <div class="field"><label for="Input_MaxDiscountPercent">Maximum discount %</label><input asp-for="Input.MaxDiscountPercent" type="number" min="0" max="100" step="0.5" /></div>
+            @if (!Model.CanPrices) { <small class="muted">Only users with “Manage Medicine Prices” can change prices.</small> }
+        </fieldset>
+    }
+    <div class="card-footer form-actions">
+        @if (Model.Similar.Count > 0) { <label class="check"><input type="checkbox" name="Input.ConfirmDuplicate" value="true" data-test="confirm-duplicate" /> Save anyway – this is a different medicine</label> }
+        <button class="btn btn-primary" type="submit" data-test="save-medicine">Save medicine</button>
+    </div>
+</form>
+<datalist id="dl-strength">@foreach (var l in L(PharmacyLookupKind.Strength).Where(x => x.IsActive)) { <option value="@l.Name"></option> }</datalist>
+<datalist id="dl-pack">@foreach (var l in L(PharmacyLookupKind.PackSize).Where(x => x.IsActive)) { <option value="@l.Name"></option> }</datalist>
+<datalist id="dl-unit">@foreach (var l in L(PharmacyLookupKind.Unit).Where(x => x.IsActive)) { <option value="@l.Name"></option> }</datalist>

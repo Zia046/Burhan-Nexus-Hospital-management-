@@ -1,0 +1,23 @@
+@model (string Mode, bool Prices, bool Discount, int LocationId, IEnumerable<BurhanNexus.HMS.Infrastructure.Pharmacy.StockLineInput> Initial)
+@using System.Text.Json
+@{
+    var initial = JsonSerializer.Serialize(Model.Initial.Where(l => l.MedicineId > 0).Select(l => new { id = l.MedicineId, batch = l.BatchId, qty = l.Quantity, discount = l.Discount, instructions = l.Instructions }));
+}
+<div class="card-body">
+    <div class="med-search" data-med-search-box>
+        <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input data-med-search placeholder="Search medicine by name, generic name or code…" autocomplete="off" /></div>
+        <div class="med-results" data-med-results hidden></div>
+    </div>
+</div>
+<div class="table-wrap">
+    <table class="table lines-table" data-med-lines data-mode="@Model.Mode" data-location="@Model.LocationId" data-prices="@(Model.Prices ? "1" : "0")" data-discount="@(Model.Discount ? "1" : "0")" data-initial="@initial">
+        <thead><tr><th>Medicine</th><th>Batch <small class="muted">(earliest expiry first)</small></th><th class="num">Available</th><th class="num">Quantity</th>
+            @if (Model.Mode == "issue") { <th>Dosage / instructions</th> }
+            @if (Model.Prices) { <th class="num">Price</th>@if (Model.Discount) { <th class="num">Discount</th> }<th class="num">Total</th> }<th></th></tr></thead>
+        <tbody></tbody>
+        @if (Model.Prices)
+        {
+            <tfoot><tr><td colspan="@(4 + (Model.Mode == "issue" ? 1 : 0) + 1 + (Model.Discount ? 1 : 0))" class="num"><strong>Net total</strong></td><td class="num"><strong data-lines-total>0.00</strong></td><td></td></tr></tfoot>
+        }
+    </table>
+</div>

@@ -1,0 +1,45 @@
+@page "/Pharmacy/Suppliers/{id:int}"
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.Suppliers.DetailsModel
+@{ var s = Model.Supplier; ViewData["Title"] = s.Name; }
+<partial name="_PharmNav" />
+<partial name="_ValidationSummary" />
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-users" /></svg> @s.Name <small class="muted mono">@s.Code</small> @if (!s.IsActive) { <span class="status">Inactive</span> }</h2>
+        <a bn-permission="@Perm.PharmManageSuppliers" class="btn btn-light btn-sm" href="/Pharmacy/Suppliers/Edit/@s.Id">Edit</a></div>
+    <div class="card-body"><dl class="details-grid">
+        <dt>Contact</dt><dd>@(s.ContactPerson ?? "—")</dd><dt>Phone</dt><dd>@(s.Phone ?? "—")</dd><dt>Email</dt><dd>@(s.Email ?? "—")</dd>
+        <dt>Address</dt><dd>@s.Address @s.City</dd><dt>Notes</dt><dd>@(s.Notes ?? "—")</dd>
+    </dl></div>
+</div>
+@if (Model.ShowAccount)
+{
+    <div class="grid-2">
+        <div class="card">
+            <div class="card-header"><h3>Account</h3><span class="pill @(Model.Balance > 0 ? "pill-blue" : "")" data-supplier-balance>Outstanding @Fmt.Money(Model.Balance)</span></div>
+            <div class="table-wrap"><table class="table table-compact" data-supplier-ledger>
+                <thead><tr><th>Date</th><th>Reference</th><th>Description</th><th class="num">Amount</th></tr></thead>
+                <tbody>@foreach (var e in Model.Ledger) { <tr><td>@Fmt.Day(e.BusinessDate)</td><td class="mono">@e.Reference</td><td>@e.Description</td><td class="num">@e.Amount.ToString("N2")</td></tr> }
+                @if (Model.Ledger.Count == 0) { <tr><td colspan="4" class="empty">No purchases yet.</td></tr> }</tbody>
+            </table></div>
+        </div>
+        <form method="post" asp-page-handler="Pay" class="card">
+            <input type="hidden" asp-for="Payment.IdempotencyKey" />
+            <div class="card-header"><h3>Record payment to supplier</h3></div>
+            <div class="card-body form-grid">
+                <div class="field"><label for="Payment_Amount">Amount *</label><input asp-for="Payment.Amount" type="number" min="0.01" step="0.01" /></div>
+                <div class="field"><label for="Payment_PaymentMethodId">Method *</label><select asp-for="Payment.PaymentMethodId">@foreach (var m in Model.Methods) { <option value="@m.Id">@m.Name</option> }</select></div>
+                <div class="field"><label for="Payment_PaymentReference">Reference</label><input asp-for="Payment.PaymentReference" maxlength="100" /></div>
+                <div class="field span-3"><label for="Payment_Notes">Notes</label><input asp-for="Payment.Notes" maxlength="300" /></div>
+            </div>
+            <div class="card-footer form-actions"><button class="btn btn-primary" type="submit" data-test="pay-supplier">Record payment</button></div>
+        </form>
+    </div>
+}
+<div class="card">
+    <div class="card-header"><h3>Purchase / receiving history</h3></div>
+    <div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>GRN</th><th>Received</th><th>Invoice / reference</th><th class="num">Lines</th><th class="num">Units</th>@if (Model.ShowAccount) { <th class="num">Net</th> }</tr></thead>
+        <tbody>@foreach (var r in Model.Receipts) { <tr><td class="mono"><a href="/Pharmacy/Doc/GRN/@r.Id">@r.Number</a></td><td>@Fmt.Day(r.ReceivedDate)</td><td>@r.ReferenceNumber</td><td class="num">@r.Items.Count</td><td class="num">@r.Items.Sum(i => i.Quantity)</td>@if (Model.ShowAccount) { <td class="num">@(r.NetAmount?.ToString("N2") ?? "—")</td> }</tr> }
+        @if (Model.Receipts.Count == 0) { <tr><td colspan="6" class="empty">Nothing received from this supplier yet.</td></tr> }</tbody>
+    </table></div>
+</div>

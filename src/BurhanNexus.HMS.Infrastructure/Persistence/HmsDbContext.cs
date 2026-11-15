@@ -73,6 +73,32 @@ public class HmsDbContext : DbContext
     public DbSet<LabSettings> LabSettings => Set<LabSettings>();
     public DbSet<LabInventoryItem> LabInventoryItems => Set<LabInventoryItem>();
 
+    // Phase 5 – pharmacy
+    public DbSet<PharmacyLookup> PharmacyLookups => Set<PharmacyLookup>();
+    public DbSet<Medicine> Medicines => Set<Medicine>();
+    public DbSet<MedicinePriceChange> MedicinePriceChanges => Set<MedicinePriceChange>();
+    public DbSet<Supplier> Suppliers => Set<Supplier>();
+    public DbSet<StockLocation> StockLocations => Set<StockLocation>();
+    public DbSet<MedicineBatch> MedicineBatches => Set<MedicineBatch>();
+    public DbSet<StockBalance> StockBalances => Set<StockBalance>();
+    public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
+    public DbSet<StockReceipt> StockReceipts => Set<StockReceipt>();
+    public DbSet<StockReceiptItem> StockReceiptItems => Set<StockReceiptItem>();
+    public DbSet<PatientMedicineIssue> PatientMedicineIssues => Set<PatientMedicineIssue>();
+    public DbSet<PatientMedicineIssueItem> PatientMedicineIssueItems => Set<PatientMedicineIssueItem>();
+    public DbSet<PharmacySale> PharmacySales => Set<PharmacySale>();
+    public DbSet<PharmacySaleItem> PharmacySaleItems => Set<PharmacySaleItem>();
+    public DbSet<StockTransfer> StockTransfers => Set<StockTransfer>();
+    public DbSet<StockTransferItem> StockTransferItems => Set<StockTransferItem>();
+    public DbSet<StockAdjustment> StockAdjustments => Set<StockAdjustment>();
+    public DbSet<MedicineReturn> MedicineReturns => Set<MedicineReturn>();
+    public DbSet<MedicineReturnItem> MedicineReturnItems => Set<MedicineReturnItem>();
+    public DbSet<SupplierReturn> SupplierReturns => Set<SupplierReturn>();
+    public DbSet<SupplierReturnItem> SupplierReturnItems => Set<SupplierReturnItem>();
+    public DbSet<SupplierLedgerEntry> SupplierLedger => Set<SupplierLedgerEntry>();
+    public DbSet<SupplierPayment> SupplierPayments => Set<SupplierPayment>();
+    public DbSet<PharmacySettings> PharmacySettings => Set<PharmacySettings>();
+
     public const string PatientNumberSequence = "patient_number_seq";
     public const string OpdNumberSequence = "opd_number_seq";
     public const string EmergencyNumberSequence = "emergency_number_seq";
@@ -84,6 +110,16 @@ public class HmsDbContext : DbContext
     public const string AdjustmentNumberSequence = "adjustment_number_seq";
     public const string LabOrderNumberSequence = "lab_order_number_seq";
     public const string LabSampleNumberSequence = "lab_sample_number_seq";
+    public const string MedicineCodeSequence = "medicine_code_seq";
+    public const string SupplierCodeSequence = "supplier_code_seq";
+    public const string StockReceiptSequence = "pharm_receipt_seq";
+    public const string MedicineIssueSequence = "pharm_issue_seq";
+    public const string PharmacySaleSequence = "pharm_sale_seq";
+    public const string StockTransferSequence = "pharm_transfer_seq";
+    public const string StockAdjustmentSequence = "pharm_adjustment_seq";
+    public const string MedicineReturnSequence = "pharm_return_seq";
+    public const string SupplierReturnSequence = "pharm_supplier_return_seq";
+    public const string SupplierPaymentSequence = "pharm_supplier_payment_seq";
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -92,7 +128,8 @@ public class HmsDbContext : DbContext
         b.HasSequence<long>(PatientNumberSequence).StartsAt(1).IncrementsBy(1);
         b.HasSequence<long>(OpdNumberSequence).StartsAt(1).IncrementsBy(1);
         b.HasSequence<long>(EmergencyNumberSequence).StartsAt(1).IncrementsBy(1);
-        foreach (var seq in new[] { LabOrderNumberSequence, LabSampleNumberSequence, ReceiptNumberSequence, ChargeNumberSequence, RefundNumberSequence, DepositNumberSequence, SettlementNumberSequence, AdjustmentNumberSequence })
+        foreach (var seq in new[] { MedicineCodeSequence, SupplierCodeSequence, StockReceiptSequence, MedicineIssueSequence, PharmacySaleSequence, StockTransferSequence,
+                                     StockAdjustmentSequence, MedicineReturnSequence, SupplierReturnSequence, SupplierPaymentSequence, LabOrderNumberSequence, LabSampleNumberSequence, ReceiptNumberSequence, ChargeNumberSequence, RefundNumberSequence, DepositNumberSequence, SettlementNumberSequence, AdjustmentNumberSequence })
             b.HasSequence<long>(seq).StartsAt(1).IncrementsBy(1);
 
         b.Entity<HospitalSettings>(e =>
@@ -355,6 +392,7 @@ public class HmsDbContext : DbContext
 
         ConfigureFinance(b);
         ConfigureLaboratory(b);
+        ConfigurePharmacy(b);
 
         b.Entity<BackupHistory>(e =>
         {
@@ -437,6 +475,10 @@ public class HmsDbContext : DbContext
             e.HasOne<Receipt>().WithMany().HasForeignKey(x => x.OriginReceiptId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<LabOrder>().WithMany().HasForeignKey(x => x.LabOrderId).OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => x.LabOrderId);
+            e.HasOne<PharmacySale>().WithMany().HasForeignKey(x => x.PharmacySaleId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.PharmacySaleId);
+            e.HasOne<PatientMedicineIssue>().WithMany().HasForeignKey(x => x.PharmacyIssueId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.PharmacyIssueId);
         });
         b.Entity<Receipt>(e =>
         {
@@ -661,6 +703,261 @@ public class HmsDbContext : DbContext
             e.HasIndex(x => x.Code).IsUnique();
             e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.ReorderLevel).HasPrecision(14, 2);
+        });
+    }
+
+    private static void ConfigurePharmacy(ModelBuilder b)
+    {
+        static void Money<T>(EntityTypeBuilder<T> e) where T : class
+        {
+            foreach (var p in typeof(T).GetProperties().Where(p => p.PropertyType == typeof(decimal) || p.PropertyType == typeof(decimal?)))
+                e.Property(p.Name).HasPrecision(14, p.Name.Contains("Cost") || p.Name == "PurchasePrice" ? 4 : 2);
+        }
+
+        b.Entity<PharmacyLookup>(e =>
+        {
+            e.ToTable("PharmacyLookups");
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => new { x.Kind, x.Name }).IsUnique();
+        });
+        b.Entity<Medicine>(e =>
+        {
+            e.ToTable("Medicines", t => t.HasCheckConstraint("CK_Medicines_Values", "\"MinimumStock\" >= 0 AND \"UnitsPerPack\" >= 1 AND \"MaxDiscountPercent\" BETWEEN 0 AND 100"));
+            Money(e);
+            e.HasIndex(x => x.Code).IsUnique();
+            e.HasIndex(x => x.Name);
+            e.HasIndex(x => x.GenericName);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.Ignore(x => x.DisplayName);
+            e.HasOne(x => x.Manufacturer).WithMany().HasForeignKey(x => x.ManufacturerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.DosageForm).WithMany().HasForeignKey(x => x.DosageFormId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<MedicinePriceChange>(e =>
+        {
+            e.ToTable("MedicinePriceChanges");
+            Money(e);
+            e.HasIndex(x => x.MedicineId);
+            e.HasOne(x => x.Medicine).WithMany().HasForeignKey(x => x.MedicineId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<Supplier>(e =>
+        {
+            e.ToTable("Suppliers");
+            e.HasIndex(x => x.Code).IsUnique();
+            e.HasIndex(x => x.Name);
+            e.Property(x => x.RowVersion).IsRowVersion();
+        });
+        b.Entity<StockLocation>(e =>
+        {
+            e.ToTable("StockLocations");
+            e.HasIndex(x => x.Code).IsUnique();
+            e.HasIndex(x => x.Name).IsUnique();
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.Department).WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<MedicineBatch>(e =>
+        {
+            e.ToTable("MedicineBatches");
+            Money(e);
+            e.HasIndex(x => new { x.MedicineId, x.BatchNumber }).IsUnique().HasDatabaseName("UX_MedicineBatches_Batch");
+            e.HasIndex(x => x.ExpiryDate);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.Medicine).WithMany().HasForeignKey(x => x.MedicineId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Supplier).WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<StockBalance>(e =>
+        {
+            e.ToTable("StockBalances", t => t.HasCheckConstraint("CK_StockBalances_NotNegative", "\"Quantity\" >= 0"));
+            e.HasKey(x => new { x.LocationId, x.BatchId });
+            e.HasIndex(x => new { x.MedicineId, x.LocationId });
+            e.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Batch).WithMany().HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Medicine).WithMany().HasForeignKey(x => x.MedicineId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<InventoryTransaction>(e =>
+        {
+            e.ToTable("InventoryTransactions", t => t.HasCheckConstraint("CK_InventoryTransactions_Values", "\"Quantity\" <> 0 AND \"BalanceAfter\" >= 0"));
+            Money(e);
+            e.Property(x => x.Type).HasConversion<string>().HasMaxLength(30);
+            e.HasIndex(x => new { x.MedicineId, x.LocationId, x.Id });
+            e.HasIndex(x => new { x.BatchId, x.LocationId });
+            e.HasIndex(x => new { x.Type, x.BusinessDate });
+            e.HasIndex(x => new { x.DocumentType, x.DocumentId });
+            e.HasIndex(x => x.PatientId);
+            e.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Medicine).WithMany().HasForeignKey(x => x.MedicineId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Batch).WithMany().HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<StockLocation>().WithMany().HasForeignKey(x => x.CounterpartLocationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Patient>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<StockReceipt>(e =>
+        {
+            e.ToTable("StockReceipts", t => t.HasCheckConstraint("CK_StockReceipts_GovernmentNoPrices",
+                "\"Mode\" = 'Private' OR (\"GrossAmount\" IS NULL AND \"NetAmount\" IS NULL AND \"DiscountAmount\" IS NULL AND \"AdditionalCharges\" IS NULL)"));
+            Money(e);
+            e.Property(x => x.Mode).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => x.Number).IsUnique();
+            e.HasIndex(x => x.IdempotencyKey).IsUnique().HasDatabaseName("UX_StockReceipts_Idempotency");
+            e.HasIndex(x => x.BusinessDate);
+            e.HasIndex(x => x.SupplierId);
+            e.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Supplier).WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<StockReceiptItem>(e =>
+        {
+            e.ToTable("StockReceiptItems", t => t.HasCheckConstraint("CK_StockReceiptItems_Quantity", "\"Quantity\" > 0"));
+            Money(e);
+            e.HasOne(x => x.StockReceipt).WithMany(x => x.Items).HasForeignKey(x => x.StockReceiptId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Medicine).WithMany().HasForeignKey(x => x.MedicineId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Batch).WithMany().HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<PatientMedicineIssue>(e =>
+        {
+            e.ToTable("PatientMedicineIssues", t => t.HasCheckConstraint("CK_PatientMedicineIssues_Government",
+                "\"Mode\" = 'Private' OR (\"EncounterId\" IS NOT NULL AND \"GrossAmount\" IS NULL AND \"NetAmount\" IS NULL)"));
+            Money(e);
+            e.Property(x => x.Mode).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => x.Number).IsUnique();
+            e.HasIndex(x => x.IdempotencyKey).IsUnique().HasDatabaseName("UX_PatientMedicineIssues_Idempotency");
+            e.HasIndex(x => new { x.PatientId, x.BusinessDate });
+            e.HasIndex(x => x.EncounterId);
+            e.HasIndex(x => x.BusinessDate);
+            e.HasOne(x => x.Patient).WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Encounter).WithMany().HasForeignKey(x => x.EncounterId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<PatientMedicineIssueItem>(e =>
+        {
+            e.ToTable("PatientMedicineIssueItems", t => t.HasCheckConstraint("CK_PatientMedicineIssueItems_Quantity", "\"Quantity\" > 0 AND \"ReturnedQuantity\" BETWEEN 0 AND \"Quantity\""));
+            Money(e);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasIndex(x => x.MedicineId);
+            e.HasOne(x => x.Issue).WithMany(x => x.Items).HasForeignKey(x => x.IssueId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Medicine).WithMany().HasForeignKey(x => x.MedicineId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Batch).WithMany().HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Charge).WithMany().HasForeignKey(x => x.ChargeId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<PharmacySale>(e =>
+        {
+            e.ToTable("PharmacySales");
+            Money(e);
+            e.HasIndex(x => x.Number).IsUnique();
+            e.HasIndex(x => x.IdempotencyKey).IsUnique().HasDatabaseName("UX_PharmacySales_Idempotency");
+            e.HasIndex(x => x.BusinessDate);
+            e.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Receipt).WithMany().HasForeignKey(x => x.ReceiptId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Counter).WithMany().HasForeignKey(x => x.CounterId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<PharmacySaleItem>(e =>
+        {
+            e.ToTable("PharmacySaleItems", t => t.HasCheckConstraint("CK_PharmacySaleItems_Quantity", "\"Quantity\" > 0 AND \"ReturnedQuantity\" BETWEEN 0 AND \"Quantity\""));
+            Money(e);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasIndex(x => x.MedicineId);
+            e.HasOne(x => x.Sale).WithMany(x => x.Items).HasForeignKey(x => x.SaleId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Medicine).WithMany().HasForeignKey(x => x.MedicineId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Batch).WithMany().HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Charge).WithMany().HasForeignKey(x => x.ChargeId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<StockTransfer>(e =>
+        {
+            e.ToTable("StockTransfers", t => t.HasCheckConstraint("CK_StockTransfers_Locations", "\"FromLocationId\" <> \"ToLocationId\""));
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => x.Number).IsUnique();
+            e.HasIndex(x => x.IdempotencyKey).IsUnique().HasDatabaseName("UX_StockTransfers_Idempotency");
+            e.HasIndex(x => x.BusinessDate);
+            e.HasOne(x => x.FromLocation).WithMany().HasForeignKey(x => x.FromLocationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ToLocation).WithMany().HasForeignKey(x => x.ToLocationId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<StockTransferItem>(e =>
+        {
+            e.ToTable("StockTransferItems", t => t.HasCheckConstraint("CK_StockTransferItems_Quantity", "\"Quantity\" > 0"));
+            e.HasOne(x => x.Transfer).WithMany(x => x.Items).HasForeignKey(x => x.TransferId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Medicine).WithMany().HasForeignKey(x => x.MedicineId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Batch).WithMany().HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<StockAdjustment>(e =>
+        {
+            e.ToTable("StockAdjustments", t => t.HasCheckConstraint("CK_StockAdjustments_Quantity", "\"Quantity\" > 0"));
+            e.Property(x => x.Reason).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasIndex(x => x.Number).IsUnique();
+            e.HasIndex(x => x.IdempotencyKey).IsUnique().HasDatabaseName("UX_StockAdjustments_Idempotency");
+            e.HasIndex(x => new { x.Status, x.BusinessDate });
+            e.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Medicine).WithMany().HasForeignKey(x => x.MedicineId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Batch).WithMany().HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<MedicineReturn>(e =>
+        {
+            e.ToTable("MedicineReturns");
+            Money(e);
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => x.Number).IsUnique();
+            e.HasIndex(x => x.IdempotencyKey).IsUnique().HasDatabaseName("UX_MedicineReturns_Idempotency");
+            e.HasIndex(x => x.BusinessDate);
+            e.HasOne(x => x.Sale).WithMany().HasForeignKey(x => x.SaleId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Issue).WithMany().HasForeignKey(x => x.IssueId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Refund).WithMany().HasForeignKey(x => x.RefundId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<StockLocation>().WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<MedicineReturnItem>(e =>
+        {
+            e.ToTable("MedicineReturnItems", t => t.HasCheckConstraint("CK_MedicineReturnItems_Quantity", "\"Quantity\" > 0"));
+            Money(e);
+            e.HasOne(x => x.Return).WithMany(x => x.Items).HasForeignKey(x => x.ReturnId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<PharmacySaleItem>().WithMany().HasForeignKey(x => x.SaleItemId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<PatientMedicineIssueItem>().WithMany().HasForeignKey(x => x.IssueItemId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Medicine>().WithMany().HasForeignKey(x => x.MedicineId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<MedicineBatch>().WithMany().HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<SupplierReturn>(e =>
+        {
+            e.ToTable("SupplierReturns");
+            Money(e);
+            e.Property(x => x.Mode).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => x.Number).IsUnique();
+            e.HasIndex(x => x.IdempotencyKey).IsUnique().HasDatabaseName("UX_SupplierReturns_Idempotency");
+            e.HasOne(x => x.Supplier).WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Location).WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<SupplierReturnItem>(e =>
+        {
+            e.ToTable("SupplierReturnItems", t => t.HasCheckConstraint("CK_SupplierReturnItems_Quantity", "\"Quantity\" > 0"));
+            Money(e);
+            e.HasOne(x => x.SupplierReturn).WithMany(x => x.Items).HasForeignKey(x => x.SupplierReturnId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Medicine>().WithMany().HasForeignKey(x => x.MedicineId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<MedicineBatch>().WithMany().HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<SupplierLedgerEntry>(e =>
+        {
+            e.ToTable("SupplierLedger");
+            Money(e);
+            e.Property(x => x.Type).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => new { x.SupplierId, x.BusinessDate });
+            e.HasOne(x => x.Supplier).WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<StockReceipt>().WithMany().HasForeignKey(x => x.StockReceiptId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<SupplierPayment>().WithMany().HasForeignKey(x => x.SupplierPaymentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<SupplierReturn>().WithMany().HasForeignKey(x => x.SupplierReturnId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<SupplierPayment>(e =>
+        {
+            e.ToTable("SupplierPayments", t => t.HasCheckConstraint("CK_SupplierPayments_Amount", "\"Amount\" > 0"));
+            Money(e);
+            e.HasIndex(x => x.Number).IsUnique();
+            e.HasIndex(x => x.IdempotencyKey).IsUnique().HasDatabaseName("UX_SupplierPayments_Idempotency");
+            e.HasOne(x => x.Supplier).WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.PaymentMethod).WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<PharmacySettings>(e =>
+        {
+            e.ToTable("PharmacySettings", t => t.HasCheckConstraint("CK_PharmacySettings_Singleton", "\"Id\" = 1"));
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.MedicineServiceItem).WithMany().HasForeignKey(x => x.MedicineServiceItemId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.GovernmentIssueServiceItem).WithMany().HasForeignKey(x => x.GovernmentIssueServiceItemId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

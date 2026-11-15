@@ -1,0 +1,19 @@
+@{
+    var tab = ViewData["PharmTab"] as string;
+    var isPrivate = ViewData["PharmPrivate"] as bool? ?? false;
+    string Cls(string t) => t == tab ? "active" : "";
+}
+<nav class="subnav no-print">
+    <a bn-permission="@Perm.PharmDashboard" class="@Cls("dashboard")" href="/Pharmacy"><svg class="icon icon-sm"><use href="#i-chart" /></svg> Dashboard</a>
+    <a bn-permission="@Perm.PharmIssueToPatients" class="@Cls("issue")" href="/Pharmacy/Issue"><svg class="icon icon-sm"><use href="#i-users-round" /></svg> Patient issue</a>
+    @if (isPrivate) { <a bn-permission="@Perm.PharmRetailSales" class="@Cls("sale")" href="/Pharmacy/Sale"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Retail sale</a> }
+    <a bn-permission="@Perm.PharmReceiveStock" class="@Cls("receive")" href="/Pharmacy/Receive"><svg class="icon icon-sm"><use href="#i-download" /></svg> Receive stock</a>
+    <a bn-permission="@Perm.PharmTransferStock" class="@Cls("transfer")" href="/Pharmacy/Transfer"><svg class="icon icon-sm"><use href="#i-refresh" /></svg> Transfer</a>
+    <a bn-permission="@Perm.PharmViewCatalogue" class="@Cls("medicines")" href="/Pharmacy/Medicines"><svg class="icon icon-sm"><use href="#i-pill" /></svg> Medicines</a>
+    <a bn-permission="@Perm.PharmViewStockReports" class="@Cls("stock")" href="/Pharmacy/Stock"><svg class="icon icon-sm"><use href="#i-database" /></svg> Stock &amp; batches</a>
+    <a bn-permission="@Perm.PharmAdjustStock" class="@Cls("adjust")" href="/Pharmacy/Adjustments"><svg class="icon icon-sm"><use href="#i-sliders" /></svg> Adjustments</a>
+    <a bn-permission="@Perm.PharmViewCatalogue" class="@Cls("documents")" href="/Pharmacy/Documents"><svg class="icon icon-sm"><use href="#i-file" /></svg> Documents</a>
+    <a bn-permission="@Perm.PharmManageSuppliers" class="@Cls("suppliers")" href="/Pharmacy/Suppliers"><svg class="icon icon-sm"><use href="#i-users" /></svg> Suppliers</a>
+    <a bn-permission="@Perm.PharmViewStockReports" class="@Cls("reports")" href="/Pharmacy/Reports"><svg class="icon icon-sm"><use href="#i-chart" /></svg> Reports</a>
+    <a bn-permission="@Perm.PharmSettings" class="@Cls("settings")" href="/Pharmacy/Settings"><svg class="icon icon-sm"><use href="#i-settings" /></svg> Settings</a>
+</nav>

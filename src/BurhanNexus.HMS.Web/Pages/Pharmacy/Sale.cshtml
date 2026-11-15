@@ -1,0 +1,28 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.SaleModel
+@{ ViewData["Title"] = "Retail sale"; }
+<partial name="_PharmNav" />
+<partial name="_ValidationSummary" />
+@if (Model.Counters.Count == 0)
+{
+    <div class="alert alert-warning"><svg class="icon"><use href="#i-info" /></svg><div>You are not assigned to a cash counter. Ask the administrator to assign you (Finance → Counters).</div></div>
+}
+<form method="post" class="card" data-sale-form novalidate>
+    <input type="hidden" asp-for="Input.IdempotencyKey" />
+    <div class="card-header"><h2><svg class="icon"><use href="#i-wallet" /></svg> New retail sale <small class="muted">walk-in customer</small></h2></div>
+    <div class="card-body form-grid">
+        <div class="field"><label for="Input_CustomerName">Customer name</label><input asp-for="Input.CustomerName" maxlength="150" placeholder="optional" /></div>
+        <div class="field"><label for="Input_CustomerPhone">Phone</label><input asp-for="Input.CustomerPhone" maxlength="30" placeholder="optional" /></div>
+        <div class="field"><label for="Input_Notes">Notes</label><input asp-for="Input.Notes" maxlength="300" /></div>
+    </div>
+    @await Html.PartialAsync("_MedicineLines", ("sale", true, Model.CanDiscount, Model.LocationId, (IEnumerable<BurhanNexus.HMS.Infrastructure.Pharmacy.StockLineInput>)Model.Input.Lines))
+    <div class="card-body form-grid">
+        @if (Model.CanDiscount) { <div class="field span-2"><label for="Input_DiscountReason">Discount reason</label><input asp-for="Input.DiscountReason" maxlength="200" /></div> }
+        <div class="field"><label for="Input_CounterId">Counter *</label><select asp-for="Input.CounterId">@foreach (var c in Model.Counters) { <option value="@c.Id">@c.Name</option> }</select></div>
+        <div class="field"><label for="Input_PaymentMethodId">Payment method *</label><select asp-for="Input.PaymentMethodId">@foreach (var m in Model.Methods) { <option value="@m.Id">@m.Name</option> }</select></div>
+        <div class="field"><label for="Input_PaymentReference">Payment reference</label><input asp-for="Input.PaymentReference" maxlength="100" placeholder="card / transfer no." /></div>
+    </div>
+    <div class="card-footer form-actions"><span class="muted">Payment is recorded on a cashier receipt; stock is deducted at the same time.</span>
+        <button class="btn btn-success btn-lg" type="submit" data-test="save-sale">Complete sale &amp; receipt</button></div>
+</form>
+@section Scripts { <script src="~/js/pharmacy.js" asp-append-version="true"></script> }

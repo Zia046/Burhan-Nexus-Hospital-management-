@@ -46,6 +46,7 @@ else if (p.Status == PatientStatus.Archived)
             <a bn-permission="@Perm.PatientsEdit" class="btn btn-light" href="/Patients/Edit/@p.Id"><svg class="icon icon-sm"><use href="#i-edit" /></svg> Edit</a>
         }
         <a bn-permission="@Perm.FinanceCollect" class="btn btn-light" href="/Finance/Collect?patientId=@p.Id"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Collect payment</a>
+        <a bn-permission="@Perm.PharmIssueToPatients" class="btn btn-light" href="/Pharmacy/Issue?patientId=@p.Id" data-test="profile-issue-medicines"><svg class="icon icon-sm"><use href="#i-pill" /></svg> Issue medicines</a>
         <a bn-permission="@Perm.PatientsPrint" class="btn btn-light" href="/Patients/Record/@p.Id" target="_blank"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print record</a>
     </div>
 </section>
@@ -110,6 +111,16 @@ else if (p.Status == PatientStatus.Archived)
     </div>
 
     <div class="stack">
+        @if (Model.Medicines is { } meds)
+        {
+            <div class="card" data-profile-medicines>
+                <div class="card-header"><h3><svg class="icon"><use href="#i-pill" /></svg> Medicines issued</h3><a class="btn btn-light btn-sm" href="/Pharmacy/PatientHistory/@p.Id">All</a></div>
+                <div class="table-wrap"><table class="table table-compact"><tbody>
+                    @foreach (var m in meds) { <tr><td class="small nowrap">@Fmt.Day(m.BusinessDate)</td><td>@m.MedicineName</td><td class="num">@m.Quantity</td><td class="mono small">@m.BatchNumber</td><td class="small">@m.EncounterNumber</td><td class="small">@m.IssuedBy</td></tr> }
+                    @if (meds.Count == 0) { <tr><td class="empty">No medicines issued.</td></tr> }
+                </tbody></table></div>
+            </div>
+        }
         <div class="card">
             <div class="card-header"><h3><svg class="icon"><use href="#i-users-round" /></svg> Patient details</h3></div>
             <div class="card-body">

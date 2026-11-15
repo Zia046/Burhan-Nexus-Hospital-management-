@@ -72,11 +72,23 @@ public static class DatabaseHardening
         END;
         $$;
 
+        -- Phase 5: commercial pharmacy records (retail sales, supplier accounts) cannot exist in a Government hospital.
+        CREATE OR REPLACE FUNCTION bnhms_pharmacy_private_only() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF EXISTS (SELECT 1 FROM "HospitalConfiguration" WHERE "HospitalType" = 'Government') THEN
+                RAISE EXCEPTION 'Pharmacy % are only available in Private hospital mode.', TG_TABLE_NAME;
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+
         DO $$
         DECLARE t text;
         BEGIN
             FOREACH t IN ARRAY ARRAY['CashierLedger','DoctorLedger','DoctorSettlements','FinancialAdjustments','DailyCashClosings','ReceiptPrints','ServiceFees',
-                                       'LabItemEvents','LabResultRevisions','LabReportPrints'] LOOP
+                                       'LabItemEvents','LabResultRevisions','LabReportPrints',
+                                       'InventoryTransactions','SupplierLedger','SupplierPayments','MedicinePriceChanges','StockReceipts','StockReceiptItems',
+                                       'StockTransfers','StockTransferItems','MedicineReturns','MedicineReturnItems','SupplierReturns','SupplierReturnItems'] LOOP
                 IF to_regclass(format('%I', t)) IS NOT NULL THEN
                     EXECUTE format('DROP TRIGGER IF EXISTS trg_%s_immutable ON %I', lower(t), t);
                     EXECUTE format('CREATE TRIGGER trg_%s_immutable BEFORE UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION bnhms_finance_immutable()', lower(t), t);
@@ -84,7 +96,9 @@ public static class DatabaseHardening
                     EXECUTE format('CREATE TRIGGER trg_%s_no_truncate BEFORE TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION bnhms_finance_immutable()', lower(t), t);
                 END IF;
             END LOOP;
-            FOREACH t IN ARRAY ARRAY['Receipts','ReceiptLines','Charges','Refunds','CashDeposits','LabOrders','LabOrderItems','LabResultValues','LabSamples'] LOOP
+            FOREACH t IN ARRAY ARRAY['Receipts','ReceiptLines','Charges','Refunds','CashDeposits','LabOrders','LabOrderItems','LabResultValues','LabSamples',
+                                       'Medicines','MedicineBatches','StockBalances','PatientMedicineIssues','PatientMedicineIssueItems','PharmacySales',
+                                       'PharmacySaleItems','StockAdjustments','Suppliers','StockLocations'] LOOP
                 IF to_regclass(format('%I', t)) IS NOT NULL THEN
                     EXECUTE format('DROP TRIGGER IF EXISTS trg_%s_no_delete ON %I', lower(t), t);
                     EXECUTE format('CREATE TRIGGER trg_%s_no_delete BEFORE DELETE ON %I FOR EACH ROW EXECUTE FUNCTION bnhms_finance_immutable()', lower(t), t);
@@ -100,6 +114,12 @@ public static class DatabaseHardening
                 DROP TRIGGER IF EXISTS trg_labresultvalues_guard ON "LabResultValues";
                 CREATE TRIGGER trg_labresultvalues_guard BEFORE UPDATE ON "LabResultValues" FOR EACH ROW EXECUTE FUNCTION bnhms_lab_value_guard();
             END IF;
+            FOREACH t IN ARRAY ARRAY['PharmacySales','SupplierPayments','SupplierLedger'] LOOP
+                IF to_regclass(format('%I', t)) IS NOT NULL THEN
+                    EXECUTE format('DROP TRIGGER IF EXISTS trg_%s_private_only ON %I', lower(t), t);
+                    EXECUTE format('CREATE TRIGGER trg_%s_private_only BEFORE INSERT ON %I FOR EACH ROW EXECUTE FUNCTION bnhms_pharmacy_private_only()', lower(t), t);
+                END IF;
+            END LOOP;
             IF to_regclass('"Charges"') IS NOT NULL THEN
                 DROP TRIGGER IF EXISTS trg_charges_guard ON "Charges";
                 CREATE TRIGGER trg_charges_guard BEFORE UPDATE ON "Charges" FOR EACH ROW EXECUTE FUNCTION bnhms_charge_guard();

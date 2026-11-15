@@ -1,0 +1,63 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.AdjustmentsModel
+@using BurhanNexus.HMS.Core.Domain
+@{ ViewData["Title"] = "Stock adjustments"; }
+<partial name="_PharmNav" />
+<partial name="_ValidationSummary" />
+@if (Model.CanRequest)
+{
+    <form method="get" class="toolbar filters no-print">
+        <label>Location <select name="Location" data-autosubmit>@foreach (var l in Model.Locations) { <option value="@l.Id" selected="@(l.Id == Model.Location)">@l.Name</option> }</select></label>
+        <noscript><button class="btn btn-light" type="submit">Change</button></noscript>
+    </form>
+    <form method="post" class="card card-medium" data-adjust-form>
+        <input type="hidden" asp-for="Input.IdempotencyKey" />
+        <input type="hidden" name="Input.LocationId" value="@Model.Location" />
+        <div class="card-header"><h2><svg class="icon"><use href="#i-sliders" /></svg> New adjustment – @Model.Locations.FirstOrDefault(l => l.Id == Model.Location)?.Name</h2></div>
+        <div class="card-body form-grid">
+            <div class="field span-3"><label for="Input_BatchId">Medicine &amp; batch *</label>
+                <select asp-for="Input.BatchId"><option value="0">— select —</option>@foreach (var b in Model.Batches.OrderBy(x => x.MedicineName)) { <option value="@b.BatchId">@b.MedicineName · batch @b.BatchNumber · exp @Fmt.Day(b.Expiry) · current @b.Quantity</option> }</select></div>
+            <div class="field"><label for="Input_Increase">Type *</label><select asp-for="Input.Increase"><option value="false">Decrease (−)</option><option value="true">Increase (+)</option></select></div>
+            <div class="field"><label for="Input_Quantity">Quantity *</label><input asp-for="Input.Quantity" type="number" min="1" /></div>
+            <div class="field"><label for="Input_Reason">Reason *</label><select asp-for="Input.Reason">
+                <option value="PhysicalCount">Physical stock difference</option><option value="Damaged">Damaged medicine</option><option value="BrokenPackaging">Broken packaging</option>
+                <option value="Expired">Expired stock (write-off)</option><option value="Lost">Lost stock</option><option value="DataEntryCorrection">Data-entry correction</option><option value="Other">Other</option></select></div>
+            <div class="field span-3"><label for="Input_Note">Explanation *</label><input asp-for="Input.Note" maxlength="300" required placeholder="What happened? e.g. counted 95, system 100" /></div>
+        </div>
+        <div class="card-footer form-actions"><span class="muted">@(Model.CanApprove ? "You may approve: the stock changes immediately." : "An authorised user must approve before the stock changes.")</span>
+            <button class="btn btn-primary" type="submit" data-test="save-adjustment">Save adjustment</button></div>
+    </form>
+}
+<div class="card">
+    <div class="card-header"><h3>Waiting for approval</h3><span class="pill">@Model.Pending.Count</span></div>
+    <div class="table-wrap"><table class="table table-compact" data-pending-adjustments>
+        <thead><tr><th>No.</th><th>Location</th><th>Medicine / batch</th><th class="num">Change</th><th class="num">Recorded</th><th>Reason</th><th>Requested by</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var a in Model.Pending)
+        {
+            <tr data-adjustment="@a.Number"><td class="mono">@a.Number</td><td>@a.Location!.Name</td><td>@a.Medicine!.Name · <span class="mono">@a.Batch!.BatchNumber</span></td>
+                <td class="num">@(a.Increase ? "+" : "−")@a.Quantity</td><td class="num">@a.QuantityBefore</td><td>@a.Reason: @a.Note</td><td>@a.RequestedByUsername</td>
+                <td class="actions">@if (Model.CanApprove)
+                {
+                    <form method="post" asp-page-handler="Decide" asp-route-id="@a.Id" class="inline-form">
+                        <input name="note" maxlength="300" placeholder="Note (required to reject)" class="w-md" />
+                        <button class="btn btn-primary btn-sm" type="submit" name="approve" value="true" data-test="approve-@a.Number">Approve</button>
+                        <button class="btn btn-danger btn-sm" type="submit" name="approve" value="false">Reject</button>
+                    </form>
+                }</td></tr>
+        }
+        @if (Model.Pending.Count == 0) { <tr><td colspan="8" class="empty">Nothing waiting.</td></tr> }
+        </tbody>
+    </table></div>
+</div>
+<div class="card">
+    <div class="card-header"><h3>Last 30 days</h3></div>
+    <div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>No.</th><th>Date</th><th>Location</th><th>Medicine / batch</th><th class="num">Change</th><th class="num">Before → after</th><th>Reason</th><th>Status</th><th>By</th></tr></thead>
+        <tbody>@foreach (var a in Model.Recent)
+        { <tr><td class="mono">@a.Number</td><td>@Fmt.Day(a.BusinessDate)</td><td>@a.Location!.Name</td><td>@a.Medicine!.Name · <span class="mono">@a.Batch!.BatchNumber</span></td><td class="num">@(a.Increase ? "+" : "−")@a.Quantity</td>
+            <td class="num">@a.QuantityBefore → @(a.QuantityAfter?.ToString() ?? "—")</td><td>@a.Reason: @a.Note</td><td><span class="status @(a.Status == StockAdjustmentStatus.Approved ? "status-ok" : "status-bad")">@a.Status</span>@if (a.DecisionNote is not null) { <small class="block muted">@a.DecisionNote</small> }</td>
+            <td class="small">@a.RequestedByUsername@(a.DecidedByUsername is null ? "" : " / " + a.DecidedByUsername)</td></tr> }
+        @if (Model.Recent.Count == 0) { <tr><td colspan="9" class="empty">No adjustments.</td></tr> }</tbody>
+    </table></div>
+</div>

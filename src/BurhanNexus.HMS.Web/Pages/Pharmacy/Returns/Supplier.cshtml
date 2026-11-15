@@ -1,0 +1,27 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.Returns.SupplierModel
+@using BurhanNexus.HMS.Infrastructure.Pharmacy
+@{ ViewData["Title"] = "Return to supplier"; }
+<partial name="_PharmNav" />
+<partial name="_ValidationSummary" />
+<form method="post" class="card card-medium" data-supplier-return-form>
+    <input type="hidden" asp-for="Input.IdempotencyKey" />
+    <div class="card-header"><h2>Return medicines to supplier</h2></div>
+    <div class="card-body form-grid">
+        <div class="field"><label for="Input_SupplierId">Supplier</label><select asp-for="Input.SupplierId"><option value="">—</option>@foreach (var s in Model.Suppliers) { <option value="@s.Id">@s.Name</option> }</select></div>
+        <div class="field"><label for="Input_SourceName">or source</label><input asp-for="Input.SourceName" maxlength="150" /></div>
+        <div class="field"><label for="Input_ReferenceInvoice">Reference invoice</label><input asp-for="Input.ReferenceInvoice" maxlength="60" /></div>
+        <div class="field span-3"><label for="Input_Reason">Reason *</label><input asp-for="Input.Reason" maxlength="300" required placeholder="e.g. near expiry, damaged in transit, wrong item" /></div>
+    </div>
+    <div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>Batch (main pharmacy)</th><th class="num">Quantity</th></tr></thead>
+        <tbody>
+        @for (var k = 0; k < Model.Input.Lines.Count; k++)
+        {
+            <tr><td><select name="Input.Lines[@k].BatchId"><option value="0">—</option>@foreach (var b in Model.Batches.OrderBy(x => x.MedicineName)) { <option value="@b.BatchId" selected="@(b.BatchId == Model.Input.Lines[k].BatchId)">@b.MedicineName · @b.BatchNumber · exp @Fmt.Day(b.Expiry)@(b.State == ExpiryState.Expired ? " (expired)" : "") · in stock @b.Quantity</option> }</select></td>
+                <td class="num"><input type="number" name="Input.Lines[@k].Quantity" value="@(Model.Input.Lines[k].Quantity == 0 ? null : Model.Input.Lines[k].Quantity)" min="0" class="w-xs" /></td></tr>
+        }
+        </tbody>
+    </table></div>
+    <div class="card-footer form-actions"><button class="btn btn-primary" type="submit" data-test="save-supplier-return">Save supplier return</button></div>
+</form>

@@ -1,0 +1,51 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.SettingsModel
+@using BurhanNexus.HMS.Core.Domain
+@{ ViewData["Title"] = "Pharmacy settings"; }
+<partial name="_PharmNav" />
+<partial name="_ValidationSummary" />
+@if (Model.CanSettings)
+{
+    <form method="post" class="card">
+        <input type="hidden" asp-for="RowVersion" />
+        <div class="card-header"><h2><svg class="icon"><use href="#i-settings" /></svg> Pharmacy settings</h2><span class="pill">@(Model.IsPrivate ? "Private hospital" : "Government hospital")</span></div>
+        <div class="card-body form-grid">
+            <div class="field span-2"><label for="Input_PharmacyName">Pharmacy name on slips</label><input asp-for="Input.PharmacyName" maxlength="150" placeholder="empty = hospital name" /></div>
+            <div class="field"><label for="Input_NearExpiryDays">Near-expiry warning (days)</label><input asp-for="Input.NearExpiryDays" type="number" min="1" max="730" /></div>
+            <div class="field"><label for="Input_EncounterValidDays">Visit valid for issue (days)</label><input asp-for="Input.EncounterValidDays" type="number" min="0" max="365" />
+                <small class="muted">Government: medicines only against an OPD / Emergency visit from the last N days.</small></div>
+            @if (!Model.IsPrivate)
+            {
+                <div class="field span-2"><label for="Input_GovernmentIssueServiceItemId">Pharmacy fee per issue (optional)</label>
+                    <select asp-for="Input.GovernmentIssueServiceItemId"><option value="">No fee – medicines are free</option>@foreach (var s in Model.Services) { <option value="@s.Item.Id">@s.Item.Name (@(s.CurrentFee == 0 ? "free" : s.CurrentFee.ToString("N2")))</option> }</select>
+                    <small class="muted">Uses the Phase 3 service fee. No medicine prices are shown.</small></div>
+            }
+            <div class="field span-3"><label for="Input_SlipFooter">Slip footer</label><input asp-for="Input.SlipFooter" maxlength="200" /></div>
+        </div>
+        <div class="card-footer form-actions"><button class="btn btn-primary" type="submit" data-test="save-pharm-settings">Save settings</button></div>
+    </form>
+}
+@if (Model.CanLocations)
+{
+    <div class="card" id="locations">
+        <div class="card-header"><h2><svg class="icon"><use href="#i-building" /></svg> Stock locations</h2><small class="muted">Departments that keep their own stock (Minor OT, Emergency, Dressing Room, Ward …)</small></div>
+        <div class="table-wrap"><table class="table table-compact" data-locations>
+            <thead><tr><th>Location</th><th class="num">Units</th></tr></thead>
+            <tbody>
+            @foreach (var l in Model.Locations.Append(new StockLocation { Kind = StockLocationKind.Department, IsActive = true }))
+            {
+                var isNew = l.Id == 0;
+                <tr data-location="@l.Code"><td><form method="post" asp-page-handler="Location" asp-route-id="@(isNew ? null : l.Id)" class="inline-form">
+                    <input name="location.Code" value="@l.Code" maxlength="20" class="w-xs" placeholder="Code" required />
+                    <input name="location.Name" value="@l.Name" maxlength="100" placeholder="@(isNew ? "New department store, e.g. Dressing Room" : "")" required />
+                    <select name="location.DepartmentId"><option value="">— department —</option>@foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(d.Id == l.DepartmentId)">@d.Name</option> }</select>
+                    <input name="location.SortOrder" type="number" value="@l.SortOrder" class="w-xs" />
+                    @if (l.Kind == StockLocationKind.MainPharmacy) { <span class="status status-info">Main pharmacy</span><input type="hidden" name="location.IsActive" value="true" /> }
+                    else { <label class="check"><input type="checkbox" name="location.IsActive" value="true" checked="@l.IsActive" /> Keeps stock</label> }
+                    <button class="btn @(isNew ? "btn-primary" : "btn-light") btn-sm" type="submit" data-test="@(isNew ? "add-location" : "save-location-" + l.Code)">@(isNew ? "Add" : "Save")</button>
+                </form></td><td class="num">@(isNew ? "" : Model.Units.GetValueOrDefault(l.Id).ToString("N0"))</td></tr>
+            }
+            </tbody>
+        </table></div>
+    </div>
+}

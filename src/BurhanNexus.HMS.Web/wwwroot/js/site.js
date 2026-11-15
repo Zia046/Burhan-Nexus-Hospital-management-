@@ -440,3 +440,6 @@
     });
   }
 })();
+
+// ---------------- Phase 5: selects that reload their form (location / report pickers) ----------------
+document.querySelectorAll("select[data-autosubmit]").forEach(s => s.addEventListener("change", () => s.form && s.form.submit()));

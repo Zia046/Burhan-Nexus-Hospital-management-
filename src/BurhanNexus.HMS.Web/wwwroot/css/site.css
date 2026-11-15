@@ -572,3 +572,21 @@ form.inline { display: inline; }
 .verify-bulk .card-body { justify-content: space-between; }
 .print-only { display: none; }
 @media print { .print-only { display: block; } }
+
+/* ---------------- Phase 5: pharmacy ---------------- */
+.details-grid { display: grid; grid-template-columns: max-content 1fr max-content 1fr; gap: 6px 16px; margin: 0; }
+.details-grid dt { color: var(--muted); font-weight: 600; }
+.details-grid dd { margin: 0; }
+@media (max-width: 800px) { .details-grid { grid-template-columns: max-content 1fr; } }
+.med-search { position: relative; max-width: 640px; }
+.med-results { position: absolute; z-index: 20; left: 0; right: 0; top: 100%; background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(15,42,74,.15); max-height: 320px; overflow: auto; }
+.med-result { display: flex; gap: 8px; align-items: baseline; width: 100%; text-align: left; padding: 8px 12px; border: 0; background: none; cursor: pointer; border-bottom: 1px solid var(--line); }
+.med-result:hover, .med-result.on { background: #f0f6ff; }
+.med-avail { margin-left: auto; font-size: .82rem; white-space: nowrap; }
+.lines-table select { max-width: 320px; }
+.lines-table input:not([type=hidden]) { min-width: 0; }
+.choice-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.choice { display: flex; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+.choice:has(input:checked) { border-color: var(--blue-600); background: #f0f6ff; }
+.field-label { font-weight: 600; display: block; }
+.row-expired td { background: #fff5f5; }

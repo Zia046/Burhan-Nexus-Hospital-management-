@@ -322,6 +322,129 @@ try {
   await shot(page, "p4-15-lab-dashboard");
   await go("/Lab/Reports");
   await shot(page, "p4-16-lab-reports");
+
+  // ---- Phase 5: pharmacy (Government first, then Private) ----
+  const ym = m => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + m); return d.toISOString().slice(0, 7); };
+  const addMed = async q => {
+    await page.fill("[data-med-search]", "");
+    await page.type("[data-med-search]", q, { delay: 30 });
+    await page.waitForSelector("[data-med-result]", { timeout: 5000 });
+    await page.click("[data-med-result]");
+    await page.waitForTimeout(200);
+  };
+  const newMedicine = async (name, generic, strength, form, unit, min) => {
+    await go("/Pharmacy/Medicines/Edit");
+    await page.fill("#Input_Name", name);
+    await page.fill("#Input_GenericName", generic);
+    await page.fill("#Input_Strength", strength);
+    await page.selectOption("#Input_DosageFormId", { label: form });
+    await page.fill("#Input_Unit", unit);
+    await page.fill("#Input_MinimumStock", String(min));
+    await submit("button[data-test='save-medicine']");
+    return new URL(page.url()).pathname.split("/").pop();
+  };
+  const paraId = await newMedicine("Paracetamol", "Acetaminophen", "500 mg", "Tablet", "Tablet", 200);
+  const amoxId = await newMedicine("Amoxil", "Amoxicillin", "250 mg", "Capsule", "Capsule", 100);
+  await newMedicine("Tetanus Toxoid", "TT vaccine", "0.5 ml", "Injection", "Ampoule", 20);
+  await go("/Pharmacy/Medicines/Edit");
+  await page.fill("#Input_Name", "PARACETAMOL");
+  await page.fill("#Input_Strength", "500mg");
+  await page.selectOption("#Input_DosageFormId", { label: "Tablet" });
+  await submit("button[data-test='save-medicine']");
+  await shot(page, "p5-02-duplicate-medicine-warning");
+  await go("/Pharmacy/Receive");
+  await page.fill("#Input_SourceName", "District Health Office");
+  await page.fill("#Input_ReferenceNumber", "DHO/2026/114");
+  for (const [q, batch, exp, qty] of [["Parac", "PCM-2401", ym(4), 500], ["Parac", "PCM-2409", ym(14), 1000], ["Amoxil", "AMX-118", ym(10), 300], ["Tetanus", "TT-77", ym(8), 60]]) {
+    await addMed(q);
+    const row = "[data-receive-lines] tbody tr:last-child";
+    await page.fill(`${row} [data-name=BatchNumber]`, batch);
+    await page.fill(`${row} [data-name=Expiry]`, exp);
+    await page.fill(`${row} [data-name=Quantity]`, String(qty));
+  }
+  await shot(page, "p5-03-receive-stock-government");
+  await submit("button[data-test='save-receipt']");
+  await shot(page, "p5-04-goods-received-note");
+  await go(`/Pharmacy/Issue?encounterId=${visitId}`);
+  await addMed("Parac");
+  await page.fill("[data-med-lines] tbody tr:last-child [data-name=Quantity]", "15");
+  await page.fill("[data-med-lines] tbody tr:last-child [data-name=Instructions]", "1 tab three times a day after meals");
+  await addMed("Amoxil");
+  await page.fill("[data-med-lines] tbody tr:last-child [data-name=Quantity]", "21");
+  await page.fill("[data-med-lines] tbody tr:last-child [data-name=Instructions]", "1 cap three times a day for 7 days");
+  await shot(page, "p5-05-patient-issue-government");
+  await submit("button[data-test='save-issue']");
+  const issPath = new URL(page.url()).pathname;
+  await shot(page, "p5-06-issue-document");
+  await pdf(issPath.replace("/Pharmacy/Doc/", "/Print/Pharmacy/"), "sample-pharmacy-issue-slip-80mm.pdf");
+  await go("/Pharmacy/Transfer");
+  await addMed("Tetanus");
+  await page.fill("[data-med-lines] tbody tr:last-child [data-name=Quantity]", "20");
+  await addMed("Parac");
+  await page.fill("[data-med-lines] tbody tr:last-child [data-name=Quantity]", "100");
+  await page.fill("#Input_Reference", "OT weekly supply");
+  await shot(page, "p5-07-transfer-to-minor-ot");
+  await submit("button[data-test='save-transfer']");
+  await pdf(new URL(page.url()).pathname.replace("/Pharmacy/Doc/", "/Print/Pharmacy/"), "sample-pharmacy-transfer-slip-80mm.pdf");
+  await go("/Pharmacy/Stock");
+  await shot(page, "p5-08-batch-stock");
+  await go(`/Pharmacy/Medicines/${paraId}`);
+  await shot(page, "p5-09-medicine-history");
+  await go("/Pharmacy/Medicines");
+  await shot(page, "p5-01-medicine-catalogue");
+  await go("/Pharmacy/Adjustments");
+  await shot(page, "p5-10-stock-adjustments");
+  await go("/Pharmacy/Reports?report=department-stock");
+  await shot(page, "p5-11-report-minor-ot-stock");
+  await go("/Pharmacy");
+  await shot(page, "p5-12-dashboard-government");
+
+  // Private hospital: prices, supplier purchase, walk-in sale with receipt.
+  await go("/Settings/HospitalType");
+  await page.selectOption("#NewType", "Private");
+  await page.fill("#Password", "Hospital#2026");
+  await page.fill("#Confirmation", "CHANGE");
+  await submit("button:has-text('Change hospital type')");
+  for (const [id, cost, sale] of [[paraId, "1.20", "2.00"], [amoxId, "5.50", "8.00"]]) {
+    await go(`/Pharmacy/Medicines/Edit/${id}`);
+    await page.fill("#Input_PurchasePrice", cost);
+    await page.fill("#Input_SalePrice", sale);
+    await submit("button[data-test='save-medicine']");
+    if (page.url().includes("/Edit")) { await page.check("[name='Input.ConfirmDuplicate']"); await submit("button[data-test='save-medicine']"); }
+  }
+  await go("/Pharmacy/Suppliers/Edit");
+  await page.fill("#Input_Name", "Peshawar Medical Distributors");
+  await page.fill("#Input_ContactPerson", "Haji Gul");
+  await page.fill("#Input_Phone", "091-2561234");
+  await page.fill("#Input_City", "Peshawar");
+  await submit("button[data-test='save-supplier']");
+  await go("/Pharmacy/Receive");
+  await page.selectOption("#Input_SupplierId", { label: "Peshawar Medical Distributors" });
+  await page.fill("#Input_ReferenceNumber", "PMD-88231");
+  await addMed("Amoxil");
+  const prow = "[data-receive-lines] tbody tr:last-child";
+  await page.fill(`${prow} [data-name=BatchNumber]`, "AMX-131");
+  await page.fill(`${prow} [data-name=Expiry]`, ym(16));
+  await page.fill(`${prow} [data-name=Quantity]`, "200");
+  await page.fill(`${prow} [data-name=UnitCost]`, "5.50");
+  await shot(page, "p5-13-purchase-private");
+  await submit("button[data-test='save-receipt']");
+  await go("/Pharmacy/Sale");
+  await page.fill("#Input_CustomerName", "Walk-in customer");
+  await addMed("Parac");
+  await page.fill("[data-med-lines] tbody tr:last-child [data-name=Quantity]", "20");
+  await addMed("Amoxil");
+  await page.fill("[data-med-lines] tbody tr:last-child [data-name=Quantity]", "10");
+  await page.fill("[data-med-lines] tbody tr:last-child [data-name=Discount]", "5");
+  await page.fill("#Input_DiscountReason", "Regular customer");
+  await shot(page, "p5-14-retail-sale");
+  await submit("button[data-test='save-sale']");
+  await shot(page, "p5-15-sale-document");
+  await pdf(new URL(page.url()).pathname.replace("/Pharmacy/Doc/", "/Print/Pharmacy/"), "sample-pharmacy-sale-receipt-80mm.pdf");
+  await go("/Pharmacy/Reports?report=gross-profit&period=today");
+  await shot(page, "p5-16-gross-profit");
+  await go("/Pharmacy?period=today");
+  await shot(page, "p5-17-dashboard-private");
 } catch (e) {
   errors.push("SCRIPT FAILURE: " + (e && e.stack || e));
   try { await shot(page, "p2-zz-failure"); } catch {}
