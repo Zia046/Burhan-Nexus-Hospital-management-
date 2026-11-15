@@ -41,7 +41,12 @@ else
             <div class="actions"><a class="btn btn-light btn-sm" href="/Pharmacy/Issue">Change patient</a></div>
         </div>
         <div class="card-body">
-            <label class="field-label">OPD / Emergency visit @(Model.IsPrivate ? "(optional)" : "*")</label>
+            @if (Model.Admission is { } adm)
+            {
+                <input type="hidden" name="Input.IpdAdmissionId" value="@adm.Id" />
+                <div class="alert alert-info" data-ipd-admission><svg class="icon"><use href="#i-hospital" /></svg><div>Inpatient issue for admission <strong class="mono">@adm.AdmissionNumber</strong>@(Model.IsPrivate ? " – charges go on the IPD bill." : ".")</div></div>
+            }
+            <label class="field-label">OPD / Emergency visit @(Model.IsPrivate || Model.Admission is not null ? "(optional)" : "*")</label>
             <div class="choice-list" data-encounters>
                 @if (Model.IsPrivate) { <label class="choice"><input type="radio" name="Input.EncounterId" value="" checked="@(Model.Input.EncounterId is null)" /> No visit (registered patient)</label> }
                 @foreach (var e in Model.Encounters)

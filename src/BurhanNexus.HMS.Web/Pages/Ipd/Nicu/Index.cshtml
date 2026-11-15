@@ -1,0 +1,32 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ipd.Nicu.IndexModel
+@{ ViewData["Title"] = "NICU"; }
+<partial name="_IpdNav" />
+<div class="stat-row">
+    <div class="stat-card"><small>Babies in NICU</small><strong data-nicu-count>@Model.Babies.Count</strong></div>
+    <div class="stat-card"><small>Cots / incubators free</small><strong>@Model.Cots.Count(c => c.Status == BedStatus.Available)</strong> <small>/ @Model.Cots.Count</small></div>
+    <div class="stat-card"><small>Newborns rooming-in</small><strong>@Model.RoomingIn.Count</strong></div>
+</div>
+<div class="card" data-nicu-list>
+    <div class="card-header"><h2>Babies in the NICU</h2><a bn-permission="@Perm.IpdManageNicu" class="btn btn-primary btn-sm" href="/Ipd/Nicu/Admit">NICU admission</a></div>
+    <div class="table-wrap">
+        <table class="table">
+            <thead><tr><th>Admission</th><th>Baby</th><th>Cot</th><th>Reason / diagnosis</th><th>Admitted</th><th>Last observation</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var b in Model.Babies)
+            {
+                <tr class="@(b.NeedsAttention ? "row-warn" : "")"><td class="mono">@b.AdmissionNumber</td><td><strong>@b.PatientName</strong> <small class="muted">@b.PatientNumber · @b.AgeGender</small></td><td>@(b.Bed ?? "—")</td>
+                    <td>@(b.Diagnosis ?? "—")</td><td>@Fmt.DateTimeText(b.AdmittedUtc)</td><td>@(Model.LastObservation.TryGetValue(b.Id, out var lo) ? Fmt.DateTimeText(lo) : "none recorded")</td>
+                    <td class="actions"><a class="btn btn-light btn-sm" href="/Ipd/Admission/@b.Id?tab=nicu">Open</a></td></tr>
+            }
+            @if (Model.Babies.Count == 0) { <tr><td colspan="7" class="empty">No babies in the NICU.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="card"><div class="card-header"><h2>Cots, incubators &amp; warmers</h2></div>
+    <div class="bed-grid">@foreach (var c in Model.Cots) { <div class="bed-tile st-@c.Status.ToString().ToLowerInvariant()" title="@c.Status"><strong>@c.Code</strong><small>@c.Type @c.EquipmentId</small><small>@c.Status</small></div> }</div>
+</div>
+<div class="card"><div class="card-header"><h2>Newborns rooming-in with the mother</h2></div>
+    @await Html.PartialAsync("_AdmissionTable", (Model.RoomingIn, "No newborns rooming-in."))
+</div>

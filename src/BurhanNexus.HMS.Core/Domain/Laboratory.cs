@@ -119,6 +119,8 @@ public class LabOrder
     public Patient? Patient { get; set; }
     public long? EncounterId { get; set; }
     public PatientEncounter? Encounter { get; set; }
+    /// <summary>Phase 7: ordered for an inpatient admission.</summary>
+    public long? IpdAdmissionId { get; set; }
     public LabReferralType ReferralType { get; set; }
     public int? ReferringDoctorId { get; set; }
     public Doctor? ReferringDoctor { get; set; }

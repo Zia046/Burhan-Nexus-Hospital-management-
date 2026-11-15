@@ -27,9 +27,13 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
 
             modelBuilder.HasSequence("charge_number_seq");
 
+            modelBuilder.HasSequence("delivery_seq");
+
             modelBuilder.HasSequence("deposit_number_seq");
 
             modelBuilder.HasSequence("emergency_number_seq");
+
+            modelBuilder.HasSequence("ipd_admission_seq");
 
             modelBuilder.HasSequence("lab_order_number_seq");
 
@@ -56,6 +60,8 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
             modelBuilder.HasSequence("pharm_supplier_return_seq");
 
             modelBuilder.HasSequence("pharm_transfer_seq");
+
+            modelBuilder.HasSequence("pregnancy_seq");
 
             modelBuilder.HasSequence("radiology_order_seq");
 
@@ -538,6 +544,9 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                         .HasPrecision(14, 2)
                         .HasColumnType("numeric(14,2)");
 
+                    b.Property<long?>("IpdAdmissionId")
+                        .HasColumnType("bigint");
+
                     b.Property<long?>("LabOrderId")
                         .HasColumnType("bigint");
 
@@ -601,6 +610,8 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("EncounterId");
 
+                    b.HasIndex("IpdAdmissionId");
+
                     b.HasIndex("LabOrderId");
 
                     b.HasIndex("OriginReceiptId");
@@ -623,6 +634,151 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("CK_Charges_Paid", "\"PaidAmount\" >= 0 AND \"PaidAmount\" <= \"NetAmount\" AND \"RefundedAmount\" >= 0 AND \"RefundedAmount\" <= \"PaidAmount\"");
                         });
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.ClinicalFormField", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal?>("AlertHigh")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<decimal?>("AlertLow")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<string>("AlertSource")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Choices")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Section")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Kind", "Key")
+                        .IsUnique();
+
+                    b.ToTable("ClinicalFormFields", (string)null);
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.ClinicalRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("AdmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("CorrectionReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<long?>("CorrectsRecordId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("EnteredUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<long>("PatientId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("PregnancyId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("RecordedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ResponsibleName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Values")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorrectsRecordId")
+                        .IsUnique()
+                        .HasFilter("\"CorrectsRecordId\" IS NOT NULL");
+
+                    b.HasIndex("PregnancyId");
+
+                    b.HasIndex("PatientId", "Kind");
+
+                    b.HasIndex("AdmissionId", "Kind", "RecordedUtc");
+
+                    b.ToTable("ClinicalRecords", (string)null);
                 });
 
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.Counter", b =>
@@ -802,6 +958,123 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("BusinessDate", "Scope", "UserId", "CounterId");
 
                     b.ToTable("DailyCashClosings", (string)null);
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.DeliveryRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AdmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("AttendingStaff")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<int>("BabyCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Complications")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("DeliveredUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeliveringDoctor")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<DateOnly>("DeliveryDate")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("EstimatedBloodLossMl")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("IdempotencyKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ImmediateCare")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<long?>("LabourRecordId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("MaternalCondition")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("MotherPatientId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Perineum")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Placenta")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long?>("PregnancyId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("TypeDetail")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdmissionId");
+
+                    b.HasIndex("DeliveryDate");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_DeliveryRecords_Idempotency");
+
+                    b.HasIndex("LabourRecordId");
+
+                    b.HasIndex("MotherPatientId");
+
+                    b.HasIndex("Number")
+                        .IsUnique();
+
+                    b.HasIndex("PregnancyId");
+
+                    b.ToTable("DeliveryRecords", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_DeliveryRecords_Babies", "\"BabyCount\" >= 1");
+                        });
                 });
 
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.Department", b =>
@@ -1572,6 +1845,712 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdAdmission", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateOnly>("AdmissionDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("AdmissionDiagnosis")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("AdmissionNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("AdmittedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("AdmittingDoctorId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AdmittingDoctorName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Allergies")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("AttendantName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("AttendantPhone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("AttendantRelation")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("AttentionNote")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("ConditionAtDischarge")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CreatedByUsername")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int?>("CurrentBedId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("CurrentWardId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DepartmentId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("DischargeDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("DischargeDoctor")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("DischargeMedications")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("DischargeRequestedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("DischargeRequestedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DischargeType")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("DischargedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("DischargedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FinalDiagnosis")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("FollowUp")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("IdempotencyKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("InitialCondition")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("InvestigationSummary")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("MedicalHistory")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<long?>("MotherAdmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("NeedsAttention")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("PatientId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("PregnancyId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Procedures")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("ReferredTo")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ReferringDoctor")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<long?>("SourceEncounterId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("TreatmentSummary")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<DateTime>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdmissionDate");
+
+                    b.HasIndex("AdmissionNumber")
+                        .IsUnique();
+
+                    b.HasIndex("AdmittingDoctorId");
+
+                    b.HasIndex("CurrentBedId");
+
+                    b.HasIndex("CurrentWardId");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_IpdAdmissions_Idempotency");
+
+                    b.HasIndex("MotherAdmissionId");
+
+                    b.HasIndex("PatientId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_IpdAdmissions_OneActive")
+                        .HasFilter("\"Status\" IN ('Registered','Admitted','UnderTreatment','Transferred','DischargeRequested')");
+
+                    b.HasIndex("PregnancyId");
+
+                    b.HasIndex("SourceEncounterId");
+
+                    b.HasIndex("PatientId", "Status");
+
+                    b.HasIndex("Status", "Kind");
+
+                    b.ToTable("IpdAdmissions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_IpdAdmissions_Mother", "\"MotherAdmissionId\" IS NULL OR \"MotherAdmissionId\" <> \"Id\"");
+                        });
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdBed", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<long?>("CurrentAdmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("EquipmentId")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("RoomId")
+                        .HasColumnType("integer");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("StatusNote")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("WardId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("CurrentAdmissionId")
+                        .IsUnique()
+                        .HasFilter("\"CurrentAdmissionId\" IS NOT NULL");
+
+                    b.HasIndex("RoomId");
+
+                    b.HasIndex("WardId");
+
+                    b.ToTable("IpdBeds", (string)null);
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdBedAllocation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AdmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("AllocatedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("BedId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("FromUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsShared")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ReleasedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long?>("SharedWithAdmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("ToUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("WardId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdmissionId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_IpdBedAllocations_OpenAdmission")
+                        .HasFilter("\"ToUtc\" IS NULL");
+
+                    b.HasIndex("BedId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_IpdBedAllocations_OpenBed")
+                        .HasFilter("\"ToUtc\" IS NULL AND NOT \"IsShared\"");
+
+                    b.HasIndex("SharedWithAdmissionId");
+
+                    b.HasIndex("WardId");
+
+                    b.HasIndex("BedId", "FromUtc");
+
+                    b.ToTable("IpdBedAllocations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_IpdBedAllocations_Period", "\"ToUtc\" IS NULL OR \"ToUtc\" >= \"FromUtc\"");
+                        });
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdBedCharge", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AdmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ChargeId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateOnly>("Night")
+                        .HasColumnType("date");
+
+                    b.Property<int>("WardId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChargeId");
+
+                    b.HasIndex("AdmissionId", "Night")
+                        .IsUnique();
+
+                    b.ToTable("IpdBedCharges", (string)null);
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdBedStatusChange", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("BedId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("From")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("To")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BedId");
+
+                    b.ToTable("IpdBedStatusChanges", (string)null);
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("AdmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Event")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("FromValue")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long?>("PregnancyId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ToValue")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdmissionId");
+
+                    b.HasIndex("PregnancyId");
+
+                    b.HasIndex("Category", "CreatedUtc");
+
+                    b.ToTable("IpdEvents", (string)null);
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdRoom", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BedCapacity")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("WardId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WardId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("IpdRooms", (string)null);
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("AdmissionServiceItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("AllowDirectAdmission")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("FormFooter")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<int>("LetterheadTopMarginMm")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("PrintHeader")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RequireBillClearanceForDischarge")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RequireMarConfirmations")
+                        .HasColumnType("boolean");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateTime>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdmissionServiceItemId");
+
+                    b.ToTable("IpdSettings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_IpdSettings_Singleton", "\"Id\" = 1");
+                        });
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdTransfer", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AdmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("FromBedId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("FromDepartmentId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FromText")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("FromWardId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("ReceivingDepartment")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<int?>("ToBedId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ToDepartmentId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ToText")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("ToWardId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("TransferUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdmissionId");
+
+                    b.HasIndex("TransferUtc");
+
+                    b.ToTable("IpdTransfers", (string)null);
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdWard", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("BedChargeServiceItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Capacity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int?>("DepartmentId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ResponsibleStaff")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("StockLocationId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BedChargeServiceItemId");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("DepartmentId");
+
+                    b.HasIndex("StockLocationId");
+
+                    b.ToTable("IpdWards", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_IpdWards_Capacity", "\"Capacity\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.LabCategory", b =>
                 {
                     b.Property<int>("Id")
@@ -1728,6 +2707,9 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("IdempotencyKey")
                         .HasColumnType("uuid");
 
+                    b.Property<long?>("IpdAdmissionId")
+                        .HasColumnType("bigint");
+
                     b.Property<bool>("IsUrgent")
                         .HasColumnType("boolean");
 
@@ -1769,6 +2751,8 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("IdempotencyKey")
                         .IsUnique()
                         .HasDatabaseName("UX_LabOrders_Idempotency");
+
+                    b.HasIndex("IpdAdmissionId");
 
                     b.HasIndex("OrderNumber")
                         .IsUnique();
@@ -2445,6 +3429,78 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.ToTable("LabTestParameters", (string)null);
                 });
 
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.LabourRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AdmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ClinicalHistory")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("GestationalAge")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("InitialAssessment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("MembraneStatus")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("MembranesRupturedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("OnsetInfo")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("OnsetUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("PregnancyId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("PresentingComplaints")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("ResponsibleStaff")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdmissionId")
+                        .IsUnique();
+
+                    b.HasIndex("PregnancyId");
+
+                    b.ToTable("LabourRecords", (string)null);
+                });
+
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.LicenseInformation", b =>
                 {
                     b.Property<int>("Id")
@@ -2555,6 +3611,185 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("LoginHistory", (string)null);
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.MedicationDose", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AdmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("DoseGiven")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<DateTime?>("GivenUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Nurse")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<long>("OrderId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("RecordedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("RecordedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Remarks")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("RouteGiven")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateTime>("ScheduledUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<long?>("StockTransactionId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StockTransactionId");
+
+                    b.HasIndex("AdmissionId", "ScheduledUtc");
+
+                    b.HasIndex("OrderId", "ScheduledUtc")
+                        .IsUnique();
+
+                    b.ToTable("MedicationDoses", (string)null);
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.MedicationOrder", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AdmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Dose")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<int?>("DurationDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EnteredBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Frequency")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("Instructions")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("MedicineId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("MedicineName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<long>("PatientId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Prescriber")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Route")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("StartUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("StockUnitsPerDose")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StopReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTime?>("StopUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("StoppedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Times")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdmissionId");
+
+                    b.HasIndex("MedicineId");
+
+                    b.ToTable("MedicationOrders", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_MedicationOrders_Units", "\"StockUnitsPerDose\" >= 0");
+                        });
                 });
 
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.Medicine", b =>
@@ -2918,6 +4153,231 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.NewbornRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int?>("Apgar1")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Apgar10")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Apgar5")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("BirthOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("BirthUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("BirthWeightGrams")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Condition")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("CongenitalObservations")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("DeliveryId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Examination")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("GestationalAge")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<long>("MotherPatientId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<long?>("NewbornAdmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("NewbornPatientId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Placement")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<long?>("PregnancyId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ResponsibleStaff")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Resuscitation")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Sex")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MotherPatientId");
+
+                    b.HasIndex("NewbornAdmissionId");
+
+                    b.HasIndex("NewbornPatientId")
+                        .IsUnique()
+                        .HasFilter("\"NewbornPatientId\" IS NOT NULL");
+
+                    b.HasIndex("PregnancyId");
+
+                    b.HasIndex("DeliveryId", "BirthOrder")
+                        .IsUnique();
+
+                    b.ToTable("NewbornRecords", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_NewbornRecords_NotMother", "\"NewbornPatientId\" IS NULL OR \"NewbornPatientId\" <> \"MotherPatientId\"");
+                        });
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.NicuDetails", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AdmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("AdmissionWeightGrams")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("BirthHistory")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int?>("BirthWeightGrams")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ClinicalCondition")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("GestationalAge")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<long?>("MotherPatientId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("NewbornRecordId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ReferralDetails")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("ResponsibleClinician")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdmissionId")
+                        .IsUnique();
+
+                    b.HasIndex("NewbornRecordId");
+
+                    b.ToTable("NicuDetails", (string)null);
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.NursingTask", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AdmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("CompletedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("CompletedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTime>("DueUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdmissionId", "Status");
+
+                    b.ToTable("NursingTasks", (string)null);
+                });
+
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.OpdVisit", b =>
                 {
                     b.Property<long>("EncounterId")
@@ -3271,6 +4731,9 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("IdempotencyKey")
                         .HasColumnType("uuid");
 
+                    b.Property<long?>("IpdAdmissionId")
+                        .HasColumnType("bigint");
+
                     b.Property<int>("LocationId")
                         .HasColumnType("integer");
 
@@ -3308,6 +4771,8 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("IdempotencyKey")
                         .IsUnique()
                         .HasDatabaseName("UX_PatientMedicineIssues_Idempotency");
+
+                    b.HasIndex("IpdAdmissionId");
 
                     b.HasIndex("LocationId");
 
@@ -3745,6 +5210,112 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_PharmacySettings_Singleton", "\"Id\" = 1");
                         });
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.Pregnancy", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int?>("Abortions")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("Edd")
+                        .HasColumnType("date");
+
+                    b.Property<string>("FollowUpPlan")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int?>("Gravida")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("HighRiskAssessment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("HighRiskReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("HighRiskReferral")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<bool>("IsHighRisk")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("LivingChildren")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("Lmp")
+                        .HasColumnType("date");
+
+                    b.Property<string>("MedicalHistory")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int?>("Para")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("PatientId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("PreviousComplications")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateOnly>("RegisteredDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("RiskFactors")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("StatusNote")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTime>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Number")
+                        .IsUnique();
+
+                    b.HasIndex("PatientId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Pregnancies_OneActive")
+                        .HasFilter("\"Status\" = 'Active'");
+
+                    b.ToTable("Pregnancies", (string)null);
                 });
 
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.PrintedDocument", b =>
@@ -4219,6 +5790,9 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("IdempotencyKey")
                         .HasColumnType("uuid");
 
+                    b.Property<long?>("IpdAdmissionId")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("OrderNumber")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -4265,6 +5839,8 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("IdempotencyKey")
                         .IsUnique()
                         .HasDatabaseName("UX_RadiologyOrders_Idempotency");
+
+                    b.HasIndex("IpdAdmissionId");
 
                     b.HasIndex("OrderNumber")
                         .IsUnique();
@@ -5194,6 +6770,97 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("DoctorId");
 
                     b.ToTable("ServiceItems", (string)null);
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.ShiftHandover", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AcknowledgeNote")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<int?>("AcknowledgedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AcknowledgedByUsername")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("AcknowledgedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("AdmissionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Diagnosis")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ImportantObservations")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("IvFluids")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("MedicationDue")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int?>("OutgoingUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("OutgoingUsername")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("OutstandingTasks")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("PatientCondition")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("PendingInvestigations")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("PendingProcedures")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Shift")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("SpecialCare")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int?>("WardId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdmissionId");
+
+                    b.ToTable("ShiftHandovers", (string)null);
                 });
 
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.StockAdjustment", b =>
@@ -6294,6 +7961,11 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("EncounterId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", null)
+                        .WithMany()
+                        .HasForeignKey("IpdAdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("BurhanNexus.HMS.Core.Domain.LabOrder", null)
                         .WithMany()
                         .HasForeignKey("LabOrderId")
@@ -6341,6 +8013,30 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Navigation("ServiceItem");
                 });
 
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.ClinicalRecord", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", null)
+                        .WithMany()
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.ClinicalRecord", null)
+                        .WithMany()
+                        .HasForeignKey("CorrectsRecordId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Pregnancy", null)
+                        .WithMany()
+                        .HasForeignKey("PregnancyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.Counter", b =>
                 {
                     b.HasOne("BurhanNexus.HMS.Core.Domain.Department", "Department")
@@ -6368,6 +8064,35 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Navigation("Counter");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.DeliveryRecord", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", "Admission")
+                        .WithMany()
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.LabourRecord", null)
+                        .WithMany()
+                        .HasForeignKey("LabourRecordId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Patient", "Mother")
+                        .WithMany()
+                        .HasForeignKey("MotherPatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Pregnancy", null)
+                        .WithMany()
+                        .HasForeignKey("PregnancyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Admission");
+
+                    b.Navigation("Mother");
                 });
 
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.Doctor", b =>
@@ -6512,6 +8237,201 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Navigation("Medicine");
                 });
 
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdAdmission", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Doctor", "AdmittingDoctor")
+                        .WithMany()
+                        .HasForeignKey("AdmittingDoctorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdBed", "CurrentBed")
+                        .WithMany()
+                        .HasForeignKey("CurrentBedId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdWard", "CurrentWard")
+                        .WithMany()
+                        .HasForeignKey("CurrentWardId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", null)
+                        .WithMany()
+                        .HasForeignKey("MotherAdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Pregnancy", null)
+                        .WithMany()
+                        .HasForeignKey("PregnancyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.PatientEncounter", "SourceEncounter")
+                        .WithMany()
+                        .HasForeignKey("SourceEncounterId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("AdmittingDoctor");
+
+                    b.Navigation("CurrentBed");
+
+                    b.Navigation("CurrentWard");
+
+                    b.Navigation("Department");
+
+                    b.Navigation("Patient");
+
+                    b.Navigation("SourceEncounter");
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdBed", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", null)
+                        .WithMany()
+                        .HasForeignKey("CurrentAdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdRoom", "Room")
+                        .WithMany()
+                        .HasForeignKey("RoomId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdWard", "Ward")
+                        .WithMany()
+                        .HasForeignKey("WardId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Room");
+
+                    b.Navigation("Ward");
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdBedAllocation", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", null)
+                        .WithMany()
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdBed", "Bed")
+                        .WithMany()
+                        .HasForeignKey("BedId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", null)
+                        .WithMany()
+                        .HasForeignKey("SharedWithAdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdWard", null)
+                        .WithMany()
+                        .HasForeignKey("WardId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Bed");
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdBedCharge", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", null)
+                        .WithMany()
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Charge", null)
+                        .WithMany()
+                        .HasForeignKey("ChargeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdBedStatusChange", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdBed", null)
+                        .WithMany()
+                        .HasForeignKey("BedId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdEvent", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", null)
+                        .WithMany()
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Pregnancy", null)
+                        .WithMany()
+                        .HasForeignKey("PregnancyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdRoom", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdWard", "Ward")
+                        .WithMany()
+                        .HasForeignKey("WardId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Ward");
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdSettings", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.ServiceItem", null)
+                        .WithMany()
+                        .HasForeignKey("AdmissionServiceItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdTransfer", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", null)
+                        .WithMany()
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.IpdWard", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.ServiceItem", "BedChargeServiceItem")
+                        .WithMany()
+                        .HasForeignKey("BedChargeServiceItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.StockLocation", null)
+                        .WithMany()
+                        .HasForeignKey("StockLocationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("BedChargeServiceItem");
+
+                    b.Navigation("Department");
+                });
+
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.LabItemEvent", b =>
                 {
                     b.HasOne("BurhanNexus.HMS.Core.Domain.LabOrderItem", null)
@@ -6526,6 +8446,11 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.HasOne("BurhanNexus.HMS.Core.Domain.PatientEncounter", "Encounter")
                         .WithMany()
                         .HasForeignKey("EncounterId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", null)
+                        .WithMany()
+                        .HasForeignKey("IpdAdmissionId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("BurhanNexus.HMS.Core.Domain.Patient", "Patient")
@@ -6668,6 +8593,24 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Navigation("LabTest");
                 });
 
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.LabourRecord", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", "Admission")
+                        .WithMany()
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Pregnancy", "Pregnancy")
+                        .WithMany()
+                        .HasForeignKey("PregnancyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Admission");
+
+                    b.Navigation("Pregnancy");
+                });
+
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.LoginHistory", b =>
                 {
                     b.HasOne("BurhanNexus.HMS.Core.Domain.User", "User")
@@ -6676,6 +8619,39 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.MedicationDose", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.MedicationOrder", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.InventoryTransaction", null)
+                        .WithMany()
+                        .HasForeignKey("StockTransactionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.MedicationOrder", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", null)
+                        .WithMany()
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Medicine", "Medicine")
+                        .WithMany()
+                        .HasForeignKey("MedicineId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Medicine");
                 });
 
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.Medicine", b =>
@@ -6794,6 +8770,67 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Navigation("Return");
                 });
 
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.NewbornRecord", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.DeliveryRecord", "Delivery")
+                        .WithMany("Newborns")
+                        .HasForeignKey("DeliveryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("MotherPatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", null)
+                        .WithMany()
+                        .HasForeignKey("NewbornAdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Patient", "NewbornPatient")
+                        .WithMany()
+                        .HasForeignKey("NewbornPatientId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Pregnancy", null)
+                        .WithMany()
+                        .HasForeignKey("PregnancyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Delivery");
+
+                    b.Navigation("NewbornPatient");
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.NicuDetails", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", "Admission")
+                        .WithMany()
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.NewbornRecord", "NewbornRecord")
+                        .WithMany()
+                        .HasForeignKey("NewbornRecordId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Admission");
+
+                    b.Navigation("NewbornRecord");
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.NursingTask", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", null)
+                        .WithMany()
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.OpdVisit", b =>
                 {
                     b.HasOne("BurhanNexus.HMS.Core.Domain.PatientEncounter", "Encounter")
@@ -6863,6 +8900,11 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.HasOne("BurhanNexus.HMS.Core.Domain.PatientEncounter", "Encounter")
                         .WithMany()
                         .HasForeignKey("EncounterId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", null)
+                        .WithMany()
+                        .HasForeignKey("IpdAdmissionId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("BurhanNexus.HMS.Core.Domain.StockLocation", "Location")
@@ -6995,6 +9037,17 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Navigation("MedicineServiceItem");
                 });
 
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.Pregnancy", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Patient", "Patient")
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Patient");
+                });
+
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.PrintedDocument", b =>
                 {
                     b.HasOne("BurhanNexus.HMS.Core.Domain.PatientEncounter", "Encounter")
@@ -7061,6 +9114,11 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.HasOne("BurhanNexus.HMS.Core.Domain.PatientEncounter", "Encounter")
                         .WithMany()
                         .HasForeignKey("EncounterId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", null)
+                        .WithMany()
+                        .HasForeignKey("IpdAdmissionId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("BurhanNexus.HMS.Core.Domain.Patient", "Patient")
@@ -7271,6 +9329,15 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Navigation("Department");
 
                     b.Navigation("Doctor");
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.ShiftHandover", b =>
+                {
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.IpdAdmission", null)
+                        .WithMany()
+                        .HasForeignKey("AdmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.StockAdjustment", b =>
@@ -7585,6 +9652,11 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.Counter", b =>
                 {
                     b.Navigation("Assignments");
+                });
+
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.DeliveryRecord", b =>
+                {
+                    b.Navigation("Newborns");
                 });
 
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.Department", b =>

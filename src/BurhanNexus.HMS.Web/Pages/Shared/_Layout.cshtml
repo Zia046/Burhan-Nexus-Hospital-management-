@@ -123,6 +123,53 @@
             }
         }
 
+        @if (Any(Perm.IpdDashboard, Perm.IpdViewPatients, Perm.IpdRegisterAdmission, Perm.IpdAllocateBed, Perm.IpdViewGynae, Perm.IpdManageLabour, Perm.IpdLabourObservations,
+                 Perm.IpdManageNicu, Perm.IpdNicuObservations, Perm.IpdManageNursing, Perm.IpdNursingNotes, Perm.IpdRecordMedication, Perm.IpdHandover,
+                 Perm.IpdManageWards, Perm.IpdManageRooms, Perm.IpdManageBeds, Perm.IpdSettings))
+        {
+            <div class="nav-section">IPD &amp; Maternity</div>
+            @if (perms.Contains(Perm.IpdDashboard))
+            {
+                <a class="nav-link @Active("ipd-dashboard")" href="/Ipd" data-nav="ipd-dashboard"><svg class="icon"><use href="#i-hospital" /></svg><span>IPD Dashboard</span></a>
+            }
+            @if (perms.Contains(Perm.IpdRegisterAdmission))
+            {
+                <a class="nav-link @Active("ipd-admit")" href="/Ipd/Admit" data-nav="ipd-admit"><svg class="icon"><use href="#i-plus" /></svg><span>Admit Patient</span></a>
+            }
+            @if (perms.Contains(Perm.IpdViewPatients))
+            {
+                <a class="nav-link @Active("ipd-patients")" href="/Ipd/Admissions" data-nav="ipd-patients"><svg class="icon"><use href="#i-users" /></svg><span>Inpatients</span></a>
+            }
+            @if (Any(Perm.IpdViewPatients, Perm.IpdAllocateBed, Perm.IpdManageBeds))
+            {
+                <a class="nav-link @Active("ipd-beds")" href="/Ipd/Beds" data-nav="ipd-beds"><svg class="icon"><use href="#i-hospital" /></svg><span>Bed Map</span></a>
+            }
+            @if (perms.Contains(Perm.IpdViewGynae))
+            {
+                <a class="nav-link @Active("ipd-gynae")" href="/Ipd/Gynae" data-nav="ipd-gynae"><svg class="icon"><use href="#i-stethoscope" /></svg><span>Gynae &amp; ANC</span></a>
+            }
+            @if (Any(Perm.IpdManageLabour, Perm.IpdLabourObservations))
+            {
+                <a class="nav-link @Active("ipd-labour")" href="/Ipd/Labour" data-nav="ipd-labour"><svg class="icon"><use href="#i-activity" /></svg><span>Labour Room</span></a>
+            }
+            @if (Any(Perm.IpdManageNicu, Perm.IpdNicuObservations))
+            {
+                <a class="nav-link @Active("ipd-nicu")" href="/Ipd/Nicu" data-nav="ipd-nicu"><svg class="icon"><use href="#i-users-round" /></svg><span>NICU</span></a>
+            }
+            @if (Any(Perm.IpdManageNursing, Perm.IpdNursingNotes, Perm.IpdRecordMedication, Perm.IpdHandover))
+            {
+                <a class="nav-link @Active("ipd-nursing")" href="/Ipd/Nursing" data-nav="ipd-nursing"><svg class="icon"><use href="#i-check-circle" /></svg><span>Nursing</span></a>
+            }
+            @if (Any(Perm.IpdManageWards, Perm.IpdManageRooms, Perm.IpdManageBeds))
+            {
+                <a class="nav-link @Active("ipd-wards")" href="/Ipd/Wards" data-nav="ipd-wards"><svg class="icon"><use href="#i-sliders" /></svg><span>Wards &amp; Beds</span></a>
+            }
+            @if (perms.Contains(Perm.IpdSettings))
+            {
+                <a class="nav-link @Active("ipd-settings")" href="/Ipd/Settings" data-nav="ipd-settings"><svg class="icon"><use href="#i-settings" /></svg><span>IPD Settings</span></a>
+            }
+        }
+
         @if (Any(Perm.RadDashboard, Perm.RadCreateBooking, Perm.RadViewXRay, Perm.RadViewUltrasound, Perm.RadEnterReport, Perm.RadEditDraft, Perm.RadVerifyReport,
                  Perm.RadViewHistory, Perm.RadViewStatistics, Perm.RadManageServices, Perm.RadManageTemplates, Perm.RadSettings))
         {
@@ -286,7 +333,7 @@
             }
         }
     </nav>
-    <div class="sidebar-footer">Burhan Nexus · v1.6 · Phase 6</div>
+    <div class="sidebar-footer">Burhan Nexus · v1.7 · Phase 7</div>
 </aside>
 <div class="sidebar-backdrop" data-sidebar-close></div>
 

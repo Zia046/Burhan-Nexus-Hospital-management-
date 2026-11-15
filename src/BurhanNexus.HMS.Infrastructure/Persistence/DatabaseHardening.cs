@@ -114,12 +114,53 @@ public static class DatabaseHardening
         END;
         $$;
 
+        -- Phase 7: a closed bed allocation is never re-opened or moved; a discharged / cancelled admission is never re-opened;
+        -- a recorded medication dose (administered / missed / withheld) is never changed.
+        CREATE OR REPLACE FUNCTION bnhms_ipd_allocation_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF NEW."BedId" IS DISTINCT FROM OLD."BedId" OR NEW."AdmissionId" IS DISTINCT FROM OLD."AdmissionId" OR NEW."FromUtc" IS DISTINCT FROM OLD."FromUtc"
+               OR (OLD."ToUtc" IS NOT NULL AND NEW."ToUtc" IS DISTINCT FROM OLD."ToUtc") THEN
+                RAISE EXCEPTION 'Bed occupancy history cannot be changed.';
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+        CREATE OR REPLACE FUNCTION bnhms_ipd_admission_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF OLD."Status" IN ('Discharged','Cancelled','Referred') AND NEW."Status" IS DISTINCT FROM OLD."Status" THEN
+                RAISE EXCEPTION 'A closed admission cannot be re-opened. Register a new admission.';
+            END IF;
+            IF NEW."PatientId" IS DISTINCT FROM OLD."PatientId" OR NEW."AdmissionNumber" IS DISTINCT FROM OLD."AdmissionNumber" THEN
+                RAISE EXCEPTION 'The patient / number of an admission cannot be changed.';
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+        CREATE OR REPLACE FUNCTION bnhms_mar_dose_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF OLD."Status" IN ('Administered','Missed','Withheld') THEN
+                RAISE EXCEPTION 'A recorded medication dose cannot be changed.';
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+        CREATE OR REPLACE FUNCTION bnhms_newborn_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF NEW."MotherPatientId" IS DISTINCT FROM OLD."MotherPatientId" OR NEW."DeliveryId" IS DISTINCT FROM OLD."DeliveryId"
+               OR (OLD."NewbornPatientId" IS NOT NULL AND NEW."NewbornPatientId" IS DISTINCT FROM OLD."NewbornPatientId") THEN
+                RAISE EXCEPTION 'The mother–baby link cannot be changed.';
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+
         DO $$
         DECLARE t text;
         BEGIN
             FOREACH t IN ARRAY ARRAY['CashierLedger','DoctorLedger','DoctorSettlements','FinancialAdjustments','DailyCashClosings','ReceiptPrints','ServiceFees',
                                        'LabItemEvents','LabResultRevisions','LabReportPrints',
                                        'RadiologyExamEvents','RadiologyReportRevisions','RadiologyReportPrints',
+                                       'IpdBedStatusChanges','IpdTransfers','IpdEvents','ClinicalRecords','IpdBedCharges','DeliveryRecords',
                                        'InventoryTransactions','SupplierLedger','SupplierPayments','MedicinePriceChanges','StockReceipts','StockReceiptItems',
                                        'StockTransfers','StockTransferItems','MedicineReturns','MedicineReturnItems','SupplierReturns','SupplierReturnItems'] LOOP
                 IF to_regclass(format('%I', t)) IS NOT NULL THEN
@@ -132,7 +173,9 @@ public static class DatabaseHardening
             FOREACH t IN ARRAY ARRAY['Receipts','ReceiptLines','Charges','Refunds','CashDeposits','LabOrders','LabOrderItems','LabResultValues','LabSamples',
                                        'Medicines','MedicineBatches','StockBalances','PatientMedicineIssues','PatientMedicineIssueItems','PharmacySales',
                                        'PharmacySaleItems','StockAdjustments','Suppliers','StockLocations',
-                                       'RadiologyServices','RadiologyOrders','RadiologyExams','RadiologyAttachments'] LOOP
+                                       'RadiologyServices','RadiologyOrders','RadiologyExams','RadiologyAttachments',
+                                       'IpdWards','IpdRooms','IpdBeds','IpdAdmissions','IpdBedAllocations','Pregnancies','LabourRecords','NewbornRecords',
+                                       'NicuDetails','NursingTasks','ShiftHandovers','MedicationOrders','MedicationDoses'] LOOP
                 IF to_regclass(format('%I', t)) IS NOT NULL THEN
                     EXECUTE format('DROP TRIGGER IF EXISTS trg_%s_no_delete ON %I', lower(t), t);
                     EXECUTE format('CREATE TRIGGER trg_%s_no_delete BEFORE DELETE ON %I FOR EACH ROW EXECUTE FUNCTION bnhms_finance_immutable()', lower(t), t);
@@ -161,6 +204,16 @@ public static class DatabaseHardening
             IF to_regclass('"RadiologyAttachments"') IS NOT NULL THEN
                 DROP TRIGGER IF EXISTS trg_radiologyattachments_guard ON "RadiologyAttachments";
                 CREATE TRIGGER trg_radiologyattachments_guard BEFORE UPDATE ON "RadiologyAttachments" FOR EACH ROW EXECUTE FUNCTION bnhms_radiology_attachment_guard();
+            END IF;
+            IF to_regclass('"IpdBedAllocations"') IS NOT NULL THEN
+                DROP TRIGGER IF EXISTS trg_ipdbedallocations_guard ON "IpdBedAllocations";
+                CREATE TRIGGER trg_ipdbedallocations_guard BEFORE UPDATE ON "IpdBedAllocations" FOR EACH ROW EXECUTE FUNCTION bnhms_ipd_allocation_guard();
+                DROP TRIGGER IF EXISTS trg_ipdadmissions_guard ON "IpdAdmissions";
+                CREATE TRIGGER trg_ipdadmissions_guard BEFORE UPDATE ON "IpdAdmissions" FOR EACH ROW EXECUTE FUNCTION bnhms_ipd_admission_guard();
+                DROP TRIGGER IF EXISTS trg_medicationdoses_guard ON "MedicationDoses";
+                CREATE TRIGGER trg_medicationdoses_guard BEFORE UPDATE ON "MedicationDoses" FOR EACH ROW EXECUTE FUNCTION bnhms_mar_dose_guard();
+                DROP TRIGGER IF EXISTS trg_newbornrecords_guard ON "NewbornRecords";
+                CREATE TRIGGER trg_newbornrecords_guard BEFORE UPDATE ON "NewbornRecords" FOR EACH ROW EXECUTE FUNCTION bnhms_newborn_guard();
             END IF;
             IF to_regclass('"Charges"') IS NOT NULL THEN
                 DROP TRIGGER IF EXISTS trg_charges_guard ON "Charges";

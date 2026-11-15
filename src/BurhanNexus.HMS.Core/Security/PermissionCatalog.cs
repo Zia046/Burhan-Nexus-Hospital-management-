@@ -231,6 +231,47 @@ public static class PermissionCatalog
                 new(Actions.Approve, "Approve", "Reserved for future use"),
                 new(Actions.Refund, "Refund", "Reserved for the billing phase"),
             }),
+        new(Modules_.Ipd, "IPD, Maternity & NICU", "Admissions, wards & beds, Gynae, ANC, Labour Room, delivery, newborns, NICU, nursing and medication administration", "hospital", true, "/Ipd",
+            new PermissionAction[]
+            {
+                new(IpdActions.Dashboard, "View IPD Dashboard", "Admissions, bed occupancy and ward-wise counts"),
+                new(IpdActions.ViewPatients, "View Inpatient Records", "Open admissions and their clinical record"),
+                new(IpdActions.ViewAllWards, "View All Wards", "See patients of every ward (otherwise only wards of the user's departments)"),
+                new(IpdActions.RegisterAdmission, "Register Admission", "Admit patients (from OPD, Emergency, Gynae, Maternity or direct)"),
+                new(IpdActions.EditAdmission, "Edit Admission", "Change admission details, attendant, diagnosis; cancel a wrong admission"),
+                new(IpdActions.AllocateBed, "Allocate Bed", "Allocate / change beds and set bed status"),
+                new(IpdActions.TransferPatient, "Transfer Patient", "Transfer between beds, rooms, wards, departments and facilities"),
+                new(IpdActions.RequestDischarge, "Prepare Discharge", "Write the discharge summary and request discharge"),
+                new(IpdActions.DischargePatient, "Discharge Patient", "Authorise and complete discharge (releases the bed)"),
+                new(IpdActions.ManageWards, "Manage Wards", "Create / edit / deactivate wards"),
+                new(IpdActions.ManageRooms, "Manage Rooms", "Create / edit rooms"),
+                new(IpdActions.ManageBeds, "Manage Beds", "Create beds, cots and incubators; bed status"),
+                new(IpdActions.ProgressNotes, "Enter Progress Notes", "Daily progress notes and clinical observations"),
+                new(IpdActions.ViewGynae, "View Gynae Records", "Gynae / obstetric history, assessments and pregnancy records (sensitive)"),
+                new(IpdActions.EnterGynae, "Enter Gynae Assessment", "Gynae history and assessments"),
+                new(IpdActions.ManageAnc, "Manage ANC Records", "Pregnancy registration, ANC visits and high-risk documentation"),
+                new(IpdActions.ManageLabour, "Manage Labour Room", "Labour admission and labour status"),
+                new(IpdActions.LabourObservations, "Enter Labour Observations", "Maternal / fetal observations and labour progress"),
+                new(IpdActions.Partograph, "Enter Partograph", "Partograph entries"),
+                new(IpdActions.EnterDelivery, "Enter Delivery Record", "Delivery records (NVD, assisted, C-section)"),
+                new(IpdActions.RegisterNewborn, "Register Newborn", "Birth records and newborn Patient IDs"),
+                new(IpdActions.LinkMotherBaby, "Link Mother and Baby", "Mother–baby relationship, rooming-in"),
+                new(IpdActions.Postnatal, "Postnatal Care", "Postnatal assessments of the mother"),
+                new(IpdActions.ManageNicu, "Manage NICU", "NICU admission, cot / incubator allocation, transfer and discharge"),
+                new(IpdActions.NicuObservations, "Enter NICU Observations", "NICU vitals, feeding, intake / output, care and progress"),
+                new(IpdActions.ManageNursing, "Manage Nursing Records", "Nursing assessments, vitals and nursing tasks"),
+                new(IpdActions.NursingNotes, "Enter Nursing Notes", "Chronological nursing notes"),
+                new(IpdActions.Handover, "Manage Shift Handover", "Write and acknowledge shift handovers"),
+                new(IpdActions.MedicationOrders, "Enter Medication Orders", "Record medication orders (also from handwritten prescriptions)"),
+                new(IpdActions.RecordMedication, "Record Medication Administration", "Record administered / missed / withheld doses"),
+                new(IpdActions.ViewInvestigations, "View Investigation Results", "Laboratory and radiology orders / results of the admission"),
+                new(IpdActions.CorrectRecords, "Correct Clinical Records", "Enter corrections of clinical records (the original is kept)"),
+                new(IpdActions.ViewFinancial, "View Patient Financial Details", "Charges, payments and balance of an admission"),
+                new(IpdActions.ManageBilling, "Manage IPD Billing", "Post bed and service charges, final bill"),
+                new(IpdActions.PrintForms, "Print Forms", "Print clinical forms and summaries"),
+                new(IpdActions.ExportPdf, "Export PDF", "Save forms as PDF"),
+                new(IpdActions.Settings, "Manage IPD Settings", "Clinical form fields, alert limits, charges and printing"),
+            }),
         Future("MinorOt", "Minor OT", "Minor operation theatre settings", "scissors"),
         Future("Doctors", "Doctor Management", "Doctors, schedules and shares", "user-cross"),
         new(Modules_.Finance, "Financial Management", "Cashier counters, receipts, deposits, refunds, doctor accounts and financial reports", "wallet", true, "/Finance",
@@ -329,6 +370,48 @@ public static class PermissionCatalog
         public const string Laboratory = "Laboratory";
         public const string Pharmacy = "Pharmacy";
         public const string Radiology = "Radiology";
+        public const string Ipd = "Ipd";
+    }
+
+    public static class IpdActions
+    {
+        public const string Dashboard = "Dashboard";
+        public const string ViewPatients = "ViewPatients";
+        public const string ViewAllWards = "ViewAllWards";
+        public const string RegisterAdmission = "RegisterAdmission";
+        public const string EditAdmission = "EditAdmission";
+        public const string AllocateBed = "AllocateBed";
+        public const string TransferPatient = "TransferPatient";
+        public const string RequestDischarge = "RequestDischarge";
+        public const string DischargePatient = "DischargePatient";
+        public const string ManageWards = "ManageWards";
+        public const string ManageRooms = "ManageRooms";
+        public const string ManageBeds = "ManageBeds";
+        public const string ProgressNotes = "ProgressNotes";
+        public const string ViewGynae = "ViewGynae";
+        public const string EnterGynae = "EnterGynae";
+        public const string ManageAnc = "ManageAnc";
+        public const string ManageLabour = "ManageLabour";
+        public const string LabourObservations = "LabourObservations";
+        public const string Partograph = "Partograph";
+        public const string EnterDelivery = "EnterDelivery";
+        public const string RegisterNewborn = "RegisterNewborn";
+        public const string LinkMotherBaby = "LinkMotherBaby";
+        public const string Postnatal = "Postnatal";
+        public const string ManageNicu = "ManageNicu";
+        public const string NicuObservations = "NicuObservations";
+        public const string ManageNursing = "ManageNursing";
+        public const string NursingNotes = "NursingNotes";
+        public const string Handover = "Handover";
+        public const string MedicationOrders = "MedicationOrders";
+        public const string RecordMedication = "RecordMedication";
+        public const string ViewInvestigations = "ViewInvestigations";
+        public const string CorrectRecords = "CorrectRecords";
+        public const string ViewFinancial = "ViewFinancial";
+        public const string ManageBilling = "ManageBilling";
+        public const string PrintForms = "PrintForms";
+        public const string ExportPdf = "ExportPdf";
+        public const string Settings = "Settings";
     }
 
     public static class RadiologyActions
@@ -597,6 +680,43 @@ public static class Perm
     public const string FinanceAdjustments = "Finance.Adjustments";
     public const string FinanceExport = "Finance.Export";
     public const string FinanceSettings = "Finance.Settings";
+    public const string IpdDashboard = "Ipd.Dashboard";
+    public const string IpdViewPatients = "Ipd.ViewPatients";
+    public const string IpdViewAllWards = "Ipd.ViewAllWards";
+    public const string IpdRegisterAdmission = "Ipd.RegisterAdmission";
+    public const string IpdEditAdmission = "Ipd.EditAdmission";
+    public const string IpdAllocateBed = "Ipd.AllocateBed";
+    public const string IpdTransferPatient = "Ipd.TransferPatient";
+    public const string IpdRequestDischarge = "Ipd.RequestDischarge";
+    public const string IpdDischargePatient = "Ipd.DischargePatient";
+    public const string IpdManageWards = "Ipd.ManageWards";
+    public const string IpdManageRooms = "Ipd.ManageRooms";
+    public const string IpdManageBeds = "Ipd.ManageBeds";
+    public const string IpdProgressNotes = "Ipd.ProgressNotes";
+    public const string IpdViewGynae = "Ipd.ViewGynae";
+    public const string IpdEnterGynae = "Ipd.EnterGynae";
+    public const string IpdManageAnc = "Ipd.ManageAnc";
+    public const string IpdManageLabour = "Ipd.ManageLabour";
+    public const string IpdLabourObservations = "Ipd.LabourObservations";
+    public const string IpdPartograph = "Ipd.Partograph";
+    public const string IpdEnterDelivery = "Ipd.EnterDelivery";
+    public const string IpdRegisterNewborn = "Ipd.RegisterNewborn";
+    public const string IpdLinkMotherBaby = "Ipd.LinkMotherBaby";
+    public const string IpdPostnatal = "Ipd.Postnatal";
+    public const string IpdManageNicu = "Ipd.ManageNicu";
+    public const string IpdNicuObservations = "Ipd.NicuObservations";
+    public const string IpdManageNursing = "Ipd.ManageNursing";
+    public const string IpdNursingNotes = "Ipd.NursingNotes";
+    public const string IpdHandover = "Ipd.Handover";
+    public const string IpdMedicationOrders = "Ipd.MedicationOrders";
+    public const string IpdRecordMedication = "Ipd.RecordMedication";
+    public const string IpdViewInvestigations = "Ipd.ViewInvestigations";
+    public const string IpdCorrectRecords = "Ipd.CorrectRecords";
+    public const string IpdViewFinancial = "Ipd.ViewFinancial";
+    public const string IpdManageBilling = "Ipd.ManageBilling";
+    public const string IpdPrintForms = "Ipd.PrintForms";
+    public const string IpdExportPdf = "Ipd.ExportPdf";
+    public const string IpdSettings = "Ipd.Settings";
     public const string RadDashboard = "Radiology.Dashboard";
     public const string RadViewXRay = "Radiology.ViewXRayWorklist";
     public const string RadViewUltrasound = "Radiology.ViewUltrasoundWorklist";

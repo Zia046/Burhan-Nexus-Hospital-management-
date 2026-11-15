@@ -510,6 +510,144 @@ try {
   const histHref = await page.getAttribute("a[href^='/Radiology/Patient/']", "href");
   await go(histHref);
   await shot(page, "p6-13-patient-radiology-history");
+
+  // ---- Phase 7: IPD, wards & beds, Gynae / ANC, Labour Room, delivery, NICU, nursing & MAR ----
+  for (const [room, code, type] of [["Male General Ward / Room 1", "MGW-01", "Standard"], ["Male General Ward / Room 1", "MGW-02", "Standard"],
+                                    ["Labour Room / Room 1", "LR-01", "Labour"], ["NICU / Room 1", "NICU-01", "Incubator"], ["NICU / Room 1", "NICU-02", "Cot"]]) {
+    await go("/Ipd/Wards");
+    await page.selectOption("#Bed_RoomId", { label: room });
+    await page.fill("#Bed_Code", code);
+    await page.selectOption("#Bed_Type", type);
+    await submit("button[data-test='save-bed']");
+  }
+  await shot(page, "p7-01-wards-rooms-beds");
+  await go("/Patients/Register");
+  await page.fill("[name='Patient.FullName']", "Ahmad Khan");
+  await page.selectOption("[name='Patient.Gender']", "Male");
+  await page.selectOption("[name='Patient.GuardianRelation']", "SonOf");
+  await page.fill("[name='Patient.GuardianName']", "Gul Khan");
+  await page.fill("[name='Patient.DateOfBirth']", "1978-02-10");
+  await page.fill("[name='Patient.MobileNumber']", "03339876543");
+  await page.fill("[name='Patient.Address']", "Mohallah Sethi, Ring Road");
+  await page.fill("[name='Patient.CityOrVillage']", "Peshawar");
+  await page.waitForTimeout(900);
+  await submit("button[value='profile']");
+  step("ipd patient: " + page.url());
+  const ahmadId = new URL(page.url()).pathname.split("/").pop();
+  await go(`/Ipd/Admit?patientId=${ahmadId}`);
+  await page.selectOption("select[data-bed-list]", { index: 1 });
+  await page.fill("#Input_AdmissionDiagnosis", "Fever with abdominal pain (as written by the doctor)");
+  await page.fill("#Input_Allergies", "Penicillin");
+  await page.fill("#Input_AttendantName", "Gul Khan");
+  await shot(page, "p7-02-admission-form");
+  await submit("button[data-test='ipd-admit-save']");
+  const admUrl = new URL(page.url()).pathname;
+  await shot(page, "p7-03-inpatient-chart");
+  await go(admUrl + "?tab=notes");
+  await page.click("[data-record-form='Vitals'] summary");
+  await page.fill("[data-record-form='Vitals'] [name='Record.Values[temp]']", "38.6");
+  await page.fill("[data-record-form='Vitals'] [name='Record.Values[pulse]']", "104");
+  await page.fill("[data-record-form='Vitals'] [name='Record.Values[bp_sys]']", "118");
+  await submit("button[data-test='save-Vitals']");
+  await page.click("[data-record-form='ProgressNote'] summary");
+  await page.fill("[data-record-form='ProgressNote'] [name='Record.Values[condition]']", "Febrile, conscious, tolerating orally");
+  await page.fill("[data-record-form='ProgressNote'] [name='Record.Values[plan]']", "Continue treatment as per consultant");
+  await submit("button[data-test='save-ProgressNote']");
+  await shot(page, "p7-04-progress-and-vitals");
+  await go(admUrl + "?tab=mar");
+  await page.click("[data-order-form] summary");
+  await page.selectOption("[name='Order.MedicineId']", paraId);
+  await page.fill("[name='Order.Dose']", "1 tab");
+  await page.fill("[name='Order.Route']", "Oral");
+  await page.fill("[name='Order.Frequency']", "TDS");
+  await page.fill("[name='Order.Times']", "08:00, 14:00, 20:00");
+  await page.fill("[name='Order.DurationDays']", "3");
+  await page.fill("[name='Order.Prescriber']", "Dr. Imran Ali");
+  await submit("button[data-test='save-order']");
+  await page.click("[data-dose] details summary");
+  for (const c of ["ConfirmPatient", "ConfirmMedicine", "ConfirmDose", "ConfirmRoute", "ConfirmTime"]) await page.check(`[data-dose] details[open] [name='Dose.${c}']`);
+  await shot(page, "p7-05-mar-record-dose");
+  await submit("[data-dose] details[open] button[data-test='save-dose']");
+  await shot(page, "p7-06-mar");
+  await go(admUrl + "?tab=nursing");
+  await page.click("[data-handovers] details summary");
+  await page.fill("[name='Handover.PatientCondition']", "Febrile at 14:00, otherwise stable");
+  await page.fill("[name='Handover.MedicationDue']", "20:00 Paracetamol");
+  await submit("button[data-test='save-handover']");
+  await shot(page, "p7-07-nursing-handover");
+  await go("/Ipd/Beds");
+  await shot(page, "p7-08-bed-map");
+
+  // Maternity: pregnancy → ANC → Labour Room → partograph → twins delivery → NICU.
+  const rukhsanaId = new URL(patientUrl).pathname.split("/").pop();
+  await go(`/Ipd/Gynae/Patient/${rukhsanaId}`);
+  const lmp = new Date(Date.now() - 268 * 86400000).toISOString().slice(0, 10);
+  await page.fill("[name='Preg.Lmp']", lmp);
+  await page.fill("[name='Preg.Gravida']", "3");
+  await page.fill("[name='Preg.Para']", "2");
+  await submit("button[data-test='save-pregnancy']");
+  await page.fill("[data-record-form='AncVisit'] [name='Record.Values[bp_sys]']", "112");
+  await page.fill("[data-record-form='AncVisit'] [name='Record.Values[bp_dia]']", "74");
+  await page.fill("[data-record-form='AncVisit'] [name='Record.Values[fhr]']", "142");
+  await page.fill("[data-record-form='AncVisit'] [name='Record.Values[fundal_height]']", "36");
+  await submit("button[data-test='save-AncVisit']");
+  await shot(page, "p7-09-pregnancy-anc-timeline");
+  await go(`/Ipd/Labour/Admit?patientId=${rukhsanaId}`);
+  await page.selectOption("select[data-bed-list]", { index: 1 });
+  await page.fill("[name='Labour.MembraneStatus']", "Intact");
+  await page.fill("[name='Labour.PresentingComplaints']", "Labour pains since morning");
+  await submit("button[data-test='labour-admit']");
+  const labourUrl = new URL(page.url()).pathname;
+  for (const [cx, fhr] of [["4", "140"], ["6", "138"], ["8", "136"]]) {
+    await go(labourUrl + "?tab=labour");
+    await page.click("[data-record-form='LabourObservation'] summary");
+    await page.fill("[data-record-form='LabourObservation'] [name='Record.Values[cervix]']", cx);
+    await page.fill("[data-record-form='LabourObservation'] [name='Record.Values[fhr]']", fhr);
+    await page.fill("[data-record-form='LabourObservation'] [name='Record.Values[contractions]']", "3");
+    await submit("button[data-test='save-LabourObservation']");
+  }
+  await shot(page, "p7-10-labour-room-observations");
+  await pdf(labourUrl.replace("/Ipd/Admission/", "/Print/Ipd/partograph/"), "sample-ipd-partograph-A4.pdf");
+  await go("/Ipd/Labour");
+  await shot(page, "p7-11-labour-room-dashboard");
+  await go(labourUrl.replace("/Ipd/Admission/", "/Ipd/Delivery/New/") + "?babies=2");
+  await page.selectOption("[name='Input.Babies[0].Sex']", "Female");
+  await page.fill("[name='Input.Babies[0].BirthWeightGrams']", "2700");
+  await page.fill("[name='Input.Babies[0].Apgar1']", "8");
+  await page.fill("[name='Input.Babies[0].Apgar5']", "9");
+  await page.selectOption("[name='Input.Babies[1].Sex']", "Male");
+  await page.fill("[name='Input.Babies[1].BirthWeightGrams']", "1850");
+  await page.fill("[name='Input.Babies[1].Apgar1']", "6");
+  await page.selectOption("[name='Input.Babies[1].Placement']", "Nicu");
+  await page.selectOption("[name='Input.Babies[1].NicuBedId']", { index: 1 });
+  await page.fill("[name='Input.Babies[1].NicuReason']", "Low birth weight (as assessed by the doctor)");
+  await shot(page, "p7-12-delivery-entry-twins");
+  await submit("button[data-test='save-delivery']");
+  await shot(page, "p7-13-delivery-record");
+  await pdf(new URL(page.url()).pathname.replace("/Ipd/Delivery/", "/Print/Ipd/delivery/"), "sample-ipd-delivery-record-A4.pdf");
+  await go("/Ipd/Nicu");
+  await shot(page, "p7-14-nicu-dashboard");
+  await go("/Ipd/Gynae");
+  await shot(page, "p7-15-gynae-anc");
+  await go("/Ipd/Nursing");
+  await shot(page, "p7-16-nursing-dashboard");
+
+  // Discharge of the general patient → discharge summary and final bill.
+  await go(admUrl + "?tab=discharge");
+  await page.selectOption("[name='Discharge.Type']", "Routine");
+  await page.fill("[name='Discharge.FinalDiagnosis']", "Enteric fever (as documented by the doctor)");
+  await page.fill("[name='Discharge.ConditionAtDischarge']", "Stable, afebrile");
+  await page.fill("[name='Discharge.TreatmentSummary']", "Treated as per the consultant's orders.");
+  await page.fill("[name='Discharge.FollowUp']", "OPD after one week with reports");
+  page.once("dialog", d => d.accept());
+  await submit("button[data-test='discharge']");
+  await shot(page, "p7-17-discharged");
+  await pdf(admUrl.replace("/Ipd/Admission/", "/Print/Ipd/discharge/"), "sample-ipd-discharge-summary-A4.pdf");
+  await pdf(admUrl.replace("/Ipd/Admission/", "/Print/Ipd/bill/"), "sample-ipd-final-bill-A4.pdf");
+  await pdf(admUrl.replace("/Ipd/Admission/", "/Print/Ipd/admission/"), "sample-ipd-admission-form-A4.pdf");
+  await pdf(admUrl.replace("/Ipd/Admission/", "/Print/Ipd/mar/"), "sample-ipd-mar-A4.pdf");
+  await go("/Ipd");
+  await shot(page, "p7-18-ipd-dashboard");
 } catch (e) {
   errors.push("SCRIPT FAILURE: " + (e && e.stack || e));
   try { await shot(page, "p2-zz-failure"); } catch {}

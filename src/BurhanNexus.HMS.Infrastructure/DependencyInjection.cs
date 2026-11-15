@@ -78,6 +78,10 @@ public static class DependencyInjection
         services.AddScoped<Radiology.IRadiologyCatalogService, Radiology.RadiologyCatalogService>();
         services.AddScoped<Radiology.IRadiologyService, Radiology.RadiologyWorkflowService>();
         services.AddScoped<Radiology.IRadiologyReportService, Radiology.RadiologyReportService>();
+        services.AddScoped<Ipd.IIpdSetupService, Ipd.IpdSetupService>();
+        services.AddScoped<Ipd.IIpdService, Ipd.IpdService>();
+        services.AddScoped<Ipd.IMaternityService, Ipd.MaternityService>();
+        services.AddScoped<Ipd.IIpdQueryService, Ipd.IpdQueryService>();
         return services;
     }
 
@@ -99,6 +103,7 @@ public static class DependencyInjection
         await Laboratory.LabCatalogService.SeedAsync(db, DateTime.UtcNow, ct);
         await Pharmacy.PharmacyCatalogService.SeedAsync(db, DateTime.UtcNow, ct);
         await Radiology.RadiologyCatalogService.SeedAsync(db, DateTime.UtcNow, ct);
+        await Ipd.IpdSetupService.SeedAsync(db, DateTime.UtcNow, ct);
         await Finance.FinanceSetupService.SeedAsync(db, DateTime.UtcNow, DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz)), ct);
         if (await db.HospitalConfigurations.AnyAsync(c => c.SetupCompleted, ct))
             await scope.ServiceProvider.GetRequiredService<ILicenseService>().EnsureInitializedAsync(ct);

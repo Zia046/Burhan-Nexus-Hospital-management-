@@ -1,0 +1,18 @@
+@model (IReadOnlyList<IpdBed> Beds, string Name, int? Selected, bool Required)
+<div class="field" data-bed-select>
+    <label>Bed @(Model.Required ? "*" : "(optional – can be allocated later)")</label>
+    <div class="inline-form wrap">
+        <select data-bed-filter="ward" aria-label="Filter by ward"><option value="">All wards</option>@foreach (var w in Model.Beds.Select(b => b.Ward!).DistinctBy(w => w.Id)) { <option value="@w.Id">@w.Name</option> }</select>
+        <select data-bed-filter="type" aria-label="Filter by bed type"><option value="">All bed types</option>@foreach (var t in Model.Beds.Select(b => b.Type).Distinct()) { <option value="@t">@t</option> }</select>
+    </div>
+    <select name="@Model.Name" data-bed-list aria-label="Bed">
+        <option value="">@(Model.Required ? "— select a bed —" : "— no bed yet —")</option>
+        @foreach (var g in Model.Beds.GroupBy(b => b.Ward!.Name))
+        {
+            <optgroup label="@g.Key">
+                @foreach (var b in g) { <option value="@b.Id" data-ward="@b.WardId" data-type="@b.Type" selected="@(Model.Selected == b.Id)">@b.Code · @b.Room!.Name · @b.Type@(b.Status == BedStatus.Reserved ? " (reserved)" : "")@(b.EquipmentId is null ? "" : " · " + b.EquipmentId)</option> }
+            </optgroup>
+        }
+    </select>
+    @if (Model.Beds.Count == 0) { <small class="text-warning">No free bed of this kind – free a bed (cleaning done) or add beds.</small> }
+</div>

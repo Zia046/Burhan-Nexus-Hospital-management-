@@ -51,6 +51,8 @@ public sealed class IssueInput
     public Guid IdempotencyKey { get; set; }
     public long PatientId { get; set; }
     public long? EncounterId { get; set; }
+    /// <summary>Phase 7: medicines for an inpatient admission (Government: an active admission is enough).</summary>
+    public long? IpdAdmissionId { get; set; }
     public string? Notes { get; set; }
     public string? DiscountReason { get; set; }
     public List<StockLineInput> Lines { get; set; } = new();
@@ -458,9 +460,14 @@ public sealed class PharmacyService : IPharmacyService
                     if (encounter is null || encounter.PatientId != patient.Id) errors.Add("The selected visit does not belong to this patient.");
                     else if (encounter.Type is not (EncounterType.Opd or EncounterType.Emergency)) errors.Add("Select an OPD or Emergency visit.");
                 }
-                if (!isPrivate)
+                if (input.IpdAdmissionId is long aid
+                    && !await _db.IpdAdmissions.AnyAsync(a => a.Id == aid && a.PatientId == patient.Id
+                        && (a.Status == AdmissionStatus.Registered || a.Status == AdmissionStatus.Admitted || a.Status == AdmissionStatus.UnderTreatment
+                            || a.Status == AdmissionStatus.Transferred || a.Status == AdmissionStatus.DischargeRequested), ct))
+                    errors.Add("The selected admission is not an active admission of this patient.");
+                if (!isPrivate && input.IpdAdmissionId is null)
                 {
-                    // Government: only for a registered OPD / Emergency visit, never for walk-ins.
+                    // Government: only for a registered OPD / Emergency visit (or an inpatient admission), never for walk-ins.
                     if (input.EncounterId is null) errors.Add("Select the patient's OPD or Emergency visit. Medicines are only issued against a registered visit.");
                     else if (encounter is not null && encounter.EncounterDate < today.AddDays(-settings.EncounterValidDays))
                         errors.Add($"Visit {encounter.EncounterNumber} of {encounter.EncounterDate:dd MMM yyyy} is older than {settings.EncounterValidDays} day(s). Register a new OPD / Emergency visit.");
@@ -475,7 +482,7 @@ public sealed class PharmacyService : IPharmacyService
                 var issue = new PatientMedicineIssue
                 {
                     Number = await NumberAsync(HmsDbContext.MedicineIssueSequence, "ISS", today, ct), IdempotencyKey = input.IdempotencyKey,
-                    Mode = isPrivate ? HospitalType.Private : HospitalType.Government, PatientId = patient.Id, EncounterId = encounter?.Id, LocationId = location.Id,
+                    Mode = isPrivate ? HospitalType.Private : HospitalType.Government, PatientId = patient.Id, EncounterId = encounter?.Id, LocationId = location.Id, IpdAdmissionId = input.IpdAdmissionId,
                     Notes = T(input.Notes, 500), BusinessDate = today, CreatedUtc = now, CreatedByUserId = _ctx.UserId, CreatedByUsername = _ctx.Username,
                     Workstation = T(_ctx.Workstation, 100)
                 };
@@ -508,6 +515,7 @@ public sealed class PharmacyService : IPharmacyService
                         var charge = await NewChargeAsync(svc, patient.Id, encounter?.Id, $"{i.MedicineName} × {i.Quantity}", gross, i.Discount ?? 0,
                             i.Discount > 0 ? T(input.DiscountReason, 200) : null, today, now, ct);
                         charge.PharmacyIssueId = issue.Id;
+                        charge.IpdAdmissionId = input.IpdAdmissionId;
                         _db.Charges.Add(charge);
                         await _db.SaveChangesAsync(ct);
                         i.ChargeId = charge.Id;
@@ -521,6 +529,7 @@ public sealed class PharmacyService : IPharmacyService
                     {
                         var charge = await NewChargeAsync(svc, patient.Id, encounter?.Id, svc.Name, fee, 0, null, today, now, ct);
                         charge.PharmacyIssueId = issue.Id;
+                        charge.IpdAdmissionId = input.IpdAdmissionId;
                         _db.Charges.Add(charge);
                     }
                 }

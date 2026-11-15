@@ -1,0 +1,50 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ipd.BedsModel
+@{ ViewData["Title"] = "Bed map"; var canSet = await PermCtx.HasAnyAsync(Perm.IpdManageBeds, Perm.IpdAllocateBed); }
+<partial name="_IpdNav" />
+<div class="toolbar">
+    <form method="get" class="filters"><select name="wardId" aria-label="Ward" data-autosubmit><option value="">All wards</option>@foreach (var w in Model.Wards) { <option value="@w.Id" selected="@(Model.WardId == w.Id)">@w.Name</option> }</select></form>
+    <div class="bed-legend"><span class="bed-dot st-available"></span> Available <span class="bed-dot st-occupied"></span> Occupied <span class="bed-dot st-reserved"></span> Reserved <span class="bed-dot st-cleaningrequired"></span> Cleaning <span class="bed-dot st-undermaintenance"></span> Maintenance / unavailable</div>
+</div>
+@foreach (var wg in Model.Beds.GroupBy(b => b.WardId))
+{
+    var w = wg.First().Ward!;
+    var wb = wg.ToList();
+    <div class="card" data-bedmap-ward="@w.Code">
+        <div class="card-header"><h2><svg class="icon"><use href="#i-hospital" /></svg> @w.Name</h2><span class="muted">@wb.Count(b => b.Status == BedStatus.Occupied) / @wb.Count occupied</span></div>
+        <div class="card-body">
+            @foreach (var r in wb.GroupBy(b => b.Room!.Name))
+            {
+                <h4 class="section-title">@r.Key</h4>
+                <div class="bed-grid">
+                    @foreach (var b in r)
+                    {
+                        var occ = b.CurrentAdmissionId is long aid && Model.Occupants.TryGetValue(aid, out var o) ? o : default;
+                        <div class="bed-tile st-@b.Status.ToString().ToLowerInvariant()" data-bed="@b.Code" data-bed-status="@b.Status">
+                            <div class="bed-code">@b.Code <small>@b.Type</small></div>
+                            @if (b.CurrentAdmissionId is long id2 && occ.Number is not null)
+                            {
+                                <a href="/Ipd/Admission/@id2"><strong>@occ.Patient</strong><small class="block">@occ.PatientNumber · @occ.Number</small></a>
+                                @if (Model.RoomingIn.TryGetValue(b.Id, out var babies)) { foreach (var baby in babies) { <small class="block">+ @baby (with mother)</small> } }
+                            }
+                            else
+                            {
+                                <span class="small">@b.Status@(b.StatusNote is null ? "" : " – " + b.StatusNote)</span>
+                                @if (canSet)
+                                {
+                                    <details class="inline-details"><summary class="btn btn-light btn-sm">Status</summary>
+                                        <form method="post" asp-page-handler="Status" asp-route-bedId="@b.Id" asp-route-wardId="@Model.WardId" class="stack-sm">
+                                            <select name="NewStatus" aria-label="Status">@foreach (var s in new[] { BedStatus.Available, BedStatus.Reserved, BedStatus.CleaningRequired, BedStatus.UnderMaintenance, BedStatus.TemporarilyUnavailable }) { <option value="@s" selected="@(b.Status == s)">@s</option> }</select>
+                                            <input name="Note" maxlength="200" placeholder="Note / reason" aria-label="Note" />
+                                            <button class="btn btn-primary btn-sm" type="submit" data-test="bed-status-@b.Code">Save</button></form></details>
+                                }
+                            }
+                            @if (b.EquipmentId is not null) { <small class="muted block">@b.EquipmentId</small> }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+@if (Model.Beds.Count == 0) { <div class="card"><div class="card-body empty">No beds yet. Add rooms and beds under <a href="/Ipd/Wards">Wards &amp; beds</a>.</div></div> }

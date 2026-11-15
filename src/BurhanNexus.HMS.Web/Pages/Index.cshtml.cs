@@ -74,12 +74,13 @@ public class IndexModel : HmsPageModel
             DoctorsToday = (await _appointments.StatsAsync(today, today)).Where(d => d.Total > 0).ToList();
         }
         AvailableModules = PermissionCatalog.Modules
-            .Where(m => m.IsAvailable && m.Key is "Patients" or "Opd" or "Emergency" or "Laboratory" or "Pharmacy" or "Radiology")
+            .Where(m => m.IsAvailable && m.Key is "Patients" or "Opd" or "Emergency" or "Laboratory" or "Pharmacy" or "Radiology" or "Ipd")
             .Where(m => m.Actions.Any(a => Perms.Contains(m.PermissionKey(a.Key))
                                            && (a.Key is "View" or "Add" or "Search" or "ViewOwnAccount"
                                                || (m.Key == "Laboratory" && a.Key is "Dashboard" or "Book" or "EnterResults" or "ViewResults")
                                                || (m.Key == "Pharmacy" && a.Key is "Dashboard" or "IssueToPatients" or "ViewCatalogue" or "RetailSales")
-                                               || (m.Key == "Radiology" && a.Key is "Dashboard" or "CreateBooking" or "ViewXRayWorklist" or "ViewUltrasoundWorklist" or "EnterReport" or "VerifyReport" or "ViewHistory"))))
+                                               || (m.Key == "Radiology" && a.Key is "Dashboard" or "CreateBooking" or "ViewXRayWorklist" or "ViewUltrasoundWorklist" or "EnterReport" or "VerifyReport" or "ViewHistory")
+                                               || (m.Key == "Ipd" && a.Key is "Dashboard" or "ViewPatients" or "RegisterAdmission" or "ViewGynae" or "ManageLabour" or "ManageNicu" or "ManageNursing" or "RecordMedication"))))
             .ToList();
 
         // Future modules: shown as "coming soon" only if the user has been given access to them.

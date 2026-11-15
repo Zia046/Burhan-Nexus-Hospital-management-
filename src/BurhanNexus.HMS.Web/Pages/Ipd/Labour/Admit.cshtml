@@ -1,0 +1,49 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ipd.Labour.AdmitModel
+@{ ViewData["Title"] = "Labour Room admission"; var p = Model.Patient; var i = Model.Input; var l = Model.Labour; }
+<partial name="_IpdNav" />
+<partial name="_ValidationSummary" />
+@if (p is null)
+{
+    @await Html.PartialAsync("_PatientPick", ("Labour Room admission – find the patient", Model.Q, Model.Matches, "/Ipd/Labour/Admit?patientId={0}", ""))
+}
+else
+{
+    <form method="post" class="grid-side" novalidate data-labour-admit>
+        <input type="hidden" name="PatientId" value="@p.Id" />
+        <input type="hidden" name="Input.IdempotencyKey" value="@i.IdempotencyKey" />
+        <input type="hidden" name="Input.Source" value="@i.Source" />
+        <input type="hidden" name="Input.SourceEncounterId" value="@i.SourceEncounterId" />
+        <input type="hidden" name="Input.DepartmentId" value="@i.DepartmentId" />
+        <div class="card">
+            <div class="card-header"><h2>Labour Room admission – @p.FullName <small class="muted">@p.PatientNumber</small></h2></div>
+            <div class="card-body">
+                @if (Model.Current is { } c) { <div class="alert alert-warning">Already admitted (@c.AdmissionNumber). <a href="/Ipd/Admission/@c.Id?tab=labour">Open the admission and use "Move to Labour Room"</a>.</div> }
+                <div class="field"><label>Pregnancy</label>
+                    @if (Model.ActivePregnancy is { } g) { <select name="Labour.PregnancyId"><option value="@g.Id" selected>@g.Number · EDD @(g.Edd is DateOnly e ? Fmt.Day(e) : "—") @(g.IsHighRisk ? "· HIGH RISK" : "")</option><option value="">Not linked</option></select> }
+                    else { <p class="small muted">No active pregnancy registered – <a bn-permission="@Perm.IpdManageAnc" href="/Ipd/Gynae/Patient/@p.Id">register it first</a>, or continue without.</p><input type="hidden" name="Labour.PregnancyId" value="" /> }
+                </div>
+                @await Html.PartialAsync("_BedSelect", (Model.Beds, "Input.BedId", i.BedId, true))
+                <div class="grid-3">
+                    <div class="field"><label>Gestational age</label><input name="Labour.GestationalAge" value="@l.GestationalAge" maxlength="20" /></div>
+                    <div class="field"><label>Onset of labour</label><input type="datetime-local" name="Labour.OnsetLocal" /></div>
+                    <div class="field"><label>Membrane status</label><input name="Labour.MembraneStatus" maxlength="100" /></div>
+                    <div class="field"><label>Admitting / responsible doctor</label><input name="Input.AdmittingDoctorName" maxlength="150" /></div>
+                    <div class="field"><label>Responsible staff</label><input name="Labour.ResponsibleStaff" maxlength="150" /></div>
+                    <div class="field"><label>Allergies</label><input name="Input.Allergies" maxlength="500" /></div>
+                </div>
+                <div class="grid-2">
+                    <div class="field"><label>Presenting complaints</label><textarea name="Labour.PresentingComplaints" rows="2" maxlength="1000"></textarea></div>
+                    <div class="field"><label>Clinical history</label><textarea name="Labour.ClinicalHistory" rows="2" maxlength="1000"></textarea></div>
+                </div>
+                <div class="grid-3">
+                    <div class="field"><label>Attendant</label><input name="Input.AttendantName" maxlength="150" /></div>
+                    <div class="field"><label>Relation</label><input name="Input.AttendantRelation" maxlength="50" /></div>
+                    <div class="field"><label>Phone</label><input name="Input.AttendantPhone" maxlength="30" /></div>
+                </div>
+            </div>
+            <div class="card-footer form-actions"><a class="btn btn-light" href="/Ipd/Labour/Admit">Change patient</a><button class="btn btn-primary btn-lg" type="submit" data-test="labour-admit" data-once>Admit to Labour Room</button></div>
+        </div>
+    </form>
+}
+@section Scripts { <script src="~/js/ipd.js" asp-append-version="true"></script> }

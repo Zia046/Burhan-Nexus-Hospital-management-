@@ -1,0 +1,60 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Ipd.Gynae.PatientModel
+@{ var p = Model.P; ViewData["Title"] = $"Gynae – {p.FullName}"; var action = $"/Ipd/Gynae/Patient/{p.Id}?handler=Record"; }
+<partial name="_IpdNav" />
+<partial name="_ValidationSummary" />
+<div class="card patient-banner"><div class="card-body banner-row">
+    <div class="patient-id-box sm"><small>Patient ID</small><strong>@p.PatientNumber</strong></div>
+    <div class="grow"><h2>@p.FullName <small class="muted">@Model.AgeText · @p.Gender</small></h2><div class="small">Husband / guardian: @(p.GuardianName ?? "—") · @(p.MobileNumber ?? "")</div></div>
+    <div class="banner-actions no-print">
+        <a bn-permission="@Perm.IpdRegisterAdmission" class="btn btn-light btn-sm" href="/Ipd/Admit?patientId=@p.Id&kind=gynae">Gynae admission</a>
+        <a bn-permission="@Perm.IpdManageLabour" class="btn btn-light btn-sm" href="/Ipd/Labour/Admit?patientId=@p.Id">Labour Room admission</a>
+        <a bn-permission="@Perm.IpdPrintForms" class="btn btn-light btn-sm" href="/Print/Ipd/gynae/@p.Id" target="_blank">Print Gynae record</a>
+    </div>
+</div></div>
+@if (p.Gender != Gender.Female) { <div class="alert alert-warning">This patient is not registered as female – pregnancy records cannot be created.</div> }
+<div class="grid-2">
+    <div class="card" data-pregnancy-list>
+        <div class="card-header"><h3>Pregnancies (each kept separately)</h3></div>
+        <table class="table table-compact"><tbody>
+        @foreach (var g in Model.Pregnancies)
+        {
+            <tr class="@(g.IsHighRisk ? "row-warn" : "")"><td><a href="/Ipd/Pregnancy/@g.Id">@g.Number</a></td><td>@g.Status</td><td>LMP @(g.Lmp is DateOnly l ? Fmt.Day(l) : "—") · EDD @(g.Edd is DateOnly e ? Fmt.Day(e) : "—")</td><td>@(g.IsHighRisk ? "⚑ High risk" : "")</td></tr>
+        }
+        @if (Model.Pregnancies.Count == 0) { <tr><td class="empty">No pregnancies recorded.</td></tr> }
+        </tbody></table>
+        @if (p.Gender == Gender.Female && Model.Pregnancies.All(g => g.Status != PregnancyStatus.Active))
+        {
+            <details bn-permission="@Perm.IpdManageAnc" class="card-body" open="@(Model.Pregnancies.Count == 0)"><summary>Register new pregnancy</summary>
+                <form method="post" asp-page-handler="Pregnancy" asp-route-id="@p.Id" novalidate data-pregnancy-form>
+                    <div class="grid-3">
+                        <div class="field"><label>LMP</label><input type="date" name="Preg.Lmp" /></div>
+                        <div class="field"><label>EDD (blank = LMP + 280 days)</label><input type="date" name="Preg.Edd" /></div>
+                        <div class="field"><label>Gravida</label><input type="number" min="0" name="Preg.Gravida" /></div>
+                        <div class="field"><label>Para</label><input type="number" min="0" name="Preg.Para" /></div>
+                        <div class="field"><label>Abortions</label><input type="number" min="0" name="Preg.Abortions" /></div>
+                        <div class="field"><label>Living children</label><input type="number" min="0" name="Preg.LivingChildren" /></div>
+                    </div>
+                    <div class="field"><label>Previous pregnancy complications</label><textarea name="Preg.PreviousComplications" rows="2" maxlength="1000"></textarea></div>
+                    <div class="grid-2">
+                        <div class="field"><label>Medical history</label><textarea name="Preg.MedicalHistory" rows="2" maxlength="2000"></textarea></div>
+                        <div class="field"><label>Risk factors</label><textarea name="Preg.RiskFactors" rows="2" maxlength="1000"></textarea></div>
+                    </div>
+                    <button class="btn btn-primary" type="submit" data-test="save-pregnancy">Register pregnancy</button>
+                </form>
+            </details>
+        }
+    </div>
+    <div class="card"><div class="card-header"><h3>Admissions</h3></div>
+        @await Html.PartialAsync("_AdmissionTable", (Model.Admissions, "No admissions."))
+    </div>
+</div>
+@foreach (var (kind, recs) in Model.Records)
+{
+    var original = Model.CorrectId is long cid ? recs.FirstOrDefault(r => r.Record.Id == cid) : null;
+    <section class="record-section" data-section="@kind">
+        <h2 class="section-title">@BurhanNexus.HMS.Web.Pages.Ipd.IpdPageModel.Title(kind)</h2>
+        <div bn-permission="@Perm.IpdEnterGynae">@await Html.PartialAsync("_RecordForm", (kind, Model.Fields[kind], action, original?.Record.Id, original, false))</div>
+        @await Html.PartialAsync("_RecordList", (kind, Model.Fields[kind], recs, (string?)$"/Ipd/Gynae/Patient/{p.Id}?x=1"))
+    </section>
+}

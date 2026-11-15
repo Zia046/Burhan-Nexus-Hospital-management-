@@ -31,6 +31,8 @@ public class BookModel : RadiologyPageModel
 
     [BindProperty(SupportsGet = true)] public long? PatientId { get; set; }
     [BindProperty(SupportsGet = true)] public long? EncounterId { get; set; }
+    /// <summary>Phase 7: examinations ordered for an inpatient admission.</summary>
+    [BindProperty(SupportsGet = true)] public long? AdmissionId { get; set; }
     [BindProperty(SupportsGet = true, Name = "q")] public string? Q { get; set; }
     [BindProperty] public RadiologyBookingInput Input { get; set; } = new();
     [BindProperty] public List<int> ServiceIds { get; set; } = new();
@@ -66,6 +68,8 @@ public class BookModel : RadiologyPageModel
         Services = (await Catalog.ServicesAsync(activeOnly: true)).Where(s => only is null || s.Service.Modality == only).ToList();
         Doctors = await _registration.DoctorsAsync(activeOnly: true);
         Departments = await _db.Departments.AsNoTracking().Where(d => d.IsActive).OrderBy(d => d.Name).ToListAsync();
+        if (AdmissionId is long aid && PatientId is null)
+            PatientId = await _db.IpdAdmissions.Where(a => a.Id == aid).Select(a => (long?)a.PatientId).FirstOrDefaultAsync();
         if (EncounterId is long eid && PatientId is null)
             PatientId = await _db.PatientEncounters.Where(e => e.Id == eid).Select(e => (long?)e.PatientId).FirstOrDefaultAsync();
         if (PatientId is long pid)
@@ -108,6 +112,7 @@ public class BookModel : RadiologyPageModel
         Input.PatientId = PatientId ?? 0;
         Input.EncounterId = long.TryParse(VisitChoice, out var visit) ? visit : null;
         Input.ServiceIds = ServiceIds;
+        Input.IpdAdmissionId = AdmissionId;
         Input.Discounts = Discounts.Where(d => d.Value != 0).ToDictionary(d => d.Key, d => d.Value);
         var today = await _clock.TodayAsync();
         var local = await _clock.LocalNowAsync();

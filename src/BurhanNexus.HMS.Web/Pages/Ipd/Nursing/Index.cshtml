@@ -1,0 +1,44 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ipd.Nursing.IndexModel
+@{ ViewData["Title"] = "Nursing"; var now = DateTime.UtcNow; string Pt(long id) => Model.ById.TryGetValue(id, out var r) ? $"{r.PatientName} · {r.Bed ?? "no bed"}" : id.ToString(); }
+<partial name="_IpdNav" />
+<form method="get" class="card card-body inline-form wrap no-print">
+    <label>Ward <select name="ward"><option value="">All my wards</option>@foreach (var w in Model.Wards) { <option value="@w.Id" selected="@(Model.WardId == w.Id)">@w.Name</option> }</select></label>
+    <button class="btn btn-light btn-sm" type="submit">Show</button>
+</form>
+<div class="stat-row">
+    <div class="stat-card"><small>Patients</small><strong>@Model.Patients.Count</strong></div>
+    <div class="stat-card"><small>Doses overdue</small><strong data-overdue>@Model.DueDoses.Count(d => d.ScheduledUtc < now)</strong></div>
+    <div class="stat-card"><small>Doses due (2 h)</small><strong>@Model.DueDoses.Count(d => d.ScheduledUtc >= now)</strong></div>
+    <div class="stat-card"><small>Tasks due</small><strong>@Model.Tasks.Count</strong></div>
+    <div class="stat-card"><small>Handovers to acknowledge</small><strong>@Model.Handovers.Count</strong></div>
+</div>
+<div class="grid-2">
+    <div class="card" data-due-doses><div class="card-header"><h3>Medication due / overdue</h3></div>
+        <table class="table table-compact"><tbody>
+        @foreach (var d in Model.DueDoses)
+        {
+            <tr class="@(d.ScheduledUtc < now ? "row-warn" : "")"><td>@Fmt.DateTimeText(d.ScheduledUtc)</td><td>@Pt(d.AdmissionId)</td><td>@d.Order!.MedicineName @d.Order.Dose @d.Order.Route</td><td>@d.Status</td>
+                <td><a class="btn btn-light btn-sm" href="/Ipd/Admission/@d.AdmissionId?tab=mar">MAR</a></td></tr>
+        }
+        @if (Model.DueDoses.Count == 0) { <tr><td class="empty">Nothing due.</td></tr> }
+        </tbody></table>
+    </div>
+    <div class="card" data-due-tasks><div class="card-header"><h3>Nursing tasks due</h3></div>
+        <table class="table table-compact"><tbody>
+        @foreach (var t in Model.Tasks) { <tr class="@(t.DueUtc < now ? "row-warn" : "")"><td>@Fmt.DateTimeText(t.DueUtc)</td><td>@Pt(t.AdmissionId)</td><td>@t.Type – @t.Description</td><td><a class="btn btn-light btn-sm" href="/Ipd/Admission/@t.AdmissionId?tab=nursing">Open</a></td></tr> }
+        @if (Model.Tasks.Count == 0) { <tr><td class="empty">No tasks due.</td></tr> }
+        </tbody></table>
+    </div>
+</div>
+@if (Model.Handovers.Count > 0)
+{
+    <div class="card" data-open-handovers><div class="card-header"><h3>Handovers waiting for the incoming nurse</h3></div>
+        <table class="table table-compact"><tbody>
+        @foreach (var h in Model.Handovers) { <tr><td>@Fmt.DateTimeText(h.CreatedUtc)</td><td>@Pt(h.AdmissionId)</td><td>@h.Shift by @h.OutgoingUsername</td><td><a class="btn btn-primary btn-sm" href="/Ipd/Admission/@h.AdmissionId?tab=nursing">Review &amp; acknowledge</a></td></tr> }
+        </tbody></table>
+    </div>
+}
+<div class="card"><div class="card-header"><h3>Patients</h3></div>
+    @await Html.PartialAsync("_AdmissionTable", (Model.Patients, "No patients in your wards."))
+</div>

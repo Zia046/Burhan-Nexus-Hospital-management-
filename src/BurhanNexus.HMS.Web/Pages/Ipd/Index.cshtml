@@ -1,0 +1,59 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ipd.IndexModel
+@{ ViewData["Title"] = "IPD dashboard"; var d = Model.Data; }
+<partial name="_IpdNav" />
+<div class="toolbar">
+    <form method="get" class="filters wrap">
+        <partial name="/Pages/Finance/_PeriodFilter.cshtml" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" />
+        <select name="departmentId" aria-label="Department"><option value="">All departments</option>@foreach (var x in Model.Departments) { <option value="@x.Id" selected="@(Model.DepartmentId == x.Id)">@x.Name</option> }</select>
+        <select name="wardId" aria-label="Ward"><option value="">All wards</option>@foreach (var w in Model.Wards) { <option value="@w.Id" selected="@(Model.WardId == w.Id)">@w.Name</option> }</select>
+        <select name="status" aria-label="Patient status">
+            <option value="active" selected="@(Model.Status is null or "active")">Currently admitted</option>
+            <option value="attention" selected="@(Model.Status == "attention")">Requiring attention</option>
+            <option value="discharge" selected="@(Model.Status == "discharge")">Awaiting discharge</option>
+            <option value="admitted" selected="@(Model.Status == "admitted")">Admitted in period</option>
+            <option value="discharged" selected="@(Model.Status == "discharged")">Discharged in period</option>
+        </select>
+        <button class="btn btn-light" type="submit">Show</button>
+    </form>
+    <div class="toolbar-actions"><a bn-permission="@Perm.IpdRegisterAdmission" class="btn btn-primary" href="/Ipd/Admit"><svg class="icon icon-sm"><use href="#i-plus" /></svg> Admit patient</a></div>
+</div>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-hospital" /></svg> Inpatients – @BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(d.From, d.To)</h2></div>
+    <div class="card-body">
+        <div class="kpi-grid lab-kpis" data-ipd-kpis>
+            <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-users" /></svg></div><div><span class="kpi-label">Admitted now</span><strong class="kpi-value" data-kpi="admitted">@d.Admitted</strong></div></div>
+            <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-hospital" /></svg></div><div><span class="kpi-label">Occupied beds</span><strong class="kpi-value" data-kpi="occupied">@d.Occupied</strong></div></div>
+            <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-check" /></svg></div><div><span class="kpi-label">Available beds</span><strong class="kpi-value" data-kpi="available">@d.Available</strong></div></div>
+            <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-lock" /></svg></div><div><span class="kpi-label">Reserved · cleaning · unavailable</span><strong class="kpi-value" data-kpi="other-beds">@d.Reserved · @d.Cleaning · @d.Unavailable</strong></div></div>
+            <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-plus" /></svg></div><div><span class="kpi-label">Admitted in period</span><strong class="kpi-value" data-kpi="admitted-period">@d.AdmittedInPeriod</strong></div></div>
+            <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-logout" /></svg></div><div><span class="kpi-label">Discharged in period</span><strong class="kpi-value" data-kpi="discharged">@d.DischargedInPeriod</strong></div></div>
+            <div class="kpi"><div class="kpi-icon red"><svg class="icon"><use href="#i-clock" /></svg></div><div><span class="kpi-label">Awaiting discharge</span><strong class="kpi-value" data-kpi="awaiting">@d.AwaitingDischarge</strong></div></div>
+            <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-refresh" /></svg></div><div><span class="kpi-label">Transferred in period</span><strong class="kpi-value" data-kpi="transferred">@d.TransferredInPeriod</strong></div></div>
+            <div class="kpi"><div class="kpi-icon red"><svg class="icon"><use href="#i-alert" /></svg></div><div><span class="kpi-label">Requiring attention</span><strong class="kpi-value" data-kpi="attention">@d.NeedsAttention</strong></div></div>
+            <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-stethoscope" /></svg></div><div><span class="kpi-label">Gynae · Labour Room · NICU</span><strong class="kpi-value" data-kpi="units">@d.Gynae · @d.Labour · @d.Nicu</strong></div></div>
+            @if (d.Billed is decimal b)
+            {
+                <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-wallet" /></svg></div><div><span class="kpi-label">IPD billed · collected</span><strong class="kpi-value" data-kpi="finance">@Fmt.Money(b) · @Fmt.Money(d.Collected ?? 0)</strong></div></div>
+            }
+        </div>
+    </div>
+</div>
+<div class="grid-side">
+    <div class="card">
+        <div class="card-header"><h3>Patients</h3><span class="pill pill-blue">@Model.Patients.Count</span></div>
+        @await Html.PartialAsync("_AdmissionTable", (Model.Patients, "No patients."))
+    </div>
+    <div class="card">
+        <div class="card-header"><h3>Ward-wise occupancy</h3><a class="btn btn-light btn-sm" href="/Ipd/Beds">Bed map</a></div>
+        <div class="table-wrap">
+            <table class="table table-compact" data-ward-occupancy>
+                <thead><tr><th>Ward</th><th class="num">Beds</th><th class="num">Occupied</th><th class="num">Free</th><th class="num">Other</th></tr></thead>
+                <tbody>
+                @foreach (var w in d.Wards) { <tr data-ward="@w.Ward"><td>@w.Ward</td><td class="num">@w.Beds</td><td class="num">@w.Occupied</td><td class="num">@w.Available</td><td class="num">@(w.Reserved + w.Cleaning + w.Unavailable)</td></tr> }
+                @if (d.Wards.Count == 0) { <tr><td colspan="5" class="empty">No beds configured yet – add them under Wards &amp; beds.</td></tr> }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

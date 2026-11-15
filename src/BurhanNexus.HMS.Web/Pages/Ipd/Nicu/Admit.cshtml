@@ -1,0 +1,41 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ipd.Nicu.AdmitModel
+@{ ViewData["Title"] = "NICU admission"; var p = Model.Patient; var i = Model.Input; }
+<partial name="_IpdNav" />
+<partial name="_ValidationSummary" />
+@if (p is null)
+{
+    @await Html.PartialAsync("_PatientPick", ("NICU admission – find the baby (or register a referred baby)", Model.Q, Model.Matches, "/Ipd/Nicu/Admit?patientId={0}", ""))
+}
+else
+{
+    <form method="post" class="card" novalidate data-nicu-admit>
+        <input type="hidden" name="PatientId" value="@p.Id" />
+        <input type="hidden" name="Input.IdempotencyKey" value="@i.IdempotencyKey" />
+        <input type="hidden" name="Input.NewbornRecordId" value="@i.NewbornRecordId" />
+        <div class="card-header"><h2>NICU admission – @p.FullName <small class="muted">@p.PatientNumber</small></h2></div>
+        <div class="card-body">
+            @if (Model.Birth is { } b) { <p>Born here @Fmt.DateTimeText(b.BirthUtc) · delivery @b.Delivery?.Number · baby @b.BirthOrder · @(b.BirthWeightGrams is int w ? $"{w} g" : "weight not recorded")</p> }
+            @if (Model.Current is { } c) { <div class="alert alert-info">Currently @c.Kind admission @c.AdmissionNumber – the baby will be transferred to the NICU cot.</div> }
+            <div class="grid-3">
+                <div class="field"><label>Source</label><select name="Input.Source">@foreach (var s in new[] { AdmissionSource.DeliveryRoom, AdmissionSource.LabourRoom, AdmissionSource.PostnatalWard, AdmissionSource.Emergency, AdmissionSource.Opd, AdmissionSource.ExternalReferral, AdmissionSource.Other }) { <option value="@s" selected="@(i.Source == s)">@s</option> }</select></div>
+                <div class="field"><label>Gestational age</label><input name="Input.GestationalAge" value="@i.GestationalAge" maxlength="20" /></div>
+                <div class="field"><label>Birth weight (g)</label><input type="number" min="0" name="Input.BirthWeightGrams" value="@i.BirthWeightGrams" /></div>
+                <div class="field"><label>Admission weight (g)</label><input type="number" min="0" name="Input.AdmissionWeightGrams" value="@i.AdmissionWeightGrams" /></div>
+                <div class="field"><label>Responsible clinician</label><input name="Input.ResponsibleClinician" value="@i.ResponsibleClinician" maxlength="150" /></div>
+                <div class="field"><label>Referral details</label><input name="Input.ReferralDetails" value="@i.ReferralDetails" maxlength="300" /></div>
+            </div>
+            <div class="field"><label>Cot / incubator / warmer *</label><select name="Input.BedId"><option value="0">— select —</option>@foreach (var cot in Model.Cots) { <option value="@cot.Id" selected="@(i.BedId == cot.Id)">@cot.Ward!.Name / @cot.Code · @cot.Type @cot.EquipmentId</option> }</select></div>
+            <div class="grid-2">
+                <div class="field"><label>Reason for admission *</label><textarea name="Input.Reason" rows="2" maxlength="500">@i.Reason</textarea></div>
+                <div class="field"><label>Clinical condition</label><textarea name="Input.ClinicalCondition" rows="2" maxlength="500">@i.ClinicalCondition</textarea></div>
+                <div class="field"><label>Birth history</label><textarea name="Input.BirthHistory" rows="2" maxlength="1000">@i.BirthHistory</textarea></div>
+            </div>
+            <div class="grid-2">
+                <div class="field"><label>Attendant (parent)</label><input name="Input.AttendantName" value="@i.AttendantName" maxlength="150" /></div>
+                <div class="field"><label>Phone</label><input name="Input.AttendantPhone" value="@i.AttendantPhone" maxlength="30" /></div>
+            </div>
+        </div>
+        <div class="card-footer form-actions"><a class="btn btn-light" href="/Ipd/Nicu/Admit">Change baby</a><button class="btn btn-primary btn-lg" type="submit" data-test="nicu-admit" data-once>Admit to NICU</button></div>
+    </form>
+}

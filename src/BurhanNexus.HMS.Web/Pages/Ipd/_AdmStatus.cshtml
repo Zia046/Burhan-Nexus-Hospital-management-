@@ -1,0 +1,11 @@
+@model AdmissionStatus
+@{
+    var cls = Model switch
+    {
+        AdmissionStatus.Registered or AdmissionStatus.DischargeRequested => "status-warn",
+        AdmissionStatus.Admitted or AdmissionStatus.UnderTreatment or AdmissionStatus.Transferred => "status-info",
+        AdmissionStatus.Discharged or AdmissionStatus.Referred => "status-ok",
+        _ => "status-bad",
+    };
+}
+<span class="status @cls" data-adm-status="@Model">@BurhanNexus.HMS.Infrastructure.Ipd.IpdService.Label(Model)</span>

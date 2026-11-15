@@ -41,6 +41,8 @@ public class CollectModel : HmsPageModel
     [BindProperty(SupportsGet = true)] public long? PharmacyIssueId { get; set; }
     /// <summary>Phase 6: coming from a radiology order – its open examination fees are pre-selected.</summary>
     [BindProperty(SupportsGet = true)] public long? RadiologyOrderId { get; set; }
+    /// <summary>Phase 7: coming from an IPD bill – the open charges of the admission are pre-selected.</summary>
+    [BindProperty(SupportsGet = true)] public long? IpdAdmissionId { get; set; }
     [BindProperty] public CollectInput Input { get; set; } = new();
     [BindProperty] public List<NewChargeLine> Lines { get; set; } = new();
     [BindProperty] public List<BalancePayment> Balances { get; set; } = new();

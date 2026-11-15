@@ -1,0 +1,34 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ipd.Labour.IndexModel
+@{ ViewData["Title"] = "Labour Room"; }
+<partial name="_IpdNav" />
+<div class="stat-row">
+    @foreach (var s in new[] { LabourStatus.Admitted, LabourStatus.UnderObservation, LabourStatus.EarlyLabour, LabourStatus.ActiveLabour })
+    { <div class="stat-card"><small>@MaternityService.Label(s)</small><strong data-labour-count="@s">@Model.Active.Count(l => l.Status == s)</strong></div> }
+    <div class="stat-card"><small>Labour beds free</small><strong>@Model.Beds.Count(b => b.Status == BedStatus.Available)</strong> <small>/ @Model.Beds.Count</small></div>
+</div>
+<div class="card" data-labour-list>
+    <div class="card-header"><h2>Women in the Labour Room</h2><a bn-permission="@Perm.IpdManageLabour" class="btn btn-primary btn-sm" href="/Ipd/Labour/Admit">Labour Room admission</a></div>
+    <div class="table-wrap">
+        <table class="table">
+            <thead><tr><th>Admission</th><th>Patient</th><th>Bed</th><th>Status</th><th>Gestation</th><th>Admitted</th><th>Last observation</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var l in Model.Active)
+            {
+                var a = l.Admission!;
+                <tr data-labour-row="@l.Id"><td class="mono">@a.AdmissionNumber</td><td><strong>@a.Patient!.FullName</strong> <small class="muted">@a.Patient.PatientNumber</small></td><td>@(a.CurrentBed?.Code ?? "—")</td>
+                    <td>@MaternityService.Label(l.Status)</td><td>@(l.GestationalAge ?? "—")</td><td>@Fmt.DateTimeText(a.AdmittedUtc)</td>
+                    <td>@(Model.LastObservation.TryGetValue(a.Id, out var lo) ? Fmt.DateTimeText(lo) : "none recorded")</td>
+                    <td class="actions"><a class="btn btn-light btn-sm" href="/Ipd/Admission/@a.Id?tab=labour">Open</a></td></tr>
+            }
+            @if (Model.Active.Count == 0) { <tr><td colspan="8" class="empty">No women in labour.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="card"><div class="card-header"><h2>Deliveries (last 3 days)</h2></div>
+    <table class="table table-compact"><thead><tr><th>Delivery</th><th>Mother</th><th>Time</th><th>Type</th><th>Babies</th></tr></thead><tbody>
+    @foreach (var d in Model.Recent) { <tr><td><a href="/Ipd/Delivery/@d.Id">@d.Number</a></td><td>@d.Mother!.FullName</td><td>@Fmt.DateTimeText(d.DeliveredUtc)</td><td>@MaternityService.Label(d.Type)</td><td>@d.BabyCount</td></tr> }
+    @if (Model.Recent.Count == 0) { <tr><td colspan="5" class="empty">No deliveries.</td></tr> }
+    </tbody></table>
+</div>
