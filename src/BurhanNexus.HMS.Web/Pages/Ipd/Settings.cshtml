@@ -1,0 +1,71 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ipd.SettingsModel
+@{ ViewData["Title"] = "IPD settings & clinical forms"; var i = Model.Input; var f = Model.Field; }
+<partial name="_IpdNav" />
+<partial name="_ValidationSummary" />
+<div class="grid-2">
+    <form method="post" class="card" novalidate data-ipd-settings>
+        <input type="hidden" name="RowVersion" value="@Model.RowVersion" />
+        <div class="card-header"><h3>IPD settings</h3></div>
+        <div class="card-body">
+            @if (Model.IsPrivate)
+            {
+                <div class="field"><label for="Input_AdmissionServiceItemId">Admission fee (Phase 3 service)</label><select id="Input_AdmissionServiceItemId" name="Input.AdmissionServiceItemId"><option value="">No admission fee</option>
+                    @foreach (var s in Model.Services) { <option value="@s.Item.Id" selected="@(i.AdmissionServiceItemId == s.Item.Id)">@s.Item.Name · @Fmt.Money(s.CurrentFee)</option> }</select></div>
+                <label class="check"><input type="checkbox" name="Input.RequireBillClearanceForDischarge" value="true" checked="@i.RequireBillClearanceForDischarge" /> Final bill must be cleared before discharge</label><input type="hidden" name="Input.RequireBillClearanceForDischarge" value="false" />
+            }
+            else { <p class="small muted">Government mode: services are recorded for statistics; no purchase, sale or profit information is shown.</p><input type="hidden" name="Input.AdmissionServiceItemId" value="@i.AdmissionServiceItemId" /> }
+            <label class="check"><input type="checkbox" name="Input.AllowDirectAdmission" value="true" checked="@i.AllowDirectAdmission" /> Allow direct admission (without an OPD / Emergency visit)</label><input type="hidden" name="Input.AllowDirectAdmission" value="false" />
+            <label class="check"><input type="checkbox" name="Input.RequireMarConfirmations" value="true" checked="@i.RequireMarConfirmations" /> Medication administration: require right patient / medicine / dose / route / time confirmation</label><input type="hidden" name="Input.RequireMarConfirmations" value="false" />
+            <h4 class="section-title">Printed forms</h4>
+            <label class="check"><input type="checkbox" name="Input.PrintHeader" value="true" checked="@i.PrintHeader" /> Print the hospital header (untick for pre-printed letterhead)</label><input type="hidden" name="Input.PrintHeader" value="false" />
+            <div class="grid-2">
+                <div class="field"><label for="Input_LetterheadTopMarginMm">Letterhead top margin (mm)</label><input id="Input_LetterheadTopMarginMm" type="number" min="0" max="120" name="Input.LetterheadTopMarginMm" value="@i.LetterheadTopMarginMm" /></div>
+                <div class="field"><label for="Input_FormFooter">Form footer</label><input id="Input_FormFooter" name="Input.FormFooter" value="@i.FormFooter" maxlength="300" /></div>
+            </div>
+        </div>
+        <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="save-ipd-settings">Save settings</button></div>
+    </form>
+    <form method="post" asp-page-handler="Field" asp-route-field="@Model.EditField" class="card" novalidate data-field-form>
+        <div class="card-header"><h3>@(Model.EditField is null ? "Add form field" : "Edit form field")</h3></div>
+        <div class="card-body">
+            <div class="grid-2">
+                <div class="field"><label for="Field_Kind">Form</label><select id="Field_Kind" name="Field.Kind">@foreach (var k in Enum.GetValues<RecordKind>()) { <option value="@k" selected="@(f.Kind == k)">@BurhanNexus.HMS.Web.Pages.Ipd.IpdPageModel.Title(k)</option> }</select></div>
+                <div class="field"><label for="Field_Key">Key (letters / digits)</label><input id="Field_Key" name="Field.Key" value="@f.Key" maxlength="40" readonly="@(Model.EditField is not null)" /></div>
+                <div class="field"><label for="Field_Label">Label</label><input id="Field_Label" name="Field.Label" value="@f.Label" maxlength="100" /></div>
+                <div class="field"><label for="Field_Section">Section</label><input id="Field_Section" name="Field.Section" value="@f.Section" maxlength="60" /></div>
+                <div class="field"><label for="Field_Type">Type</label><select id="Field_Type" name="Field.Type">@foreach (var t in Enum.GetValues<FieldType>()) { <option value="@t" selected="@(f.Type == t)">@t</option> }</select></div>
+                <div class="field"><label for="Field_Unit">Unit</label><input id="Field_Unit" name="Field.Unit" value="@f.Unit" maxlength="20" /></div>
+                <div class="field"><label for="Field_SortOrder">Sort order</label><input id="Field_SortOrder" type="number" name="Field.SortOrder" value="@f.SortOrder" /></div>
+            </div>
+            <div class="field"><label for="Field_Choices">Choices (separated by |)</label><input id="Field_Choices" name="Field.Choices" value="@f.Choices" maxlength="500" /></div>
+            <h4 class="section-title">Alert limits (optional – only from the hospital's approved protocol)</h4>
+            <div class="grid-3">
+                <div class="field"><label for="Field_AlertLow">Low</label><input id="Field_AlertLow" type="number" step="any" name="Field.AlertLow" value="@f.AlertLow" /></div>
+                <div class="field"><label for="Field_AlertHigh">High</label><input id="Field_AlertHigh" type="number" step="any" name="Field.AlertHigh" value="@f.AlertHigh" /></div>
+                <div class="field"><label for="Field_AlertSource">Protocol / approved by</label><input id="Field_AlertSource" name="Field.AlertSource" value="@f.AlertSource" maxlength="200" /></div>
+            </div>
+            <p class="small muted">No limits are built in. A value outside the limits is only highlighted (⚑) – the system never interprets it.</p>
+            <label class="check"><input type="checkbox" name="Field.IsRequired" value="true" checked="@f.IsRequired" /> Required</label><input type="hidden" name="Field.IsRequired" value="false" />
+            <label class="check"><input type="checkbox" name="Field.IsActive" value="true" checked="@f.IsActive" /> Active</label><input type="hidden" name="Field.IsActive" value="false" />
+        </div>
+        <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="save-field">Save field</button></div>
+    </form>
+</div>
+<div class="card" data-field-list>
+    <div class="card-header"><h3>Clinical form fields</h3>
+        <form method="get" class="inline-form"><select name="kind" aria-label="Form"><option value="">All forms</option>@foreach (var k in Enum.GetValues<RecordKind>()) { <option value="@k" selected="@(Model.Kind == k)">@BurhanNexus.HMS.Web.Pages.Ipd.IpdPageModel.Title(k)</option> }</select><button class="btn btn-light btn-sm" type="submit">Show</button></form></div>
+    <div class="table-wrap">
+        <table class="table table-compact">
+            <thead><tr><th>Form</th><th>Section</th><th>Label</th><th>Key</th><th>Type</th><th>Unit</th><th>Alert limits</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var x in Model.Fields)
+            {
+                <tr class="@(x.IsActive ? "" : "row-muted")"><td>@BurhanNexus.HMS.Web.Pages.Ipd.IpdPageModel.Title(x.Kind)</td><td>@x.Section</td><td>@x.Label @(x.IsRequired ? "*" : "")</td><td class="mono">@x.Key</td><td>@x.Type</td><td>@x.Unit</td>
+                    <td>@(x.AlertLow is null && x.AlertHigh is null ? "—" : $"{x.AlertLow}–{x.AlertHigh} ({x.AlertSource})")</td><td>@(x.IsActive ? "Active" : "Inactive")</td>
+                    <td class="actions"><a class="btn btn-light btn-sm" href="/Ipd/Settings?field=@x.Id&kind=@x.Kind">Edit</a></td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

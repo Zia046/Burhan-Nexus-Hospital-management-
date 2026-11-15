@@ -66,7 +66,8 @@ public class AdmitModel : IpdPageModel
         await LoadAsync();
         Input.IdempotencyKey = Guid.NewGuid();
         Input.Kind = IsGynae ? AdmissionKind.Gynae : AdmissionKind.General;
-        var v = Visits.FirstOrDefault(x => x.Id == EncounterId) ?? Visits.FirstOrDefault(x => x.EncounterDate >= (await Clock.TodayAsync()).AddDays(-1));
+        var since = (await Clock.TodayAsync()).AddDays(-1);
+        var v = Visits.FirstOrDefault(x => x.Id == EncounterId) ?? Visits.FirstOrDefault(x => x.EncounterDate >= since);
         if (v is not null)
         {
             Input.SourceEncounterId = v.Id;

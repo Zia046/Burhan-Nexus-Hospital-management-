@@ -1,0 +1,26 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ipd.Gynae.IndexModel
+@{ ViewData["Title"] = "Gynae & ANC"; }
+<partial name="_IpdNav" />
+@await Html.PartialAsync("_PatientPick", ("Find a patient (Gynae / ANC)", Model.Q, Model.Matches, "/Ipd/Gynae/Patient/{0}", ""))
+<div class="card" data-pregnancies>
+    <div class="card-header"><h2>Active pregnancies</h2>
+        <form method="get" class="inline-form"><label class="check"><input type="checkbox" name="risk" value="true" checked="@Model.HighRiskOnly" /> High-risk only</label><button class="btn btn-light btn-sm" type="submit">Filter</button></form></div>
+    <div class="table-wrap">
+        <table class="table table-compact">
+            <thead><tr><th>Pregnancy</th><th>Patient</th><th>LMP</th><th>EDD</th><th>Gestation today</th><th>G P A L</th><th>Risk</th></tr></thead>
+            <tbody>
+            @foreach (var p in Model.Pregnancies)
+            {
+                <tr class="@(p.IsHighRisk ? "row-warn" : "")" data-pregnancy="@p.Id"><td><a href="/Ipd/Pregnancy/@p.Id">@p.Number</a></td><td><a href="/Ipd/Gynae/Patient/@p.PatientId">@p.Patient!.FullName</a> <small class="muted">@p.Patient.PatientNumber</small></td>
+                    <td>@(p.Lmp is DateOnly l ? Fmt.Day(l) : "—")</td><td>@(p.Edd is DateOnly e ? Fmt.Day(e) : "—")</td><td>@(p.GestationOn(Model.Today) ?? "—")</td>
+                    <td>@p.Gravida @p.Para @p.Abortions @p.LivingChildren</td><td>@(p.IsHighRisk ? "⚑ High risk – " + p.HighRiskReason : "—")</td></tr>
+            }
+            @if (Model.Pregnancies.Count == 0) { <tr><td colspan="7" class="empty">No active pregnancies.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="card"><div class="card-header"><h2>Gynae inpatients</h2><a bn-permission="@Perm.IpdRegisterAdmission" class="btn btn-light btn-sm" href="/Ipd/Admit?kind=gynae">Gynae admission</a></div>
+    @await Html.PartialAsync("_AdmissionTable", (Model.Inpatients, "No Gynae inpatients."))
+</div>
