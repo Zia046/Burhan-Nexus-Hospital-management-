@@ -3,6 +3,14 @@
 @{
     ViewData["Title"] = "Pharmacy reports";
     var r = Model.Report!;
+    string Cell(object? v) => v switch
+    {
+        null => "",
+        DateOnly d => Fmt.Day(d),
+        decimal m => m.ToString("N2", System.Globalization.CultureInfo.InvariantCulture),
+        int i => i.ToString("N0", System.Globalization.CultureInfo.InvariantCulture),
+        _ => v.ToString() ?? ""
+    };
     var q = $"report={Model.Key}&period={Model.PresetKey}&from={Model.From:yyyy-MM-dd}&to={Model.To:yyyy-MM-dd}&locationId={Model.LocationId}&medicineId={Model.MedicineId}&categoryId={Model.CategoryId}&supplierId={Model.SupplierId}&batch={Uri.EscapeDataString(Model.Batch ?? "")}";
 }
 <partial name="_PharmNav" />
@@ -28,8 +36,8 @@
     @if (r.Note is not null) { <div class="card-body small muted">@r.Note</div> }
     <div class="table-wrap"><table class="table table-compact" data-report="@r.Key">
         <thead><tr>@foreach (var c in r.Columns) { <th>@c</th> }</tr></thead>
-        <tbody>@foreach (var row in r.Rows) { <tr>@foreach (var v in row) { <td class="@(v is decimal or int ? "num" : "")">@Model.Cell(v)</td> }</tr> }
+        <tbody>@foreach (var row in r.Rows) { <tr>@foreach (var v in row) { <td class="@(v is decimal or int ? "num" : "")">@Cell(v)</td> }</tr> }
         @if (r.Rows.Count == 0) { <tr><td colspan="@r.Columns.Count" class="empty">No data for this selection.</td></tr> }</tbody>
-        @if (r.Totals is not null && r.Rows.Count > 0) { <tfoot><tr>@foreach (var v in r.Totals) { <td class="@(v is decimal or int ? "num" : "")"><strong>@Model.Cell(v)</strong></td> }</tr></tfoot> }
+        @if (r.Totals is not null && r.Rows.Count > 0) { <tfoot><tr>@foreach (var v in r.Totals) { <td class="@(v is decimal or int ? "num" : "")"><strong>@Cell(v)</strong></td> }</tr></tfoot> }
     </table></div>
 </div>

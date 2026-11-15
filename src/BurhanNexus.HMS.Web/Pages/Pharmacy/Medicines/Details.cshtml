@@ -13,14 +13,14 @@
         <dl class="details-grid">
             <dt>Generic</dt><dd>@(m.GenericName ?? "—")</dd><dt>Brand</dt><dd>@(m.BrandName ?? "—")</dd>
             <dt>Manufacturer</dt><dd>@(m.Manufacturer?.Name ?? "—")</dd><dt>Category</dt><dd>@(m.Category?.Name ?? "—")</dd>
-            <dt>Pack</dt><dd>@(m.PackSize ?? "—") · @m.UnitsPerPack @m.Unit(s) per pack</dd><dt>Minimum stock</dt><dd>@m.MinimumStock @m.Unit(s)</dd>
+            <dt>Pack</dt><dd>@(m.PackSize ?? "—") · @m.UnitsPerPack @(m.Unit)(s) per pack</dd><dt>Minimum stock</dt><dd>@m.MinimumStock @(m.Unit)(s)</dd>
             <dt>Storage</dt><dd>@(m.StorageInstructions ?? "—")</dd>
             @if (Model.ShowPrices) { <dt>Purchase / sale price</dt><dd>@(m.PurchasePrice?.ToString("N2") ?? "—") / @(m.SalePrice is decimal sp ? Fmt.Money(sp) : "—") @(m.AllowDiscount ? $"· discount up to {m.MaxDiscountPercent:0.##} %" : "· no discount")</dd> }
         </dl>
     </div>
 </div>
 <div class="card">
-    <div class="card-header"><h3>Batches</h3><span class="pill">@Model.Batches.Where(b => b.Quantity > 0).Sum(b => b.Quantity) @m.Unit(s) in stock</span></div>
+    <div class="card-header"><h3>Batches</h3><span class="pill">@Model.Batches.Where(b => b.Quantity > 0).Sum(b => b.Quantity) @(m.Unit)(s) in stock</span></div>
     <div class="table-wrap"><table class="table table-compact" data-batches>
         <thead><tr><th>Batch</th><th>Expiry</th><th>Location</th><th class="num">Quantity</th><th>Supplier</th>@if (Model.ShowPrices) { <th class="num">Unit cost</th><th class="num">Sale price</th> }</tr></thead>
         <tbody>

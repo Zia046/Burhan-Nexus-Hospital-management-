@@ -86,15 +86,6 @@ public class ReportsModel : PharmacyPageModel
         return File(x.ToBytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", name + ".xlsx");
     }
 
-    public string Cell(object? v) => v switch
-    {
-        null => "",
-        DateOnly d => Fmt.Day(d),
-        decimal m => m.ToString("N2", CultureInfo.InvariantCulture),
-        int i => i.ToString("N0", CultureInfo.InvariantCulture),
-        _ => v.ToString() ?? ""
-    };
-
     private static string Csv(object? v)
     {
         var s = v switch { null => "", DateOnly d => d.ToString("yyyy-MM-dd"), IFormattable f => f.ToString(null, CultureInfo.InvariantCulture), _ => v.ToString() ?? "" };

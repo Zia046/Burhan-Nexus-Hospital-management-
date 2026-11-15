@@ -3,6 +3,7 @@ using BurhanNexus.HMS.Infrastructure.Persistence;
 using BurhanNexus.HMS.Infrastructure.Pharmacy;
 using BurhanNexus.HMS.Infrastructure.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace BurhanNexus.HMS.Web.Pages.Print;
 
