@@ -154,6 +154,45 @@ public static class DatabaseHardening
         END;
         $$;
 
+        CREATE OR REPLACE FUNCTION bnhms_operative_note_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF OLD."Status" = 'Final' THEN
+                RAISE EXCEPTION 'A finalized operation note cannot be changed – record an amendment.';
+            END IF;
+            IF NEW."SurgeryId" <> OLD."SurgeryId" OR NEW."Version" <> OLD."Version" THEN
+                RAISE EXCEPTION 'The surgery / version of an operation note cannot be changed.';
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+
+        CREATE OR REPLACE FUNCTION bnhms_surgery_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF NEW."Number" <> OLD."Number" OR NEW."PatientId" <> OLD."PatientId" THEN
+                RAISE EXCEPTION 'The surgery number and patient cannot be changed.';
+            END IF;
+            IF OLD."Status" IN ('Completed','Cancelled') AND NEW."Status" <> OLD."Status" THEN
+                RAISE EXCEPTION 'A completed or cancelled surgery cannot be reopened.';
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+
+        CREATE OR REPLACE FUNCTION bnhms_cssd_batch_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF OLD."Status" = 'Failed' AND NEW."Status" <> 'Failed' THEN
+                RAISE EXCEPTION 'A failed sterilization cycle can never be passed or released.';
+            END IF;
+            IF NEW."Status" = 'Released' AND OLD."Status" NOT IN ('Passed','Released') THEN
+                RAISE EXCEPTION 'Only a passed sterilization cycle can be released.';
+            END IF;
+            IF OLD."Status" = 'Released' AND NEW."Status" <> 'Released' THEN
+                RAISE EXCEPTION 'A released batch cannot change its result.';
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+
         DO $$
         DECLARE t text;
         BEGIN
@@ -161,6 +200,7 @@ public static class DatabaseHardening
                                        'LabItemEvents','LabResultRevisions','LabReportPrints',
                                        'RadiologyExamEvents','RadiologyReportRevisions','RadiologyReportPrints',
                                        'IpdBedStatusChanges','IpdTransfers','IpdEvents','ClinicalRecords','IpdBedCharges','DeliveryRecords',
+                                       'SurgeryEvents','OtDocuments','SurgeryChecklistEntries','SurgeryChecklistStages','OtDrugEntries','OtConsumptions','OtEquipmentLogs','SurgeryCharges','CssdBatchSets',
                                        'InventoryTransactions','SupplierLedger','SupplierPayments','MedicinePriceChanges','StockReceipts','StockReceiptItems',
                                        'StockTransfers','StockTransferItems','MedicineReturns','MedicineReturnItems','SupplierReturns','SupplierReturnItems'] LOOP
                 IF to_regclass(format('%I', t)) IS NOT NULL THEN
@@ -175,7 +215,9 @@ public static class DatabaseHardening
                                        'PharmacySaleItems','StockAdjustments','Suppliers','StockLocations',
                                        'RadiologyServices','RadiologyOrders','RadiologyExams','RadiologyAttachments',
                                        'IpdWards','IpdRooms','IpdBeds','IpdAdmissions','IpdBedAllocations','Pregnancies','LabourRecords','NewbornRecords',
-                                       'NicuDetails','NursingTasks','ShiftHandovers','MedicationOrders','MedicationDoses'] LOOP
+                                       'NicuDetails','NursingTasks','ShiftHandovers','MedicationOrders','MedicationDoses',
+                                       'OtTheatres','OtProcedures','Surgeries','SurgeryTeamMembers','OtConsentTypes','SurgeryConsents','OtChecklistItems',
+                                       'OperativeNotes','SurgerySpecimens','OtEquipment','RecoveryEpisodes','CssdInstruments','CssdSets','CssdBatches','CssdIssues'] LOOP
                 IF to_regclass(format('%I', t)) IS NOT NULL THEN
                     EXECUTE format('DROP TRIGGER IF EXISTS trg_%s_no_delete ON %I', lower(t), t);
                     EXECUTE format('CREATE TRIGGER trg_%s_no_delete BEFORE DELETE ON %I FOR EACH ROW EXECUTE FUNCTION bnhms_finance_immutable()', lower(t), t);
@@ -214,6 +256,14 @@ public static class DatabaseHardening
                 CREATE TRIGGER trg_medicationdoses_guard BEFORE UPDATE ON "MedicationDoses" FOR EACH ROW EXECUTE FUNCTION bnhms_mar_dose_guard();
                 DROP TRIGGER IF EXISTS trg_newbornrecords_guard ON "NewbornRecords";
                 CREATE TRIGGER trg_newbornrecords_guard BEFORE UPDATE ON "NewbornRecords" FOR EACH ROW EXECUTE FUNCTION bnhms_newborn_guard();
+            END IF;
+            IF to_regclass('"OperativeNotes"') IS NOT NULL THEN
+                DROP TRIGGER IF EXISTS trg_operativenotes_guard ON "OperativeNotes";
+                CREATE TRIGGER trg_operativenotes_guard BEFORE UPDATE ON "OperativeNotes" FOR EACH ROW EXECUTE FUNCTION bnhms_operative_note_guard();
+                DROP TRIGGER IF EXISTS trg_surgeries_guard ON "Surgeries";
+                CREATE TRIGGER trg_surgeries_guard BEFORE UPDATE ON "Surgeries" FOR EACH ROW EXECUTE FUNCTION bnhms_surgery_guard();
+                DROP TRIGGER IF EXISTS trg_cssdbatches_guard ON "CssdBatches";
+                CREATE TRIGGER trg_cssdbatches_guard BEFORE UPDATE ON "CssdBatches" FOR EACH ROW EXECUTE FUNCTION bnhms_cssd_batch_guard();
             END IF;
             IF to_regclass('"Charges"') IS NOT NULL THEN
                 DROP TRIGGER IF EXISTS trg_charges_guard ON "Charges";

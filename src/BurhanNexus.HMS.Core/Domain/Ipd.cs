@@ -214,6 +214,8 @@ public enum RecordKind
     LabourAssessment = 20, LabourObservation = 21,
     PostnatalAssessment = 30,
     NicuAssessment = 40, NicuObservation = 41, NicuFeeding = 42, NicuCare = 43, NicuProgress = 44,
+    // Phase 8 – operation theatre
+    PreOpAssessment = 50, AnesthesiaAssessment = 51, IntraOpMonitoring = 52, PacuObservation = 53, PostOpRecord = 54,
 }
 
 public enum FieldType { Number = 1, Text = 2, LongText = 3, Choice = 4, YesNo = 5 }
@@ -247,6 +249,8 @@ public class ClinicalRecord
     public long PatientId { get; set; }
     public long? AdmissionId { get; set; }
     public long? PregnancyId { get; set; }
+    /// <summary>Phase 8: the surgery this record belongs to (pre-op, anesthesia, monitoring, recovery, post-op).</summary>
+    public long? SurgeryId { get; set; }
     /// <summary>Clinical time of the observation / note (may differ from the entry time).</summary>
     public DateTime RecordedUtc { get; set; }
     public DateTime EnteredUtc { get; set; }

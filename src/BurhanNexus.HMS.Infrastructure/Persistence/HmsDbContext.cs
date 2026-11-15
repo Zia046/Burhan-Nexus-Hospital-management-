@@ -132,6 +132,33 @@ public class HmsDbContext : DbContext
     public DbSet<MedicationDose> MedicationDoses => Set<MedicationDose>();
     public DbSet<IpdBedCharge> IpdBedCharges => Set<IpdBedCharge>();
     public DbSet<IpdSettings> IpdSettings => Set<IpdSettings>();
+    // Phase 8 – operation theatre
+    public DbSet<OtTheatre> OtTheatres => Set<OtTheatre>();
+    public DbSet<OtProcedure> OtProcedures => Set<OtProcedure>();
+    public DbSet<Surgery> Surgeries => Set<Surgery>();
+    public DbSet<SurgeryTeamMember> SurgeryTeamMembers => Set<SurgeryTeamMember>();
+    public DbSet<SurgeryEvent> SurgeryEvents => Set<SurgeryEvent>();
+    public DbSet<OtConsentType> OtConsentTypes => Set<OtConsentType>();
+    public DbSet<SurgeryConsent> SurgeryConsents => Set<SurgeryConsent>();
+    public DbSet<OtDocument> OtDocuments => Set<OtDocument>();
+    public DbSet<OtChecklistItem> OtChecklistItems => Set<OtChecklistItem>();
+    public DbSet<SurgeryChecklistEntry> SurgeryChecklistEntries => Set<SurgeryChecklistEntry>();
+    public DbSet<SurgeryChecklistStage> SurgeryChecklistStages => Set<SurgeryChecklistStage>();
+    public DbSet<OtDrugEntry> OtDrugEntries => Set<OtDrugEntry>();
+    public DbSet<OperativeNote> OperativeNotes => Set<OperativeNote>();
+    public DbSet<SurgerySpecimen> SurgerySpecimens => Set<SurgerySpecimen>();
+    public DbSet<OtConsumption> OtConsumptions => Set<OtConsumption>();
+    public DbSet<OtEquipment> OtEquipment => Set<OtEquipment>();
+    public DbSet<OtEquipmentLog> OtEquipmentLogs => Set<OtEquipmentLog>();
+    public DbSet<RecoveryEpisode> RecoveryEpisodes => Set<RecoveryEpisode>();
+    public DbSet<CssdInstrument> CssdInstruments => Set<CssdInstrument>();
+    public DbSet<CssdSet> CssdSets => Set<CssdSet>();
+    public DbSet<CssdSetItem> CssdSetItems => Set<CssdSetItem>();
+    public DbSet<CssdBatch> CssdBatches => Set<CssdBatch>();
+    public DbSet<CssdBatchSet> CssdBatchSets => Set<CssdBatchSet>();
+    public DbSet<CssdIssue> CssdIssues => Set<CssdIssue>();
+    public DbSet<SurgeryCharge> SurgeryCharges => Set<SurgeryCharge>();
+    public DbSet<OtSettings> OtSettings => Set<OtSettings>();
 
     public const string PatientNumberSequence = "patient_number_seq";
     public const string OpdNumberSequence = "opd_number_seq";
@@ -159,6 +186,8 @@ public class HmsDbContext : DbContext
     public const string IpdAdmissionSequence = "ipd_admission_seq";
     public const string PregnancySequence = "pregnancy_seq";
     public const string DeliverySequence = "delivery_seq";
+    public const string SurgerySequence = "surgery_seq";
+    public const string CssdBatchSequence = "cssd_batch_seq";
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -168,7 +197,7 @@ public class HmsDbContext : DbContext
         b.HasSequence<long>(OpdNumberSequence).StartsAt(1).IncrementsBy(1);
         b.HasSequence<long>(EmergencyNumberSequence).StartsAt(1).IncrementsBy(1);
         foreach (var seq in new[] { MedicineCodeSequence, SupplierCodeSequence, StockReceiptSequence, MedicineIssueSequence, PharmacySaleSequence, StockTransferSequence,
-                                     StockAdjustmentSequence, MedicineReturnSequence, SupplierReturnSequence, SupplierPaymentSequence, RadiologyOrderSequence, RadiologyServiceCodeSequence, IpdAdmissionSequence, PregnancySequence, DeliverySequence, LabOrderNumberSequence, LabSampleNumberSequence, ReceiptNumberSequence, ChargeNumberSequence, RefundNumberSequence, DepositNumberSequence, SettlementNumberSequence, AdjustmentNumberSequence })
+                                     StockAdjustmentSequence, MedicineReturnSequence, SupplierReturnSequence, SupplierPaymentSequence, RadiologyOrderSequence, RadiologyServiceCodeSequence, IpdAdmissionSequence, PregnancySequence, DeliverySequence, SurgerySequence, CssdBatchSequence, LabOrderNumberSequence, LabSampleNumberSequence, ReceiptNumberSequence, ChargeNumberSequence, RefundNumberSequence, DepositNumberSequence, SettlementNumberSequence, AdjustmentNumberSequence })
             b.HasSequence<long>(seq).StartsAt(1).IncrementsBy(1);
 
         b.Entity<HospitalSettings>(e =>
@@ -434,6 +463,7 @@ public class HmsDbContext : DbContext
         ConfigurePharmacy(b);
         ConfigureRadiology(b);
         ConfigureIpd(b);
+        ConfigureOt(b);
         b.Entity<LabOrder>().HasOne<IpdAdmission>().WithMany().HasForeignKey(x => x.IpdAdmissionId).OnDelete(DeleteBehavior.Restrict);
         b.Entity<RadiologyOrder>().HasOne<IpdAdmission>().WithMany().HasForeignKey(x => x.IpdAdmissionId).OnDelete(DeleteBehavior.Restrict);
         b.Entity<PatientMedicineIssue>().HasOne<IpdAdmission>().WithMany().HasForeignKey(x => x.IpdAdmissionId).OnDelete(DeleteBehavior.Restrict);
@@ -971,6 +1001,228 @@ public class HmsDbContext : DbContext
             e.Property(x => x.RowVersion).IsRowVersion();
             e.HasOne<ServiceItem>().WithMany().HasForeignKey(x => x.AdmissionServiceItemId).OnDelete(DeleteBehavior.Restrict);
         });
+    }
+
+    private static void ConfigureOt(ModelBuilder b)
+    {
+        b.Entity<OtTheatre>(e =>
+        {
+            e.ToTable("OtTheatres", t => t.HasCheckConstraint("CK_OtTheatres_Cleaning", "\"CleaningMinutes\" BETWEEN 0 AND 480"));
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.Type).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.StockLocation).WithMany().HasForeignKey(x => x.StockLocationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ChargeServiceItem).WithMany().HasForeignKey(x => x.ChargeServiceItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<OtProcedure>(e =>
+        {
+            e.ToTable("OtProcedures", t => t.HasCheckConstraint("CK_OtProcedures_Duration", "\"DurationMinutes\" BETWEEN 5 AND 1440"));
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.DefaultOtType).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.Department).WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ServiceItem).WithMany().HasForeignKey(x => x.ServiceItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<Surgery>(e =>
+        {
+            e.ToTable("Surgeries", t => t.HasCheckConstraint("CK_Surgeries_Period", "\"PlannedEndUtc\" > \"PlannedStartUtc\" AND \"DurationMinutes\" > 0 AND \"CleaningMinutes\" >= 0"));
+            e.HasIndex(x => x.Number).IsUnique();
+            e.HasIndex(x => x.IdempotencyKey).IsUnique().HasDatabaseName("UX_Surgeries_Idempotency");
+            e.HasIndex(x => new { x.TheatreId, x.PlannedStartUtc });
+            e.HasIndex(x => new { x.PlannedDate, x.Status });
+            e.HasIndex(x => x.PatientId);
+            e.HasIndex(x => x.IpdAdmissionId);
+            foreach (var p in new[] { nameof(Surgery.Status), nameof(Surgery.Priority), nameof(Surgery.AnesthesiaType) })
+                e.Property(p).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.Ignore(x => x.HoldsSchedule);
+            e.HasOne(x => x.Patient).WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.IpdAdmission).WithMany().HasForeignKey(x => x.IpdAdmissionId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Department).WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Procedure).WithMany().HasForeignKey(x => x.ProcedureId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Theatre).WithMany().HasForeignKey(x => x.TheatreId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<SurgeryTeamMember>(e =>
+        {
+            e.ToTable("SurgeryTeamMembers", t => t.HasCheckConstraint("CK_SurgeryTeamMembers_Person", "\"DoctorId\" IS NOT NULL OR \"UserId\" IS NOT NULL"));
+            e.Property(x => x.Role).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasIndex(x => x.SurgeryId);
+            e.HasIndex(x => x.DoctorId);
+            e.HasIndex(x => x.UserId);
+            e.HasOne<Surgery>().WithMany().HasForeignKey(x => x.SurgeryId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Doctor).WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<SurgeryEvent>(e =>
+        {
+            e.ToTable("SurgeryEvents");
+            e.HasIndex(x => new { x.SurgeryId, x.CreatedUtc });
+            e.HasOne<Surgery>().WithMany().HasForeignKey(x => x.SurgeryId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<OtConsentType>(e => { e.ToTable("OtConsentTypes"); e.HasIndex(x => x.Name).IsUnique(); });
+        b.Entity<SurgeryConsent>(e =>
+        {
+            e.ToTable("SurgeryConsents");
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasIndex(x => x.SurgeryId);
+            e.HasOne<Surgery>().WithMany().HasForeignKey(x => x.SurgeryId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ConsentType).WithMany().HasForeignKey(x => x.ConsentTypeId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<OtDocument>(e =>
+        {
+            e.ToTable("OtDocuments");
+            e.HasIndex(x => x.SurgeryId);
+            e.HasIndex(x => x.StoredPath).IsUnique();
+            e.HasOne<Surgery>().WithMany().HasForeignKey(x => x.SurgeryId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<SurgeryConsent>().WithMany().HasForeignKey(x => x.ConsentId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<OtChecklistItem>(e =>
+        {
+            e.ToTable("OtChecklistItems");
+            e.Property(x => x.Stage).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => new { x.Stage, x.Label }).IsUnique();
+        });
+        b.Entity<SurgeryChecklistEntry>(e =>
+        {
+            e.ToTable("SurgeryChecklistEntries");
+            e.Property(x => x.Stage).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Answer).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => new { x.SurgeryId, x.ItemId, x.Id });
+            e.HasOne<Surgery>().WithMany().HasForeignKey(x => x.SurgeryId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<OtChecklistItem>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<SurgeryChecklistStage>(e =>
+        {
+            e.ToTable("SurgeryChecklistStages");
+            e.Property(x => x.Stage).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => new { x.SurgeryId, x.Stage }).IsUnique();
+            e.HasOne<Surgery>().WithMany().HasForeignKey(x => x.SurgeryId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<OtDrugEntry>(e =>
+        {
+            e.ToTable("OtDrugEntries");
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(10);
+            e.HasIndex(x => new { x.SurgeryId, x.GivenUtc });
+            e.HasOne<Surgery>().WithMany().HasForeignKey(x => x.SurgeryId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<OperativeNote>(e =>
+        {
+            e.ToTable("OperativeNotes");
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(10);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasIndex(x => new { x.SurgeryId, x.Version }).IsUnique();
+            e.HasIndex(x => x.SurgeryId).IsUnique().HasFilter("\"Status\" = 'Draft'").HasDatabaseName("UX_OperativeNotes_OneDraft");
+            e.HasIndex(x => x.AmendsNoteId).IsUnique().HasFilter("\"AmendsNoteId\" IS NOT NULL");
+            e.HasOne<Surgery>().WithMany().HasForeignKey(x => x.SurgeryId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<OperativeNote>().WithMany().HasForeignKey(x => x.AmendsNoteId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<SurgerySpecimen>(e =>
+        {
+            e.ToTable("SurgerySpecimens");
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasIndex(x => x.SurgeryId);
+            e.HasOne<Surgery>().WithMany().HasForeignKey(x => x.SurgeryId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Patient>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.LabOrder).WithMany().HasForeignKey(x => x.LabOrderId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<OtConsumption>(e =>
+        {
+            e.ToTable("OtConsumptions", t => t.HasCheckConstraint("CK_OtConsumptions_Quantity", "\"Quantity\" > 0"));
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(10);
+            e.HasIndex(x => x.SurgeryId);
+            e.HasIndex(x => x.ReturnOfId);
+            e.HasOne<Surgery>().WithMany().HasForeignKey(x => x.SurgeryId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Medicine).WithMany().HasForeignKey(x => x.MedicineId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<MedicineBatch>().WithMany().HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<StockLocation>().WithMany().HasForeignKey(x => x.LocationId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<OtConsumption>().WithMany().HasForeignKey(x => x.ReturnOfId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<OtEquipment>(e =>
+        {
+            e.ToTable("OtEquipment");
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.Theatre).WithMany().HasForeignKey(x => x.TheatreId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<OtEquipmentLog>(e =>
+        {
+            e.ToTable("OtEquipmentLogs");
+            e.HasIndex(x => x.EquipmentId);
+            e.HasOne<OtEquipment>().WithMany().HasForeignKey(x => x.EquipmentId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<RecoveryEpisode>(e =>
+        {
+            e.ToTable("RecoveryEpisodes");
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.Ignore(x => x.IsOpen);
+            e.HasIndex(x => x.SurgeryId).IsUnique();
+            e.HasIndex(x => x.Status);
+            e.HasOne(x => x.Surgery).WithMany().HasForeignKey(x => x.SurgeryId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<CssdInstrument>(e => { e.ToTable("CssdInstruments"); e.HasIndex(x => x.Code).IsUnique(); });
+        b.Entity<CssdSet>(e =>
+        {
+            e.ToTable("CssdSets");
+            e.HasIndex(x => x.Code).IsUnique();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasMany(x => x.Items).WithOne().HasForeignKey(x => x.SetId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<OtTheatre>().WithMany().HasForeignKey(x => x.TheatreId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<CssdSetItem>(e =>
+        {
+            e.ToTable("CssdSetItems", t => t.HasCheckConstraint("CK_CssdSetItems_Quantity", "\"Quantity\" > 0"));
+            e.HasIndex(x => new { x.SetId, x.InstrumentId }).IsUnique();
+            e.HasOne(x => x.Instrument).WithMany().HasForeignKey(x => x.InstrumentId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<CssdBatch>(e =>
+        {
+            e.ToTable("CssdBatches");
+            e.HasIndex(x => x.Number).IsUnique();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasMany(x => x.Sets).WithOne().HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<CssdBatchSet>(e =>
+        {
+            e.ToTable("CssdBatchSets");
+            e.HasIndex(x => new { x.BatchId, x.SetId }).IsUnique();
+            e.HasOne(x => x.Set).WithMany().HasForeignKey(x => x.SetId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<CssdIssue>(e =>
+        {
+            e.ToTable("CssdIssues");
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasIndex(x => x.SetId).IsUnique().HasFilter("\"ReturnedUtc\" IS NULL").HasDatabaseName("UX_CssdIssues_OpenSet");
+            e.HasIndex(x => x.SurgeryId);
+            e.HasOne(x => x.Set).WithMany().HasForeignKey(x => x.SetId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Surgery>().WithMany().HasForeignKey(x => x.SurgeryId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<CssdBatch>().WithMany().HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<SurgeryCharge>(e =>
+        {
+            e.ToTable("SurgeryCharges");
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(30);
+            e.HasIndex(x => new { x.SurgeryId, x.Kind }).IsUnique().HasFilter("\"Kind\" <> 'Other'").HasDatabaseName("UX_SurgeryCharges_Standard");
+            e.HasIndex(x => x.ChargeId).IsUnique();
+            e.HasOne<Surgery>().WithMany().HasForeignKey(x => x.SurgeryId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Charge).WithMany().HasForeignKey(x => x.ChargeId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<OtSettings>(e =>
+        {
+            e.ToTable("OtSettings", t => t.HasCheckConstraint("CK_OtSettings_Single", "\"Id\" = 1"));
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.RowVersion).IsRowVersion();
+        });
+        b.Entity<ClinicalRecord>().HasOne<Surgery>().WithMany().HasForeignKey(x => x.SurgeryId).OnDelete(DeleteBehavior.Restrict);
+        b.Entity<ClinicalRecord>().HasIndex(x => new { x.SurgeryId, x.Kind });
+        b.Entity<Charge>().HasOne<Surgery>().WithMany().HasForeignKey(x => x.SurgeryId).OnDelete(DeleteBehavior.Restrict);
+        b.Entity<Charge>().HasIndex(x => x.SurgeryId);
     }
 
     private static void ConfigureRadiology(ModelBuilder b)
