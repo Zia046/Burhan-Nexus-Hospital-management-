@@ -2,7 +2,20 @@ using System.ComponentModel.DataAnnotations;
 
 namespace BurhanNexus.HMS.Core.Domain;
 
+/// <summary>"Seen" is no longer used (removed from the workflow); old rows keep it and are shown as booked.</summary>
 public enum AppointmentStatus { Booked = 1, Seen = 2, Cancelled = 3 }
+
+/// <summary>How the consultation fee of an appointment was settled at booking (or later by a doctor's waiver).</summary>
+public enum AppointmentPayment
+{
+    /// <summary>Booked before fee collection at booking existed (fee may have been paid at the cashier).</summary>
+    NotRecorded = 0,
+    Paid = 1,
+    /// <summary>The doctor has no fee / the fee is zero.</summary>
+    Free = 2,
+    /// <summary>The doctor waived the fee (recorded by an authorised user with a reason).</summary>
+    FreeByDoctor = 3,
+}
 
 /// <summary>
 /// Private-hospital appointment with a doctor. Each appointment is linked 1:1 to the patient's OPD encounter
@@ -47,6 +60,30 @@ public class Appointment
     [MaxLength(500)] public string? CancelReason { get; set; }
 
     public DateTime? SeenUtc { get; set; }
+
+    // ---- consultation fee (collected at booking through the Phase 3 cashier system – the token slip is the proof) ----
+    /// <summary>Client key of the booking form: a double click returns the same appointment (and never collects twice).</summary>
+    public Guid? IdempotencyKey { get; set; }
+    public AppointmentPayment PaymentStatus { get; set; } = AppointmentPayment.NotRecorded;
+    public long? ChargeId { get; set; }
+    public long? ReceiptId { get; set; }
+    public Receipt? Receipt { get; set; }
+    public decimal? AmountPaid { get; set; }
+    [MaxLength(60)] public string? PaymentMethodName { get; set; }
+
+    // ---- "Free by Doctor" (fee waiver) ----
+    public int? WaiverDoctorId { get; set; }
+    [MaxLength(150)] public string? WaiverDoctorName { get; set; }
+    [MaxLength(300)] public string? WaiverReason { get; set; }
+    /// <summary>The consultation fee that was waived (the original fee is always kept in <see cref="ConsultationFee"/>).</summary>
+    public decimal? WaivedAmount { get; set; }
+    /// <summary>True when the fee had already been collected (a doctor-account adjustment was recorded).</summary>
+    public bool WaivedAfterPayment { get; set; }
+    /// <summary>Cash actually returned to the patient (a normal Phase 3 refund, linked here) – null when the money was not returned.</summary>
+    public long? WaiverRefundId { get; set; }
+    public DateTime? WaivedUtc { get; set; }
+    public int? WaivedByUserId { get; set; }
+    [MaxLength(64)] public string? WaivedByUsername { get; set; }
     public DateTime UpdatedUtc { get; set; }
     public uint RowVersion { get; set; }
 }

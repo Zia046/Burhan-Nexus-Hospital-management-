@@ -449,3 +449,19 @@
 
 // ---------------- Phase 5: selects that reload their form (location / report pickers) ----------------
 document.querySelectorAll("select[data-autosubmit]").forEach(s => s.addEventListener("change", () => s.form && s.form.submit()));
+
+// ---------------- Update 9: booking form – show the selected doctor's consultation fee ----------------
+(function () {
+  const box = document.querySelector("[data-fee-box]");
+  if (!box) return;
+  const out = box.querySelector("[data-fee-amount]");
+  const prefix = (out.dataset.currency || "Rs.") + " ";
+  const show = () => {
+    const r = document.querySelector("input[name='Input.DoctorId']:checked");
+    if (!r) { out.textContent = "—"; return; }
+    const fee = parseFloat(r.dataset.fee || "0");
+    out.textContent = fee > 0 ? prefix + fee.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "FREE (no fee)";
+  };
+  document.querySelectorAll("input[name='Input.DoctorId']").forEach(r => r.addEventListener("change", show));
+  show();
+})();

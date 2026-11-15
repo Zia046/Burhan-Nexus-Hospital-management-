@@ -36,6 +36,8 @@ public class ReportsModel : HmsPageModel
     public IReadOnlyList<DoctorAppointmentStats> Stats { get; private set; } = Array.Empty<DoctorAppointmentStats>();
     public IReadOnlyList<AppointmentDayCount> Daily { get; private set; } = Array.Empty<AppointmentDayCount>();
     public IReadOnlyList<AppointmentListItem> Cancelled { get; private set; } = Array.Empty<AppointmentListItem>();
+    public IReadOnlyList<WaiverRow> Waivers { get; private set; } = Array.Empty<WaiverRow>();
+    public bool ShowFees { get; private set; }
 
     public async Task OnGetAsync()
     {
@@ -67,6 +69,8 @@ public class ReportsModel : HmsPageModel
         Stats = (await _appointments.StatsAsync(From, To)).Where(s => DoctorId is null || s.DoctorId == DoctorId).ToList();
         Daily = (await _appointments.DailyCountsAsync(From, To)).Where(d => DoctorId is null || d.DoctorId == DoctorId).ToList();
         Cancelled = await _appointments.ListAsync(new AppointmentQuery { From = From, To = To, DoctorId = DoctorId, Status = "cancelled", PageSize = 1000 });
+        ShowFees = await CanAsync(Perm.AppointmentsFees) || await CanAsync(Perm.AppointmentsCollectFee) || await CanAsync(Perm.AppointmentsFreeByDoctor);
+        if (ShowFees) Waivers = await _appointments.WaiversAsync(From, To, DoctorId);
     }
 
     private static string DayTitle(DateOnly d) => d.ToString("dddd, dd MMM yyyy", CultureInfo.InvariantCulture);

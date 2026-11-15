@@ -254,6 +254,8 @@ public class Refund
     [MaxLength(64)] public string? DecidedByUsername { get; set; }
     [MaxLength(300)] public string? DecisionNote { get; set; }
     public DateOnly? BusinessDate { get; set; }
+    /// <summary>Cash returned because the doctor waived the fee: the doctor's share was already reduced by the fee-waiver entry (no second reversal).</summary>
+    public long? WaiverAppointmentId { get; set; }
     public uint RowVersion { get; set; }
 }
 
@@ -310,7 +312,9 @@ public class CashierLedgerEntry
     [MaxLength(64)] public string? CreatedByUsername { get; set; }
 }
 
-public enum DoctorEntryType { ConsultationShare = 1, ShareReversal = 2, Settlement = 3, Adjustment = 4 }
+public enum DoctorEntryType { ConsultationShare = 1, ShareReversal = 2, Settlement = 3, Adjustment = 4,
+    /// <summary>The doctor waived a consultation fee that had been collected ("Free by Doctor") – reduces the doctor's earnings; not a cash refund.</summary>
+    FeeWaiver = 5 }
 
 /// <summary>Doctor ledger. Positive = payable to the doctor; settlements are negative.</summary>
 public class DoctorLedgerEntry
@@ -327,6 +331,8 @@ public class DoctorLedgerEntry
     public long? RefundId { get; set; }
     public long? SettlementId { get; set; }
     public long? AdjustmentId { get; set; }
+    /// <summary>Fee-waiver entries: the appointment whose fee the doctor waived.</summary>
+    public long? AppointmentId { get; set; }
     [MaxLength(30)] public string Reference { get; set; } = string.Empty;
     [MaxLength(300)] public string? Description { get; set; }
     public DateOnly BusinessDate { get; set; }

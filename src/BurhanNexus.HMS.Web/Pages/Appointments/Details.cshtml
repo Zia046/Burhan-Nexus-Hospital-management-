@@ -6,7 +6,7 @@
     var prints = a.Encounter!.PrintedDocuments.Where(d => d.DocumentType == PrintedDocumentType.AppointmentSlip).OrderBy(d => d.PrintNumber).ToList();
     ViewData["Title"] = $"Appointment {a.Encounter.EncounterNumber}";
     var cancelled = a.Status == AppointmentStatus.Cancelled;
-    var canFee = await PermCtx.HasAsync(Perm.AppointmentsFees);
+    var canFee = await PermCtx.HasAnyAsync(Perm.AppointmentsFees, Perm.AppointmentsCollectFee, Perm.AppointmentsFreeByDoctor);
 }
 <div class="toolbar">
     <div>
@@ -17,7 +17,7 @@
         {
             <a bn-permission="@(prints.Count == 0 ? Perm.AppointmentsPrint : Perm.AppointmentsReprint)" class="btn btn-primary" href="/Print/Appointment/@a.Id" data-test="appt-print"><svg class="icon icon-sm"><use href="#i-printer" /></svg> @(prints.Count == 0 ? "Print slip" : "Reprint slip")</a>
         }
-        @if (!cancelled) { <a bn-permission="@Perm.FinanceCollect" class="btn btn-light" href="/Finance/Collect?encounterId=@a.EncounterId" data-test="appt-collect"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Collect fee</a> }
+        @if (!cancelled && a.PaymentStatus == AppointmentPayment.NotRecorded) { <a bn-permission="@Perm.FinanceCollect" class="btn btn-light" href="/Finance/Collect?encounterId=@a.EncounterId" data-test="appt-collect"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Collect fee</a> }
         <a bn-permission="@Perm.AppointmentsAdd" class="btn btn-light" href="/Appointments/Book">Next booking</a>
     </div>
 </div>
@@ -42,9 +42,11 @@
                     <dt>Patient</dt><dd><strong>@p.FullName</strong> (<span class="mono">@p.PatientNumber</span>) <a bn-permission="@Perm.PatientsView" href="/Patients/Profile/@p.Id">profile</a></dd>
                     <dt>Complaint</dt><dd>@(a.Complaint ?? "—")</dd>
                     <dt>Notes</dt><dd>@(a.Notes ?? "—")</dd>
-                    @if (canFee) { <dt>Consultation fee</dt><dd>@(a.ConsultationFee is decimal f ? Fmt.Money(f) : "—")</dd> }
+                    @if (canFee) { <dt>Consultation fee</dt><dd data-fee-status>@(a.ConsultationFee is decimal f ? Fmt.Money(f) : "—") <partial name="_PayStatus" model="a.PaymentStatus" />
+                        @if (a.PaymentStatus == AppointmentPayment.Paid) { <small class="block muted">@Fmt.Money(a.AmountPaid ?? 0) received · @a.PaymentMethodName@(a.Receipt is null ? "" : " · " + a.Receipt.ReceiptNumber) – the token slip is the receipt</small> }
+                        @if (a.PaymentStatus == AppointmentPayment.FreeByDoctor) { <small class="block" data-waiver>Waived by @a.WaiverDoctorName · @Fmt.Money(a.WaivedAmount ?? 0) · @a.WaiverReason · recorded by @a.WaivedByUsername @Fmt.DateTimeText(a.WaivedUtc)
+                            @(a.WaivedAfterPayment ? " · doctor's account adjusted" : " · fee was not collected")@(Model.WaiverRefund is { } wr ? $" · cash refund {wr.RefundNumber} ({wr.Status})" : a.WaivedAfterPayment ? " · no cash returned" : "")</small> }</dd> }
                     <dt>Booked</dt><dd>@Fmt.DateTimeText(a.BookedUtc) by @a.BookedByUsername @(a.Workstation is null ? "" : "· " + a.Workstation)</dd>
-                    @if (a.SeenUtc is not null) { <dt>Seen</dt><dd>@Fmt.DateTimeText(a.SeenUtc)</dd> }
                     @if (cancelled) { <dt>Cancelled</dt><dd class="text-danger">@Fmt.DateTimeText(a.CancelledUtc) by @a.CancelledByUsername – @a.CancelReason</dd> }
                 </dl>
             </div>
@@ -68,10 +70,21 @@
         }
     </div>
     <div class="stack">
-        @if (a.Status == AppointmentStatus.Booked)
+        @if (!cancelled && a.PaymentStatus is AppointmentPayment.Paid or AppointmentPayment.NotRecorded)
         {
-            <form bn-permission="@Perm.AppointmentsEdit" method="post" asp-page-handler="Seen" class="card">
-                <div class="card-body"><button class="btn btn-success btn-block" type="submit"><svg class="icon icon-sm"><use href="#i-check" /></svg> Mark as seen by doctor</button></div>
+            <form bn-permission="@Perm.AppointmentsFreeByDoctor" method="post" asp-page-handler="Free" asp-route-id="@a.Id" class="card" novalidate data-free-form>
+                <div class="card-header"><h3>Mark as Free by Doctor</h3></div>
+                <div class="card-body">
+                    <p class="small muted">Original fee @(a.ConsultationFee is decimal of ? Fmt.Money(of) : "—") is kept on record. @(a.PaymentStatus == AppointmentPayment.Paid ? "The fee was collected: the doctor's account gets a fee-waiver adjustment (not a cash refund)." : "")</p>
+                    <div class="field"><label for="Waiver_WaiverDoctorId">Waived by doctor</label><select id="Waiver_WaiverDoctorId" name="Waiver.WaiverDoctorId">@foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(d.Id == a.DoctorId)">@d.Name</option> }</select></div>
+                    <div class="field"><label for="Waiver_Reason">Reason <em>*</em></label><input id="Waiver_Reason" name="Waiver.Reason" maxlength="300" /></div>
+                    @if (a.PaymentStatus == AppointmentPayment.Paid)
+                    {
+                        <label class="check"><input type="checkbox" name="Waiver.CashReturned" value="true" /> The money is actually returned to the patient (records a cash refund)</label>
+                        <div class="field"><label for="Waiver_RefundMethodId">Refund method</label><select id="Waiver_RefundMethodId" name="Waiver.RefundMethodId">@foreach (var m in Model.Methods) { <option value="@m.Id">@m.Name</option> }</select></div>
+                    }
+                </div>
+                <div class="card-footer"><button class="btn btn-light" type="submit" data-test="appt-free">Record Free by Doctor</button></div>
             </form>
         }
         @if (!cancelled)

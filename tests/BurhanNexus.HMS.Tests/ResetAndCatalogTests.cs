@@ -28,7 +28,7 @@ public class ResetAndCatalogTests : HmsTestBase
         // Phase 5: Pharmacy became a real module.
         var pharm = PermissionCatalog.FindModule("Pharmacy")!;
         Assert.True(pharm.IsAvailable);
-        Assert.Equal(25, pharm.Actions.Count);
+        Assert.Equal(26, pharm.Actions.Count); // update 9: ward medicine requests
         Assert.Contains(Perm.PharmApproveAdjustments, PermissionCatalog.AllKeys);
         // Phase 6: X-Ray and Ultrasound became one real Radiology module.
         var rad = PermissionCatalog.FindModule("Radiology")!;
@@ -39,7 +39,7 @@ public class ResetAndCatalogTests : HmsTestBase
         // Phase 7: IPD, maternity and NICU.
         var ipd = PermissionCatalog.FindModule("Ipd")!;
         Assert.True(ipd.IsAvailable);
-        Assert.Equal(37, ipd.Actions.Count);
+        Assert.Equal(38, ipd.Actions.Count); // update 9: nursing medicine demand
         // Phase 8: Operation Theatre (the Minor OT stays a pharmacy department location – no module of its own).
         var ot = PermissionCatalog.FindModule("Ot")!;
         Assert.True(ot.IsAvailable);

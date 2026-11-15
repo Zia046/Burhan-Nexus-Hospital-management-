@@ -195,6 +195,7 @@ public static class PermissionCatalog
                 new(PharmacyActions.ReceiveStock, "Receive Stock", "Record stock receiving (batch, expiry, quantity)"),
                 new(PharmacyActions.ManagePurchases, "Manage Purchases", "Private: purchase prices, invoices, supplier balances and payments"),
                 new(PharmacyActions.IssueToPatients, "Issue Medicine to Patients", "Issue medicines to registered OPD / Emergency patients"),
+                new(PharmacyActions.ProcessWardRequests, "Process Ward Medicine Requests", "View nurses' medicine demands, approve, issue (fully / partly), reject or mark unavailable"),
                 new(PharmacyActions.RetailSales, "Manage Retail Sales", "Private: walk-in medicine sales with receipt"),
                 new(PharmacyActions.ApplyDiscount, "Apply Discount", "Private: discounts on sales / issues within the medicine's limit"),
                 new(PharmacyActions.SelectBatch, "Select Another Batch (FEFO override)", "Issue / sell / transfer a batch other than the earliest-expiring one"),
@@ -217,9 +218,11 @@ public static class PermissionCatalog
             {
                 new(Actions.View, "View Appointments", "Doctor-wise appointment lists and details"),
                 new(Actions.Add, "Create Appointment", "Book appointments (assigns the doctor token)"),
-                new(Actions.Edit, "Edit Appointment", "Change time, complaint, notes; mark as seen"),
+                new(Actions.Edit, "Edit Appointment", "Change time, complaint and notes"),
                 new(Actions.Cancel, "Cancel Appointment", "Cancel appointments (token is never reused)"),
                 new(Actions.Print, "Print Appointment Slip", "Print the first copy of the thermal slip"),
+                new(AppointmentActions.CollectFee, "Collect Consultation Fee", "Record the consultation fee as paid while booking (the token slip is the payment proof)"),
+                new(AppointmentActions.FreeByDoctor, "Mark as Free by Doctor", "Record a doctor's consultation-fee waiver (reason, authorising doctor)"),
                 new(AppointmentActions.Reprint, "Reprint Appointment Slip", "Print further copies (same token)"),
                 new(AppointmentActions.Reports, "Doctor-Wise Appointment Reports", "Daily, monthly and yearly statistics per doctor"),
                 new(AppointmentActions.PrinterSettings, "Manage Printer Settings", "Thermal printer settings for workstations"),
@@ -264,6 +267,7 @@ public static class PermissionCatalog
                 new(IpdActions.Handover, "Manage Shift Handover", "Write and acknowledge shift handovers"),
                 new(IpdActions.MedicationOrders, "Enter Medication Orders", "Record medication orders (also from handwritten prescriptions)"),
                 new(IpdActions.RecordMedication, "Record Medication Administration", "Record administered / missed / withheld doses"),
+                new(IpdActions.RequestMedicines, "Request Medicines from Pharmacy", "Nursing medicine demand for admitted patients of the ward"),
                 new(IpdActions.ViewInvestigations, "View Investigation Results", "Laboratory and radiology orders / results of the admission"),
                 new(IpdActions.CorrectRecords, "Correct Clinical Records", "Enter corrections of clinical records (the original is kept)"),
                 new(IpdActions.ViewFinancial, "View Patient Financial Details", "Charges, payments and balance of an admission"),
@@ -466,6 +470,7 @@ public static class PermissionCatalog
         public const string Handover = "Handover";
         public const string MedicationOrders = "MedicationOrders";
         public const string RecordMedication = "RecordMedication";
+        public const string RequestMedicines = "RequestMedicines";
         public const string ViewInvestigations = "ViewInvestigations";
         public const string CorrectRecords = "CorrectRecords";
         public const string ViewFinancial = "ViewFinancial";
@@ -517,6 +522,7 @@ public static class PermissionCatalog
         public const string ReceiveStock = "ReceiveStock";
         public const string ManagePurchases = "ManagePurchases";
         public const string IssueToPatients = "IssueToPatients";
+        public const string ProcessWardRequests = "ProcessWardRequests";
         public const string RetailSales = "RetailSales";
         public const string ApplyDiscount = "ApplyDiscount";
         public const string SelectBatch = "SelectBatch";
@@ -597,6 +603,8 @@ public static class PermissionCatalog
         public const string Reprint = "Reprint";
         public const string Reports = "Reports";
         public const string PrinterSettings = "PrinterSettings";
+        public const string CollectFee = "CollectFee";
+        public const string FreeByDoctor = "FreeByDoctor";
     }
 
     public static class PatientActions
@@ -714,6 +722,8 @@ public static class Perm
     public const string AppointmentsPrint = "Appointments.Print";
     public const string AppointmentsReprint = "Appointments.Reprint";
     public const string AppointmentsReports = "Appointments.Reports";
+    public const string AppointmentsCollectFee = "Appointments.CollectFee";
+    public const string AppointmentsFreeByDoctor = "Appointments.FreeByDoctor";
     public const string PrinterSettings = "Appointments.PrinterSettings";
     public const string AppointmentsFees = "Appointments.FinancialAccess";
     public const string AppointmentsSettings = "Appointments.SettingsAccess";
@@ -771,6 +781,7 @@ public static class Perm
     public const string IpdHandover = "Ipd.Handover";
     public const string IpdMedicationOrders = "Ipd.MedicationOrders";
     public const string IpdRecordMedication = "Ipd.RecordMedication";
+    public const string IpdRequestMedicines = "Ipd.RequestMedicines";
     public const string IpdViewInvestigations = "Ipd.ViewInvestigations";
     public const string IpdCorrectRecords = "Ipd.CorrectRecords";
     public const string IpdViewFinancial = "Ipd.ViewFinancial";
@@ -866,6 +877,7 @@ public static class Perm
     public const string PharmReceiveStock = "Pharmacy.ReceiveStock";
     public const string PharmManagePurchases = "Pharmacy.ManagePurchases";
     public const string PharmIssueToPatients = "Pharmacy.IssueToPatients";
+    public const string PharmProcessWardRequests = "Pharmacy.ProcessWardRequests";
     public const string PharmRetailSales = "Pharmacy.RetailSales";
     public const string PharmApplyDiscount = "Pharmacy.ApplyDiscount";
     public const string PharmSelectBatch = "Pharmacy.SelectBatch";

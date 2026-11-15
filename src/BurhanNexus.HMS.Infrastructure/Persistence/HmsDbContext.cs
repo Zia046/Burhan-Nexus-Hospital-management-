@@ -446,6 +446,14 @@ public class HmsDbContext : DbContext
             e.HasOne(x => x.Doctor).WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Encounter).WithOne().HasForeignKey<Appointment>(x => x.EncounterId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.ServiceItem).WithMany().HasForeignKey(x => x.ServiceItemId).OnDelete(DeleteBehavior.Restrict);
+            // Update 9: consultation fee at booking + "Free by Doctor".
+            e.Property(x => x.PaymentStatus).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.AmountPaid).HasPrecision(12, 2);
+            e.Property(x => x.WaivedAmount).HasPrecision(12, 2);
+            e.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL").HasDatabaseName("UX_Appointments_Idempotency");
+            e.HasIndex(x => new { x.PaymentStatus, x.AppointmentDate });
+            e.HasIndex(x => x.ReceiptId);
+            e.HasOne(x => x.Receipt).WithMany().HasForeignKey(x => x.ReceiptId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<PrinterProfile>(e =>
@@ -590,6 +598,7 @@ public class HmsDbContext : DbContext
         });
         b.Entity<Refund>(e =>
         {
+            e.HasIndex(x => x.WaiverAppointmentId).IsUnique().HasFilter("\"WaiverAppointmentId\" IS NOT NULL AND \"Status\" <> 'Rejected'").HasDatabaseName("UX_Refunds_WaiverAppointment");
             e.ToTable("Refunds", t => t.HasCheckConstraint("CK_Refunds_Positive", "\"Amount\" > 0"));
             Money(e);
             e.HasIndex(x => x.RefundNumber).IsUnique();
@@ -638,6 +647,8 @@ public class HmsDbContext : DbContext
             e.HasOne<Refund>().WithMany().HasForeignKey(x => x.RefundId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<DoctorSettlement>().WithMany().HasForeignKey(x => x.SettlementId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<FinancialAdjustment>().WithMany().HasForeignKey(x => x.AdjustmentId).OnDelete(DeleteBehavior.Restrict);
+            // A doctor's fee waiver is recorded at most once per appointment (no duplicate adjustments).
+            e.HasIndex(x => x.AppointmentId).IsUnique().HasFilter("\"AppointmentId\" IS NOT NULL AND \"EntryType\" = 'FeeWaiver'").HasDatabaseName("UX_DoctorLedger_FeeWaiver");
         });
         b.Entity<DoctorSettlement>(e =>
         {

@@ -58,6 +58,9 @@ public class FormModel : IpdPageModel
     [BindProperty(SupportsGet = true)] public string Form { get; set; } = "";
     [BindProperty(SupportsGet = true)] public long Id { get; set; }
     [BindProperty(SupportsGet = true, Name = "date")] public DateOnly? Date { get; set; }
+    /// <summary>Discharge slip: the doctor's printed name is optional (the stored record keeps it). ?name=0 hides it.</summary>
+    [BindProperty(SupportsGet = true, Name = "name")] public string? NameMode { get; set; }
+    public bool ShowDoctorName => NameMode != "0";
 
     public string Title => Forms.TryGetValue(Form, out var t) ? t : Form;
     public HospitalProfile Hospital { get; private set; } = null!;

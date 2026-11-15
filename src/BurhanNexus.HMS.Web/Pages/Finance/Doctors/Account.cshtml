@@ -18,10 +18,11 @@
             <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-users" /></svg></div><div><span class="kpi-label">Consultations (all time)</span><strong class="kpi-value">@a.Consultations</strong></div></div>
             <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-wallet" /></svg></div><div><span class="kpi-label">Fees collected</span><strong class="kpi-value" data-kpi="collected">@Fmt.Money(a.FeesCollected)</strong></div></div>
             <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-hospital" /></svg></div><div><span class="kpi-label">Hospital share</span><strong class="kpi-value" data-kpi="hospital">@Fmt.Money(a.HospitalShare)</strong></div></div>
+            <div class="kpi"><div class="kpi-icon amber"><svg class="icon"><use href="#i-refresh" /></svg></div><div><span class="kpi-label">Fee waivers (Free by Doctor)</span><strong class="kpi-value" data-kpi="waivers">@Fmt.Money(a.FeeWaivers)</strong><small class="muted block">@Fmt.Money(a.FeesWaived) of fees · not a cash refund</small></div></div>
             <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-check-circle" /></svg></div><div><span class="kpi-label">Paid to doctor</span><strong class="kpi-value" data-kpi="paid">@Fmt.Money(a.PaidToDoctor)</strong></div></div>
             <div class="kpi"><div class="kpi-icon red"><svg class="icon"><use href="#i-alert" /></svg></div><div><span class="kpi-label">Remaining payable</span><strong class="kpi-value" data-kpi="payable">@Fmt.Money(a.Payable)</strong></div></div>
         </div>
-        <p class="muted small">@BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(Model.From!.Value, Model.To!.Value): @p.Consultations consultations, @Fmt.Money(p.FeesCollected) collected, doctor's share @Fmt.Money(p.DoctorEarned), paid @Fmt.Money(p.PaidToDoctor).</p>
+        <p class="muted small">@BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(Model.From!.Value, Model.To!.Value): @p.Consultations consultations, @Fmt.Money(p.FeesCollected) collected, doctor's share @Fmt.Money(p.DoctorEarned), fee waivers @Fmt.Money(p.FeeWaivers), earnings after waivers @Fmt.Money(p.EarnedAfterWaivers), paid @Fmt.Money(p.PaidToDoctor).</p>
     </div>
 </div>
 <div class="grid-side">

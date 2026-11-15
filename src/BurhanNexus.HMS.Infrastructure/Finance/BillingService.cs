@@ -181,6 +181,17 @@ public sealed class BillingService : IBillingService
             if (pay < net && !s.AllowPartialPayment) { errors.Add($"{s.Name} must be paid in full ({net:N2})."); continue; }
             if (l.EncounterId is long eid && !await _db.PatientEncounters.AnyAsync(e => e.Id == eid && e.PatientId == input.PatientId, ct))
             { errors.Add("The visit does not belong to this patient."); continue; }
+            // Update 9: the consultation fee of an appointment is settled at booking (paid, or Free by Doctor) – never collected a second time.
+            if (doctor is not null && await _db.Appointments.AsNoTracking().Where(a => a.DoctorId == doctor.Id && a.Status != AppointmentStatus.Cancelled
+                        && (a.PaymentStatus == AppointmentPayment.Paid || a.PaymentStatus == AppointmentPayment.FreeByDoctor) && a.IdempotencyKey != input.IdempotencyKey
+                        && (l.EncounterId != null ? a.EncounterId == l.EncounterId : a.PatientId == input.PatientId && a.AppointmentDate == today && a.ServiceItemId == s.Id))
+                    .Select(a => new { a.Encounter!.EncounterNumber, a.PaymentStatus }).FirstOrDefaultAsync(ct) is { } settled)
+            {
+                await _audit.LogAsync(AuditActions.ConsultationFeeDuplicateBlocked, "Appointment", settled.EncounterNumber,
+                    $"Second collection of the consultation fee for appointment {settled.EncounterNumber} refused (already {(settled.PaymentStatus == AppointmentPayment.Paid ? "paid at booking" : "Free by Doctor")})", ct: ct);
+                errors.Add($"The consultation fee of appointment {settled.EncounterNumber} was already {(settled.PaymentStatus == AppointmentPayment.Paid ? "collected at booking – the token slip is the receipt" : "waived (Free by Doctor)")}.");
+                continue;
+            }
             priced.Add((l, s, doctor, fee, discount, net, pay));
         }
         if (method is { RequiresReference: true } && T(input.PaymentReference, 100) is null && (priced.Sum(p => p.Pay) + balances.Sum(b => b.PayNow)) > 0)
@@ -429,6 +440,15 @@ public sealed class BillingService : IBillingService
         if (r.Status == ReceiptStatus.Cancelled) return ServiceResult.Fail($"Receipt {r.ReceiptNumber} is already cancelled.");
         if (await _db.Refunds.AnyAsync(x => x.ReceiptId == r.Id && x.Status != RefundStatus.Rejected, ct))
             return ServiceResult.Fail("This receipt has a refund. A refunded receipt cannot be cancelled – refund the remaining amount instead.");
+        if (await _db.DoctorLedger.AnyAsync(x => x.ReceiptId == r.Id && x.EntryType == DoctorEntryType.FeeWaiver, ct))
+            return ServiceResult.Fail("The doctor waived this consultation fee (Free by Doctor). The receipt cannot be cancelled – return the money as a refund instead.");
+        // Update 9: an appointment fee paid at booking is no longer paid when its receipt is cancelled.
+        foreach (var appt in await _db.Appointments.Where(a => a.ReceiptId == r.Id && a.PaymentStatus == AppointmentPayment.Paid).ToListAsync(ct))
+        {
+            appt.PaymentStatus = AppointmentPayment.NotRecorded;
+            appt.AmountPaid = null;
+            appt.UpdatedUtc = _clock.UtcNow;
+        }
         var chargeIds = r.Lines.Select(l => l.ChargeId).ToList();
         var charges = await _db.Charges.FromSqlRaw("SELECT c.*, c.xmin FROM \"Charges\" c WHERE c.\"Id\" = ANY({0}) FOR UPDATE", chargeIds.ToArray()).ToListAsync(ct);
         var now = _clock.UtcNow;
@@ -545,7 +565,8 @@ public sealed class BillingService : IBillingService
             }
             l.RefundedAmount += part;
             charges.First(c => c.Id == l.ChargeId).RefundedAmount += part;
-            if (l.DoctorId is int did && shareBack > 0)
+            // A refund of a fee the doctor waived: the doctor's share was already removed by the fee-waiver entry (no double reduction).
+            if (l.DoctorId is int did && shareBack > 0 && refund.WaiverAppointmentId is null)
                 _db.DoctorLedger.Add(new DoctorLedgerEntry
                 {
                     DoctorId = did, EntryType = DoctorEntryType.ShareReversal, Amount = -shareBack, GrossAmount = -part, HospitalShare = -(part - shareBack),

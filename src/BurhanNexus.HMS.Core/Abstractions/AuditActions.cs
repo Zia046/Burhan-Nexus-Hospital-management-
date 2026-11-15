@@ -65,6 +65,19 @@ public static class AuditActions
     public const string AppointmentUpdated = "Appointment.Updated";
     public const string AppointmentCancelled = "Appointment.Cancelled";
     public const string AppointmentSeen = "Appointment.Seen";
+    // Update 9 – consultation fee at booking, Free by Doctor
+    public const string AppointmentDuplicateBlocked = "Appointment.DuplicateBlocked";
+    public const string AppointmentFreeByDoctor = "Appointment.FreeByDoctor";
+    public const string ConsultationFeeDuplicateBlocked = "Finance.ConsultationFeeDuplicateBlocked";
+    // Update 9 – nursing medicine demand
+    public const string MedicineRequestCreated = "Ipd.MedicineRequestCreated";
+    public const string MedicineRequestCancelled = "Ipd.MedicineRequestCancelled";
+    public const string MedicineRequestApproved = "Pharmacy.MedicineRequestApproved";
+    public const string MedicineRequestIssued = "Pharmacy.MedicineRequestIssued";
+    public const string MedicineRequestRejected = "Pharmacy.MedicineRequestRejected";
+    // Update 9 – laboratory catalogue
+    public const string LabCatalogueImported = "Laboratory.CatalogueImported";
+    public const string LabTestsBulkUpdated = "Laboratory.TestsBulkUpdated";
     public const string AppointmentSlipPrinted = "Appointment.SlipPrinted";
     public const string AppointmentSlipReprinted = "Appointment.SlipReprinted";
     public const string AppointmentPrintFailed = "Appointment.PrintFailed";

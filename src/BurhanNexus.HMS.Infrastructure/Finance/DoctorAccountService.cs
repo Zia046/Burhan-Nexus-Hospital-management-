@@ -10,9 +10,13 @@ namespace BurhanNexus.HMS.Infrastructure.Finance;
 /// <summary>Doctor consultation account. Fees collected from patients and money paid to the doctor are kept apart.</summary>
 public sealed record DoctorAccount(
     int DoctorId, string Name, string? Specialty, bool IsActive, DoctorShareType ShareType, decimal ShareValue, decimal? ConsultationFee,
-    int Consultations, decimal FeesCollected, decimal HospitalShare, decimal DoctorEarned, decimal Adjustments, decimal PaidToDoctor)
+    int Consultations, decimal FeesCollected, decimal HospitalShare, decimal DoctorEarned, decimal Adjustments, decimal PaidToDoctor,
+    /// <summary>Update 9: "Free by Doctor" waivers of fees already collected (negative = reduces the doctor's earnings; not a cash refund).</summary>
+    decimal FeeWaivers = 0, decimal FeesWaived = 0)
 {
-    public decimal Payable => DoctorEarned + Adjustments - PaidToDoctor;
+    public decimal Payable => DoctorEarned + Adjustments + FeeWaivers - PaidToDoctor;
+    /// <summary>Consultation-fee earnings after waivers.</summary>
+    public decimal EarnedAfterWaivers => DoctorEarned + FeeWaivers;
     public string Arrangement => FinanceMath.Describe(ShareType, ShareValue);
 }
 
@@ -75,7 +79,9 @@ public sealed class DoctorAccountService : IDoctorAccountService
             return new DoctorAccount(d.Id, d.Name, d.Specialty, d.IsActive, d.ShareType, d.ShareValue, fees.TryGetValue(d.Id, out var fee) ? fee : null,
                 counts.GetValueOrDefault(d.Id), share.Sum(s => s.Gross), share.Sum(s => s.Hospital), share.Sum(s => s.Amount),
                 mine.Where(s => s.EntryType == DoctorEntryType.Adjustment).Sum(s => s.Amount),
-                -mine.Where(s => s.EntryType == DoctorEntryType.Settlement).Sum(s => s.Amount));
+                -mine.Where(s => s.EntryType == DoctorEntryType.Settlement).Sum(s => s.Amount),
+                mine.Where(s => s.EntryType == DoctorEntryType.FeeWaiver).Sum(s => s.Amount),
+                -mine.Where(s => s.EntryType == DoctorEntryType.FeeWaiver).Sum(s => s.Gross));
         }).ToList();
     }
 

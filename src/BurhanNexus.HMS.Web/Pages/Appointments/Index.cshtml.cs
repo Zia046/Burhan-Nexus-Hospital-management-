@@ -24,6 +24,7 @@ public class IndexModel : HmsPageModel
     [BindProperty(SupportsGet = true)] public DateOnly? Date { get; set; }
     [BindProperty(SupportsGet = true, Name = "doctor")] public int? DoctorId { get; set; }
     [BindProperty(SupportsGet = true)] public string? Status { get; set; }
+    [BindProperty(SupportsGet = true)] public string? Payment { get; set; }
     [BindProperty(SupportsGet = true, Name = "q")] public string? Q { get; set; }
 
     public DateOnly Today { get; private set; }
@@ -38,8 +39,8 @@ public class IndexModel : HmsPageModel
         Today = await _clock.TodayAsync();
         Date ??= Today;
         Doctors = await _setup.DoctorsAsync(activeOnly: false);
-        ShowFees = await CanAsync(Perm.AppointmentsFees);
-        Items = await _appointments.ListAsync(new AppointmentQuery { From = Date, To = Date, DoctorId = DoctorId, Status = Status, Q = Q, PageSize = 2000 });
+        ShowFees = await CanAsync(Perm.AppointmentsFees) || await CanAsync(Perm.AppointmentsCollectFee);
+        Items = await _appointments.ListAsync(new AppointmentQuery { From = Date, To = Date, DoctorId = DoctorId, Status = Status, Payment = Payment, Q = Q, PageSize = 2000 });
         Stats = (await _appointments.StatsAsync(Date.Value, Date.Value)).Where(s => DoctorId is null || s.DoctorId == DoctorId).ToList();
     }
 }

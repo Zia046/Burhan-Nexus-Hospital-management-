@@ -708,45 +708,60 @@ public partial class FinanceTests : Phase2TestBase
     }
 
     [Fact]
-    public async Task Appointment_and_opd_visits_can_be_billed_without_changing_tokens()
+    public async Task Appointment_fee_is_collected_at_booking_once_and_the_token_slip_is_the_receipt()
     {
         await SetupAsync("Private");
         var admin = await LoginAdminAsync();
         var counter = await CounterAsync(admin, "OPD", "OPD Counter");
         var doc = await DoctorAsync(admin, "Dr. Billing Link", "HospitalCommissionPercent", 20, 900);
         var pid = await RegisterPatientAsync(admin, PatientFields("Billing Link Patient", "Link Father"));
-        var book = await admin.PostFormAsync($"/Appointments/Book?patientId={pid}", new[] { P("Input.DoctorId", doc.ToString()) });
+        var cash = await MethodAsync("CASH");
+        // Booking without settling the fee is refused (nothing is recorded as paid unless it was received).
+        var refused = await admin.PostFormAsync($"/Appointments/Book?patientId={pid}", new[] { P("Input.DoctorId", doc.ToString()), P("Input.IdempotencyKey", Guid.NewGuid().ToString()) });
+        Assert.Contains("received", Errors(await refused.Content.ReadAsStringAsync()));
+        var key = Guid.NewGuid().ToString();
+        var fields = new[] { P("Input.DoctorId", doc.ToString()), P("Input.IdempotencyKey", key), P("Input.Payment", "Paid"), P("Input.CounterId", counter.ToString()), P("Input.PaymentMethodId", cash.ToString()) };
+        var book = await admin.PostFormAsync($"/Appointments/Book?patientId={pid}", fields);
         Assert.Equal(HttpStatusCode.Redirect, book.StatusCode);
+        // A double click returns the same appointment – no second token, no second payment.
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Appointments/Book?patientId={pid}", fields)).StatusCode);
         Appointment appt;
-        await using (var db = Factory.NewDb()) appt = await db.Appointments.SingleAsync();
-        Assert.Equal(1, appt.TokenNumber);
-        Assert.Contains("Collect fee", await admin.GetHtmlAsync($"/Appointments/Details/{appt.Id}"));
-
-        var form = await admin.GetHtmlAsync($"/Finance/Collect?encounterId={appt.EncounterId}");
-        Assert.Contains("Visit OPD-", form);
-        Assert.Contains("Billing Link Patient", form);
-        var token = await admin.TokenAsync($"/Finance/Collect?encounterId={appt.EncounterId}");
-        int consult;
-        await using (var db = Factory.NewDb()) consult = await db.ServiceItems.Where(s => s.DoctorId == doc).Select(s => s.Id).SingleAsync();
-        Assert.Contains($"value=\"{consult}\" data-fee=\"900.00\"", form);
-        var r = await admin.Http.PostAsync("/Finance/Collect", new FormUrlEncodedContent(new[]
-        {
-            P("__RequestVerificationToken", token), P("Input.IdempotencyKey", Guid.NewGuid().ToString()), P("Input.CounterId", counter.ToString()),
-            P("Input.PaymentMethodId", (await MethodAsync("CASH")).ToString()), P("PatientId", pid.ToString()), P("EncounterId", appt.EncounterId.ToString()),
-            P("Lines[0].ServiceItemId", consult.ToString()), P("Lines[0].DoctorId", doc.ToString()), P("Lines[0].EncounterId", appt.EncounterId.ToString()),
-        }));
-        var rid = await ReceiptIdAsync(r);
         await using (var db = Factory.NewDb())
         {
+            appt = await db.Appointments.SingleAsync();
+            Assert.Equal((1, AppointmentPayment.Paid, 900m, "Cash"), (appt.TokenNumber, appt.PaymentStatus, appt.AmountPaid!.Value, appt.PaymentMethodName));
             var charge = await db.Charges.SingleAsync();
-            Assert.Equal(appt.EncounterId, charge.EncounterId);
-            Assert.Equal(720m, charge.DoctorShareAmount);
-            Assert.Equal(1, (await db.Appointments.SingleAsync()).TokenNumber);
+            Assert.Equal((appt.EncounterId, appt.ChargeId!.Value, 720m, ChargeStatus.Paid), (charge.EncounterId!.Value, charge.Id, charge.DoctorShareAmount, charge.Status));
+            Assert.Equal(1, await db.Receipts.CountAsync());
         }
         Assert.Equal(720m, await DoctorPayableAsync(doc));
-        Assert.Contains("already billed", await admin.GetHtmlAsync($"/Finance/Collect?encounterId={appt.EncounterId}"));
-        Assert.Contains("Dr. Billing Link", await admin.GetHtmlAsync($"/Print/Receipt/{rid}"));
-        // The thermal appointment slip is unchanged.
-        Assert.Contains("TOKEN NO.", await admin.GetHtmlAsync($"/Print/Appointment/{appt.Id}"));
+        Assert.DoesNotContain("data-test=\"appt-collect\"", await admin.GetHtmlAsync($"/Appointments/Details/{appt.Id}"));
+
+        // The cashier cannot collect the same consultation fee again.
+        int consult;
+        await using (var db = Factory.NewDb()) consult = await db.ServiceItems.Where(s => s.DoctorId == doc).Select(s => s.Id).SingleAsync();
+        var token = await admin.TokenAsync($"/Finance/Collect?encounterId={appt.EncounterId}");
+        var again = await admin.Http.PostAsync("/Finance/Collect", new FormUrlEncodedContent(new[]
+        {
+            P("__RequestVerificationToken", token), P("Input.IdempotencyKey", Guid.NewGuid().ToString()), P("Input.CounterId", counter.ToString()),
+            P("Input.PaymentMethodId", cash.ToString()), P("PatientId", pid.ToString()), P("EncounterId", appt.EncounterId.ToString()),
+            P("Lines[0].ServiceItemId", consult.ToString()), P("Lines[0].DoctorId", doc.ToString()), P("Lines[0].EncounterId", appt.EncounterId.ToString()),
+        }));
+        Assert.Contains("already collected at booking", Errors(await again.Content.ReadAsStringAsync()));
+        Assert.Single(await AuditAsync(AuditActions.ConsultationFeeDuplicateBlocked));
+
+        // The token slip shows fee, PAID, method and receipt; printing / reprinting creates no financial record.
+        var slip = await admin.GetHtmlAsync($"/Print/Appointment/{appt.Id}");
+        Assert.Contains("TOKEN NO.", slip);
+        Assert.Contains("PAID", slip);
+        Assert.Contains("data-field=\"method\">Cash", slip);
+        Assert.Contains("RCP-", slip);
+        await admin.GetHtmlAsync($"/Print/Appointment/{appt.Id}");
+        await using (var db = Factory.NewDb())
+        {
+            Assert.Equal(1, await db.Receipts.CountAsync());
+            Assert.Equal(1, await db.Charges.CountAsync());
+            Assert.Equal(1, await db.CashierLedger.CountAsync());
+        }
     }
 }

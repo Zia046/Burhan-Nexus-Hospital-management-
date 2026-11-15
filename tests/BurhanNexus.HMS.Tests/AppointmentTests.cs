@@ -44,6 +44,8 @@ public partial class AppointmentTests : Phase2TestBase
     private static IEnumerable<KeyValuePair<string, string>> BookFields(int doctorId, DateOnly? date = null, string? complaint = null)
     {
         yield return P("Input.DoctorId", doctorId.ToString());
+        yield return P("Input.IdempotencyKey", Guid.NewGuid().ToString());
+        yield return P("Input.Payment", "Paid");
         if (date is { } d) yield return P("Input.AppointmentDate", d.ToString("yyyy-MM-dd"));
         if (complaint is not null) yield return P("Input.Complaint", complaint);
     }
@@ -223,9 +225,10 @@ public partial class AppointmentTests : Phase2TestBase
         Assert.Single(await AuditAsync(AuditActions.AppointmentCancelled));
         Assert.Single(await AuditAsync(AuditActions.AppointmentUpdated));
 
-        // Seen status.
-        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Appointments/Details/{a1}", Array.Empty<KeyValuePair<string, string>>(), $"/Appointments/Details/{a1}?handler=Seen")).StatusCode);
-        Assert.Equal(AppointmentStatus.Seen, (await ApptAsync(a1)).Status);
+        // Update 9: "Mark as seen by doctor" no longer exists – the booking is the last reception step.
+        Assert.DoesNotContain("mark as seen", (await admin.GetHtmlAsync($"/Appointments/Details/{a1}")).ToLowerInvariant());
+        Assert.NotEqual(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Appointments/Details/{a1}", Array.Empty<KeyValuePair<string, string>>(), $"/Appointments/Details/{a1}?handler=Seen")).StatusCode);
+        Assert.Equal(AppointmentStatus.Booked, (await ApptAsync(a1)).Status);
         var stats = await admin.GetHtmlAsync("/Appointments/Reports?period=month");
         Assert.Contains("Dr. Cancel Test", stats);
         Assert.Contains("Dr. Cancel Test", await admin.GetHtmlAsync("/Appointments/Reports?period=year"));
