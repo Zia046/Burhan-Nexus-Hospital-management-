@@ -528,8 +528,11 @@ try {
   await page.fill("[name='Patient.GuardianName']", "Gul Khan");
   await page.fill("[name='Patient.DateOfBirth']", "1978-02-10");
   await page.fill("[name='Patient.MobileNumber']", "03339876543");
+  await page.fill("[name='Patient.Address']", "Mohallah Sethi, Ring Road");
+  await page.fill("[name='Patient.CityOrVillage']", "Peshawar");
   await page.waitForTimeout(900);
   await submit("button[value='profile']");
+  step("ipd patient: " + page.url());
   const ahmadId = new URL(page.url()).pathname.split("/").pop();
   await go(`/Ipd/Admit?patientId=${ahmadId}`);
   await page.selectOption("select[data-bed-list]", { index: 1 });
