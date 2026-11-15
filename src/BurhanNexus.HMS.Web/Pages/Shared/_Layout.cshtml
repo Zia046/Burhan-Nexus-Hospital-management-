@@ -53,11 +53,11 @@
         {
             <a class="nav-link @Active("dashboard")" href="/"><svg class="icon"><use href="#i-home" /></svg><span>Dashboard</span></a>
         }
-        @foreach (var section in menu.Where(m => m.Visible))
+        @foreach (var sec in menu.Where(m => m.Visible))
         {
-            var items = isAdmin ? section.Items.Where(i => NavMenu.AdminSidebar.Contains(i.Nav)).ToList() : section.Items.ToList();
+            var items = isAdmin ? sec.Items.Where(i => NavMenu.AdminSidebar.Contains(i.Nav)).ToList() : sec.Items.ToList();
             if (isAdmin && items.Count == 0) { continue; }
-            <div class="nav-section">@section.Title</div>
+            <div class="nav-section">@sec.Title</div>
             foreach (var item in items) { @NavLink(item, "nav-link") }
         }
     </nav>
