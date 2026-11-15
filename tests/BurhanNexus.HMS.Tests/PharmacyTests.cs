@@ -607,7 +607,8 @@ public partial class PharmacyTests : Phase2TestBase
         var viewer = await UserWithAsync(admin, "pharm.viewer", Perm.DashboardView, Perm.PharmViewCatalogue);
         Assert.Contains("Panadol", await viewer.GetHtmlAsync("/Pharmacy/Medicines"));
         Assert.DoesNotContain("Sale price", await viewer.GetHtmlAsync("/Pharmacy/Medicines"));
-        Denied(await ReceiveAsync(viewer, null, "X", null, null, (para, "V1", Month(6), 1, null)), "Receive by viewer");
+        Denied(await viewer.PostFormAsync("/Pharmacy/Medicines", new[] { P("Input.IdempotencyKey", Guid.NewGuid().ToString()), P("Input.SourceName", "X"),
+            P("Lines[0].MedicineId", para.ToString()), P("Lines[0].BatchNumber", "V1"), P("Lines[0].Expiry", Month(6)), P("Lines[0].Quantity", "1") }, "/Pharmacy/Receive"), "Receive by viewer");
         Denied(await viewer.PostFormAsync("/Pharmacy/Medicines", new[] { P("Input.Name", "Hack") }, $"/Pharmacy/Medicines/Edit/{para}"), "Edit by viewer");
         Denied(await viewer.GetAsync("/Pharmacy/Reports?report=gross-profit"), "Financial report by viewer");
 
