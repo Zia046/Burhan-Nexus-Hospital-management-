@@ -1,0 +1,22 @@
+@model (IReadOnlyList<BurhanNexus.HMS.Infrastructure.Ot.SurgeryRow> Rows, string Empty)
+<div class="table-wrap">
+    <table class="table table-compact" data-surgeries>
+        <thead><tr><th>Planned</th><th>Surgery</th><th>Patient</th><th>Procedure</th><th>Theatre</th><th>Surgeon / anesthetist</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            <tr class="@(r.Priority == SurgeryPriority.Emergency ? "row-warn" : "")" data-surgery="@r.Number">
+                <td class="nowrap">@Fmt.DateTimeText(r.PlannedStartUtc)<small class="block muted">@((int)(r.PlannedEndUtc - r.PlannedStartUtc).TotalMinutes) min</small></td>
+                <td class="mono">@r.Number<small class="block">@r.Priority</small></td>
+                <td><strong>@r.PatientName</strong><small class="block muted">@r.PatientNumber · @r.AgeGender</small></td>
+                <td>@r.Procedure<small class="block muted">@r.Anesthesia</small></td>
+                <td>@r.Theatre</td>
+                <td class="small">@(r.Surgeon ?? "—")<small class="block muted">@r.Anesthetist</small></td>
+                <td><partial name="/Pages/Ot/_SurgeryStatus.cshtml" model="r.Status" />@if (r.Recovery is { } rs) { <small class="block muted">Recovery: @rs</small> }</td>
+                <td class="actions"><a class="btn btn-light btn-sm" href="/Ot/Surgery/@r.Id">Open</a></td>
+            </tr>
+        }
+        @if (Model.Rows.Count == 0) { <tr><td colspan="8" class="empty">@Model.Empty</td></tr> }
+        </tbody>
+    </table>
+</div>

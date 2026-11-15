@@ -1,0 +1,68 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ot.BookModel
+@{ ViewData["Title"] = Model.Emergency ? "Emergency surgery" : "Book surgery"; var p = Model.Patient; var i = Model.Input; }
+<partial name="_OtNav" />
+<partial name="_ValidationSummary" />
+@if (p is null)
+{
+    @await Html.PartialAsync("/Pages/Ipd/_PatientPick.cshtml", ("Book surgery – find the registered patient", Model.Q, Model.Matches, "/Ot/Book?patientId={0}" + (Model.Emergency ? "&emergency=true" : ""), Model.Emergency ? "<input type=\"hidden\" name=\"emergency\" value=\"true\" />" : ""))
+}
+else
+{
+    <form method="post" asp-route-patientId="@p.Id" asp-route-emergency="@Model.Emergency" class="grid-side" novalidate data-booking-form>
+        <input type="hidden" name="Input.IdempotencyKey" value="@i.IdempotencyKey" />
+        <input type="hidden" name="PatientId" value="@p.Id" />
+        <div class="card">
+            <div class="card-header"><h2>@(Model.Emergency ? "Emergency surgery" : "Surgery booking")</h2></div>
+            <div class="card-body">
+                @if (Model.Check is { } chk)
+                {
+                    if (chk.Count == 0) { <div class="alert alert-success" data-check-ok>The theatre and the selected team are free at this time.</div> }
+                    else { <div class="alert alert-warning" data-check-conflicts>@foreach (var c in chk) { <div>@c</div> }</div> }
+                }
+                <div class="grid-3">
+                    <div class="field span-2"><label for="Input_ProcedureId">Procedure</label><select id="Input_ProcedureId" name="Input.ProcedureId"><option value="">— select —</option>
+                        @foreach (var g in Model.Procedures.GroupBy(x => x.Specialty ?? "Other")) { <optgroup label="@g.Key">@foreach (var x in g) { <option value="@x.Id" selected="@(i.ProcedureId == x.Id)">@x.Name (@x.Code) · ~@x.DurationMinutes min</option> }</optgroup> }</select></div>
+                    <div class="field"><label for="Input_ProcedureName">Or procedure name (if not in catalogue)</label><input id="Input_ProcedureName" name="Input.ProcedureName" value="@i.ProcedureName" maxlength="200" /></div>
+                    <div class="field"><label for="Input_Priority">Priority *</label><select id="Input_Priority" name="Input.Priority">@foreach (var x in Enum.GetValues<SurgeryPriority>()) { <option value="@x" selected="@(i.Priority == x)">@x</option> }</select></div>
+                    <div class="field span-2"><label for="Input_EmergencyReason">Emergency / urgency reason @(Model.Emergency ? "*" : "")</label><input id="Input_EmergencyReason" name="Input.EmergencyReason" value="@i.EmergencyReason" maxlength="500" /></div>
+                    <div class="field"><label for="Input_TheatreId">Operation theatre *</label><select id="Input_TheatreId" name="Input.TheatreId"><option value="0">— select —</option>
+                        @foreach (var t in Model.Theatres) { <option value="@t.Id" selected="@(i.TheatreId == t.Id)" disabled="@(!t.IsAvailable)">@t.Name · @t.Type@(t.IsAvailable ? "" : " (unavailable)")</option> }</select></div>
+                    <div class="field"><label for="Input_StartLocal">Planned date &amp; start @(Model.Emergency ? "(blank = now)" : "*")</label><input id="Input_StartLocal" type="datetime-local" name="Input.StartLocal" value="@i.StartLocal?.ToString("yyyy-MM-ddTHH:mm")" /></div>
+                    <div class="field"><label for="Input_DurationMinutes">Estimated duration (min)</label><input id="Input_DurationMinutes" type="number" min="5" max="1440" name="Input.DurationMinutes" value="@i.DurationMinutes" placeholder="from catalogue" /></div>
+                    <div class="field"><label for="Input_AnesthesiaType">Anesthesia type (anesthetist's plan)</label><select id="Input_AnesthesiaType" name="Input.AnesthesiaType"><option value="">— not decided —</option>@foreach (var x in Enum.GetValues<AnesthesiaType>()) { <option value="@x" selected="@(i.AnesthesiaType == x)">@x</option> }</select></div>
+                    <div class="field"><label for="Input_SurgeonDoctorId">Surgeon</label><select id="Input_SurgeonDoctorId" name="Input.SurgeonDoctorId"><option value="">—</option>@foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(i.SurgeonDoctorId == d.Id)">@d.Name</option> }</select></div>
+                    <div class="field"><label for="Input_AssistantDoctorId">Assistant surgeon</label><select id="Input_AssistantDoctorId" name="Input.AssistantDoctorId"><option value="">—</option>@foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(i.AssistantDoctorId == d.Id)">@d.Name</option> }</select></div>
+                    <div class="field"><label for="Input_AnesthetistDoctorId">Anesthetist</label><select id="Input_AnesthetistDoctorId" name="Input.AnesthetistDoctorId"><option value="">—</option>@foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(i.AnesthetistDoctorId == d.Id)">@d.Name</option> }</select></div>
+                    <div class="field"><label for="Input_DepartmentId">Department</label><select id="Input_DepartmentId" name="Input.DepartmentId"><option value="">—</option>@foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(i.DepartmentId == d.Id)">@d.Name</option> }</select></div>
+                    <div class="field"><label for="Input_Diagnosis">Diagnosis</label><input id="Input_Diagnosis" name="Input.Diagnosis" value="@i.Diagnosis" maxlength="500" /></div>
+                    <div class="field"><label for="Input_Site">Site / side</label><input id="Input_Site" name="Input.Site" value="@i.Site" maxlength="150" /></div>
+                </div>
+                <div class="field"><label for="Input_ClinicalNotes">Clinical notes</label><textarea id="Input_ClinicalNotes" name="Input.ClinicalNotes" rows="2" maxlength="2000">@i.ClinicalNotes</textarea></div>
+                <input type="hidden" name="Input.IpdAdmissionId" value="@i.IpdAdmissionId" />
+                <label class="check"><input type="checkbox" name="Input.AsRequest" value="true" checked="@i.AsRequest" /> Save as a request (the OT confirms the slot later)</label><input type="hidden" name="Input.AsRequest" value="false" />
+                <div class="inline-form wrap">
+                    <label class="check"><input type="checkbox" name="Input.OverrideStaffConflict" value="true" /> Emergency: proceed although a team member is booked elsewhere</label><input type="hidden" name="Input.OverrideStaffConflict" value="false" />
+                    <input name="Input.OverrideReason" placeholder="Reason" maxlength="300" />
+                </div>
+                <p class="small muted">Two surgeries can never be booked in the same theatre at overlapping times (including its preparation / cleaning interval). Surgeon and anesthetist conflicts are checked as well.</p>
+            </div>
+            <div class="card-footer form-actions">
+                <a class="btn btn-light" href="/Ot/Book">Change patient</a>
+                <button class="btn btn-light" type="submit" asp-page-handler="Check" data-test="check-slot">Check availability</button>
+                <button class="btn btn-primary btn-lg" type="submit" data-test="book-surgery" data-once>@(Model.Emergency ? "Record emergency surgery" : "Book surgery")</button>
+            </div>
+        </div>
+        <div class="card patient-mini"><div class="card-body">
+            <div class="patient-id-box sm"><small>Patient ID</small><strong>@p.PatientNumber</strong></div>
+            <h3>@p.FullName</h3>
+            <dl class="kv kv-tight">
+                <dt>Age / Gender</dt><dd>@Model.AgeText · @p.Gender</dd>
+                <dt>Father / Husband</dt><dd>@(p.GuardianName ?? "—")</dd>
+                <dt>Phone</dt><dd>@(p.MobileNumber ?? "—")</dd>
+                <dt>IPD admission</dt><dd>@if (Model.Admission is { } a) { <a href="/Ipd/Admission/@a.Id">@a.AdmissionNumber</a> <small>@a.CurrentWard?.Name @a.CurrentBed?.Code</small> } else { <span>Not admitted</span> }</dd>
+            </dl>
+            @if (Model.Admission?.Allergies is { Length: > 0 } al) { <div class="alert alert-danger compact">Allergies: @al</div> }
+        </div></div>
+    </form>
+}

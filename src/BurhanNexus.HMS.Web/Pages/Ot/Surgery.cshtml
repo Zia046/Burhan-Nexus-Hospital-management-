@@ -1,0 +1,529 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Ot.SurgeryModel
+@{
+    var s = Model.S; var p = Model.P;
+    ViewData["Title"] = $"{s.Number} – {p.FullName}";
+    var tab = Model.Tab ?? "overview";
+    string Cls(string t) => t == tab ? "active" : "";
+    var recordAction = $"/Ot/Surgery/{s.Id}?handler=Record";
+    var finalNote = Model.Notes.LastOrDefault(n => n.Status == NoteStatus.Final);
+    var draft = Model.Notes.FirstOrDefault(n => n.Status == NoteStatus.Draft);
+    bool StageDone(ChecklistStage st) => Model.Stages.Any(x => x.Stage == st);
+    var allergies = s.IpdAdmission?.Allergies;
+}
+<partial name="_OtNav" />
+<partial name="_ValidationSummary" />
+
+<div class="card patient-banner" data-surgery-id="@s.Id" data-status="@s.Status">
+    <div class="card-body banner-row">
+        <div class="patient-id-box sm"><small>Surgery</small><strong data-surgery-number>@s.Number</strong></div>
+        <div class="grow">
+            <h2>@p.FullName <small class="muted">@p.PatientNumber · @Model.AgeText · @p.Gender</small></h2>
+            <div class="small"><partial name="_SurgeryStatus" model="s.Status" /> · <strong>@s.ProcedureName</strong> · @s.Theatre!.Name · @Fmt.DateTimeText(s.PlannedStartUtc) (@s.DurationMinutes min) · @s.Priority
+                @if (s.AnesthesiaType is { } at) { <span> · @at anesthesia</span> }
+                @if (s.IpdAdmission is { } a) { <span> · IPD <a href="/Ipd/Admission/@a.Id">@a.AdmissionNumber</a></span> }</div>
+            @if (s.Priority == SurgeryPriority.Emergency) { <div class="alert alert-danger compact">Emergency: @s.EmergencyReason</div> }
+            @if (!string.IsNullOrWhiteSpace(allergies)) { <div class="alert alert-danger compact" data-allergy><strong>Allergies:</strong> @allergies</div> }
+            @if (s.StatusReason is not null && s.Status is SurgeryStatus.Cancelled or SurgeryStatus.Postponed) { <div class="alert alert-warning compact">@s.Status – @s.StatusReason</div> }
+        </div>
+        <div class="banner-actions no-print">
+            <a bn-permission="@Perm.OtPrintDocuments" class="btn btn-light btn-sm" href="/Print/Ot/booking/@s.Id" target="_blank">Booking slip</a>
+            <a bn-permission="@Perm.PatientsView" class="btn btn-light btn-sm" href="/Patients/Profile/@p.Id">Patient</a>
+        </div>
+    </div>
+</div>
+
+<nav class="tabs no-print" data-surgery-tabs>
+    <a class="@Cls("overview")" href="@Model.Url("overview")">Booking &amp; team</a>
+    <a bn-permission="@Perm.OtViewPreOp|@Perm.OtEnterPreOp" class="@Cls("preop")" href="@Model.Url("preop")">Pre-op @(StageDone(ChecklistStage.PreOp) ? "✓" : "")</a>
+    <a bn-permission="@Perm.OtManageConsent|@Perm.OtViewPreOp" class="@Cls("consent")" href="@Model.Url("consent")">Consent (@Model.Consents.Count)</a>
+    <a bn-permission="@Perm.OtEnterAnesthesia|@Perm.OtViewPreOp" class="@Cls("anesthesia")" href="@Model.Url("anesthesia")">Anesthesia</a>
+    <a bn-permission="@Perm.OtCompleteChecklist|@Perm.OtEnterIntraOp" class="@Cls("safety")" href="@Model.Url("safety")">Safety checklist @(StageDone(ChecklistStage.SignOut) ? "✓" : "")</a>
+    <a bn-permission="@Perm.OtEnterIntraOp|@Perm.OtFinalizeNotes|@Perm.OtDashboard" class="@Cls("intraop")" href="@Model.Url("intraop")">Intra-op &amp; notes</a>
+    <a bn-permission="@Perm.OtRecordConsumption|@Perm.OtManageStock" class="@Cls("stock")" href="@Model.Url("stock")">OT consumption</a>
+    <a bn-permission="@Perm.OtManageRecovery|@Perm.OtDashboard" class="@Cls("recovery")" href="@Model.Url("recovery")">Recovery</a>
+    <a bn-permission="@Perm.OtEnterPostOp|@Perm.OtDashboard" class="@Cls("postop")" href="@Model.Url("postop")">Post-op</a>
+    <a bn-permission="@Perm.OtViewBilling" class="@Cls("billing")" href="@Model.Url("billing")">Billing</a>
+    <a class="@Cls("history")" href="@Model.Url("history")">History</a>
+</nav>
+
+@if (tab == "overview")
+{
+    <div class="grid-2">
+        <div class="card"><div class="card-header"><h3>Booking</h3></div><div class="card-body">
+            <dl class="kv kv-tight">
+                <dt>Procedure</dt><dd>@s.ProcedureName @(s.Procedure is { } pr ? $"({pr.Code})" : "")</dd>
+                <dt>Diagnosis</dt><dd>@(s.Diagnosis ?? "—")</dd>
+                <dt>Site / side</dt><dd>@(s.Site ?? "—")</dd>
+                <dt>Department</dt><dd>@(s.Department?.Name ?? "—")</dd>
+                <dt>Theatre</dt><dd>@s.Theatre.Name (@s.Theatre.Type) · preparation / cleaning @s.CleaningMinutes min</dd>
+                <dt>Planned</dt><dd>@Fmt.DateTimeText(s.PlannedStartUtc) – @Fmt.DateTimeText(s.PlannedEndUtc)</dd>
+                <dt>Actual</dt><dd>@(s.ActualStartUtc is null ? "—" : $"{Fmt.DateTimeText(s.ActualStartUtc)} – {Fmt.DateTimeText(s.ActualEndUtc)}")</dd>
+                <dt>Anesthesia</dt><dd>@(s.AnesthesiaType?.ToString() ?? "not decided") @s.AnesthesiaDetail</dd>
+                <dt>Clinical notes</dt><dd class="prewrap">@(s.ClinicalNotes ?? "—")</dd>
+                <dt>Booked</dt><dd>@Fmt.DateTimeText(s.CreatedUtc) by @s.CreatedByUsername</dd>
+            </dl>
+        </div>
+        @if (!Model.Closed && s.Status != SurgeryStatus.Completed)
+        {
+            <div class="card-footer no-print">
+                <form bn-permission="@Perm.OtEditBooking|@Perm.OtCancelSurgery|@Perm.OtEnterPreOp" method="post" asp-page-handler="Status" asp-route-id="@s.Id" class="inline-form wrap" novalidate data-status-form>
+                    <select name="NewStatus" aria-label="New status">
+                        @if (s.Status == SurgeryStatus.Requested) { <option value="Scheduled">Confirm schedule</option> }
+                        @if (s.Status is SurgeryStatus.Scheduled) { <option value="PreOp">Pre-operative preparation</option> }
+                        @if (s.Status is SurgeryStatus.Scheduled or SurgeryStatus.PreOp) { <option value="Ready">Ready for surgery</option> }
+                        @if (s.Status != SurgeryStatus.InProgress && s.Status != SurgeryStatus.Postponed) { <option value="Postponed">Postpone</option> }
+                        @if (s.Status != SurgeryStatus.InProgress) { <option value="Cancelled">Cancel surgery</option> }
+                    </select>
+                    <input name="Reason" placeholder="Reason (required to cancel / postpone)" maxlength="300" />
+                    <button class="btn btn-light btn-sm" type="submit" data-test="set-status">Change status</button>
+                </form>
+            </div>
+        }
+        </div>
+        <div class="card" data-team>
+            <div class="card-header"><h3>Surgical team</h3></div>
+            <table class="table table-compact"><tbody>
+            @foreach (var m in Model.TeamMembers)
+            {
+                <tr class="@(m.RemovedUtc is null ? "" : "row-muted")" data-member="@m.Role"><td><strong>@m.Role</strong></td><td>@m.Name<small class="block muted">@(m.DoctorId is null ? "HMS user" : "Doctor") · added by @m.AddedBy</small>
+                    @if (m.RemovedUtc is DateTime rm) { <small class="block">Removed @Fmt.DateTimeText(rm) by @m.RemovedBy – @m.RemovedReason</small> }</td>
+                    <td class="small">@(m.StartUtc is null ? "" : $"{Fmt.DateTimeText(m.StartUtc)} – {Fmt.DateTimeText(m.EndUtc)}")</td>
+                    <td class="actions">@if (m.RemovedUtc is null && s.Status is not (SurgeryStatus.InProgress or SurgeryStatus.Completed or SurgeryStatus.Cancelled))
+                    {
+                        <form bn-permission="@Perm.OtManageTeam" method="post" asp-page-handler="RemoveMember" asp-route-id="@s.Id" class="inline-form"><input type="hidden" name="ItemId" value="@m.Id" />
+                            <input name="Reason" placeholder="Reason" maxlength="300" /><button class="btn btn-light btn-sm" type="submit">Remove</button></form>
+                    }
+                    else if (m.RemovedUtc is null)
+                    {
+                        <details bn-permission="@Perm.OtManageTeam"><summary class="btn btn-light btn-sm">Times</summary>
+                            <form method="post" asp-page-handler="MemberTimes" asp-route-id="@s.Id" class="inline-form wrap"><input type="hidden" name="ItemId" value="@m.Id" />
+                                <input type="datetime-local" name="StartLocal" aria-label="From" /><input type="datetime-local" name="EndLocal" aria-label="To" /><button class="btn btn-light btn-sm" type="submit">Save</button></form>
+                        </details>
+                    }</td></tr>
+            }
+            @if (Model.TeamMembers.Count == 0) { <tr><td class="empty">No team assigned.</td></tr> }
+            </tbody></table>
+            @if (s.Status is not (SurgeryStatus.InProgress or SurgeryStatus.Completed or SurgeryStatus.Cancelled))
+            {
+                <form bn-permission="@Perm.OtManageTeam" method="post" asp-page-handler="Team" asp-route-id="@s.Id" class="card-body inline-form wrap" novalidate data-team-form>
+                    <select name="Team.Role" aria-label="Role">@foreach (var r in Enum.GetValues<OtRole>()) { <option value="@r">@r</option> }</select>
+                    <select name="Team.DoctorId" aria-label="Doctor"><option value="">— doctor —</option>@foreach (var d in Model.Doctors) { <option value="@d.Id">@d.Name</option> }</select>
+                    <select name="Team.UserId" aria-label="HMS user"><option value="">— or HMS user —</option>@foreach (var u in Model.Users) { <option value="@u.Id">@u.FullName</option> }</select>
+                    @if (s.Priority == SurgeryPriority.Emergency) { <label class="check"><input type="checkbox" name="Team.OverrideConflict" value="true" /> Emergency: accept conflict</label><input name="Team.OverrideReason" placeholder="Reason" maxlength="300" /> }
+                    <button class="btn btn-primary btn-sm" type="submit" data-test="add-member">Add to team</button>
+                </form>
+            }
+        </div>
+    </div>
+    @if (s.Status is SurgeryStatus.Requested or SurgeryStatus.Scheduled or SurgeryStatus.PreOp or SurgeryStatus.Ready or SurgeryStatus.Postponed)
+    {
+        <div class="grid-2">
+            <form bn-permission="@Perm.OtEditBooking" method="post" asp-page-handler="Reschedule" asp-route-id="@s.Id" class="card" novalidate data-reschedule>
+                <div class="card-header"><h3>Reschedule</h3></div>
+                <div class="card-body grid-2">
+                    <div class="field"><label>Theatre</label><select name="TheatreId">@foreach (var t in Model.Theatres) { <option value="@t.Id" selected="@(Model.TheatreId == t.Id)">@t.Name</option> }</select></div>
+                    <div class="field"><label>New start</label><input type="datetime-local" name="StartLocal" value="@Fmt.ToLocal(s.PlannedStartUtc).ToString("yyyy-MM-ddTHH:mm")" /></div>
+                    <div class="field"><label>Duration (min)</label><input type="number" min="5" max="1440" name="Duration" value="@Model.Duration" /></div>
+                    <div class="field"><label>Reason *</label><input name="Reason" maxlength="300" /></div>
+                </div>
+                <div class="card-footer"><button class="btn btn-primary btn-sm" type="submit" data-test="reschedule">Reschedule</button></div>
+            </form>
+            <form bn-permission="@Perm.OtEditBooking" method="post" asp-page-handler="Edit" asp-route-id="@s.Id" class="card" novalidate>
+                <div class="card-header"><h3>Edit booking details</h3></div>
+                <div class="card-body grid-2">
+                    <div class="field"><label>Procedure name</label><input name="Edit.ProcedureName" value="@Model.Edit.ProcedureName" maxlength="200" /></div>
+                    <div class="field"><label>Diagnosis</label><input name="Edit.Diagnosis" value="@Model.Edit.Diagnosis" maxlength="500" /></div>
+                    <div class="field"><label>Site / side</label><input name="Edit.Site" value="@Model.Edit.Site" maxlength="150" /></div>
+                    <div class="field"><label>Anesthesia type</label><select name="Edit.AnesthesiaType"><option value="">— not decided —</option>@foreach (var x in Enum.GetValues<AnesthesiaType>()) { <option value="@x" selected="@(Model.Edit.AnesthesiaType == x)">@x</option> }</select></div>
+                    <div class="field"><label>Anesthesia detail</label><input name="Edit.AnesthesiaDetail" value="@Model.Edit.AnesthesiaDetail" maxlength="100" /></div>
+                    <input type="hidden" name="Edit.DepartmentId" value="@Model.Edit.DepartmentId" />
+                    <div class="field"><label>Clinical notes</label><textarea name="Edit.ClinicalNotes" rows="2" maxlength="2000">@Model.Edit.ClinicalNotes</textarea></div>
+                </div>
+                <div class="card-footer"><button class="btn btn-light btn-sm" type="submit">Save details</button></div>
+            </form>
+        </div>
+    }
+    <div class="card" data-cssd-links><div class="card-header"><h3>CSSD instrument sets</h3></div>
+        <table class="table table-compact"><tbody>
+        @foreach (var ci in Model.CssdIssues) { <tr><td>@ci.Set!.Code – @ci.Set.Name</td><td>Issued @Fmt.DateTimeText(ci.IssuedUtc) by @ci.IssuedBy</td><td>@(ci.ReturnedUtc is null ? "In use" : $"Returned {Fmt.DateTimeText(ci.ReturnedUtc)}")</td></tr> }
+        @if (Model.CssdIssues.Count == 0) { <tr><td class="empty">No sets linked.</td></tr> }
+        </tbody></table>
+        @if (s.Status is not (SurgeryStatus.Completed or SurgeryStatus.Cancelled or SurgeryStatus.Postponed))
+        {
+            <form bn-permission="@Perm.OtManageCssd" method="post" asp-page-handler="CssdIssue" asp-route-id="@s.Id" class="card-body inline-form wrap">
+                <select name="ItemId" aria-label="Sterile set"><option value="">— sterile set —</option>@foreach (var x in Model.SterileSets) { <option value="@x.Id">@x.Code · @x.Name · until @(x.SterileUntil?.ToString("dd MMM"))</option> }</select>
+                <input name="By" placeholder="Issued to" maxlength="150" /><button class="btn btn-light btn-sm" type="submit">Issue to this surgery</button>
+            </form>
+        }
+    </div>
+}
+
+@foreach (var (kind, recs) in Model.Records)
+{
+    var fields = Model.Fields[kind];
+    var original = Model.CorrectId is long cid ? recs.FirstOrDefault(r => r.Record.Id == cid) : null;
+    <section class="record-section" data-section="@kind">
+        <h2 class="section-title">@BurhanNexus.HMS.Web.Pages.Ipd.IpdPageModel.Title(kind)</h2>
+        @if (!Model.Closed || original is not null)
+        {
+            <div bn-permission="@BurhanNexus.HMS.Web.Pages.Ipd.IpdPageModel.WritePermission(kind)">
+                @await Html.PartialAsync("/Pages/Ipd/_RecordForm.cshtml", (kind, fields, recordAction, original?.Record.Id, original, recs.Count == 0))
+            </div>
+        }
+        @await Html.PartialAsync("/Pages/Ipd/_RecordList.cshtml", (kind, fields, (IReadOnlyList<RecordView>)recs, (string?)Model.Url(tab)))
+    </section>
+}
+
+@if (tab is "preop" or "safety")
+{
+    foreach (var (stage, items) in Model.Items)
+    {
+        var done = Model.Stages.FirstOrDefault(x => x.Stage == stage);
+        <div class="card" data-checklist="@stage" data-stage-done="@(done is not null)">
+            <div class="card-header"><h3>@(stage switch { ChecklistStage.PreOp => "Pre-operative checklist", ChecklistStage.SignIn => "A. Sign In – before anesthesia", ChecklistStage.TimeOut => "B. Time Out – before incision", _ => "C. Sign Out – before leaving the OT" })</h3>
+                @if (done is not null) { <span class="status @(done.IsException ? "status-warn" : "status-ok")">@(done.IsException ? "Completed by exception" : "Completed") · @Fmt.DateTimeText(done.CompletedUtc) · @done.Username</span> }</div>
+            @if (done?.IsException == true) { <div class="card-body alert alert-warning compact">Exception: @done.ExceptionReason · pending at completion: @done.PendingItems</div> }
+            <form method="post" asp-route-id="@s.Id" novalidate>
+                <input type="hidden" name="Stage" value="@stage" />
+                <table class="table table-compact"><tbody>
+                @foreach (var it in items)
+                {
+                    var last = Model.Latest.GetValueOrDefault(it.Id);
+                    var ans = last?.Answer ?? ChecklistAnswer.Pending;
+                    <tr class="@(ans == ChecklistAnswer.Pending && it.IsMandatory ? "row-warn" : "")" data-item="@it.Id"><td>@it.Label @(it.IsMandatory ? "*" : "")</td>
+                        <td>@if (done is null)
+                            {
+                                <select name="Answers[@it.Id]" aria-label="@it.Label"><option value="Pending" selected="@(ans == ChecklistAnswer.Pending)">Pending</option><option value="Done" selected="@(ans == ChecklistAnswer.Done)">Done / confirmed</option><option value="NotApplicable" selected="@(ans == ChecklistAnswer.NotApplicable)">Not applicable</option></select>
+                            }
+                            else { <span>@ans</span> }</td>
+                        <td>@if (done is null) { <input name="Remarks[@it.Id]" value="@(last?.Remarks)" maxlength="300" placeholder="Remarks" aria-label="Remarks" /> } else { <text>@(last?.Remarks)</text> }</td>
+                        <td class="small muted">@(last is null ? "" : $"{last.Username} {Fmt.DateTimeText(last.RecordedUtc)}")</td></tr>
+                }
+                </tbody></table>
+                @if (done is null && !Model.Closed)
+                {
+                    <div class="card-body inline-form wrap" bn-permission="@(stage == ChecklistStage.PreOp ? Perm.OtEnterPreOp : Perm.OtCompleteChecklist)">
+                        <button class="btn btn-light btn-sm" type="submit" asp-page-handler="Checklist" data-test="save-@stage">Save answers</button>
+                        <span bn-permission="@Perm.OtAuthorizeException"><label class="check"><input type="checkbox" name="Exception" value="true" /> Authorised exception (mandatory items pending)</label></span>
+                        <input name="Reason" placeholder="Remarks / reason for exception" maxlength="500" />
+                        <button class="btn btn-primary btn-sm" type="submit" asp-page-handler="CompleteStage" data-test="complete-@stage">Complete @stage</button>
+                    </div>
+                }
+            </form>
+        </div>
+    }
+    if (tab == "safety")
+    {
+        <p class="no-print"><a bn-permission="@Perm.OtPrintDocuments" class="btn btn-light btn-sm" href="/Print/Ot/checklist/@s.Id" target="_blank">Print safety checklist</a></p>
+    }
+    if (tab == "preop")
+    {
+        <div class="card" data-investigations>
+            <div class="card-header"><h3>Investigations (existing Laboratory / Radiology records – no duplicates)</h3>
+                <div class="no-print"><a bn-permission="@Perm.LabBook" class="btn btn-light btn-sm" href="/Lab/Book?patientId=@p.Id@(s.IpdAdmissionId is long ia ? $"&admissionId={ia}" : "")">Order laboratory test</a>
+                    <a bn-permission="@Perm.RadCreateBooking" class="btn btn-light btn-sm" href="/Radiology/Book?patientId=@p.Id@(s.IpdAdmissionId is long ib ? $"&admissionId={ib}" : "")">Order X-ray / ultrasound</a></div></div>
+            <table class="table table-compact"><tbody>
+            @foreach (var x in Model.Investigations) { <tr><td>@Fmt.DateTimeText(x.Utc)</td><td>@x.Kind</td><td class="mono">@x.Number</td><td>@x.Name</td><td><a href="@x.Link">Open report</a></td></tr> }
+            @if (Model.Investigations.Count == 0) { <tr><td class="empty">No previous investigations for this patient.</td></tr> }
+            </tbody></table>
+        </div>
+        <p class="no-print"><a bn-permission="@Perm.OtPrintDocuments" class="btn btn-light btn-sm" href="/Print/Ot/preop/@s.Id" target="_blank">Print pre-operative assessment</a></p>
+    }
+}
+
+@if (tab == "consent")
+{
+    <div class="card" data-consents>
+        <div class="card-header"><h3>Consent documentation</h3></div>
+        <p class="card-body small muted">This records the consent process. The signed paper form (or its scan) is the legal record – a checkbox in the software is not a substitute for it.</p>
+        <table class="table table-compact"><thead><tr><th>Type</th><th>Given by</th><th>When</th><th>Status</th><th>Staff / witness</th><th>Scans</th><th></th></tr></thead><tbody>
+        @foreach (var c in Model.Consents)
+        {
+            <tr data-consent="@c.Id"><td>@c.ConsentTypeName</td><td>@c.GivenBy @c.Relation</td><td>@Fmt.DateTimeText(c.ConsentUtc)</td><td>@c.Status</td><td>@c.ResponsibleStaff<small class="block muted">@c.Witness</small></td>
+                <td>@foreach (var doc in Model.Documents.Where(x => x.ConsentId == c.Id)) { <a class="chip" href="/Ot/Document/@doc.Id" target="_blank">@doc.Title</a> }</td>
+                <td class="actions no-print"><a bn-permission="@Perm.OtPrintDocuments" class="btn btn-light btn-sm" href="/Print/Ot/consent/@c.Id" target="_blank">Print form</a>
+                    <details bn-permission="@Perm.OtManageConsent"><summary class="btn btn-light btn-sm">Change</summary>
+                        <form method="post" asp-page-handler="ConsentStatus" asp-route-id="@s.Id" class="inline-form wrap"><input type="hidden" name="ItemId" value="@c.Id" />
+                            <select name="NewConsentStatus">@foreach (var cs in Enum.GetValues<ConsentStatus>()) { <option value="@cs">@cs</option> }</select><input name="Reason" placeholder="Reason *" maxlength="300" />
+                            <button class="btn btn-light btn-sm" type="submit">Save</button></form>
+                        <form method="post" enctype="multipart/form-data" asp-page-handler="Upload" asp-route-id="@s.Id" class="inline-form wrap"><input type="hidden" name="ConsentId" value="@c.Id" /><input type="hidden" name="DocKind" value="Consent" />
+                            <input type="file" name="Upload" accept=".pdf,.jpg,.jpeg,.png" aria-label="Scan" /><button class="btn btn-light btn-sm" type="submit" data-test="upload-consent">Upload signed scan</button></form>
+                    </details></td></tr>
+        }
+        @if (Model.Consents.Count == 0) { <tr><td colspan="7" class="empty">No consent documented yet.</td></tr> }
+        </tbody></table>
+    </div>
+    @if (!Model.Closed)
+    {
+        <form bn-permission="@Perm.OtManageConsent" method="post" asp-page-handler="Consent" asp-route-id="@s.Id" class="card" novalidate data-consent-form>
+            <div class="card-header"><h3>Document a consent</h3></div>
+            <div class="card-body grid-3">
+                <div class="field"><label>Consent type *</label><select name="Consent.ConsentTypeId"><option value="0">— select —</option>@foreach (var t in Model.ConsentTypes) { <option value="@t.Id">@t.Name</option> }</select></div>
+                <div class="field"><label>Patient / representative *</label><input name="Consent.GivenBy" value="@p.FullName" maxlength="150" /></div>
+                <div class="field"><label>Relation (if representative)</label><input name="Consent.Relation" maxlength="60" /></div>
+                <div class="field"><label>Date / time</label><input type="datetime-local" name="Consent.ConsentLocal" /></div>
+                <div class="field"><label>Status</label><select name="Consent.Status">@foreach (var cs in Enum.GetValues<ConsentStatus>()) { <option value="@cs" selected="@(cs == ConsentStatus.Obtained)">@cs</option> }</select></div>
+                <div class="field"><label>Responsible staff *</label><input name="Consent.ResponsibleStaff" maxlength="150" /></div>
+                <div class="field"><label>Witness</label><input name="Consent.Witness" maxlength="150" /></div>
+                <div class="field span-2"><label>Notes</label><input name="Consent.Notes" maxlength="1000" /></div>
+            </div>
+            <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="save-consent">Save consent</button></div>
+        </form>
+    }
+}
+
+@if (tab == "anesthesia")
+{
+    <div class="grid-2">
+        <form bn-permission="@Perm.OtEnterAnesthesia" method="post" asp-page-handler="AnesthesiaTimes" asp-route-id="@s.Id" class="card" novalidate data-anesthesia-times>
+            <div class="card-header"><h3>Anesthesia record</h3></div>
+            <div class="card-body">
+                <p>Type: <strong>@(s.AnesthesiaType?.ToString() ?? "not recorded")</strong> @s.AnesthesiaDetail · start @Fmt.DateTimeText(s.AnesthesiaStartUtc) · end @Fmt.DateTimeText(s.AnesthesiaEndUtc) · provider @(s.AnesthesiaProvider ?? "—")</p>
+                <div class="grid-3">
+                    <div class="field"><label>Start</label><input type="datetime-local" name="StartLocal" /></div>
+                    <div class="field"><label>End</label><input type="datetime-local" name="EndLocal" /></div>
+                    <div class="field"><label>Anesthesia provider</label><input name="Provider" value="@s.AnesthesiaProvider" maxlength="150" /></div>
+                </div>
+            </div>
+            <div class="card-footer"><button class="btn btn-light btn-sm" type="submit">Save times</button>
+                <a bn-permission="@Perm.OtPrintDocuments" class="btn btn-light btn-sm" href="/Print/Ot/anesthesia/@s.Id" target="_blank">Print anesthesia assessment &amp; record</a></div>
+        </form>
+        @await Html.PartialAsync("_Drugs", (Model.Drugs.Where(d => d.Phase == "Anesthesia").ToList(), "Anesthesia", s.Id, Perm.OtEnterAnesthesia))
+    </div>
+}
+
+@if (tab == "intraop")
+{
+    <div class="card" data-intraop>
+        <div class="card-header"><h3>Surgery</h3>
+            <div class="no-print"><a bn-permission="@Perm.OtPrintDocuments" class="btn btn-light btn-sm" href="/Print/Ot/intraop/@s.Id" target="_blank">Intra-operative record</a>
+                <a bn-permission="@Perm.OtPrintDocuments" class="btn btn-light btn-sm" href="/Print/Ot/opnote/@s.Id" target="_blank" data-test="print-opnote">Operation notes</a></div></div>
+        <div class="card-body">
+            <p>Actual start @Fmt.DateTimeText(s.ActualStartUtc) · end @Fmt.DateTimeText(s.ActualEndUtc)</p>
+            @if (s.Status is SurgeryStatus.Scheduled or SurgeryStatus.PreOp or SurgeryStatus.Ready)
+            {
+                <form bn-permission="@Perm.OtEnterIntraOp" method="post" asp-page-handler="Start" asp-route-id="@s.Id" class="inline-form wrap" novalidate>
+                    <input type="datetime-local" name="StartLocal" aria-label="Start time" />
+                    <span bn-permission="@Perm.OtAuthorizeException"><label class="check"><input type="checkbox" name="Exception" value="true" /> Emergency exception (checklist incomplete)</label></span>
+                    <input name="Reason" placeholder="Reason for exception" maxlength="500" />
+                    <button class="btn btn-primary" type="submit" data-test="start-surgery">Start surgery</button>
+                </form>
+                @if (!StageDone(ChecklistStage.SignIn) || !StageDone(ChecklistStage.TimeOut)) { <p class="text-warning small">Sign In and Time Out must be completed before incision (or an authorised emergency exception recorded).</p> }
+            }
+            @if (s.Status == SurgeryStatus.InProgress)
+            {
+                <form bn-permission="@Perm.OtEnterIntraOp" method="post" asp-page-handler="End" asp-route-id="@s.Id" class="inline-form wrap" novalidate>
+                    <input type="datetime-local" name="EndLocal" aria-label="End time" />
+                    <span bn-permission="@Perm.OtAuthorizeException"><label class="check"><input type="checkbox" name="Exception" value="true" /> Exception (no Sign Out)</label></span>
+                    <input name="Reason" placeholder="Reason for exception" maxlength="500" />
+                    <button class="btn btn-primary" type="submit" data-test="end-surgery">End surgery → recovery</button>
+                </form>
+            }
+        </div>
+    </div>
+    @if (s.Status is SurgeryStatus.InProgress or SurgeryStatus.Completed)
+    {
+        var editable = draft is not null || finalNote is null;
+        <form method="post" asp-route-id="@s.Id" class="card" novalidate data-note-form>
+            <div class="card-header"><h3>Intra-operative record &amp; operation note
+                @if (draft is not null) { <span class="status status-warn">Draft v@(draft.Version) @(draft.AmendReason is null ? "" : $"– amendment: {draft.AmendReason}")</span> }
+                else if (finalNote is not null) { <span class="status status-ok" data-note-final>Final v@(finalNote.Version) · @finalNote.FinalizedBy · @Fmt.DateTimeText(finalNote.FinalizedUtc)</span> }</h3></div>
+            <div class="card-body">
+                <div class="grid-3">
+                    <div class="field"><label>Patient positioning</label><input name="Note.Positioning" value="@Model.Note.Positioning" maxlength="200" /></div>
+                    <div class="field"><label>Surgical site</label><input name="Note.Site" value="@Model.Note.Site" maxlength="150" /></div>
+                    <div class="field"><label>Procedure performed *</label><input name="Note.ProcedurePerformed" value="@Model.Note.ProcedurePerformed" maxlength="300" /></div>
+                    <div class="field"><label>Pre-operative diagnosis</label><input name="Note.PreOpDiagnosis" value="@Model.Note.PreOpDiagnosis" maxlength="500" /></div>
+                    <div class="field"><label>Post-operative diagnosis *</label><input name="Note.PostOpDiagnosis" value="@Model.Note.PostOpDiagnosis" maxlength="500" /></div>
+                    <div class="field"><label>Estimated blood loss (ml)</label><input type="number" min="0" name="Note.BloodLossMl" value="@Model.Note.BloodLossMl" /></div>
+                </div>
+                <div class="grid-2">
+                    <div class="field"><label>Operative findings</label><textarea name="Note.OperativeFindings" rows="3" maxlength="4000">@Model.Note.OperativeFindings</textarea></div>
+                    <div class="field"><label>Surgical technique</label><textarea name="Note.Technique" rows="3" maxlength="4000">@Model.Note.Technique</textarea></div>
+                    <div class="field"><label>IV fluids</label><textarea name="Note.IvFluids" rows="2" maxlength="1000">@Model.Note.IvFluids</textarea></div>
+                    <div class="field"><label>Drugs administered</label><textarea name="Note.DrugsAdministered" rows="2" maxlength="1000">@Model.Note.DrugsAdministered</textarea></div>
+                    <div class="field"><label>Specimen details</label><textarea name="Note.Specimens" rows="2" maxlength="1000">@Model.Note.Specimens</textarea></div>
+                    <div class="field"><label>Implants used</label><textarea name="Note.Implants" rows="2" maxlength="1000">@Model.Note.Implants</textarea></div>
+                    <div class="field"><label>Complications</label><textarea name="Note.Complications" rows="2" maxlength="1000">@Model.Note.Complications</textarea></div>
+                    <div class="field"><label>Additional procedures</label><textarea name="Note.AdditionalProcedures" rows="2" maxlength="1000">@Model.Note.AdditionalProcedures</textarea></div>
+                    <div class="field"><label>Other observations</label><textarea name="Note.Observations" rows="2" maxlength="2000">@Model.Note.Observations</textarea></div>
+                    <div class="field"><label>Post-operative instructions</label><textarea name="Note.PostOpInstructions" rows="2" maxlength="2000">@Model.Note.PostOpInstructions</textarea></div>
+                    <div class="field"><label>Surgeon notes</label><textarea name="Note.SurgeonNotes" rows="2" maxlength="2000">@Model.Note.SurgeonNotes</textarea></div>
+                    <div class="field"><label>Responsible surgeon *</label><input name="Note.SurgeonName" value="@Model.Note.SurgeonName" maxlength="150" /></div>
+                </div>
+                <p class="small muted">A finalized note can no longer be changed (also protected by the database). Corrections are made as an amendment with a reason; every version is kept.</p>
+            </div>
+            <div class="card-footer form-actions">
+                @if (editable)
+                {
+                    <button bn-permission="@Perm.OtEnterIntraOp" class="btn btn-light" type="submit" asp-page-handler="Note" data-test="save-note">Save draft</button>
+                    @if (draft is not null) { <button bn-permission="@Perm.OtFinalizeNotes" class="btn btn-primary" type="submit" asp-page-handler="Finalize" data-test="finalize-note" data-confirm="Finalize the operation note? It cannot be edited afterwards.">Finalize</button> }
+                }
+                else
+                {
+                    <input bn-permission="@Perm.OtFinalizeNotes" name="Reason" placeholder="Reason for amendment *" maxlength="300" />
+                    <button bn-permission="@Perm.OtFinalizeNotes" class="btn btn-light" type="submit" asp-page-handler="Amend" data-test="amend-note">Amend (new version)</button>
+                }
+            </div>
+        </form>
+        @if (Model.Notes.Count > 1) { <div class="card"><div class="card-header"><h3>Note versions</h3></div><table class="table table-compact"><tbody>@foreach (var n in Model.Notes) { <tr><td>v@(n.Version)</td><td>@n.Status</td><td>@n.FinalizedBy @Fmt.DateTimeText(n.FinalizedUtc)</td><td>@n.AmendReason</td></tr> }</tbody></table></div> }
+        <div class="grid-2">
+            <div class="card" data-specimens>
+                <div class="card-header"><h3>Specimens</h3><a bn-permission="@Perm.OtPrintDocuments" class="btn btn-light btn-sm no-print" href="/Print/Ot/specimen/@s.Id" target="_blank">Dispatch form &amp; labels</a></div>
+                <table class="table table-compact"><tbody>
+                @foreach (var x in Model.Specimens)
+                {
+                    <tr data-specimen="@x.Status"><td><strong>@x.Name</strong> <small class="muted">@x.Type</small><small class="block">@Fmt.DateTimeText(x.CollectedUtc) · @x.CollectedBy → @x.Destination @(x.LabOrder is null ? "" : $"· {x.LabOrder.OrderNumber}")</small></td>
+                        <td>@x.Status @(x.ReceivedBy is null ? "" : $"– {x.ReceivedBy}")</td>
+                        <td class="actions">@if (x.Status != SpecimenStatus.Received)
+                        {
+                            <form bn-permission="@Perm.OtEnterIntraOp" method="post" asp-page-handler="SpecimenStatus" asp-route-id="@s.Id" class="inline-form"><input type="hidden" name="ItemId" value="@x.Id" />
+                                <input type="hidden" name="NewSpecimenStatus" value="@(x.Status == SpecimenStatus.Collected ? "Dispatched" : "Received")" />
+                                @if (x.Status == SpecimenStatus.Dispatched) { <input name="By" placeholder="Received by" maxlength="150" /> }
+                                <button class="btn btn-light btn-sm" type="submit">@(x.Status == SpecimenStatus.Collected ? "Dispatch" : "Received at lab")</button></form>
+                        }</td></tr>
+                }
+                @if (Model.Specimens.Count == 0) { <tr><td class="empty">No specimens.</td></tr> }
+                </tbody></table>
+                <form bn-permission="@Perm.OtEnterIntraOp" method="post" asp-page-handler="Specimen" asp-route-id="@s.Id" class="card-body" novalidate data-specimen-form>
+                    <div class="grid-2">
+                        <div class="field"><label>Specimen *</label><input name="Specimen.Name" maxlength="150" /></div>
+                        <div class="field"><label>Type</label><input name="Specimen.Type" maxlength="60" placeholder="Tissue / fluid / …" /></div>
+                        <div class="field"><label>Destination laboratory</label><input name="Specimen.Destination" maxlength="150" placeholder="Histopathology – …" /></div>
+                        <div class="field"><label>Existing lab order (optional)</label><select name="Specimen.LabOrderId"><option value="">—</option>@foreach (var o in Model.LabOrders) { <option value="@o.Id">@o.OrderNumber · @Fmt.DateTimeText(o.BookedUtc)</option> }</select></div>
+                    </div>
+                    <input name="Specimen.Remarks" placeholder="Remarks" maxlength="500" />
+                    <button class="btn btn-light btn-sm" type="submit" data-test="save-specimen">Record specimen</button>
+                </form>
+            </div>
+            @await Html.PartialAsync("_Drugs", (Model.Drugs.Where(d => d.Phase == "IntraOp").ToList(), "IntraOp", s.Id, Perm.OtEnterIntraOp))
+        </div>
+    }
+}
+
+@if (tab == "stock")
+{
+    <div class="card" data-consumption>
+        <div class="card-header"><h3>Major OT consumption (from @s.Theatre.Name stock)</h3></div>
+        <p class="card-body small muted">Stock is deducted from the OT stock location only when this entry is saved. The Minor OT keeps its existing workflow (pharmacy transfers only, no patient-wise entry).</p>
+        <table class="table table-compact"><thead><tr><th>When</th><th>Item</th><th>Batch</th><th>Qty</th><th>Type</th><th>By</th><th></th></tr></thead><tbody>
+        @foreach (var c in Model.Consumption)
+        {
+            var returned = Model.Consumption.Where(x => x.ReturnOfId == c.Id).Sum(x => x.Quantity);
+            <tr><td>@Fmt.DateTimeText(c.CreatedUtc)</td><td>@c.MedicineName</td><td class="mono">@c.BatchNumber</td><td>@c.Quantity</td><td>@c.Kind @c.Note</td><td>@c.Username</td>
+                <td>@if (c.Kind == OtConsumptionKind.Use && returned < c.Quantity)
+                {
+                    <form bn-permission="@Perm.OtRecordConsumption" method="post" asp-page-handler="Return" asp-route-id="@s.Id" class="inline-form"><input type="hidden" name="ItemId" value="@c.Id" />
+                        <input type="number" name="Quantity" min="1" max="@(c.Quantity - returned)" value="1" aria-label="Quantity" /><input name="Reason" placeholder="Reason" maxlength="300" /><button class="btn btn-light btn-sm" type="submit">Return unused</button></form>
+                }</td></tr>
+        }
+        @if (Model.Consumption.Count == 0) { <tr><td colspan="7" class="empty">No consumption recorded.</td></tr> }
+        </tbody></table>
+        @if (s.Theatre.StockLocationId is null) { <p class="card-body text-warning">This theatre has no OT stock location – set it under OT rooms (the pharmacy transfers stock to it).</p> }
+        else
+        {
+            <form bn-permission="@Perm.OtRecordConsumption" method="post" asp-page-handler="Consume" asp-route-id="@s.Id" class="card-body inline-form wrap" novalidate data-consume-form>
+                <select name="MedicineId" aria-label="Item"><option value="0">— item in OT stock —</option>@foreach (var g in Model.Stock.GroupBy(x => x.Balance.MedicineId)) { <option value="@g.Key">@g.First().Name · @g.Sum(x => x.Balance.Quantity) available</option> }</select>
+                <input type="number" min="1" name="Quantity" value="1" aria-label="Quantity" />
+                <input name="Reason" placeholder="Note" maxlength="300" />
+                <button class="btn btn-primary btn-sm" type="submit" data-test="consume">Record use</button>
+            </form>
+        }
+    </div>
+}
+
+@if (tab == "recovery")
+{
+    var r = Model.RecoveryEpisode;
+    <div class="card" data-recovery="@(r?.Status)">
+        <div class="card-header"><h3>Recovery room / PACU</h3><a bn-permission="@Perm.OtPrintDocuments" class="btn btn-light btn-sm no-print" href="/Print/Ot/pacu/@s.Id" target="_blank">PACU chart</a></div>
+        @if (r is null) { <p class="card-body empty">The patient is still in theatre (or the surgery has not started).</p> }
+        else
+        {
+            <div class="card-body">
+                <p>Status <strong>@r.Status</strong> · arrival @Fmt.DateTimeText(r.ArrivalUtc) · nurse @(r.Nurse ?? "—") · anesthesia @(r.AnesthesiaSummary ?? "—")</p>
+                @if (!r.IsOpen) { <p>Transferred @Fmt.DateTimeText(r.TransferUtc) to <strong>@(r.Destination ?? "—")</strong> · handover to @r.HandoverStaff · decided by @r.DecisionBy<br />@r.HandoverNotes</p>
+                    <a bn-permission="@Perm.OtPrintDocuments" class="btn btn-light btn-sm" href="/Print/Ot/handover/@s.Id" target="_blank">Transfer handover</a> }
+            </div>
+            @if (r.IsOpen)
+            {
+                <form bn-permission="@Perm.OtManageRecovery" method="post" asp-page-handler="Recovery" asp-route-id="@s.Id" class="card-body" novalidate data-recovery-form>
+                    <div class="grid-3">
+                        <div class="field"><label>Status</label><select name="Recovery.Status">@foreach (var x in Enum.GetValues<RecoveryStatus>()) { <option value="@x" selected="@(r.Status == x)">@x</option> }</select></div>
+                        <div class="field"><label>Recovery nurse</label><input name="Recovery.Nurse" value="@r.Nurse" maxlength="150" /></div>
+                        <div class="field"><label>Destination (ward / ICU / home)</label><input name="Recovery.Destination" maxlength="150" /></div>
+                        <div class="field"><label>Handover staff</label><input name="Recovery.HandoverStaff" maxlength="150" /></div>
+                        <div class="field"><label>Decision by (clinician)</label><input name="Recovery.DecisionBy" maxlength="150" /></div>
+                        <div class="field"><label>Notes</label><input name="Recovery.Notes" maxlength="1000" /></div>
+                    </div>
+                    <div class="field"><label>Handover notes</label><textarea name="Recovery.HandoverNotes" rows="2" maxlength="1000"></textarea></div>
+                    <p class="small muted">Fitness to leave recovery is decided and documented by the responsible clinician – the system does not derive it from observations.</p>
+                    <button class="btn btn-primary btn-sm" type="submit" data-test="save-recovery">Save</button>
+                    @if (s.IpdAdmissionId is long ia) { <a class="btn btn-light btn-sm" href="/Ipd/Admission/@ia">IPD admission</a> }
+                    else { <a bn-permission="@Perm.IpdRegisterAdmission" class="btn btn-light btn-sm" href="/Ipd/Admit?patientId=@p.Id">Admit to IPD</a> }
+                </form>
+            }
+        }
+    </div>
+    @await Html.PartialAsync("_Drugs", (Model.Drugs.Where(d => d.Phase == "Recovery").ToList(), "Recovery", s.Id, Perm.OtManageRecovery))
+}
+
+@if (tab == "postop")
+{
+    <div class="card"><div class="card-body">
+        <p class="small muted">Handwritten instructions of the doctor are entered by authorised staff: choose the source (“Handwritten by doctor”), name the responsible clinician – your user is recorded as the person entering it – and upload the scan below.</p>
+        @if (s.IpdAdmissionId is long ia) { <p>Linked to IPD admission <a href="/Ipd/Admission/@ia">@(s.IpdAdmission?.AdmissionNumber)</a> – medication orders are entered on its <a href="/Ipd/Admission/@ia?tab=mar">MAR</a>.</p> }
+        <a bn-permission="@Perm.OtPrintDocuments" class="btn btn-light btn-sm" href="/Print/Ot/postop/@s.Id" target="_blank">Print post-operative instructions</a>
+    </div></div>
+    <div class="card"><div class="card-header"><h3>Scanned / handwritten documents</h3></div>
+        <table class="table table-compact"><tbody>@foreach (var d in Model.Documents) { <tr><td><a href="/Ot/Document/@d.Id" target="_blank">@d.Title</a></td><td>@d.Kind</td><td>@Fmt.DateTimeText(d.UploadedUtc) · @d.UploadedBy</td></tr> }
+        @if (Model.Documents.Count == 0) { <tr><td class="empty">None.</td></tr> }</tbody></table>
+        <form bn-permission="@Perm.OtEnterPostOp" method="post" enctype="multipart/form-data" asp-page-handler="Upload" asp-route-id="@s.Id" class="card-body inline-form wrap">
+            <input type="hidden" name="DocKind" value="PostOpInstruction" /><input name="DocTitle" placeholder="Title" maxlength="150" />
+            <input type="file" name="Upload" accept=".pdf,.jpg,.jpeg,.png" aria-label="Scan" /><button class="btn btn-light btn-sm" type="submit">Upload</button>
+        </form>
+    </div>
+}
+
+@if (tab == "billing")
+{
+    var total = Model.Bill.Where(b => b.Status != ChargeStatus.Cancelled).Sum(b => b.Net);
+    <div class="card" data-ot-bill>
+        <div class="card-header"><h3>OT bill</h3>
+            <div class="no-print"><a bn-permission="@Perm.FinanceCollect" class="btn btn-primary btn-sm" href="/Finance/Collect?patientId=@p.Id&surgeryId=@s.Id" data-test="collect">Collect payment</a>
+                <a bn-permission="@Perm.OtPrintDocuments" class="btn btn-light btn-sm" href="/Print/Ot/bill/@s.Id" target="_blank">OT bill</a></div></div>
+        <table class="table table-compact"><thead><tr><th>Date</th><th>Charge</th><th>Service</th><th>Type</th><th class="num">Fee</th><th class="num">Discount</th><th class="num">Net</th><th class="num">Paid</th><th>Status</th></tr></thead><tbody>
+        @foreach (var l in Model.Bill) { <tr class="@(l.Status == ChargeStatus.Cancelled ? "row-muted" : "")"><td>@Fmt.Day(l.Date)</td><td class="mono">@l.ChargeNumber</td><td>@l.Service</td><td>@l.Kind</td><td class="num">@Fmt.Money(l.Fee)</td><td class="num">@Fmt.Money(l.Discount)</td><td class="num">@Fmt.Money(l.Net)</td><td class="num">@Fmt.Money(l.Paid)</td><td>@l.Status</td></tr> }
+        @if (Model.Bill.Count == 0) { <tr><td colspan="9" class="empty">No OT charges yet.</td></tr> }
+        </tbody>
+        <tfoot><tr><th colspan="6">Total</th><th class="num" data-bill-total>@Fmt.Money(total)</th><th class="num">@Fmt.Money(Model.Bill.Sum(b => b.Paid))</th><th data-bill-balance>Balance @Fmt.Money(Model.Bill.Sum(b => b.Balance))</th></tr></tfoot></table>
+        @if (!Model.Closed)
+        {
+            @if (Model.Pending.Count > 0)
+            {
+                <form bn-permission="@Perm.OtManageCharges" method="post" asp-page-handler="PostCharges" asp-route-id="@s.Id" class="card-body inline-form wrap" data-pending-charges>
+                    @foreach (var (k, item) in Model.Pending) { <label class="check"><input type="checkbox" name="Kinds" value="@k" checked /> @k – @item.Name</label> }
+                    <button class="btn btn-primary btn-sm" type="submit" data-test="post-charges">Post OT charges</button>
+                </form>
+            }
+            <form bn-permission="@Perm.OtManageCharges" method="post" asp-page-handler="Charge" asp-route-id="@s.Id" class="card-body inline-form wrap" novalidate>
+                <select name="ServiceItemId" aria-label="Service"><option value="">— other surgical service —</option>@foreach (var x in Model.Services) { <option value="@x.Item.Id">@x.Item.Name · @Fmt.Money(x.CurrentFee)</option> }</select>
+                <input type="number" name="Quantity" value="1" min="1" max="100" aria-label="Quantity" />
+                <input bn-permission="@Perm.FinanceDiscount" type="number" step="0.01" min="0" name="Discount" value="0" aria-label="Discount" />
+                <input name="Reason" placeholder="Discount reason" maxlength="200" />
+                <button class="btn btn-light btn-sm" type="submit">Add charge</button>
+            </form>
+        }
+        <p class="card-body small muted">Payments, receipts, cancellations and refunds are done at the Phase 3 cashier with its permissions. Cancelling a surgery does not remove any charge or payment.</p>
+    </div>
+}
+
+@if (tab == "history")
+{
+    <div class="card"><div class="card-header"><h3>Surgery history</h3></div>
+        <table class="table table-compact" data-events><thead><tr><th>When</th><th>Category</th><th>Event</th><th>From → to</th><th>Note</th><th>By</th></tr></thead><tbody>
+        @foreach (var e in Model.Events) { <tr><td>@Fmt.DateTimeText(e.CreatedUtc)</td><td>@e.Category</td><td>@e.Event</td><td>@e.FromValue @(e.ToValue is null ? "" : "→ " + e.ToValue)</td><td>@e.Note</td><td>@e.Username</td></tr> }
+        </tbody></table>
+    </div>
+}

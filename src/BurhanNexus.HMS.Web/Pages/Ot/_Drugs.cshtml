@@ -1,0 +1,24 @@
+@model (List<OtDrugEntry> Rows, string Phase, long SurgeryId, string Permission)
+<div class="card" data-drugs="@Model.Phase">
+    <div class="card-header"><h3>@(Model.Phase switch { "IntraOp" => "Intra-operative drugs & fluids", "Recovery" => "Recovery drugs & fluids", _ => "Anesthesia drugs & fluids" })</h3></div>
+    <table class="table table-compact"><tbody>
+    @foreach (var row in Model.Rows)
+    {
+        <tr><td>@Fmt.DateTimeText(row.GivenUtc)</td><td><strong>@row.Name</strong> <small class="muted">@row.Kind</small></td><td>@row.Dose @row.Route</td><td>@row.GivenBy<small class="block muted">@row.Notes</small></td></tr>
+    }
+    @if (Model.Rows.Count == 0) { <tr><td class="empty">Nothing recorded.</td></tr> }
+    </tbody></table>
+    <form bn-permission="@Model.Permission" method="post" asp-page="/Ot/Surgery" asp-page-handler="Drug" asp-route-id="@Model.SurgeryId" class="card-body" novalidate data-drug-form>
+        <input type="hidden" name="Drug.Phase" value="@Model.Phase" />
+        <div class="grid-3">
+            <div class="field"><label>Type</label><select name="Drug.Kind"><option value="Drug">Drug</option><option value="Fluid">Fluid</option></select></div>
+            <div class="field"><label>Name *</label><input name="Drug.Name" maxlength="150" /></div>
+            <div class="field"><label>Dose / volume</label><input name="Drug.Dose" maxlength="60" /></div>
+            <div class="field"><label>Route</label><input name="Drug.Route" maxlength="40" /></div>
+            <div class="field"><label>Time</label><input type="datetime-local" name="Drug.GivenLocal" /></div>
+            <div class="field"><label>Given by</label><input name="Drug.GivenBy" maxlength="150" /></div>
+        </div>
+        <input name="Drug.Notes" placeholder="Notes" maxlength="300" />
+        <button class="btn btn-light btn-sm" type="submit" data-test="save-drug-@Model.Phase">Record</button>
+    </form>
+</div>
