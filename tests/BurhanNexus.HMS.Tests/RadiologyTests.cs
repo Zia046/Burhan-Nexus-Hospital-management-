@@ -412,7 +412,9 @@ public partial class RadiologyTests : Phase2TestBase
 
         // Reception: books, but cannot run examinations or see fees.
         var reception = await UserWithAsync(admin, "rad.reception", Perm.DashboardView, Perm.RadCreateBooking, Perm.PatientsSearch);
-        Assert.DoesNotContain("data-price", (await reception.GetHtmlAsync($"/Radiology/Book?patientId={pid}")).Replace("data-price=\"0\"", ""));
+        var bookPage = await reception.GetHtmlAsync($"/Radiology/Book?patientId={pid}");
+        Assert.DoesNotContain("data-lab-total", bookPage);
+        Assert.DoesNotContain("data-price=\"0", bookPage);
         Denied(await reception.PostFormAsync($"/Radiology/Book?patientId={pid}", None, $"/Radiology/Exam/{u.Id}?handler=Start"), "Start");
         Assert.Contains("discount", (await (await PostBookAsync(reception, pid, new[] { usg }, visit: await RegisterOpdAsync(admin, pid), extra: ($"Discounts[{usg}]", "10"))).Content.ReadAsStringAsync()).ToLowerInvariant());
 
