@@ -487,7 +487,8 @@
     </div>
 }
 
-@if (tab == "billing")
+@if (tab == "billing" && !Model.CanBill) { <div class="card"><p class="card-body empty">You do not have permission to view OT billing.</p></div> }
+@if (tab == "billing" && Model.CanBill)
 {
     var total = Model.Bill.Where(b => b.Status != ChargeStatus.Cancelled).Sum(b => b.Net);
     <div class="card" data-ot-bill>

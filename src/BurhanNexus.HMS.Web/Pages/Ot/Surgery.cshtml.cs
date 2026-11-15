@@ -67,6 +67,7 @@ public class SurgeryModel : OtPageModel
     public Patient P => S.Patient!;
     public string AgeText { get; private set; } = "—";
     public bool IsPrivate { get; private set; }
+    public bool CanBill { get; private set; }
     public IReadOnlyList<SurgeryTeamMember> TeamMembers { get; private set; } = Array.Empty<SurgeryTeamMember>();
     public IReadOnlyList<SurgeryEvent> Events { get; private set; } = Array.Empty<SurgeryEvent>();
     public IReadOnlyList<SurgeryChecklistStage> Stages { get; private set; } = Array.Empty<SurgeryChecklistStage>();
@@ -162,7 +163,8 @@ public class SurgeryModel : OtPageModel
                 Stock = bal.Select(b => (b, b.Batch!.Medicine!.Name)).ToList();
             }
         }
-        if (Tab == "billing" && await CanAsync(Perm.OtViewBilling))
+        CanBill = await CanAsync(Perm.OtViewBilling);
+        if (Tab == "billing" && CanBill)
         {
             Bill = await Billing.BillAsync(Id);
             Pending = await Billing.PendingStandardAsync(Id);

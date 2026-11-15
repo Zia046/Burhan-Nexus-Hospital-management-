@@ -40,6 +40,11 @@ public class ResetAndCatalogTests : HmsTestBase
         var ipd = PermissionCatalog.FindModule("Ipd")!;
         Assert.True(ipd.IsAvailable);
         Assert.Equal(37, ipd.Actions.Count);
+        // Phase 8: Operation Theatre (the Minor OT stays a pharmacy department location – no module of its own).
+        var ot = PermissionCatalog.FindModule("Ot")!;
+        Assert.True(ot.IsAvailable);
+        Assert.Equal(26, ot.Actions.Count);
+        Assert.Contains(Perm.OtAuthorizeException, PermissionCatalog.AllKeys);
         foreach (var key in typeof(Perm).GetFields().Select(f => (string)f.GetValue(null)!))
             Assert.Contains(key, PermissionCatalog.AllKeys);
     }
