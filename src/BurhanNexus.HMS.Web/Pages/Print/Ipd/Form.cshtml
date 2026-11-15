@@ -179,7 +179,7 @@
             var pg = Model.Pregnancy!;
             <table class="f-kv">
                 <tr><th>Pregnancy</th><td class="mono">@pg.Number · @pg.Status</td><th>G P A L</th><td>G@(pg.Gravida) P@(pg.Para) A@(pg.Abortions) L@(pg.LivingChildren)</td></tr>
-                <tr><th>LMP</th><td>@(pg.Lmp is DateOnly l ? Fmt.Day(l) : "not recorded")</td><th>EDD</th><td>@(pg.Edd is DateOnly e ? Fmt.Day(e) : "not recorded")</td></tr>
+                <tr><th>LMP</th><td>@(pg.Lmp is DateOnly lmp ? Fmt.Day(lmp) : "not recorded")</td><th>EDD</th><td>@(pg.Edd is DateOnly edd ? Fmt.Day(edd) : "not recorded")</td></tr>
                 <tr><th>Previous complications</th><td colspan="3">@V(pg.PreviousComplications)</td></tr>
                 <tr><th>Risk factors</th><td colspan="3">@V(pg.RiskFactors)</td></tr>
                 <tr><th>High risk</th><td colspan="3">@(pg.IsHighRisk ? $"YES – {pg.HighRiskReason} {pg.HighRiskReferral} {pg.FollowUpPlan}" : "No")</td></tr>
@@ -217,7 +217,7 @@
                 }
             </table>
             <table class="lr-results" data-newborn-table><thead><tr><th>Baby</th><th>Patient ID</th><th>Sex</th><th>Weight</th><th>APGAR 1/5/10</th><th>Condition</th><th>Placement</th></tr></thead><tbody>
-            @foreach (var n in dl.Newborns.OrderBy(n => n.BirthOrder).Where(n => Model.Newborn is null || n.Id == Model.Newborn.Id))
+            @foreach (var n in dl.Newborns.OrderBy(x => x.BirthOrder).Where(x => Model.Newborn is null || x.Id == Model.Newborn.Id))
             {
                 <tr><td>@n.BirthOrder</td><td class="mono">@(n.NewbornPatient?.PatientNumber ?? "—")</td><td>@n.Sex</td><td>@(n.BirthWeightGrams is int w ? $"{w} g" : "not recorded")</td>
                     <td>@(n.Apgar1?.ToString() ?? "—") / @(n.Apgar5?.ToString() ?? "—") / @(n.Apgar10?.ToString() ?? "—")</td><td>@n.Condition</td><td>@n.Placement</td></tr>
@@ -248,13 +248,13 @@
             <h3>@BurhanNexus.HMS.Web.Pages.Ipd.IpdPageModel.Title(kind) (@recs.Count)</h3>
             @if (charted)
             {
-                foreach (var f in fields.Where(f => f.Type == FieldType.Number && f.IsActive)) { @Model.Chart(recs, f) }
+                foreach (var f in fields.Where(x => x.Type == FieldType.Number && x.IsActive)) { @Model.Chart(recs, f) }
                 <p class="small">Charts show only recorded values; gaps mean “not recorded”. Dashed lines (if any) are the hospital's configured protocol limits.</p>
             }
             <table class="lr-results f-records">
                 <thead><tr><th>Time</th>@foreach (var f in used) { <th>@f.Label @(f.Unit is null ? "" : $"({f.Unit})")</th> }<th>Notes</th><th>By</th></tr></thead>
                 <tbody>
-                @foreach (var r in recs.OrderBy(r => r.Record.RecordedUtc))
+                @foreach (var r in recs.OrderBy(x => x.Record.RecordedUtc))
                 {
                     <tr><td class="nowrap">@D(r.Record.RecordedUtc)@(r.Record.CorrectsRecordId is null ? "" : " (corrected)")</td>
                         @foreach (var f in used) { <td>@(r.Values.TryGetValue(f.Key, out var v) ? v : "—")</td> }
