@@ -20,6 +20,6 @@ public class DocumentModel : OtPageModel
         if (path is null || !System.IO.File.Exists(path)) return NotFound();
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         Response.Headers["Cache-Control"] = "private, no-store";
-        return PhysicalFile(path, d.ContentType, enableRangeProcessing: false);
+        return PhysicalFile(path, d.ContentType);
     }
 }

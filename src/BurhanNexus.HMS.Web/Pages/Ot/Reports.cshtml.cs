@@ -1,4 +1,5 @@
 using System.Text;
+using BurhanNexus.HMS.Core.Abstractions;
 using BurhanNexus.HMS.Core.Domain;
 using BurhanNexus.HMS.Core.Security;
 using BurhanNexus.HMS.Infrastructure.Finance;

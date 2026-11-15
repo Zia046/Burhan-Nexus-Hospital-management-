@@ -60,10 +60,10 @@
             <table class="lr-results" data-schedule-print>
                 <thead><tr><th>Theatre</th><th>Time</th><th>Surgery</th><th>Patient</th><th>Procedure</th><th>Surgeon</th><th>Anesthetist</th><th>Anesthesia</th><th>Priority</th><th>Status</th></tr></thead>
                 <tbody>
-                @foreach (var r in Model.Schedule)
+                @foreach (var row in Model.Schedule)
                 {
-                    <tr><td>@r.Theatre</td><td class="nowrap">@D(r.PlannedStartUtc) – @Fmt.ToLocal(r.PlannedEndUtc).ToString("HH:mm")</td><td class="mono">@r.Number</td><td>@r.PatientName<br /><small>@r.PatientNumber · @r.AgeGender</small></td>
-                        <td>@r.Procedure</td><td>@V(r.Surgeon)</td><td>@V(r.Anesthetist)</td><td>@(r.Anesthesia?.ToString() ?? "—")</td><td>@r.Priority</td><td>@SurgeryService.Label(r.Status)</td></tr>
+                    <tr><td>@row.Theatre</td><td class="nowrap">@D(row.PlannedStartUtc) – @Fmt.ToLocal(row.PlannedEndUtc).ToString("HH:mm")</td><td class="mono">@row.Number</td><td>@row.PatientName<br /><small>@row.PatientNumber · @row.AgeGender</small></td>
+                        <td>@row.Procedure</td><td>@V(row.Surgeon)</td><td>@V(row.Anesthetist)</td><td>@(row.Anesthesia?.ToString() ?? "—")</td><td>@row.Priority</td><td>@SurgeryService.Label(row.Status)</td></tr>
                 }
                 @if (Model.Schedule.Count == 0) { <tr><td colspan="10">No surgeries scheduled.</td></tr> }
                 </tbody>
@@ -202,18 +202,18 @@
 
         case "pacu":
         case "handover":
-            var r = Model.Recovery;
+            var rec = Model.Recovery;
             <section class="rr-section"><h3>Recovery</h3>
-                @if (r is null) { <p>The patient has not reached recovery.</p> }
+                @if (rec is null) { <p>The patient has not reached recovery.</p> }
                 else
                 {
                     <table class="f-kv">
-                        <tr><th>Arrival</th><td>@D(r.ArrivalUtc)</td><th>Recovery nurse</th><td>@V(r.Nurse)</td></tr>
-                        <tr><th>Anesthesia</th><td colspan="3">@V(r.AnesthesiaSummary)</td></tr>
-                        <tr><th>Status</th><td>@r.Status</td><th>Transfer</th><td>@D(r.TransferUtc)</td></tr>
-                        <tr><th>Destination</th><td>@V(r.Destination)</td><th>Handover to</th><td>@V(r.HandoverStaff)</td></tr>
-                        <tr><th>Decision by (clinician)</th><td colspan="3">@V(r.DecisionBy)</td></tr>
-                        <tr><th>Handover notes</th><td colspan="3" class="prewrap">@V(r.HandoverNotes)</td></tr>
+                        <tr><th>Arrival</th><td>@D(rec.ArrivalUtc)</td><th>Recovery nurse</th><td>@V(rec.Nurse)</td></tr>
+                        <tr><th>Anesthesia</th><td colspan="3">@V(rec.AnesthesiaSummary)</td></tr>
+                        <tr><th>Status</th><td>@rec.Status</td><th>Transfer</th><td>@D(rec.TransferUtc)</td></tr>
+                        <tr><th>Destination</th><td>@V(rec.Destination)</td><th>Handover to</th><td>@V(rec.HandoverStaff)</td></tr>
+                        <tr><th>Decision by (clinician)</th><td colspan="3">@V(rec.DecisionBy)</td></tr>
+                        <tr><th>Handover notes</th><td colspan="3" class="prewrap">@V(rec.HandoverNotes)</td></tr>
                     </table>
                 }
                 @if (Model.Form == "handover") { <div class="f-sign-row"><div>Handed over by</div><div>Received by</div><div>Date / time</div></div> }
