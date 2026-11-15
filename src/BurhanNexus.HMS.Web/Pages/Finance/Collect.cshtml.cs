@@ -4,6 +4,7 @@ using BurhanNexus.HMS.Infrastructure.Finance;
 using BurhanNexus.HMS.Infrastructure.Patients;
 using BurhanNexus.HMS.Web.Security;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace BurhanNexus.HMS.Web.Pages.Finance;
 
@@ -38,6 +39,8 @@ public class CollectModel : HmsPageModel
     [BindProperty(SupportsGet = true)] public long? LabOrderId { get; set; }
     /// <summary>Phase 5: pre-fills the balances of one pharmacy patient issue.</summary>
     [BindProperty(SupportsGet = true)] public long? PharmacyIssueId { get; set; }
+    /// <summary>Phase 6: coming from a radiology order – its open examination fees are pre-selected.</summary>
+    [BindProperty(SupportsGet = true)] public long? RadiologyOrderId { get; set; }
     [BindProperty] public CollectInput Input { get; set; } = new();
     [BindProperty] public List<NewChargeLine> Lines { get; set; } = new();
     [BindProperty] public List<BalancePayment> Balances { get; set; } = new();
@@ -63,7 +66,9 @@ public class CollectModel : HmsPageModel
         var isAdmin = User.IsSystemAdministrator();
         Counters = isAdmin ? (await _setup.CountersAsync(activeOnly: true)).Select(c => c.Counter).ToList() : await _setup.CountersOfUserAsync(me);
         NotAssigned = Counters.Count == 0;
-        Services = (await _setup.ServicesAsync(activeOnly: true)).Where(s => s.Item.Kind != ServiceKind.Pharmacy).ToList();
+        var radiologyItems = await HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Persistence.HmsDbContext>()
+            .RadiologyServices.Select(r => r.ServiceItemId).ToListAsync();
+        Services = (await _setup.ServicesAsync(activeOnly: true)).Where(s => s.Item.Kind != ServiceKind.Pharmacy && !radiologyItems.Contains(s.Item.Id)).ToList();
         Doctors = await _registration.DoctorsAsync(activeOnly: true);
         Methods = await _setup.PaymentMethodsAsync(activeOnly: true);
         CanDiscount = await CanAsync(Perm.FinanceDiscount);

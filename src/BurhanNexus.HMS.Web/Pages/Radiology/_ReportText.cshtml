@@ -1,0 +1,14 @@
+@model RadiologyExam
+@{
+    var e = Model;
+}
+<div class="rad-report-view" data-report-view>
+    @if (e.ClinicalIndication is not null) { <h4>Clinical indication</h4><p>@e.ClinicalIndication</p> }
+    @if (e.Technique is not null) { <h4>Technique</h4><p class="prewrap">@e.Technique</p> }
+    @if (e.Findings is not null) { <h4>Findings</h4><p class="prewrap" data-report-findings>@e.Findings</p> }
+    @if (e.Impression is not null) { <h4>Impression</h4><p class="prewrap strong" data-report-impression>@e.Impression</p> }
+    @if (e.Recommendations is not null) { <h4>Recommendations</h4><p class="prewrap">@e.Recommendations</p> }
+    <p class="small muted">Reporting doctor: <strong>@(e.ReportingDoctorName ?? "—")</strong>@(e.ReportingDoctorDesignation is null ? "" : ", " + e.ReportingDoctorDesignation)
+        · entered by @e.ReportedByUsername @Fmt.DateTimeText(e.ReportSavedUtc)@(e.SubmittedUtc is null ? "" : $" · submitted {Fmt.DateTimeText(e.SubmittedUtc)}")
+        @if (e.VerifiedByName is not null) { <span> · verified by <strong>@e.VerifiedByName</strong> @Fmt.DateTimeText(e.VerifiedUtc)</span> }</p>
+</div>

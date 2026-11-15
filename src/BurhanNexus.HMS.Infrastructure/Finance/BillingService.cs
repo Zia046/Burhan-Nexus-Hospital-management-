@@ -154,10 +154,13 @@ public sealed class BillingService : IBillingService
         var doctorIds = lines.Where(l => l.DoctorId != null).Select(l => l.DoctorId!.Value).Concat(services.Values.Where(s => s.DoctorId != null).Select(s => s.DoctorId!.Value)).Distinct().ToList();
         var doctors = await _db.Doctors.AsNoTracking().Where(d => doctorIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, ct);
         var priced = new List<(NewChargeLine Line, ServiceItem Service, Doctor? Doctor, decimal Fee, decimal Discount, decimal Net, decimal Pay)>();
+        var lineIds = lines.Select(l => l.ServiceItemId).ToList();
+        var radiologyItems = await _db.RadiologyServices.AsNoTracking().Where(r => lineIds.Contains(r.ServiceItemId)).Select(r => r.ServiceItemId).ToListAsync(ct);
         foreach (var l in lines)
         {
             if (!services.TryGetValue(l.ServiceItemId, out var s) || !s.IsActive) { errors.Add("A selected service is not available."); continue; }
             if (s.Kind == ServiceKind.Pharmacy && l.PresetFee is null) { errors.Add("Medicines are billed from the Pharmacy module (sale or patient issue)."); continue; }
+            if (radiologyItems.Contains(s.Id)) { errors.Add($"{s.Name} is billed when the examination is booked in Radiology – book it there, then collect the balance."); continue; }
             if (s.Counters.Count > 0 && s.Counters.All(c => c.CounterId != input.CounterId)) { errors.Add($"{s.Name} cannot be collected at {counter!.Name}."); continue; }
             var doctorId = l.DoctorId ?? s.DoctorId;
             Doctor? doctor = null;

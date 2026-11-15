@@ -45,6 +45,7 @@ public sealed class BackupService : IBackupService
     private readonly BackupLock _lock;
     private readonly TimeProvider _time;
     private readonly ILogger<BackupService> _logger;
+    private readonly Radiology.RadiologyFileStore _files;
 
     public BackupService(HmsDbContext db, IOptions<HmsOptions> options, IAuditService audit, IRequestContext ctx,
         IPasswordService passwords, IMemoryCache cache, SetupStateCache setupCache, BackupLock backupLock,
@@ -52,6 +53,7 @@ public sealed class BackupService : IBackupService
     {
         _db = db;
         _options = options.Value;
+        _files = new Radiology.RadiologyFileStore(options);
         _audit = audit;
         _ctx = ctx;
         _passwords = passwords;
@@ -140,10 +142,27 @@ public sealed class BackupService : IBackupService
 
         record.SizeBytes = new FileInfo(path).Length;
         record.Sha256 = await HashFileAsync(path, ct);
+        // Phase 6: radiology images / documents live in a server folder – they are archived next to the database backup.
+        var fileCount = 0;
+        if (_files.HasFiles())
+        {
+            try { fileCount = _files.ArchiveTo(Radiology.RadiologyFileStore.ArchiveNameFor(path)); }
+            catch (Exception ex)
+            {
+                record.Status = BackupStatus.Failed;
+                record.CompletedUtc = Now;
+                record.ErrorMessage = Truncate("Radiology files could not be archived: " + ex.Message, 2000);
+                _audit.Add(AuditActions.BackupFailed, "Backup", record.Id.ToString(), $"Backup failed: {record.ErrorMessage}", success: false);
+                await _db.SaveChangesAsync(CancellationToken.None);
+                TryDelete(path);
+                TryDelete(Radiology.RadiologyFileStore.ArchiveNameFor(path));
+                return ServiceResult<BackupHistory>.Fail("Backup failed: " + record.ErrorMessage);
+            }
+        }
         record.Status = BackupStatus.Completed;
         record.CompletedUtc = Now;
         _audit.Add(AuditActions.BackupCreated, "Backup", record.Id.ToString(),
-            $"{kind} backup created: {fileName} ({record.SizeBytes:N0} bytes)", newValues: new { fileName, record.SizeBytes, record.Sha256 });
+            $"{kind} backup created: {fileName} ({record.SizeBytes:N0} bytes{(fileCount > 0 ? $", {fileCount} radiology file(s)" : "")})", newValues: new { fileName, record.SizeBytes, record.Sha256, radiologyFiles = fileCount });
         await _db.SaveChangesAsync(ct);
         return ServiceResult<BackupHistory>.Ok(record);
     }
@@ -164,7 +183,7 @@ public sealed class BackupService : IBackupService
         if (b is null) return ServiceResult.Fail("Backup not found.");
         if (b.Status == BackupStatus.InProgress) return ServiceResult.Fail("A backup that is still running cannot be deleted.");
         var path = SafePath(b.FileName);
-        if (path is not null) TryDelete(path);
+        if (path is not null) { TryDelete(path); TryDelete(Radiology.RadiologyFileStore.ArchiveNameFor(path)); }
         _db.BackupHistory.Remove(b);
         _audit.Add(AuditActions.BackupDeleted, "Backup", id.ToString(), $"Backup deleted: {b.FileName}", new { b.FileName, b.SizeBytes, b.StartedUtc });
         await _db.SaveChangesAsync(ct);
@@ -231,6 +250,13 @@ public sealed class BackupService : IBackupService
             await DatabaseHardening.ApplyAsync(_db, CancellationToken.None);
             await RepairHistoryAfterRestoreAsync(safety.Value!, CancellationToken.None);
             await SyncFolderAsync(CancellationToken.None);
+            // Phase 6: put back radiology files of that backup (existing files are never overwritten).
+            var archive = Radiology.RadiologyFileStore.ArchiveNameFor(path);
+            if (File.Exists(archive))
+            {
+                try { _files.RestoreFrom(archive); }
+                catch (Exception ex) { _logger.LogError(ex, "Radiology files of {Backup} could not be restored", b.FileName); }
+            }
             var restoredRow = await _db.BackupHistory.FirstOrDefaultAsync(x => x.FileName == b.FileName, CancellationToken.None);
             if (restoredRow is not null) restoredRow.LastRestoredUtc = Now;
             _db.AuditLogs.Add(new AuditLog

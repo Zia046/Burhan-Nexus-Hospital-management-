@@ -1,0 +1,101 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Print.RadiologyReportModel
+@{
+    Layout = null;
+    var e = Model.Exam;
+    var o = e.Order!;
+    var p = o.Patient!;
+    var h = Model.Hospital;
+    var s = Model.Rad;
+    var age = AgeCalculator.Of(p, e.ScheduledDate)?.ToString() ?? "—";
+    var hasLogo = s.Logo is not null || h.HasLogo;
+    var logo = s.Logo is not null ? $"/Radiology/Image/logo?v={s.UpdatedUtc.Ticks}" : $"/branding/logo?v={h.LogoVersion}";
+    var title = (e.ReportTitle ?? e.ServiceName).ToUpperInvariant();
+    var copy = Model.Prints.Count;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Radiology report @o.OrderNumber – @p.FullName</title>
+    <link rel="stylesheet" href="~/css/lab-report.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/radiology-report.css" asp-append-version="true" />
+    <script src="~/js/lab-report.js" asp-append-version="true" defer></script>
+</head>
+<body class="lab-report-body rad-report-body" data-rad-print data-autoprint="@(Model.Print && Model.IsReleased ? "1" : null)">
+@Html.AntiForgeryToken()
+<div class="lr-toolbar no-print">
+    <div class="lr-row">
+        <strong>Radiology report @o.OrderNumber – @e.ServiceName</strong>
+        <a class="lr-btn light" href="/Radiology/Exam/@e.Id">&larr; Examination</a>
+        <a class="lr-btn light" href="/Radiology/Patient/@p.Id">History</a>
+    </div>
+    @if (Model.FlashError is string err) { <div class="lr-msg err">@err</div> }
+    @if (!Model.IsFinal)
+    {
+        <div class="lr-msg err" data-no-final>This report is not verified (@RadiologyWorkflowService.Label(e.Status)) – it cannot be printed as final.</div>
+    }
+    else
+    {
+        <form method="post" asp-page-handler="Record" class="lr-row" data-report-form>
+            @if (!Model.IsReleased && !Model.CanRelease)
+            {
+                <span class="lr-msg err">Verified, not yet released – a user with “Release Report” must release it.</span>
+            }
+            else
+            {
+                @if (Model.CanPrint) { <button type="submit" name="Format" value="A4" class="lr-btn" data-test="rad-report-print">@(Model.IsReleased ? (copy == 0 ? "Print report" : $"Reprint (copy {copy + 1})") : "Release & print")</button> }
+                else { <span class="lr-msg err">@(copy == 0 ? "You need “Print Report”." : "Already printed – you need “Reprint Previous Report”.")</span> }
+                @if (Model.CanPdf) { <button type="submit" name="Format" value="PDF" class="lr-btn light" data-test="rad-report-pdf">@(Model.IsReleased ? "Save as PDF" : "Release & save as PDF")</button> }
+            }
+        </form>
+        <div class="lr-status">@(copy == 0 ? "Not printed yet." : $"Printed {copy} time(s), last {Fmt.DateTimeText(Model.Prints[^1].PrintedUtc)} by {Model.Prints[^1].PrintedByUsername}.") For a PDF choose “Save as PDF” in the print dialog. @(s.PrintHeader ? "" : "Header off – printing on the hospital letterhead.")</div>
+    }
+</div>
+@if (Model.IsFinal)
+{
+<main class="lr-page rr-page @(Model.IsReleased ? "" : "preview")" data-report="@o.OrderNumber">
+    @if (!Model.IsReleased) { <div class="lr-watermark" aria-hidden="true">PREVIEW</div> }
+    @if (s.PrintHeader)
+    {
+        <header class="lr-head" data-report-header>
+            @if (hasLogo) { <img class="lr-logo" src="@logo" alt="" /> }
+            <div class="lr-brand">
+                <div class="lr-hosp">@(s.HospitalName ?? h.HospitalName)</div>
+                <div class="lr-lab">@(s.DepartmentName ?? "Department of Radiology")</div>
+                <div class="lr-small">@(s.Address ?? $"{h.Address}, {h.City}")</div>
+                <div class="lr-small">@(s.ContactNumber ?? h.ContactNumber)@((s.Email ?? h.Email) is { Length: > 0 } em ? " · " + em : "")</div>
+                @if (s.ReportHeader is { Length: > 0 } hd) { <div class="lr-small">@hd</div> }
+            </div>
+        </header>
+    }
+    else
+    {
+        <div class="rr-letterhead" style="height:@(s.LetterheadTopMarginMm)mm" data-letterhead-space></div>
+    }
+    <h1 class="lr-title">@title</h1>
+    <table class="lr-info">
+        <tr><th>Patient</th><td data-field="patient"><strong>@p.FullName</strong></td><th>Patient ID</th><td class="mono" data-field="patient-id">@p.PatientNumber</td></tr>
+        <tr><th>Age / Gender</th><td>@age / @p.Gender</td><th>Order no.</th><td class="mono" data-field="order">@o.OrderNumber</td></tr>
+        <tr><th>Examination</th><td>@e.ServiceName</td><th>Examination date</th><td>@Fmt.DateTimeText(e.CompletedUtc ?? e.ScheduledUtc)</td></tr>
+        <tr><th>Referred by</th><td>@(o.ReferredBy is { Length: > 0 } rb ? rb : "—")@(o.ReferringDepartment is null ? "" : " · " + o.ReferringDepartment.Name)</td><th>Reported</th><td>@Fmt.DateTimeText(e.SubmittedUtc ?? e.ReportSavedUtc)</td></tr>
+    </table>
+    @if (e.ClinicalIndication is not null) { <section class="rr-section"><h3>Clinical indication</h3><p>@e.ClinicalIndication</p></section> }
+    @if (e.Technique is not null) { <section class="rr-section"><h3>Technique</h3><p class="rr-text">@e.Technique</p></section> }
+    @if (e.Findings is not null) { <section class="rr-section"><h3>Findings</h3><p class="rr-text" data-print-findings>@e.Findings</p></section> }
+    @if (e.Impression is not null) { <section class="rr-section rr-impression"><h3>Impression</h3><p class="rr-text" data-print-impression>@e.Impression</p></section> }
+    @if (e.Recommendations is not null) { <section class="rr-section"><h3>Recommendations</h3><p class="rr-text">@e.Recommendations</p></section> }
+    <footer class="lr-foot">
+        <div class="lr-sign">
+            @if (s.Signature is not null) { <img src="/Radiology/Image/signature?v=@s.UpdatedUtc.Ticks" alt="" /> }
+            <div class="lr-sign-line" data-print-doctor>@(e.ReportingDoctorName ?? s.DefaultReportingDoctor)</div>
+            <div class="lr-small">@(e.ReportingDoctorDesignation ?? s.DefaultDesignation ?? "Radiologist")</div>
+        </div>
+        @if (s.ShowVerifiedBy && e.VerifiedByName is not null) { <p class="lr-verified" data-print-verified>Verified by @e.VerifiedByName · @Fmt.DateTimeText(e.VerifiedUtc)@(e.RevisionNo > 0 ? $" · amended report (revision {e.RevisionNo + 1})" : "")</p> }
+        <div class="lr-footer-text">@(s.ReportFooter ?? h.ReportFooter)</div>
+        <div class="lr-end">Printed @Fmt.DateTimeText(DateTime.UtcNow)@(copy > 1 ? $" · copy {copy}" : "") · *** End of report ***</div>
+    </footer>
+</main>
+}
+</body>
+</html>

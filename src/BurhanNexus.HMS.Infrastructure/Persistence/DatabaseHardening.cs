@@ -82,11 +82,44 @@ public static class DatabaseHardening
         END;
         $$;
 
+        -- Phase 6: a verified / released radiology report can only change after an amendment (which first stores a revision
+        -- and moves the examination back to "Report pending"). Direct edits of a verified report are refused by the database.
+        CREATE OR REPLACE FUNCTION bnhms_radiology_report_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF OLD."Status" IN ('Verified','Released') AND NEW."Status" IN ('Verified','Released') AND (
+                   NEW."Findings" IS DISTINCT FROM OLD."Findings" OR NEW."Impression" IS DISTINCT FROM OLD."Impression"
+                OR NEW."Technique" IS DISTINCT FROM OLD."Technique" OR NEW."Recommendations" IS DISTINCT FROM OLD."Recommendations"
+                OR NEW."ClinicalIndication" IS DISTINCT FROM OLD."ClinicalIndication" OR NEW."ReportingDoctorName" IS DISTINCT FROM OLD."ReportingDoctorName"
+                OR NEW."ReportingDoctorDesignation" IS DISTINCT FROM OLD."ReportingDoctorDesignation" OR NEW."VerifiedByUserId" IS DISTINCT FROM OLD."VerifiedByUserId"
+                OR NEW."VerifiedUtc" IS DISTINCT FROM OLD."VerifiedUtc") THEN
+                RAISE EXCEPTION 'A verified radiology report cannot be changed directly. Amend it with a reason first.';
+            END IF;
+            IF OLD."Status" = 'Cancelled' AND NEW."Status" <> 'Cancelled' THEN
+                RAISE EXCEPTION 'A cancelled examination cannot be re-opened. Book it again.';
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+
+        -- Phase 6: attachment records keep their file link forever; only the "removed" flag (with a reason) may be set once.
+        CREATE OR REPLACE FUNCTION bnhms_radiology_attachment_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF NEW."StoredPath" IS DISTINCT FROM OLD."StoredPath" OR NEW."Sha256" IS DISTINCT FROM OLD."Sha256" OR NEW."ExamId" IS DISTINCT FROM OLD."ExamId"
+               OR NEW."PatientId" IS DISTINCT FROM OLD."PatientId" OR NEW."SizeBytes" IS DISTINCT FROM OLD."SizeBytes"
+               OR NEW."OriginalFileName" IS DISTINCT FROM OLD."OriginalFileName" OR NEW."UploadedUtc" IS DISTINCT FROM OLD."UploadedUtc"
+               OR (OLD."IsRemoved" AND NOT NEW."IsRemoved") THEN
+                RAISE EXCEPTION 'Radiology attachment records cannot be changed.';
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+
         DO $$
         DECLARE t text;
         BEGIN
             FOREACH t IN ARRAY ARRAY['CashierLedger','DoctorLedger','DoctorSettlements','FinancialAdjustments','DailyCashClosings','ReceiptPrints','ServiceFees',
                                        'LabItemEvents','LabResultRevisions','LabReportPrints',
+                                       'RadiologyExamEvents','RadiologyReportRevisions','RadiologyReportPrints',
                                        'InventoryTransactions','SupplierLedger','SupplierPayments','MedicinePriceChanges','StockReceipts','StockReceiptItems',
                                        'StockTransfers','StockTransferItems','MedicineReturns','MedicineReturnItems','SupplierReturns','SupplierReturnItems'] LOOP
                 IF to_regclass(format('%I', t)) IS NOT NULL THEN
@@ -98,7 +131,8 @@ public static class DatabaseHardening
             END LOOP;
             FOREACH t IN ARRAY ARRAY['Receipts','ReceiptLines','Charges','Refunds','CashDeposits','LabOrders','LabOrderItems','LabResultValues','LabSamples',
                                        'Medicines','MedicineBatches','StockBalances','PatientMedicineIssues','PatientMedicineIssueItems','PharmacySales',
-                                       'PharmacySaleItems','StockAdjustments','Suppliers','StockLocations'] LOOP
+                                       'PharmacySaleItems','StockAdjustments','Suppliers','StockLocations',
+                                       'RadiologyServices','RadiologyOrders','RadiologyExams','RadiologyAttachments'] LOOP
                 IF to_regclass(format('%I', t)) IS NOT NULL THEN
                     EXECUTE format('DROP TRIGGER IF EXISTS trg_%s_no_delete ON %I', lower(t), t);
                     EXECUTE format('CREATE TRIGGER trg_%s_no_delete BEFORE DELETE ON %I FOR EACH ROW EXECUTE FUNCTION bnhms_finance_immutable()', lower(t), t);
@@ -120,6 +154,14 @@ public static class DatabaseHardening
                     EXECUTE format('CREATE TRIGGER trg_%s_private_only BEFORE INSERT ON %I FOR EACH ROW EXECUTE FUNCTION bnhms_pharmacy_private_only()', lower(t), t);
                 END IF;
             END LOOP;
+            IF to_regclass('"RadiologyExams"') IS NOT NULL THEN
+                DROP TRIGGER IF EXISTS trg_radiologyexams_guard ON "RadiologyExams";
+                CREATE TRIGGER trg_radiologyexams_guard BEFORE UPDATE ON "RadiologyExams" FOR EACH ROW EXECUTE FUNCTION bnhms_radiology_report_guard();
+            END IF;
+            IF to_regclass('"RadiologyAttachments"') IS NOT NULL THEN
+                DROP TRIGGER IF EXISTS trg_radiologyattachments_guard ON "RadiologyAttachments";
+                CREATE TRIGGER trg_radiologyattachments_guard BEFORE UPDATE ON "RadiologyAttachments" FOR EACH ROW EXECUTE FUNCTION bnhms_radiology_attachment_guard();
+            END IF;
             IF to_regclass('"Charges"') IS NOT NULL THEN
                 DROP TRIGGER IF EXISTS trg_charges_guard ON "Charges";
                 CREATE TRIGGER trg_charges_guard BEFORE UPDATE ON "Charges" FOR EACH ROW EXECUTE FUNCTION bnhms_charge_guard();

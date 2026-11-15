@@ -1,0 +1,22 @@
+@page "{id:int?}"
+@model BurhanNexus.HMS.Web.Pages.Radiology.Templates.EditModel
+@{ ViewData["Title"] = Model.Id is null ? "New report template" : "Edit report template"; var i = Model.Input; }
+<partial name="/Pages/Radiology/_RadNav.cshtml" />
+<form method="post" class="card card-medium" novalidate>
+    <div class="card-header"><h2><svg class="icon"><use href="#i-file" /></svg> @ViewData["Title"]</h2></div>
+    <div class="card-body">
+        <partial name="_ValidationSummary" />
+        <div class="grid-2">
+            <div class="field"><label for="Input_Name">Template name</label><input id="Input_Name" name="Input.Name" value="@i.Name" maxlength="120" /></div>
+            <div class="field"><label for="Input_Modality">Modality</label><select id="Input_Modality" name="Input.Modality">
+                <option value="XRay" selected="@(i.Modality == RadiologyModality.XRay)">X-Ray</option>
+                <option value="Ultrasound" selected="@(i.Modality == RadiologyModality.Ultrasound)">Ultrasound</option></select></div>
+        </div>
+        <div class="field"><label for="Input_Technique">Technique</label><textarea id="Input_Technique" name="Input.Technique" rows="2" maxlength="2000">@i.Technique</textarea></div>
+        <div class="field"><label for="Input_Findings">Findings</label><textarea id="Input_Findings" name="Input.Findings" rows="10" maxlength="8000">@i.Findings</textarea></div>
+        <div class="field"><label for="Input_Impression">Impression</label><textarea id="Input_Impression" name="Input.Impression" rows="2" maxlength="2000">@i.Impression</textarea></div>
+        <div class="field"><label for="Input_Recommendations">Recommendations</label><textarea id="Input_Recommendations" name="Input.Recommendations" rows="2" maxlength="2000">@i.Recommendations</textarea></div>
+        <label class="check"><input type="checkbox" name="Input.IsActive" value="true" checked="@i.IsActive" /> Active</label><input type="hidden" name="Input.IsActive" value="false" />
+    </div>
+    <div class="card-footer form-actions"><a class="btn btn-light" href="/Radiology/Services">Cancel</a><button class="btn btn-primary" type="submit">Save template</button></div>
+</form>

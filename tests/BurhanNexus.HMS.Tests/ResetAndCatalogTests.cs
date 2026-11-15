@@ -12,7 +12,7 @@ public class ResetAndCatalogTests : HmsTestBase
     public void Permission_catalogue_is_consistent()
     {
         Assert.Equal(PermissionCatalog.All.Count, PermissionCatalog.AllKeys.Count);
-        foreach (var module in new[] { "Patients", "Opd", "Emergency", "XRay", "Ultrasound", "MinorOt", "Doctors", "Reports" })
+        foreach (var module in new[] { "Patients", "Opd", "Emergency", "MinorOt", "Doctors", "Reports" })
             foreach (var action in new[] { "View", "Add", "Edit", "Delete", "Print", "ExportPdf", "Verify", "Approve", "Cancel", "Refund", "FinancialAccess", "SettingsAccess" })
                 Assert.Contains($"{module}.{action}", PermissionCatalog.AllKeys);
         // Phase 3: Finance became a real module with its own, specific financial permissions.
@@ -30,6 +30,12 @@ public class ResetAndCatalogTests : HmsTestBase
         Assert.True(pharm.IsAvailable);
         Assert.Equal(25, pharm.Actions.Count);
         Assert.Contains(Perm.PharmApproveAdjustments, PermissionCatalog.AllKeys);
+        // Phase 6: X-Ray and Ultrasound became one real Radiology module.
+        var rad = PermissionCatalog.FindModule("Radiology")!;
+        Assert.True(rad.IsAvailable);
+        Assert.Equal(27, rad.Actions.Count);
+        Assert.Null(PermissionCatalog.FindModule("XRay"));
+        Assert.Contains(Perm.RadVerifyReport, PermissionCatalog.AllKeys);
         foreach (var key in typeof(Perm).GetFields().Select(f => (string)f.GetValue(null)!))
             Assert.Contains(key, PermissionCatalog.AllKeys);
     }

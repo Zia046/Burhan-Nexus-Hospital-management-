@@ -14,11 +14,15 @@ public sealed class HmsOptions
     /// <summary>Folder containing pg_dump / pg_restore. Empty = auto-detect.</summary>
     public string? PostgresBinDirectory { get; set; }
 
+    /// <summary>Phase 6: folder on the hospital server where radiology images / documents are stored (only metadata is in the database).</summary>
+    public string RadiologyStorageDirectory { get; set; } = "radiology-files";
+
     /// <summary>Apply database migrations automatically at start-up.</summary>
     public bool AutoMigrate { get; set; } = true;
 
     public string ResolveDataDirectory() => Resolve(DataDirectory);
     public string ResolveBackupDirectory() => Resolve(BackupDirectory);
+    public string ResolveRadiologyStorageDirectory() => Resolve(RadiologyStorageDirectory);
 
     private static string Resolve(string path) =>
         Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, path));

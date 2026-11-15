@@ -1,0 +1,10 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Radiology.ReportingModel
+@{ ViewData["Title"] = "Radiology reporting"; }
+<partial name="_RadNav" />
+<partial name="_ListFilter" model="(Model.Q, Model.Modality, false, (DateOnly?)null, (DateOnly?)null)" />
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-edit" /></svg> Reports to write</h2><span class="pill pill-blue" data-count>@Model.Rows.Count</span></div>
+    @await Html.PartialAsync("_ExamTable", (Model.Rows, "reporting", "No reports pending.", "report"))
+    <div class="card-body small muted">Examination completed → write the report → save draft or submit for verification. Red = sent back by the verifier.</div>
+</div>

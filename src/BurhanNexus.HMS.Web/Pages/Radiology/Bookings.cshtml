@@ -1,0 +1,10 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Radiology.BookingsModel
+@{ ViewData["Title"] = "Radiology bookings"; }
+<partial name="_RadNav" />
+<partial name="_ListFilter" model="(Model.Q, Model.Modality, true, Model.From, Model.To)" />
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-calendar" /></svg> Bookings</h2><span class="pill pill-blue" data-count>@Model.Rows.Count</span>
+        <a bn-permission="@Perm.RadCreateBooking" class="btn btn-primary btn-sm" href="/Radiology/Book">New booking</a></div>
+    @await Html.PartialAsync("_ExamTable", (Model.Rows, "bookings", "No bookings in this period.", ""))
+</div>

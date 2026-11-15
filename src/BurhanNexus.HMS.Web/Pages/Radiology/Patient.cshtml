@@ -1,0 +1,49 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Radiology.PatientModel
+@{
+    var p = Model.Patient;
+    ViewData["Title"] = $"Radiology history – {p.FullName}";
+    var canPrint = await PermCtx.HasAnyAsync(Perm.RadPrintReport, Perm.RadReprintReport, Perm.RadExportPdf);
+}
+<partial name="_RadNav" />
+<div class="toolbar">
+    <div><a class="btn btn-light" href="/Radiology/History">&larr; Find patient</a></div>
+    <div class="toolbar-actions">
+        <a bn-permission="@Perm.RadCreateBooking" class="btn btn-primary" href="/Radiology/Book?patientId=@p.Id"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New booking</a>
+        <a bn-permission="@Perm.PatientsView" class="btn btn-light" href="/Patients/Profile/@p.Id">Patient profile</a>
+    </div>
+</div>
+<div class="card">
+    <div class="card-body lab-patient">
+        <div class="patient-id-box sm"><small>Patient ID</small><strong>@p.PatientNumber</strong></div>
+        <div><h3>@p.FullName</h3><span class="muted">@p.GuardianName · @p.Gender · @p.MobileNumber</span></div>
+    </div>
+</div>
+@foreach (var g in Model.Rows.GroupBy(r => r.Modality).OrderBy(g => g.Key))
+{
+    <div class="card" data-history="@g.Key">
+        <div class="card-header"><h3><svg class="icon"><use href="#i-@(g.Key == RadiologyModality.XRay ? "scan" : "wave")" /></svg> @RadiologyCatalogService.Label(g.Key) examinations</h3><span class="pill pill-blue">@g.Count()</span></div>
+        <div class="table-wrap">
+            <table class="table">
+                <thead><tr><th>Date</th><th>Order</th><th>Examination</th><th>Report status</th><th>Files</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var r in g)
+                {
+                    <tr class="@(r.Status == RadiologyExamStatus.Cancelled ? "row-muted" : "")" data-exam="@r.ServiceCode">
+                        <td class="nowrap">@Fmt.Day(r.ScheduledDate)</td>
+                        <td class="mono"><a href="/Radiology/Order/@r.OrderId">@r.OrderNumber</a></td>
+                        <td>@r.ServiceName<small class="muted block">@(r.ReferringDepartment ?? "")@(r.ReferredBy is null ? "" : " · " + r.ReferredBy)</small></td>
+                        <td><partial name="_RadStatus" model="r.Status" />@if (r.VerifiedBy is not null) { <small class="muted block">verified by @r.VerifiedBy</small> }@if (r.Prints > 0) { <small class="muted block">printed @r.Prints×</small> }</td>
+                        <td>@(r.Attachments == 0 ? "—" : r.Attachments.ToString())</td>
+                        <td class="actions nowrap">
+                            <a class="btn btn-light btn-sm" href="/Radiology/Exam/@r.Id">Open</a>
+                            @if (canPrint && r.Status is RadiologyExamStatus.Verified or RadiologyExamStatus.Released) { <a class="btn btn-success btn-sm" href="/Print/RadiologyReport/@r.Id" data-test="history-print-@r.ServiceCode">Report</a> }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+@if (Model.Rows.Count == 0) { <div class="card"><div class="card-body empty">No radiology examinations for this patient.</div></div> }

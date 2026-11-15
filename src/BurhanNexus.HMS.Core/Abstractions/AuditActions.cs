@@ -115,6 +115,27 @@ public static class AuditActions
     public const string LabSettingsChanged = "Lab.SettingsChanged";
     public const string LabExported = "Lab.Exported";
 
+    // Phase 6 – radiology
+    public const string RadServiceSaved = "Radiology.ServiceSaved";
+    public const string RadTemplateSaved = "Radiology.TemplateSaved";
+    public const string RadOrderBooked = "Radiology.OrderBooked";
+    public const string RadOrderEdited = "Radiology.OrderEdited";
+    public const string RadDuplicateBlocked = "Radiology.DuplicateBookingBlocked";
+    public const string RadExamCancelled = "Radiology.ExamCancelled";
+    public const string RadExamStatus = "Radiology.ExamStatusChanged";
+    public const string RadReportSaved = "Radiology.ReportSaved";
+    public const string RadReportVerified = "Radiology.ReportVerified";
+    public const string RadReportRejected = "Radiology.ReportRejected";
+    public const string RadReportReleased = "Radiology.ReportReleased";
+    public const string RadReportAmended = "Radiology.ReportAmended";
+    public const string RadReportPrinted = "Radiology.ReportPrinted";
+    public const string RadReportReprinted = "Radiology.ReportReprinted";
+    public const string RadAttachmentAdded = "Radiology.AttachmentAdded";
+    public const string RadAttachmentRemoved = "Radiology.AttachmentRemoved";
+    public const string RadAttachmentViewed = "Radiology.AttachmentDownloaded";
+    public const string RadSettingsChanged = "Radiology.SettingsChanged";
+    public const string RadExported = "Radiology.Exported";
+
     // Phase 5 – pharmacy
     public const string PharmMedicineSaved = "Pharmacy.MedicineSaved";
     public const string PharmMedicinePriceChanged = "Pharmacy.MedicinePriceChanged";

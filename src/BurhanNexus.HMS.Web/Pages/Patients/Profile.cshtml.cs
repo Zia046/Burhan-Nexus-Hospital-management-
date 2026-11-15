@@ -37,6 +37,8 @@ public class ProfileModel : HmsPageModel
     public int EmergencyCount { get; private set; }
     /// <summary>Phase 5: recent medicines issued to the patient (only with "View Patient Medicine History").</summary>
     public IReadOnlyList<BurhanNexus.HMS.Infrastructure.Pharmacy.PatientMedicineRow>? Medicines { get; private set; }
+    /// <summary>Phase 6: radiology history section (only with "View Patient Radiology History").</summary>
+    public IReadOnlyList<BurhanNexus.HMS.Infrastructure.Radiology.RadiologyExamRow>? Radiology { get; private set; }
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -48,6 +50,9 @@ public class ProfileModel : HmsPageModel
         CanSeeVisits = await CanAsync(Perm.PatientsVisits);
         if (await CanAsync(Perm.PharmViewPatientHistory))
             Medicines = (await HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Pharmacy.IPharmacyQueryService>().PatientHistoryAsync(Id, false)).Take(10).ToList();
+        if (await CanAsync(Perm.RadViewHistory))
+            Radiology = await HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Radiology.IRadiologyService>()
+                .ExamsAsync(new BurhanNexus.HMS.Infrastructure.Radiology.RadiologyWorklistQuery { PatientId = Id, Take = 10 });
         if (CanSeeVisits)
         {
             EncounterType? type = TypeFilter switch { "opd" => EncounterType.Opd, "emergency" => EncounterType.Emergency, _ => null };

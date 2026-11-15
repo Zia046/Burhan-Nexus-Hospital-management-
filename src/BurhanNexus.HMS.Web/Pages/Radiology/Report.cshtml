@@ -1,0 +1,68 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Radiology.ReportModel
+@{
+    var e = Model.Exam;
+    var o = e.Order!;
+    var p = o.Patient!;
+    ViewData["Title"] = $"Report – {e.ServiceName}";
+    var age = AgeCalculator.Of(p, e.ScheduledDate)?.ToString() ?? "—";
+}
+<partial name="_RadNav" />
+<div class="toolbar">
+    <div><a class="btn btn-light" href="/Radiology/Exam/@e.Id">&larr; Examination</a> <a class="btn btn-light" href="/Radiology/Reporting">Reporting list</a></div>
+</div>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-edit" /></svg> @(e.ReportTitle ?? e.ServiceName) report</h2><partial name="_RadStatus" model="e.Status" /></div>
+    <div class="card-body">
+        <table class="table table-compact rad-info" data-report-patient>
+            <tr><th>Patient</th><td><strong>@p.FullName</strong></td><th>Patient ID</th><td class="mono">@p.PatientNumber</td><th>Age / Gender</th><td>@age / @p.Gender</td></tr>
+            <tr><th>Order no.</th><td class="mono">@o.OrderNumber</td><th>Examination</th><td>@e.ServiceName</td><th>Examination date</th><td>@Fmt.DateTimeText(e.CompletedUtc ?? e.ScheduledUtc)</td></tr>
+        </table>
+        @if (e.CorrectionReason is not null) { <div class="alert alert-warning"><svg class="icon"><use href="#i-alert" /></svg><div><strong>Returned for correction:</strong> @e.CorrectionReason</div></div> }
+        @if (e.TechnicalNotes is not null) { <p class="small"><strong>Technician's notes:</strong> @e.TechnicalNotes</p> }
+    </div>
+</div>
+<partial name="_ValidationSummary" />
+@if (!Model.Editable)
+{
+    <div class="alert alert-info"><svg class="icon"><use href="#i-info" /></svg><div>This report cannot be edited now (@RadiologyWorkflowService.Label(e.Status)).@(e.Status is RadiologyExamStatus.Verified or RadiologyExamStatus.Released ? " A verified report is changed only by “Amend verified report” on the examination page." : " Complete the examination first.")</div></div>
+}
+else
+{
+    <form method="post" class="card" novalidate data-rad-report>
+        <input type="hidden" name="RowVersion" value="@Model.RowVersion" />
+        <input type="hidden" name="Input.TemplateName" value="@Model.Input.TemplateName" data-template-name />
+        <div class="card-header"><h3>Report</h3>
+            @if (Model.Templates.Count > 0)
+            {
+                <div class="inline-form">
+                    <select aria-label="Template" data-template-select>
+                        <option value="">Template…</option>
+                        @foreach (var t in Model.Templates)
+                        {
+                            <option value="@t.Id" data-technique="@t.Technique" data-findings="@t.Findings" data-impression="@t.Impression" data-recommendations="@t.Recommendations">@t.Name</option>
+                        }
+                    </select>
+                    <button type="button" class="btn btn-light btn-sm" data-template-apply>Load template</button>
+                </div>
+            }
+        </div>
+        <div class="card-body">
+            <div class="field"><label for="Input_ClinicalIndication">Clinical indication</label><textarea id="Input_ClinicalIndication" name="Input.ClinicalIndication" rows="2" maxlength="1000">@Model.Input.ClinicalIndication</textarea></div>
+            <div class="field"><label for="Input_Technique">Technique</label><textarea id="Input_Technique" name="Input.Technique" rows="2" maxlength="2000" data-field="technique">@Model.Input.Technique</textarea></div>
+            <div class="field"><label for="Input_Findings">Findings</label><textarea id="Input_Findings" name="Input.Findings" rows="12" maxlength="8000" data-field="findings">@Model.Input.Findings</textarea></div>
+            <div class="field"><label for="Input_Impression">Impression / conclusion</label><textarea id="Input_Impression" name="Input.Impression" rows="3" maxlength="2000" data-field="impression">@Model.Input.Impression</textarea></div>
+            <div class="field"><label for="Input_Recommendations">Recommendations</label><textarea id="Input_Recommendations" name="Input.Recommendations" rows="2" maxlength="2000" data-field="recommendations">@Model.Input.Recommendations</textarea></div>
+            <div class="grid-2">
+                <div class="field"><label for="Input_ReportingDoctorName">Reporting doctor / radiologist</label><input id="Input_ReportingDoctorName" name="Input.ReportingDoctorName" value="@Model.Input.ReportingDoctorName" maxlength="150" /></div>
+                <div class="field"><label for="Input_ReportingDoctorDesignation">Designation</label><input id="Input_ReportingDoctorDesignation" name="Input.ReportingDoctorDesignation" value="@Model.Input.ReportingDoctorDesignation" maxlength="150" placeholder="e.g. Consultant Radiologist" /></div>
+            </div>
+            <p class="small muted">Only the sections this examination needs have to be filled. A draft can be saved at any time; submitting sends the report to the verification queue.</p>
+        </div>
+        <div class="card-footer form-actions">
+            <button class="btn btn-light" type="submit" data-test="rad-save-draft">Save draft</button>
+            @if (Model.CanSubmit) { <button class="btn btn-primary btn-lg" type="submit" formaction="?handler=Submit" data-test="rad-submit" data-once>Submit for verification</button> }
+        </div>
+    </form>
+}
+@section Scripts { <script src="~/js/radiology.js" asp-append-version="true"></script> }

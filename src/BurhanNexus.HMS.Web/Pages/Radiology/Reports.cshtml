@@ -1,0 +1,50 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Radiology.ReportsModel
+@{
+    ViewData["Title"] = "Radiology reports";
+    var table = Model.Table();
+    var qs = $"report={Model.Report}&from={Model.From:yyyy-MM-dd}&to={Model.To:yyyy-MM-dd}&group={Model.Group}&modality={Model.Modality}";
+}
+<partial name="_RadNav" />
+<div class="toolbar no-print">
+    <form method="get" class="filters wrap">
+        <select name="report" aria-label="Report" data-autosubmit>
+            @foreach (var c in BurhanNexus.HMS.Web.Pages.Radiology.ReportsModel.Catalog_.Where(c => !c.Financial || Model.Financial))
+            {
+                <option value="@c.Key" selected="@(Model.Report == c.Key)">@c.Title</option>
+            }
+        </select>
+        <partial name="/Pages/Finance/_PeriodFilter.cshtml" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" />
+        <select name="group" aria-label="Group by"><option value="day" selected="@(Model.Group == "day")">Daily</option><option value="month" selected="@(Model.Group == "month")">Monthly</option><option value="year" selected="@(Model.Group == "year")">Yearly</option></select>
+        @if (Model.Report is not ("xray" or "ultrasound"))
+        {
+            <select name="modality" aria-label="Modality"><option value="">X-Ray &amp; Ultrasound</option>
+                <option value="XRay" selected="@(Model.Modality == "XRay")">X-Ray</option><option value="Ultrasound" selected="@(Model.Modality == "Ultrasound")">Ultrasound</option></select>
+        }
+        <button class="btn btn-light" type="submit">Show</button>
+    </form>
+    <div class="toolbar-actions">
+        <button type="button" class="btn btn-light" data-print><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print / PDF</button>
+        <a class="btn btn-light" href="?handler=Export&format=xlsx&@qs" data-test="rad-export-xlsx">Excel</a>
+        <a class="btn btn-light" href="?handler=Export&format=csv&@qs">CSV</a>
+    </div>
+</div>
+<div class="card" data-rad-report="@Model.Report">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-chart" /></svg> @Model.Title</h2>
+        <span class="muted">@BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(Model.From!.Value, Model.To!.Value)@(Model.ModalityFilter is { } mf ? " · " + RadiologyCatalogService.Label(mf) : "")</span></div>
+    <div class="table-wrap">
+        <table class="table table-compact">
+            <thead><tr>@foreach (var h in table[0]) { <th>@h</th> }</tr></thead>
+            <tbody>
+            @foreach (var row in table.Skip(1))
+            {
+                <tr>@foreach (var c in row)
+                    {
+                        <td class="@(c is int or decimal ? "num" : "")">@(c switch { DateOnly dd => Fmt.Day(dd), decimal m => Fmt.Money(m), _ => c?.ToString() })</td>
+                    }</tr>
+            }
+            @if (table.Length == 1) { <tr><td colspan="@table[0].Length" class="empty">No data for this period.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -213,7 +213,9 @@ public sealed class HospitalAdminService : IHospitalAdminService
         c.UpdatedUtc = Now;
         _audit.Add(AuditActions.HospitalTypeChanged, "HospitalConfiguration", "1",
             $"Hospital type changed to {type}" + (applyDefaults ? " (default rules applied)" : " (existing rules kept)"), old, RulesSnapshot(c));
-        return await SaveAsync(ct);
+        var saved = await SaveAsync(ct);
+        if (saved.Succeeded && applyDefaults) await Radiology.RadiologyCatalogService.ApplyHospitalTypeDefaultsAsync(_db, type, ct);
+        return saved;
     }
 
     public async Task<ServiceResult> UpdateOperationalRulesAsync(OperationalRulesInput i, uint rowVersion, CancellationToken ct = default)
