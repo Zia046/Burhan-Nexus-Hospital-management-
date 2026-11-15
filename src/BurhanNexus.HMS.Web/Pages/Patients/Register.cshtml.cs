@@ -45,6 +45,7 @@ public class RegisterModel : HmsPageModel
         var p = result.Patient!;
         FlashSuccess = $"Patient registered. Patient ID: {p.PatientNumber}";
         if (Next == "lab" && await CanAsync(Perm.LabBook)) return Redirect($"/Lab/Book?patientId={p.Id}");
+        if (Next == "radiology" && await CanAsync(Perm.RadCreateBooking)) return Redirect($"/Radiology/Book?patientId={p.Id}");
         if (Next == "appointment" && await CanAsync(Perm.AppointmentsAdd)) return Redirect($"/Appointments/Book?patientId={p.Id}");
         if (Next == "opd" && await CanAsync(Perm.OpdAdd)) return Redirect($"/Opd/Register?patientId={p.Id}");
         if (Next == "emergency" && await CanAsync(Perm.EmergencyAdd)) return Redirect($"/Emergency/Register?patientId={p.Id}");

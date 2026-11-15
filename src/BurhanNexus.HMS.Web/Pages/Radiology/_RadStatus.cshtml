@@ -1,0 +1,14 @@
+@model RadiologyExamStatus
+@{
+    var cls = Model switch
+    {
+        RadiologyExamStatus.Booked => "status-info",
+        RadiologyExamStatus.Waiting => "status-warn",
+        RadiologyExamStatus.InProgress => "status-info",
+        RadiologyExamStatus.ExamCompleted or RadiologyExamStatus.ReportEntered => "status-info",
+        RadiologyExamStatus.ReportPending or RadiologyExamStatus.AwaitingVerification => "status-warn",
+        RadiologyExamStatus.Verified or RadiologyExamStatus.Released => "status-ok",
+        _ => "status-bad",
+    };
+}
+<span class="status @cls" data-status="@Model">@RadiologyWorkflowService.Label(Model)</span>

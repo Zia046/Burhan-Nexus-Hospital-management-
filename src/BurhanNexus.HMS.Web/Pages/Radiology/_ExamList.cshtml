@@ -1,0 +1,21 @@
+@model (string Title, string Key, IReadOnlyList<RadiologyExamRow> Rows, string Empty)
+<div class="card">
+    <div class="card-header"><h3>@Model.Title</h3><span class="pill pill-blue">@Model.Rows.Count</span></div>
+    <div class="table-wrap">
+        <table class="table table-compact" data-rad-list="@Model.Key">
+            <thead><tr><th>Token</th><th>Patient</th><th>Examination</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr class="@(r.Priority == RadiologyPriority.Urgent ? "row-urgent" : "")">
+                    <td class="mono nowrap">@(r.Modality == RadiologyModality.XRay ? "X" : "U")-@r.TokenNumber<small class="muted block">@Fmt.Day(r.ScheduledDate)</small></td>
+                    <td><strong>@r.PatientName</strong><small class="muted block">@r.PatientNumber · @r.AgeGender</small></td>
+                    <td>@r.ServiceName @if (r.Priority == RadiologyPriority.Urgent) { <span class="status status-bad">Urgent</span> }<small class="block"><partial name="_RadStatus" model="r.Status" /></small></td>
+                    <td class="actions"><a class="btn btn-light btn-sm" href="/Radiology/Exam/@r.Id">Open</a></td>
+                </tr>
+            }
+            @if (Model.Rows.Count == 0) { <tr><td colspan="4" class="empty">@Model.Empty</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

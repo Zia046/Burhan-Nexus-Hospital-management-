@@ -1,0 +1,71 @@
+@page "{modality}"
+@model BurhanNexus.HMS.Web.Pages.Radiology.WorklistModel
+@{
+    var label = RadiologyCatalogService.Label(Model.Modality);
+    ViewData["Title"] = $"{label} worklist";
+    var canStart = await PermCtx.HasAsync(Perm.RadStartExam);
+    var canComplete = await PermCtx.HasAsync(Perm.RadCompleteExam);
+}
+<partial name="_RadNav" />
+<div class="toolbar">
+    <form method="get" class="filters wrap">
+        <label class="inline-label">Date <input type="date" name="date" value="@Model.Date?.ToString("yyyy-MM-dd")" /></label>
+        <select name="status" aria-label="Status" data-autosubmit>
+            <option value="queue" selected="@(Model.Status is null or "" or "queue")">Queue (booked / waiting / in progress)</option>
+            <option value="reporting" selected="@(Model.Status == "reporting")">Report pending</option>
+            <option value="verification" selected="@(Model.Status == "verification")">Awaiting verification</option>
+            <option value="final" selected="@(Model.Status == "final")">Verified / released</option>
+            <option value="cancelled" selected="@(Model.Status == "cancelled")">Cancelled</option>
+            <option value="all" selected="@(Model.Status == "all")">All</option>
+        </select>
+        <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Order no., Patient ID, name, phone" maxlength="100" /></div>
+        <button class="btn btn-light" type="submit">Show</button>
+    </form>
+    <div class="toolbar-actions"><a bn-permission="@Perm.RadCreateBooking" class="btn btn-primary" href="/Radiology/Book"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New booking</a></div>
+</div>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-@(Model.Modality == RadiologyModality.XRay ? "scan" : "wave")" /></svg> @label worklist – @Fmt.Day(Model.Date!.Value)</h2>
+        <span class="pill pill-blue" data-worklist-count>@Model.Rows.Count examination(s)</span></div>
+    <div class="table-wrap">
+        <table class="table" data-worklist="@Model.Modality">
+            <thead><tr><th>Token</th><th>Patient</th><th>Examination</th><th>Booked for</th><th>Referred from</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr id="exam-@r.Id" class="@(r.Priority == RadiologyPriority.Urgent ? "row-urgent" : "")" data-exam="@r.ServiceCode" data-patient="@r.PatientNumber">
+                    <td><span class="token-badge">@r.TokenNumber</span></td>
+                    <td><strong>@r.PatientName</strong><small class="muted block">@r.PatientNumber · @r.AgeGender</small></td>
+                    <td>@r.ServiceName @if (r.Priority == RadiologyPriority.Urgent) { <span class="status status-bad">Urgent</span> }<small class="muted block mono">@r.OrderNumber</small>
+                        @if (r.CorrectionReason is not null && r.Status == RadiologyExamStatus.ReportPending) { <small class="text-danger block">↩ @r.CorrectionReason</small> }</td>
+                    <td class="nowrap">@Fmt.DateTimeText(r.ScheduledUtc)@if (r.ScheduledDate < Model.Today) { <small class="text-warning block">earlier day</small> }</td>
+                    <td>@(r.ReferringDepartment ?? "—")<small class="muted block">@r.ReferredBy</small></td>
+                    <td><partial name="_RadStatus" model="r.Status" /></td>
+                    <td class="actions nowrap">
+                        @if (canStart && r.Status == RadiologyExamStatus.Booked)
+                        {
+                            <form method="post" asp-page-handler="Arrive" asp-route-examId="@r.Id" class="inline-form"><input type="hidden" name="date" value="@Model.Date?.ToString("yyyy-MM-dd")" /><input type="hidden" name="status" value="@Model.Status" />
+                                <button class="btn btn-light btn-sm" type="submit" data-test="arrive-@r.ServiceCode">Arrived</button></form>
+                        }
+                        @if (canStart && r.Status is RadiologyExamStatus.Booked or RadiologyExamStatus.Waiting)
+                        {
+                            <form method="post" asp-page-handler="Start" asp-route-examId="@r.Id" class="inline-form"><input type="hidden" name="date" value="@Model.Date?.ToString("yyyy-MM-dd")" /><input type="hidden" name="status" value="@Model.Status" />
+                                <button class="btn btn-primary btn-sm" type="submit" data-test="start-@r.ServiceCode">Start</button></form>
+                        }
+                        @if (canComplete && r.Status == RadiologyExamStatus.InProgress)
+                        {
+                            <details class="inline-details"><summary class="btn btn-success btn-sm" data-test="complete-open-@r.ServiceCode">Complete</summary>
+                                <form method="post" asp-page-handler="Complete" asp-route-examId="@r.Id" class="inline-form stack-sm" novalidate>
+                                    <input type="hidden" name="date" value="@Model.Date?.ToString("yyyy-MM-dd")" /><input type="hidden" name="status" value="@Model.Status" />
+                                    <input name="PerformedBy" maxlength="150" placeholder="Technician (default: you)" aria-label="Technician" />
+                                    <input name="TechnicalNotes" maxlength="1000" placeholder="Technical notes (optional)" aria-label="Technical notes" />
+                                    <button class="btn btn-success btn-sm" type="submit" data-test="complete-@r.ServiceCode">Mark completed</button></form></details>
+                        }
+                        <a class="btn btn-light btn-sm" href="/Radiology/Exam/@r.Id">Open</a>
+                    </td>
+                </tr>
+            }
+            @if (Model.Rows.Count == 0) { <tr><td colspan="7" class="empty">No examinations.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

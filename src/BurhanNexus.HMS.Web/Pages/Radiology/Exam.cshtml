@@ -1,0 +1,205 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Radiology.ExamModel
+@{
+    var e = Model.Exam;
+    var o = Model.Order;
+    var p = o.Patient!;
+    var label = RadiologyCatalogService.Label(e.Modality);
+    ViewData["Title"] = $"{e.ServiceName} – {o.OrderNumber}";
+    var age = AgeCalculator.Of(p, e.ScheduledDate)?.ToString() ?? "—";
+    var hasReport = e.ReportSavedUtc is not null;
+    var isFinal = e.Status is RadiologyExamStatus.Verified or RadiologyExamStatus.Released;
+    var reportable = e.Status is RadiologyExamStatus.ExamCompleted or RadiologyExamStatus.ReportPending or RadiologyExamStatus.ReportEntered or RadiologyExamStatus.AwaitingVerification;
+    var canWrite = e.Status == RadiologyExamStatus.ExamCompleted && !hasReport ? await PermCtx.HasAsync(Perm.RadEnterReport) : await PermCtx.HasAsync(Perm.RadEditDraft) || await PermCtx.HasAsync(Perm.RadEnterReport);
+    var canPrint = await PermCtx.HasAsync(Model.Prints.Count == 0 ? Perm.RadPrintReport : Perm.RadReprintReport) || await PermCtx.HasAsync(Perm.RadExportPdf);
+}
+<partial name="_RadNav" />
+<div class="toolbar">
+    <div><a class="btn btn-light" href="/Radiology/Worklist/@e.Modality">&larr; @label worklist</a> <a class="btn btn-light" href="/Radiology/Order/@o.Id">Order @o.OrderNumber</a></div>
+    <div class="toolbar-actions">
+        @if (reportable && canWrite) { <a class="btn btn-primary" href="/Radiology/Report/@e.Id" data-test="rad-write-report"><svg class="icon icon-sm"><use href="#i-edit" /></svg> @(hasReport ? "Edit report" : "Write report")</a> }
+        @if (isFinal && canPrint) { <a class="btn btn-success" href="/Print/RadiologyReport/@e.Id" data-test="rad-print"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Report (A4)</a> }
+        @if (Model.ShowFees && Model.Payment is { Balance: > 0 }) { <a bn-permission="@Perm.FinanceCollect" class="btn btn-light" href="/Finance/Collect?patientId=@p.Id&radiologyOrderId=@o.Id" data-test="rad-collect"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Collect payment</a> }
+    </div>
+</div>
+<partial name="_ValidationSummary" />
+<div class="card">
+    <div class="card-header">
+        <h2><svg class="icon"><use href="#i-@(e.Modality == RadiologyModality.XRay ? "scan" : "wave")" /></svg> @e.ServiceName <span class="token-badge">@label token @e.TokenNumber</span>
+            @if (o.Priority == RadiologyPriority.Urgent) { <span class="status status-bad">Urgent</span> }</h2>
+        <partial name="_RadStatus" model="e.Status" />
+    </div>
+    <div class="card-body lab-patient">
+        <div class="patient-id-box sm"><small>Patient ID</small><strong>@p.PatientNumber</strong></div>
+        <div><h3>@p.FullName</h3><span class="muted">@p.GuardianName · @age · @p.Gender · @p.MobileNumber</span></div>
+        <dl class="kv kv-tight">
+            <dt>Order</dt><dd class="mono">@o.OrderNumber</dd>
+            <dt>Booked for</dt><dd>@Fmt.DateTimeText(e.ScheduledUtc) <small class="muted">(booked @Fmt.DateTimeText(o.BookedUtc) by @o.BookedByUsername)</small></dd>
+            <dt>Referred</dt><dd>@(o.ReferringDepartment?.Name ?? "—")@(o.ReferredBy is { Length: > 0 } rb ? " · " + rb : "")</dd>
+            @if (e.ClinicalIndication is not null) { <dt>Indication</dt><dd>@e.ClinicalIndication</dd> }
+            @if (e.StartedUtc is not null) { <dt>Examination</dt><dd>started @Fmt.DateTimeText(e.StartedUtc)@(e.CompletedUtc is null ? "" : $" · completed {Fmt.DateTimeText(e.CompletedUtc)} by {e.PerformedByName}")</dd> }
+            @if (e.TechnicalNotes is not null) { <dt>Technical notes</dt><dd>@e.TechnicalNotes</dd> }
+            @if (Model.Payment is { } pay) { <dt>Payment</dt><dd data-payment="@pay.State">@pay.State · @Fmt.Money(pay.Paid) of @Fmt.Money(pay.Net)</dd> }
+            @if (e.CancelReason is not null) { <dt>Cancelled</dt><dd>@Fmt.DateTimeText(e.CancelledUtc) by @e.CancelledByUsername – @e.CancelReason</dd> }
+        </dl>
+        <div class="actions"><a bn-permission="@Perm.RadViewHistory" href="/Radiology/Patient/@p.Id">Radiology history</a></div>
+    </div>
+    @if (e.Service?.PreparationInstructions is { } prep && e.Status is RadiologyExamStatus.Booked or RadiologyExamStatus.Waiting) { <div class="card-body small"><strong>Preparation:</strong> @prep</div> }
+    <div class="card-footer form-actions rad-steps" data-exam-actions>
+        @if (e.Status == RadiologyExamStatus.Booked)
+        {
+            <form bn-permission="@Perm.RadStartExam" method="post" asp-page-handler="Arrive" class="inline-form"><button class="btn btn-light" type="submit" data-test="rad-arrive">Patient arrived</button></form>
+        }
+        @if (e.Status is RadiologyExamStatus.Booked or RadiologyExamStatus.Waiting)
+        {
+            <form bn-permission="@Perm.RadStartExam" method="post" asp-page-handler="Start" class="inline-form"><button class="btn btn-primary" type="submit" data-test="rad-start">Start examination</button></form>
+        }
+        @if (e.Status == RadiologyExamStatus.InProgress)
+        {
+            <form bn-permission="@Perm.RadCompleteExam" method="post" asp-page-handler="Complete" class="inline-form wrap" novalidate>
+                <input name="PerformedBy" maxlength="150" placeholder="Technician (default: you)" aria-label="Technician" />
+                <input name="TechnicalNotes" maxlength="1000" placeholder="Technical notes (optional)" aria-label="Technical notes" class="grow" />
+                <button class="btn btn-success" type="submit" data-test="rad-complete">Mark examination completed</button></form>
+        }
+        @if (e.Status == RadiologyExamStatus.Verified)
+        {
+            <form bn-permission="@Perm.RadReleaseReport" method="post" asp-page-handler="Release" class="inline-form"><button class="btn btn-success" type="submit" data-test="rad-release">Release final report</button></form>
+        }
+    </div>
+</div>
+
+@if (hasReport || reportable)
+{
+    <div class="card" id="report">
+        <div class="card-header"><h3><svg class="icon"><use href="#i-file" /></svg> Report @(e.RevisionNo > 0 ? $"(revision {e.RevisionNo + 1})" : "")</h3>
+            @if (e.CorrectionReason is not null && !isFinal) { <span class="status status-bad" data-correction>↩ @e.CorrectionReason</span> }</div>
+        <div class="card-body">
+            @if (hasReport) { <partial name="_ReportText" model="e" /> }
+            else { <p class="empty">No report written yet.</p> }
+        </div>
+        @if (e.Status == RadiologyExamStatus.AwaitingVerification)
+        {
+            <div bn-permission="@Perm.RadVerifyReport" class="card-footer form-actions" id="verify" data-verify>
+                @if (Model.IsOwnReport && !(Model.Settings.AllowSelfVerification && await PermCtx.HasAsync(Perm.RadVerifyOwnReport)))
+                {
+                    <span class="text-warning small">You entered this report – another authorised person must verify it.</span>
+                }
+                else
+                {
+                    <form method="post" asp-page-handler="Verify" class="inline-form"><button class="btn btn-success" type="submit" data-test="rad-verify">Approve (verify)</button></form>
+                }
+                <details class="inline-details"><summary class="btn btn-light">Reject…</summary>
+                    <form method="post" asp-page-handler="Reject" class="inline-form" novalidate>
+                        <input name="Reason" maxlength="300" placeholder="Reason (required)" required aria-label="Reason" class="grow" />
+                        <button class="btn btn-danger" type="submit" data-test="rad-reject">Send back for correction</button></form></details>
+            </div>
+        }
+        @if (isFinal)
+        {
+            <div bn-permission="@Perm.RadAmendReport" class="card-footer">
+                <details class="inline-details"><summary class="btn btn-light btn-sm">Amend verified report…</summary>
+                    <form method="post" asp-page-handler="Amend" class="inline-form" novalidate>
+                        <input name="Reason" maxlength="300" placeholder="Reason for the correction (required)" required aria-label="Reason" class="grow" />
+                        <button class="btn btn-danger btn-sm" type="submit" data-test="rad-amend">Re-open for correction</button></form></details>
+                <small class="muted">The verified text is kept as a revision; the corrected report must be verified again.</small>
+            </div>
+        }
+    </div>
+}
+
+<div class="grid-side">
+    <div class="stack">
+        @if (await PermCtx.HasAnyAsync(new[] { Perm.RadViewAttachments, Perm.RadManageAttachments }))
+        {
+            <div class="card" data-attachments>
+                <div class="card-header"><h3><svg class="icon"><use href="#i-image" /></svg> Images &amp; documents</h3><span class="pill pill-blue">@Model.Attachments.Count(a => !a.IsRemoved)</span></div>
+                <div class="table-wrap">
+                    <table class="table table-compact">
+                        <thead><tr><th>File</th><th>Type</th><th>Size</th><th>Uploaded</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var a in Model.Attachments)
+                        {
+                            <tr class="@(a.IsRemoved ? "row-muted" : "")" data-attachment="@a.OriginalFileName">
+                                <td>@if (!a.IsRemoved && await PermCtx.HasAsync(Perm.RadViewAttachments)) { <a href="/Radiology/Attachment/@a.Id" target="_blank" rel="noopener">@a.OriginalFileName</a> } else { @a.OriginalFileName }
+                                    @if (a.Description is not null) { <small class="muted block">@a.Description</small> }
+                                    @if (a.IsRemoved) { <small class="block">Removed @Fmt.DateTimeText(a.RemovedUtc) by @a.RemovedByUsername: @a.RemoveReason</small> }</td>
+                                <td>@a.Kind</td><td class="nowrap">@DisplayFormatter.Bytes(a.SizeBytes)</td><td class="small">@Fmt.DateTimeText(a.UploadedUtc)<br />@a.UploadedByUsername</td>
+                                <td class="actions nowrap">
+                                    @if (!a.IsRemoved)
+                                    {
+                                        <a bn-permission="@Perm.RadViewAttachments" class="btn btn-light btn-sm" href="/Radiology/Attachment/@a.Id?download=true">Download</a>
+                                        <details bn-permission="@Perm.RadManageAttachments" class="inline-details"><summary class="btn btn-light btn-sm">Remove</summary>
+                                            <form method="post" asp-page-handler="RemoveFile" asp-route-attachmentId="@a.Id" class="inline-form" novalidate>
+                                                <input name="Reason" maxlength="300" placeholder="Reason (required)" required aria-label="Reason" />
+                                                <button class="btn btn-danger btn-sm" type="submit">Remove</button></form></details>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        @if (Model.Attachments.Count == 0) { <tr><td colspan="5" class="empty">No files attached.</td></tr> }
+                        </tbody>
+                    </table>
+                </div>
+                @if (e.Status != RadiologyExamStatus.Cancelled)
+                {
+                    <form bn-permission="@Perm.RadManageAttachments" method="post" asp-page-handler="Upload" enctype="multipart/form-data" class="card-footer inline-form wrap" novalidate data-upload>
+                        <input type="file" name="Upload" accept=".jpg,.jpeg,.png,.pdf,.dcm,image/jpeg,image/png,application/pdf,application/dicom" aria-label="File" />
+                        <input name="Description" maxlength="300" placeholder="Description (optional)" aria-label="Description" class="grow" />
+                        <button class="btn btn-light" type="submit" data-test="rad-upload">Attach</button>
+                        <small class="muted block">JPG, PNG, PDF or DICOM (.dcm), max @Model.Settings.MaxUploadMb MB. Files are kept on the hospital server. DICOM files are stored and downloadable – this is not a PACS viewer.</small>
+                    </form>
+                }
+            </div>
+        }
+        <div class="card">
+            <div class="card-header"><h3>History</h3></div>
+            <ul class="activity" data-history>
+                @foreach (var ev in Model.Events.Take(80))
+                {
+                    <li><span class="activity-dot"></span><div><strong>@ev.EventType</strong><small>@Fmt.DateTimeText(ev.CreatedUtc) · @ev.Username @(ev.Note is null ? "" : "– " + ev.Note)</small></div></li>
+                }
+            </ul>
+        </div>
+    </div>
+    <div class="stack">
+        <div class="card">
+            <div class="card-header"><h3>Reports printed</h3><span class="pill pill-blue">@Model.Prints.Count</span></div>
+            <ul class="activity">
+                @foreach (var pr in Model.Prints) { <li><span class="activity-dot"></span><div><strong>Copy @pr.CopyNumber · @pr.Format</strong><small>@Fmt.DateTimeText(pr.PrintedUtc) · @pr.PrintedByUsername</small></div></li> }
+                @if (Model.Prints.Count == 0) { <li class="empty">Not printed yet.</li> }
+            </ul>
+        </div>
+        @if (Model.Revisions.Count > 0)
+        {
+            <div class="card">
+                <div class="card-header"><h3>Report revisions</h3></div>
+                <ul class="activity" data-revisions>
+                    @foreach (var r in Model.Revisions)
+                    {
+                        <li><span class="activity-dot"></span><div><strong>Revision @r.RevisionNo (was @RadiologyWorkflowService.Label(r.PreviousStatus))</strong><small>@Fmt.DateTimeText(r.CreatedUtc) · @r.CreatedByUsername – @r.Reason</small>
+                            <details><summary class="small">Text of that version</summary><pre class="small prewrap">@r.Snapshot</pre></details></div></li>
+                    }
+                </ul>
+            </div>
+        }
+        @if (e.Status is RadiologyExamStatus.Booked or RadiologyExamStatus.Waiting)
+        {
+            <form bn-permission="@Perm.RadEditBooking" method="post" asp-page-handler="Reschedule" class="card" novalidate>
+                <div class="card-header"><h3>Reschedule</h3></div>
+                <div class="card-body grid-2">
+                    <div class="field"><label for="NewDate">Date</label><input id="NewDate" type="date" name="NewDate" value="@e.ScheduledDate.ToString("yyyy-MM-dd")" /></div>
+                    <div class="field"><label for="NewTime">Time</label><input id="NewTime" type="time" name="NewTime" value="@Fmt.ToLocal(e.ScheduledUtc).ToString("HH:mm")" /></div>
+                </div>
+                <div class="card-footer"><button class="btn btn-light" type="submit">Save new date</button></div>
+            </form>
+        }
+        @if (e.Status is not RadiologyExamStatus.Cancelled and not RadiologyExamStatus.Verified and not RadiologyExamStatus.Released)
+        {
+            <form bn-permission="@Perm.RadCancelBooking" method="post" asp-page-handler="Cancel" class="card" novalidate>
+                <div class="card-header"><h3>Cancel examination</h3></div>
+                <div class="card-body"><input name="Reason" maxlength="300" placeholder="Reason (required)" required aria-label="Reason" /></div>
+                <div class="card-footer"><button class="btn btn-danger" type="submit" data-test="rad-cancel">Cancel examination</button></div>
+            </form>
+        }
+    </div>
+</div>

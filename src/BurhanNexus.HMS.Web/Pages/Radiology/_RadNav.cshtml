@@ -1,0 +1,17 @@
+@{
+    var tab = ViewData["RadTab"] as string;
+    string Cls(string t) => t == tab ? "active" : "";
+}
+<nav class="subnav no-print" data-rad-nav>
+    <a bn-permission="@Perm.RadDashboard" class="@Cls("dashboard")" href="/Radiology"><svg class="icon icon-sm"><use href="#i-chart" /></svg> Dashboard</a>
+    <a bn-permission="@Perm.RadCreateBooking" class="@Cls("book")" href="/Radiology/Book"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New booking</a>
+    <a bn-permission="@Perm.RadViewXRay" class="@Cls("xray")" href="/Radiology/Worklist/XRay"><svg class="icon icon-sm"><use href="#i-scan" /></svg> X-Ray</a>
+    <a bn-permission="@Perm.RadViewUltrasound" class="@Cls("ultrasound")" href="/Radiology/Worklist/Ultrasound"><svg class="icon icon-sm"><use href="#i-wave" /></svg> Ultrasound</a>
+    <a bn-permission="@Perm.RadCreateBooking|@Perm.RadEditBooking|@Perm.RadViewXRay|@Perm.RadViewUltrasound" class="@Cls("bookings")" href="/Radiology/Bookings"><svg class="icon icon-sm"><use href="#i-calendar" /></svg> Bookings</a>
+    <a bn-permission="@Perm.RadEnterReport|@Perm.RadEditDraft" class="@Cls("reporting")" href="/Radiology/Reporting"><svg class="icon icon-sm"><use href="#i-edit" /></svg> Reporting</a>
+    <a bn-permission="@Perm.RadVerifyReport" class="@Cls("verify")" href="/Radiology/Verify"><svg class="icon icon-sm"><use href="#i-check-circle" /></svg> Verification</a>
+    <a bn-permission="@Perm.RadViewHistory" class="@Cls("history")" href="/Radiology/History"><svg class="icon icon-sm"><use href="#i-history" /></svg> Patient history</a>
+    <a bn-permission="@Perm.RadViewStatistics" class="@Cls("reports")" href="/Radiology/Reports"><svg class="icon icon-sm"><use href="#i-chart" /></svg> Reports</a>
+    <a bn-permission="@Perm.RadManageServices|@Perm.RadManageTemplates" class="@Cls("services")" href="/Radiology/Services"><svg class="icon icon-sm"><use href="#i-sliders" /></svg> Services</a>
+    <a bn-permission="@Perm.RadSettings" class="@Cls("settings")" href="/Radiology/Settings"><svg class="icon icon-sm"><use href="#i-settings" /></svg> Settings</a>
+</nav>

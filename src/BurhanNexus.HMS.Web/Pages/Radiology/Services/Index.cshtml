@@ -1,0 +1,52 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Radiology.Services.IndexModel
+@{ ViewData["Title"] = "Radiology services"; }
+<partial name="/Pages/Radiology/_RadNav.cshtml" />
+<div class="toolbar">
+    <div></div>
+    <div class="toolbar-actions">
+        <a bn-permission="@Perm.RadManageServices" class="btn btn-primary" href="/Radiology/Services/Edit" data-test="rad-new-service"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New service</a>
+        <a bn-permission="@Perm.RadManageTemplates" class="btn btn-light" href="/Radiology/Templates/Edit"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New template</a>
+    </div>
+</div>
+@foreach (var g in Model.Services.GroupBy(s => s.Service.Modality))
+{
+    <div class="card" data-services="@g.Key">
+        <div class="card-header"><h2><svg class="icon"><use href="#i-@(g.Key == RadiologyModality.XRay ? "scan" : "wave")" /></svg> @RadiologyCatalogService.Label(g.Key) services</h2><span class="pill pill-blue">@g.Count()</span></div>
+        <div class="table-wrap">
+            <table class="table table-compact">
+                <thead><tr><th>Code</th><th>Service</th><th>Body part / type</th><th>Duration</th>@if (Model.ShowFees) { <th class="num">Fee</th> }<th>Default template</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var s in g)
+                {
+                    <tr class="@(s.Service.IsActive ? "" : "row-muted")" data-service="@s.Service.Code">
+                        <td class="mono">@s.Service.Code</td><td><strong>@s.Service.Name</strong>@if (s.Service.PreparationInstructions is not null) { <small class="muted block">@s.Service.PreparationInstructions</small> }</td>
+                        <td>@s.Service.BodyPart</td><td>@(s.Service.DurationMinutes is int m ? $"{m} min" : "—")</td>
+                        @if (Model.ShowFees) { <td class="num">@(s.Fee == 0 ? "Free" : Fmt.Money(s.Fee))</td> }
+                        <td>@(s.Service.DefaultTemplate?.Name ?? "—")</td>
+                        <td>@(s.Service.IsActive ? "Active" : "Inactive")</td>
+                        <td class="actions"><a bn-permission="@Perm.RadManageServices" class="btn btn-light btn-sm" href="/Radiology/Services/Edit/@s.Service.Id" data-test="edit-@s.Service.Code">Edit</a></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+<div class="card" data-templates>
+    <div class="card-header"><h2><svg class="icon"><use href="#i-file" /></svg> Report templates</h2><span class="pill pill-blue">@Model.Templates.Count</span></div>
+    <div class="table-wrap">
+        <table class="table table-compact">
+            <thead><tr><th>Template</th><th>Modality</th><th>Impression</th><th>Updated</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var t in Model.Templates)
+            {
+                <tr class="@(t.IsActive ? "" : "row-muted")"><td><strong>@t.Name</strong></td><td>@RadiologyCatalogService.Label(t.Modality)</td><td class="small">@t.Impression</td>
+                    <td class="small">@Fmt.DateTimeText(t.UpdatedUtc) · @t.UpdatedByUsername</td><td>@(t.IsActive ? "Active" : "Inactive")</td>
+                    <td class="actions"><a bn-permission="@Perm.RadManageTemplates" class="btn btn-light btn-sm" href="/Radiology/Templates/Edit/@t.Id">Edit</a></td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-body small muted">Templates only pre-fill new reports. Changing a template never changes a saved report.</div>
+</div>

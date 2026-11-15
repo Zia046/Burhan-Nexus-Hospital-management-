@@ -1,0 +1,64 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Radiology.SettingsModel
+@{ ViewData["Title"] = "Radiology settings"; var i = Model.Input; var s = Model.Current; }
+<partial name="_RadNav" />
+<div class="grid-side">
+    <form method="post" class="card" novalidate data-rad-settings>
+        <input type="hidden" name="RowVersion" value="@Model.RowVersion" />
+        <div class="card-header"><h2><svg class="icon"><use href="#i-settings" /></svg> Radiology settings</h2></div>
+        <div class="card-body">
+            <partial name="_ValidationSummary" />
+            <h3 class="section-title">A4 report header &amp; footer</h3>
+            <label class="check"><input type="checkbox" name="Input.PrintHeader" value="true" checked="@i.PrintHeader" data-test="rad-print-header" /> Print the hospital header (logo, name, address) on reports</label><input type="hidden" name="Input.PrintHeader" value="false" />
+            <div class="field"><label for="Input_LetterheadTopMarginMm">Space left at the top when the header is off (pre-printed letterhead), mm</label><input id="Input_LetterheadTopMarginMm" type="number" min="0" max="120" name="Input.LetterheadTopMarginMm" value="@i.LetterheadTopMarginMm" /></div>
+            <div class="grid-2">
+                <div class="field"><label for="Input_HospitalName">Hospital name (empty = hospital settings)</label><input id="Input_HospitalName" name="Input.HospitalName" value="@i.HospitalName" maxlength="200" /></div>
+                <div class="field"><label for="Input_DepartmentName">Department name</label><input id="Input_DepartmentName" name="Input.DepartmentName" value="@i.DepartmentName" maxlength="150" /></div>
+                <div class="field"><label for="Input_Address">Address</label><input id="Input_Address" name="Input.Address" value="@i.Address" maxlength="300" /></div>
+                <div class="field"><label for="Input_ContactNumber">Contact number</label><input id="Input_ContactNumber" name="Input.ContactNumber" value="@i.ContactNumber" maxlength="100" /></div>
+                <div class="field"><label for="Input_Email">Email</label><input id="Input_Email" name="Input.Email" value="@i.Email" maxlength="150" /></div>
+                <div class="field"><label for="Input_ReportHeader">Extra header line</label><input id="Input_ReportHeader" name="Input.ReportHeader" value="@i.ReportHeader" maxlength="300" /></div>
+            </div>
+            <div class="field"><label for="Input_ReportFooter">Footer text</label><input id="Input_ReportFooter" name="Input.ReportFooter" value="@i.ReportFooter" maxlength="500" /></div>
+            <div class="grid-2">
+                <div class="field"><label for="Input_DefaultReportingDoctor">Default reporting doctor</label><input id="Input_DefaultReportingDoctor" name="Input.DefaultReportingDoctor" value="@i.DefaultReportingDoctor" maxlength="150" /></div>
+                <div class="field"><label for="Input_DefaultDesignation">Default designation</label><input id="Input_DefaultDesignation" name="Input.DefaultDesignation" value="@i.DefaultDesignation" maxlength="150" placeholder="Consultant Radiologist" /></div>
+            </div>
+            <label class="check"><input type="checkbox" name="Input.ShowVerifiedBy" value="true" checked="@i.ShowVerifiedBy" /> Show “verified by” on the report</label><input type="hidden" name="Input.ShowVerifiedBy" value="false" />
+            <h3 class="section-title">Verification &amp; release</h3>
+            <label class="check"><input type="checkbox" name="Input.AllowSelfVerification" value="true" checked="@i.AllowSelfVerification" /> Allow a user to verify their own report (only users who also have “Verify Own Report”)</label><input type="hidden" name="Input.AllowSelfVerification" value="false" />
+            <label class="check"><input type="checkbox" name="Input.RequirePaymentBeforeRelease" value="true" checked="@i.RequirePaymentBeforeRelease" /> Release reports only when the examination fee is fully paid</label><input type="hidden" name="Input.RequirePaymentBeforeRelease" value="false" />
+            <h3 class="section-title">Bookings</h3>
+            <label class="check"><input type="checkbox" name="Input.AllowBookingWithoutVisit" value="true" checked="@i.AllowBookingWithoutVisit" data-test="rad-allow-no-visit" /> Allow bookings without an OPD / Emergency visit (referred / other authorised patients)</label><input type="hidden" name="Input.AllowBookingWithoutVisit" value="false" />
+            <div class="grid-2">
+                <div class="field"><label for="Input_VisitValidDays">An OPD / Emergency visit is valid for (days)</label><input id="Input_VisitValidDays" type="number" min="1" max="90" name="Input.VisitValidDays" value="@i.VisitValidDays" /></div>
+                <div class="field"><label for="Input_MaxUploadMb">Maximum file size for attachments (MB)</label><input id="Input_MaxUploadMb" type="number" min="1" max="200" name="Input.MaxUploadMb" value="@i.MaxUploadMb" /></div>
+            </div>
+            <p class="small muted">@(Model.IsPrivate ? "Private hospital: fees follow the Private service fees." : "Government hospital: fees follow the Government service-fee configuration (free services stay free).") Fees are set per service in Phase 3 (cashier).</p>
+        </div>
+        <div class="card-footer form-actions"><button class="btn btn-primary" type="submit" data-test="rad-save-settings">Save settings</button></div>
+    </form>
+    <div class="stack">
+        @foreach (var (kind, title, has) in new[] { ("logo", "Report logo", s.Logo is not null), ("signature", "Signature image", s.Signature is not null) })
+        {
+            <form method="post" asp-page-handler="Image" asp-route-kind="@kind" enctype="multipart/form-data" class="card" novalidate>
+                <div class="card-header"><h3>@title</h3></div>
+                <div class="card-body">
+                    @if (has) { <img class="lab-image-preview" src="/Radiology/Image/@kind?v=@s.UpdatedUtc.Ticks" alt="" /> } else { <p class="small muted">@(kind == "logo" ? "Not set – the hospital logo is used." : "Not set.")</p> }
+                    <input type="file" name="file" accept="image/png,image/jpeg" aria-label="@title" />
+                </div>
+                <div class="card-footer form-actions">
+                    <button class="btn btn-light btn-sm" type="submit">Upload</button>
+                    @if (has) { <button class="btn btn-light btn-sm" type="submit" name="remove" value="true">Remove</button> }
+                </div>
+            </form>
+        }
+        <div class="card">
+            <div class="card-header"><h3>File storage</h3></div>
+            <div class="card-body small">
+                <p>Images and documents are stored on this server in:<br /><code data-storage-path>@Model.StoragePath</code></p>
+                <p class="muted">Change the folder with <code>Hms:RadiologyStorageDirectory</code> in appsettings.json. Every system backup also archives this folder (<code>*.radiology-files.zip</code> next to the database backup), and a restore puts the files back.</p>
+            </div>
+        </div>
+    </div>
+</div>

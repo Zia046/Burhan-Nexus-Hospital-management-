@@ -1,0 +1,17 @@
+@model (string? Q, string? Modality, bool Dates, DateOnly? From, DateOnly? To)
+<div class="toolbar">
+    <form method="get" class="filters wrap">
+        @if (Model.Dates)
+        {
+            <label class="inline-label">From <input type="date" name="from" value="@Model.From?.ToString("yyyy-MM-dd")" /></label>
+            <label class="inline-label">To <input type="date" name="to" value="@Model.To?.ToString("yyyy-MM-dd")" /></label>
+        }
+        <select name="modality" aria-label="Modality" data-autosubmit>
+            <option value="" selected="@string.IsNullOrEmpty(Model.Modality)">X-Ray &amp; Ultrasound</option>
+            <option value="XRay" selected="@(Model.Modality == "XRay")">X-Ray</option>
+            <option value="Ultrasound" selected="@(Model.Modality == "Ultrasound")">Ultrasound</option>
+        </select>
+        <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Order no., Patient ID, name, phone, CNIC" maxlength="100" /></div>
+        <button class="btn btn-light" type="submit">Search</button>
+    </form>
+</div>

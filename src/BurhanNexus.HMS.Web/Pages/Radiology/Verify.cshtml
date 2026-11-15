@@ -1,0 +1,10 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Radiology.VerifyModel
+@{ ViewData["Title"] = "Radiology verification"; }
+<partial name="_RadNav" />
+<partial name="_ListFilter" model="(Model.Q, Model.Modality, false, (DateOnly?)null, (DateOnly?)null)" />
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-check-circle" /></svg> Reports awaiting verification</h2><span class="pill pill-blue" data-count>@Model.Rows.Count</span></div>
+    @await Html.PartialAsync("_ExamTable", (Model.Rows, "verification", "Nothing to verify.", "verify"))
+    <div class="card-body small muted">Only verified reports can be released and printed as final. Rejection needs a reason; the corrected report is verified again.</div>
+</div>

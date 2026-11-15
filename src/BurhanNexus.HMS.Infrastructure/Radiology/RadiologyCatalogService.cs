@@ -3,6 +3,7 @@ using BurhanNexus.HMS.Core.Domain;
 using BurhanNexus.HMS.Infrastructure.Finance;
 using BurhanNexus.HMS.Infrastructure.Patients;
 using BurhanNexus.HMS.Infrastructure.Persistence;
+using BurhanNexus.HMS.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace BurhanNexus.HMS.Infrastructure.Radiology;

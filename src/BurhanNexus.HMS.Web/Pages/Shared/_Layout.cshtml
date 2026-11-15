@@ -123,6 +123,56 @@
             }
         }
 
+        @if (Any(Perm.RadDashboard, Perm.RadCreateBooking, Perm.RadViewXRay, Perm.RadViewUltrasound, Perm.RadEnterReport, Perm.RadEditDraft, Perm.RadVerifyReport,
+                 Perm.RadViewHistory, Perm.RadViewStatistics, Perm.RadManageServices, Perm.RadManageTemplates, Perm.RadSettings))
+        {
+            <div class="nav-section">Radiology</div>
+            @if (perms.Contains(Perm.RadDashboard))
+            {
+                <a class="nav-link @Active("rad-dashboard")" href="/Radiology" data-nav="rad-dashboard"><svg class="icon"><use href="#i-scan" /></svg><span>Radiology Dashboard</span></a>
+            }
+            @if (perms.Contains(Perm.RadCreateBooking))
+            {
+                <a class="nav-link @Active("rad-book")" href="/Radiology/Book" data-nav="rad-book"><svg class="icon"><use href="#i-plus" /></svg><span>New Booking</span></a>
+            }
+            @if (perms.Contains(Perm.RadViewXRay))
+            {
+                <a class="nav-link @Active("rad-xray")" href="/Radiology/Worklist/XRay" data-nav="rad-xray"><svg class="icon"><use href="#i-scan" /></svg><span>X-Ray Worklist</span></a>
+            }
+            @if (perms.Contains(Perm.RadViewUltrasound))
+            {
+                <a class="nav-link @Active("rad-ultrasound")" href="/Radiology/Worklist/Ultrasound" data-nav="rad-ultrasound"><svg class="icon"><use href="#i-wave" /></svg><span>Ultrasound Worklist</span></a>
+            }
+            @if (Any(Perm.RadCreateBooking, Perm.RadEditBooking, Perm.RadViewXRay, Perm.RadViewUltrasound))
+            {
+                <a class="nav-link @Active("rad-bookings")" href="/Radiology/Bookings" data-nav="rad-bookings"><svg class="icon"><use href="#i-calendar" /></svg><span>Bookings</span></a>
+            }
+            @if (Any(Perm.RadEnterReport, Perm.RadEditDraft))
+            {
+                <a class="nav-link @Active("rad-reporting")" href="/Radiology/Reporting" data-nav="rad-reporting"><svg class="icon"><use href="#i-edit" /></svg><span>Reporting</span></a>
+            }
+            @if (perms.Contains(Perm.RadVerifyReport))
+            {
+                <a class="nav-link @Active("rad-verify")" href="/Radiology/Verify" data-nav="rad-verify"><svg class="icon"><use href="#i-check-circle" /></svg><span>Report Verification</span></a>
+            }
+            @if (perms.Contains(Perm.RadViewHistory))
+            {
+                <a class="nav-link @Active("rad-history")" href="/Radiology/History" data-nav="rad-history"><svg class="icon"><use href="#i-history" /></svg><span>Patient History</span></a>
+            }
+            @if (perms.Contains(Perm.RadViewStatistics))
+            {
+                <a class="nav-link @Active("rad-reports")" href="/Radiology/Reports" data-nav="rad-reports"><svg class="icon"><use href="#i-chart" /></svg><span>Radiology Reports</span></a>
+            }
+            @if (Any(Perm.RadManageServices, Perm.RadManageTemplates))
+            {
+                <a class="nav-link @Active("rad-services")" href="/Radiology/Services" data-nav="rad-services"><svg class="icon"><use href="#i-sliders" /></svg><span>Services &amp; Templates</span></a>
+            }
+            @if (perms.Contains(Perm.RadSettings))
+            {
+                <a class="nav-link @Active("rad-settings")" href="/Radiology/Settings" data-nav="rad-settings"><svg class="icon"><use href="#i-settings" /></svg><span>Radiology Settings</span></a>
+            }
+        }
+
         @if (Any(Perm.PharmDashboard, Perm.PharmViewCatalogue, Perm.PharmIssueToPatients, Perm.PharmRetailSales, Perm.PharmReceiveStock, Perm.PharmTransferStock,
                  Perm.PharmViewStockReports, Perm.PharmViewDepartmentStock, Perm.PharmAdjustStock, Perm.PharmApproveAdjustments, Perm.PharmManageSuppliers, Perm.PharmSettings))
         {
@@ -236,7 +286,7 @@
             }
         }
     </nav>
-    <div class="sidebar-footer">Burhan Nexus · v1.5 · Phase 5</div>
+    <div class="sidebar-footer">Burhan Nexus · v1.6 · Phase 6</div>
 </aside>
 <div class="sidebar-backdrop" data-sidebar-close></div>
 

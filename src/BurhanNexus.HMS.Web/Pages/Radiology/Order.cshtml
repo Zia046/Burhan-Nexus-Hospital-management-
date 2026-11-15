@@ -1,0 +1,86 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Radiology.OrderModel
+@{
+    var o = Model.Order;
+    var p = o.Patient!;
+    ViewData["Title"] = $"Radiology order {o.OrderNumber}";
+    var age = AgeCalculator.Of(p, o.BusinessDate)?.ToString() ?? "—";
+    var net = Model.Payments.Values.Where(x => x.State != ExamPaymentState.Cancelled).Sum(x => x.Net);
+    var paid = Model.Payments.Values.Where(x => x.State != ExamPaymentState.Cancelled).Sum(x => x.Paid);
+}
+<partial name="_RadNav" />
+<div class="toolbar">
+    <div><a class="btn btn-light" href="/Radiology/Bookings">&larr; Bookings</a></div>
+    <div class="toolbar-actions">
+        @if (Model.ShowFees && net > paid) { <a bn-permission="@Perm.FinanceCollect" class="btn btn-primary" href="/Finance/Collect?patientId=@p.Id&radiologyOrderId=@o.Id" data-test="rad-order-collect"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Collect payment</a> }
+        <a bn-permission="@Perm.RadViewHistory" class="btn btn-light" href="/Radiology/Patient/@p.Id">Radiology history</a>
+    </div>
+</div>
+<partial name="_ValidationSummary" />
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-scan" /></svg> <span class="mono" data-order-number>@o.OrderNumber</span> @if (o.Priority == RadiologyPriority.Urgent) { <span class="status status-bad">Urgent</span> }</h2>
+        @if (Model.ShowFees) { <span class="pill pill-blue" data-order-payment>Paid @Fmt.Money(paid) of @Fmt.Money(net)</span> }</div>
+    <div class="card-body lab-patient">
+        <div class="patient-id-box sm"><small>Patient ID</small><strong>@p.PatientNumber</strong></div>
+        <div><h3>@p.FullName</h3><span class="muted">@p.GuardianName · @age · @p.Gender · @p.MobileNumber</span></div>
+        <dl class="kv kv-tight">
+            <dt>Booked</dt><dd>@Fmt.DateTimeText(o.BookedUtc) by @o.BookedByUsername</dd>
+            <dt>Visit</dt><dd>@(o.Encounter?.EncounterNumber ?? "— (no OPD / Emergency visit)")</dd>
+            <dt>Referred</dt><dd>@(o.ReferringDepartment?.Name ?? "—")@(o.ReferredBy is { Length: > 0 } rb ? " · " + rb + (o.ReferralType == RadiologyReferralType.External ? " (external)" : "") : "")</dd>
+            @if (o.ClinicalIndication is not null) { <dt>Clinical indication</dt><dd>@o.ClinicalIndication</dd> }
+        </dl>
+    </div>
+    <div class="table-wrap">
+        <table class="table" data-order-exams>
+            <thead><tr><th>Token</th><th>Examination</th><th>Booked for</th><th>Status</th>@if (Model.ShowFees) { <th>Payment</th> }<th></th></tr></thead>
+            <tbody>
+            @foreach (var e in o.Exams)
+            {
+                Model.Payments.TryGetValue(e.Id, out var pay);
+                <tr class="@(e.Status == RadiologyExamStatus.Cancelled ? "row-muted" : "")" data-exam="@e.ServiceCode">
+                    <td><span class="token-badge">@(e.Modality == RadiologyModality.XRay ? "X" : "U")-@e.TokenNumber</span></td>
+                    <td><strong>@e.ServiceName</strong><small class="muted block">@RadiologyCatalogService.Label(e.Modality) · @e.ServiceCode</small>
+                        @if (e.CancelReason is not null) { <small class="block">Cancelled: @e.CancelReason</small> }</td>
+                    <td class="nowrap">@Fmt.DateTimeText(e.ScheduledUtc)</td>
+                    <td><partial name="_RadStatus" model="e.Status" /></td>
+                    @if (Model.ShowFees) { <td class="nowrap">@(pay is null ? "—" : pay.State.ToString()) @if (pay is { Net: > 0 }) { <small class="muted block">@Fmt.Money(pay.Paid) / @Fmt.Money(pay.Net)</small> }</td> }
+                    <td class="actions"><a class="btn btn-light btn-sm" href="/Radiology/Exam/@e.Id">Open</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+@if (Model.Doctors.Count > 0 || Model.Services.Count > 0)
+{
+    <div class="grid-2">
+        <form bn-permission="@Perm.RadEditBooking" method="post" asp-page-handler="Details" class="card" novalidate>
+            <div class="card-header"><h3>Booking details</h3></div>
+            <div class="card-body grid-2">
+                <div class="field"><label for="Details_ReferringDepartmentId">Referring department</label><select id="Details_ReferringDepartmentId" name="Details.ReferringDepartmentId"><option value="">—</option>
+                    @foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(Model.Details.ReferringDepartmentId == d.Id)">@d.Name</option> }</select></div>
+                <div class="field"><label for="Details_Priority">Priority</label><select id="Details_Priority" name="Details.Priority">
+                    <option value="Routine" selected="@(Model.Details.Priority == RadiologyPriority.Routine)">Routine</option>
+                    <option value="Urgent" selected="@(Model.Details.Priority == RadiologyPriority.Urgent)">Urgent</option></select></div>
+                <div class="field"><label for="Details_ReferralType">Referred by</label><select id="Details_ReferralType" name="Details.ReferralType">
+                    <option value="None" selected="@(Model.Details.ReferralType == RadiologyReferralType.None)">Not recorded / self</option>
+                    <option value="HospitalDoctor" selected="@(Model.Details.ReferralType == RadiologyReferralType.HospitalDoctor)">Hospital doctor</option>
+                    <option value="External" selected="@(Model.Details.ReferralType == RadiologyReferralType.External)">External doctor</option></select></div>
+                <div class="field"><label for="Details_ReferringDoctorId">Hospital doctor</label><select id="Details_ReferringDoctorId" name="Details.ReferringDoctorId"><option value="">—</option>
+                    @foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(Model.Details.ReferringDoctorId == d.Id)">@d.Name</option> }</select></div>
+                <div class="field"><label for="Details_ExternalDoctorName">External doctor</label><input id="Details_ExternalDoctorName" name="Details.ExternalDoctorName" value="@Model.Details.ExternalDoctorName" maxlength="150" /></div>
+                <div class="field"><label for="Details_ClinicalIndication">Clinical indication</label><input id="Details_ClinicalIndication" name="Details.ClinicalIndication" value="@Model.Details.ClinicalIndication" maxlength="1000" /></div>
+            </div>
+            <div class="card-footer"><button class="btn btn-light" type="submit">Save details</button></div>
+        </form>
+        @if (Model.Services.Count > 0)
+        {
+            <form bn-permission="@Perm.RadEditBooking" method="post" asp-page-handler="Add" class="card" novalidate>
+                <div class="card-header"><h3>Add examinations</h3></div>
+                <div class="card-body"><select name="AddServiceIds" multiple size="8" aria-label="Examinations">
+                    @foreach (var s in Model.Services) { <option value="@s.Service.Id">@RadiologyCatalogService.Label(s.Service.Modality): @s.Service.Name</option> }</select></div>
+                <div class="card-footer"><button class="btn btn-light" type="submit">Add selected</button></div>
+            </form>
+        }
+    </div>
+}

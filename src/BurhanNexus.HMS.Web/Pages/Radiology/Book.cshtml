@@ -1,0 +1,137 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Radiology.BookModel
+@{
+    ViewData["Title"] = "New radiology booking";
+    var p = Model.Patient;
+}
+<partial name="_RadNav" />
+@if (p is null)
+{
+    <div class="card card-medium">
+        <div class="card-header"><h2><svg class="icon"><use href="#i-scan" /></svg> New X-Ray / Ultrasound booking – find the patient</h2></div>
+        <div class="card-body">
+            <form method="get" class="search-main">
+                <div class="input-icon grow"><svg class="icon"><use href="#i-search" /></svg>
+                    <input name="q" value="@Model.Q" placeholder="Patient ID, name, phone or CNIC" autofocus autocomplete="off" maxlength="100" /></div>
+                <button class="btn btn-primary" type="submit">Search</button>
+                @if (Model.CanRegister) { <a class="btn btn-success" href="/Patients/Register?next=radiology@(string.IsNullOrWhiteSpace(Model.Q) ? "" : "&name=" + Uri.EscapeDataString(Model.Q))"><svg class="icon icon-sm"><use href="#i-plus" /></svg> Register new patient</a> }
+            </form>
+            <p class="small muted">The doctor's handwritten advice is enough – no doctor login or digital order is needed. Search first to avoid duplicate patient records.</p>
+            @if (!string.IsNullOrWhiteSpace(Model.Q))
+            {
+                <div class="table-wrap">
+                    <table class="table table-compact" data-matches>
+                        <thead><tr><th>Patient ID</th><th>Name</th><th>Father / Husband</th><th>Age</th><th>Phone</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var m in Model.Matches)
+                        {
+                            <tr><td class="mono">@m.PatientNumber</td><td><strong>@m.FullName</strong></td><td>@m.GuardianName</td><td>@m.AgeText · @m.Gender</td><td>@m.MobileNumber</td>
+                                <td class="actions"><a class="btn btn-primary btn-sm" href="/Radiology/Book?patientId=@m.Id" data-test="rad-select-patient">Select</a>
+                                    <a bn-permission="@Perm.RadViewHistory" class="btn btn-light btn-sm" href="/Radiology/Patient/@m.Id">Radiology history</a></td></tr>
+                        }
+                        @if (Model.Matches.Count == 0) { <tr><td colspan="6" class="empty">No patient found – register the patient first.</td></tr> }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <form method="post" class="grid-side" novalidate data-lab-book data-rad-book>
+        <input type="hidden" name="Input.IdempotencyKey" value="@Model.Input.IdempotencyKey" />
+        <input type="hidden" name="PatientId" value="@p.Id" />
+        <div class="card">
+            <div class="card-header"><h2><svg class="icon"><use href="#i-scan" /></svg> Select examinations</h2><span class="pill pill-blue" data-selected-count>0 selected</span></div>
+            <div class="card-body">
+                <partial name="_ValidationSummary" />
+                <h3 class="section-title">OPD / Emergency visit</h3>
+                <div class="rad-visits" data-visits>
+                    @if (Model.Settings.AllowBookingWithoutVisit) { <label class="check rad-visit"><input type="radio" name="VisitChoice" value="" checked="@(string.IsNullOrEmpty(Model.VisitChoice))" /> No visit (other authorised booking)</label> }
+                    @foreach (var v in Model.Visits)
+                    {
+                        <label class="check rad-visit" data-visit="@v.EncounterNumber"><input type="radio" name="VisitChoice" value="@v.Id" checked="@(Model.VisitChoice == v.Id.ToString())" />
+                            <span><strong class="mono">@v.EncounterNumber</strong> · @(v.Type == EncounterType.Opd ? "OPD" : "Emergency") · @Fmt.Day(v.EncounterDate)@(v.Department is null ? "" : " · " + v.Department.Name)@(v.Doctor is null ? "" : " · " + v.Doctor.Name)</span></label>
+                    }
+                    @if (Model.Visits.Count == 0)
+                    {
+                        <div class="alert @(Model.Settings.AllowBookingWithoutVisit ? "alert-info" : "alert-warning")"><svg class="icon"><use href="#i-info" /></svg><div>No OPD / Emergency visit in the last @Model.Settings.VisitValidDays day(s).@(Model.Settings.AllowBookingWithoutVisit ? "" : " This hospital books examinations only against a registered visit – register the OPD / Emergency visit first.")</div></div>
+                    }
+                </div>
+                @if (Model.Services.Count == 0) { <div class="alert alert-warning"><svg class="icon"><use href="#i-info" /></svg><div>No active examinations. Activate services in <a href="/Radiology/Services">Radiology services</a>.</div></div> }
+                <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input type="search" placeholder="Filter examinations…" data-test-filter aria-label="Filter examinations" /></div>
+                @foreach (var g in Model.Services.GroupBy(s => s.Service.Modality))
+                {
+                    <h3 class="section-title">@RadiologyCatalogService.Label(g.Key)</h3>
+                    <div class="test-picker" data-modality="@g.Key">
+                        @foreach (var s in g)
+                        {
+                            <label class="test-choice" data-test-name="@s.Service.Name.ToLowerInvariant() @s.Service.Code.ToLowerInvariant() @(s.Service.BodyPart?.ToLowerInvariant())">
+                                <input type="checkbox" name="ServiceIds" value="@s.Service.Id" checked="@Model.ServiceIds.Contains(s.Service.Id)" data-price="@s.Fee.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-rad-service="@s.Service.Code" />
+                                <span><strong>@s.Service.Name</strong> <small class="muted">@s.Service.Code@(s.Service.DurationMinutes is int min ? $" · ~{min} min" : "")</small>
+                                    @if (s.Service.PreparationInstructions is not null) { <small class="block text-warning">Preparation: @s.Service.PreparationInstructions</small> }
+                                    @if (Model.ShowFees) { <small class="block">@(s.Fee == 0 ? "Free" : Fmt.Money(s.Fee))</small> }</span>
+                                @if (Model.CanDiscount && s.Fee > 0) { <input class="input-num" type="number" step="0.01" min="0" max="@s.Fee" name="Discounts[@s.Service.Id]" placeholder="disc." aria-label="Discount" /> }
+                            </label>
+                        }
+                    </div>
+                }
+                <h3 class="section-title">Date, referral &amp; clinical indication</h3>
+                <div class="grid-2">
+                    <div class="field"><label for="ExamDate">Examination date</label><input id="ExamDate" type="date" name="ExamDate" value="@Model.ExamDate?.ToString("yyyy-MM-dd")" min="@Model.Today.ToString("yyyy-MM-dd")" /></div>
+                    <div class="field"><label for="ExamTime">Time</label><input id="ExamTime" type="time" name="ExamTime" value="@Model.ExamTime?.ToString("HH:mm")" /></div>
+                    <div class="field"><label for="Input_ReferringDepartmentId">Referring department</label>
+                        <select id="Input_ReferringDepartmentId" name="Input.ReferringDepartmentId"><option value="">—</option>
+                            @foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(Model.Input.ReferringDepartmentId == d.Id)">@d.Name</option> }</select></div>
+                    <div class="field"><label for="Input_Priority">Priority</label>
+                        <select id="Input_Priority" name="Input.Priority">
+                            <option value="Routine" selected="@(Model.Input.Priority == RadiologyPriority.Routine)">Routine</option>
+                            <option value="Urgent" selected="@(Model.Input.Priority == RadiologyPriority.Urgent)">Urgent</option></select></div>
+                    <div class="field"><label for="Input_ReferralType">Referred by</label>
+                        <select id="Input_ReferralType" name="Input.ReferralType" data-referral>
+                            <option value="None" selected="@(Model.Input.ReferralType == RadiologyReferralType.None)">Not recorded / self</option>
+                            <option value="HospitalDoctor" selected="@(Model.Input.ReferralType == RadiologyReferralType.HospitalDoctor)">Hospital doctor</option>
+                            <option value="External" selected="@(Model.Input.ReferralType == RadiologyReferralType.External)">External doctor</option>
+                        </select></div>
+                    <div class="field" data-referral-doctor><label for="Input_ReferringDoctorId">Hospital doctor</label>
+                        <select id="Input_ReferringDoctorId" name="Input.ReferringDoctorId"><option value="">—</option>
+                            @foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(Model.Input.ReferringDoctorId == d.Id)">@d.Name @(d.Specialty is null ? "" : "– " + d.Specialty)</option> }</select></div>
+                    <div class="field" data-referral-external><label for="Input_ExternalDoctorName">External doctor</label>
+                        <input id="Input_ExternalDoctorName" name="Input.ExternalDoctorName" value="@Model.Input.ExternalDoctorName" maxlength="150" placeholder="Dr. name, clinic" /></div>
+                    @if (Model.CanDiscount) { <div class="field"><label for="Input_DiscountReason">Discount reason</label><input id="Input_DiscountReason" name="Input.DiscountReason" value="@Model.Input.DiscountReason" maxlength="200" /></div> }
+                </div>
+                <div class="field"><label for="Input_ClinicalIndication">Clinical indication / notes (from the doctor's advice)</label>
+                    <textarea id="Input_ClinicalIndication" name="Input.ClinicalIndication" rows="2" maxlength="1000">@Model.Input.ClinicalIndication</textarea></div>
+            </div>
+            <div class="card-footer form-actions">
+                @if (Model.ShowFees) { <span class="collect-total">Total: <strong data-lab-total>0.00</strong></span> }
+                <a class="btn btn-light" href="/Radiology/Book">Change patient</a>
+                <button class="btn btn-primary btn-lg" type="submit" data-test="rad-book-save" data-once>Save booking</button>
+            </div>
+        </div>
+        <div class="stack">
+            <div class="card patient-mini"><div class="card-body">
+                <div class="patient-id-box sm"><small>Patient ID</small><strong>@p.PatientNumber</strong></div>
+                <h3>@p.FullName</h3>
+                <dl class="kv kv-tight">
+                    <dt>Father / Husband</dt><dd>@(p.GuardianName ?? "—")</dd>
+                    <dt>Age / Gender</dt><dd>@Model.AgeText · @p.Gender</dd>
+                    <dt>Phone</dt><dd>@(p.MobileNumber ?? "—")</dd>
+                    <dt>CNIC</dt><dd>@(p.Cnic ?? "—")</dd>
+                </dl>
+                <a bn-permission="@Perm.PatientsView" href="/Patients/Profile/@p.Id">Open profile</a>
+            </div></div>
+            <div bn-permission="@Perm.RadViewHistory" class="card">
+                <div class="card-header"><h3>Previous radiology</h3><a class="btn btn-light btn-sm" href="/Radiology/Patient/@p.Id">All</a></div>
+                <ul class="activity">
+                    @foreach (var o in Model.Previous)
+                    {
+                        <li><span class="activity-dot"></span><div><strong><a href="/Radiology/Exam/@o.Id">@o.ServiceName</a> · @Fmt.Day(o.ScheduledDate)</strong><small>@o.OrderNumber · @RadiologyWorkflowService.Label(o.Status)</small></div></li>
+                    }
+                    @if (Model.Previous.Count == 0) { <li class="empty">No earlier examinations.</li> }
+                </ul>
+            </div>
+        </div>
+    </form>
+}

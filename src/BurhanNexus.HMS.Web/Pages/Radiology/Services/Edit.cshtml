@@ -1,0 +1,42 @@
+@page "{id:int?}"
+@model BurhanNexus.HMS.Web.Pages.Radiology.Services.EditModel
+@{ ViewData["Title"] = Model.Id is null ? "New radiology service" : "Edit radiology service"; var i = Model.Input; }
+<partial name="/Pages/Radiology/_RadNav.cshtml" />
+<form method="post" class="card card-medium" novalidate data-rad-service-form>
+    <div class="card-header"><h2><svg class="icon"><use href="#i-sliders" /></svg> @ViewData["Title"]</h2></div>
+    <div class="card-body">
+        <partial name="_ValidationSummary" />
+        <div class="grid-2">
+            <div class="field"><label for="Input_Modality">Modality</label><select id="Input_Modality" name="Input.Modality">
+                <option value="XRay" selected="@(i.Modality == RadiologyModality.XRay)">X-Ray</option>
+                <option value="Ultrasound" selected="@(i.Modality == RadiologyModality.Ultrasound)">Ultrasound</option></select></div>
+            <div class="field"><label for="Input_Code">Code</label><input id="Input_Code" name="Input.Code" value="@i.Code" maxlength="24" placeholder="e.g. XR-WRIST" /></div>
+            <div class="field"><label for="Input_Name">Service name</label><input id="Input_Name" name="Input.Name" value="@i.Name" maxlength="150" /></div>
+            <div class="field"><label for="Input_BodyPart">Body part / examination type</label><input id="Input_BodyPart" name="Input.BodyPart" value="@i.BodyPart" maxlength="100" /></div>
+            <div class="field"><label for="Input_DurationMinutes">Estimated duration (minutes)</label><input id="Input_DurationMinutes" type="number" min="0" max="600" name="Input.DurationMinutes" value="@i.DurationMinutes" /></div>
+            <div class="field"><label for="Input_SortOrder">Sort order</label><input id="Input_SortOrder" type="number" name="Input.SortOrder" value="@i.SortOrder" /></div>
+            <div class="field"><label for="Input_ReportTitle">Report heading (optional)</label><input id="Input_ReportTitle" name="Input.ReportTitle" value="@i.ReportTitle" maxlength="150" /></div>
+            <div class="field"><label for="Input_DefaultTemplateId">Default report template</label><select id="Input_DefaultTemplateId" name="Input.DefaultTemplateId"><option value="">—</option>
+                @foreach (var t in Model.Templates) { <option value="@t.Id" selected="@(i.DefaultTemplateId == t.Id)">@RadiologyCatalogService.Label(t.Modality): @t.Name</option> }</select></div>
+        </div>
+        <div class="field"><label for="Input_Description">Description</label><input id="Input_Description" name="Input.Description" value="@i.Description" maxlength="500" /></div>
+        <div class="field"><label for="Input_PreparationInstructions">Preparation instructions (shown at booking)</label><textarea id="Input_PreparationInstructions" name="Input.PreparationInstructions" rows="2" maxlength="1000">@i.PreparationInstructions</textarea></div>
+        <h3 class="section-title">Fee (Phase 3 cashier)</h3>
+        @if (Model.CanManageFees)
+        {
+            <div class="grid-2">
+                <label class="check"><input type="checkbox" name="Input.IsFree" value="true" checked="@i.IsFree" /> Free service</label><input type="hidden" name="Input.IsFree" value="false" />
+                <div class="field"><label for="Input_Fee">Fee</label><input id="Input_Fee" type="number" step="0.01" min="0" name="Input.Fee" value="@i.Fee.ToString(System.Globalization.CultureInfo.InvariantCulture)" /></div>
+                @if (Model.Id is not null) { <div class="field"><label for="Input_FeeEffectiveFrom">New fee applies from</label><input id="Input_FeeEffectiveFrom" type="date" name="Input.FeeEffectiveFrom" /></div> }
+                <label class="check"><input type="checkbox" name="Input.AllowPartialPayment" value="true" checked="@i.AllowPartialPayment" /> Allow partial payment</label><input type="hidden" name="Input.AllowPartialPayment" value="false" />
+            </div>
+            <p class="small muted">Fee changes are kept in the fee history; examinations already booked keep their own fee.</p>
+        }
+        else
+        {
+            <p class="small muted">@(Model.Id is null ? "A new service starts free – a user with “Manage Radiology Fees” sets its fee." : $"Current fee: {(Model.CurrentFee == 0 ? "Free" : Fmt.Money(Model.CurrentFee))}. Changing the fee needs “Manage Radiology Fees”.")</p>
+        }
+        <label class="check"><input type="checkbox" name="Input.IsActive" value="true" checked="@i.IsActive" /> Active (can be booked)</label><input type="hidden" name="Input.IsActive" value="false" />
+    </div>
+    <div class="card-footer form-actions"><a class="btn btn-light" href="/Radiology/Services">Cancel</a><button class="btn btn-primary" type="submit" data-test="rad-save-service">Save service</button></div>
+</form>

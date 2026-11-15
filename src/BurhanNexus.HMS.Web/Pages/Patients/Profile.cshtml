@@ -47,6 +47,7 @@ else if (p.Status == PatientStatus.Archived)
         }
         <a bn-permission="@Perm.FinanceCollect" class="btn btn-light" href="/Finance/Collect?patientId=@p.Id"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Collect payment</a>
         <a bn-permission="@Perm.PharmIssueToPatients" class="btn btn-light" href="/Pharmacy/Issue?patientId=@p.Id" data-test="profile-issue-medicines"><svg class="icon icon-sm"><use href="#i-pill" /></svg> Issue medicines</a>
+        <a bn-permission="@Perm.RadCreateBooking" class="btn btn-light" href="/Radiology/Book?patientId=@p.Id" data-test="profile-book-radiology"><svg class="icon icon-sm"><use href="#i-scan" /></svg> X-Ray / Ultrasound</a>
         <a bn-permission="@Perm.PatientsPrint" class="btn btn-light" href="/Patients/Record/@p.Id" target="_blank"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print record</a>
     </div>
 </section>
@@ -118,6 +119,16 @@ else if (p.Status == PatientStatus.Archived)
                 <div class="table-wrap"><table class="table table-compact"><tbody>
                     @foreach (var m in meds) { <tr><td class="small nowrap">@Fmt.Day(m.BusinessDate)</td><td>@m.MedicineName</td><td class="num">@m.Quantity</td><td class="mono small">@m.BatchNumber</td><td class="small">@m.EncounterNumber</td><td class="small">@m.IssuedBy</td></tr> }
                     @if (meds.Count == 0) { <tr><td class="empty">No medicines issued.</td></tr> }
+                </tbody></table></div>
+            </div>
+        }
+        @if (Model.Radiology is { } rads)
+        {
+            <div class="card" data-profile-radiology>
+                <div class="card-header"><h3><svg class="icon"><use href="#i-scan" /></svg> Radiology history</h3><a class="btn btn-light btn-sm" href="/Radiology/Patient/@p.Id">All</a></div>
+                <div class="table-wrap"><table class="table table-compact"><tbody>
+                    @foreach (var r in rads) { <tr><td class="small nowrap">@Fmt.Day(r.ScheduledDate)</td><td><a href="/Radiology/Exam/@r.Id">@r.ServiceName</a></td><td class="mono small">@r.OrderNumber</td><td class="small">@RadiologyWorkflowService.Label(r.Status)</td></tr> }
+                    @if (rads.Count == 0) { <tr><td class="empty">No X-Ray / Ultrasound examinations.</td></tr> }
                 </tbody></table></div>
             </div>
         }

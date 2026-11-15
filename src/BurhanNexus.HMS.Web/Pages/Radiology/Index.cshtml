@@ -1,0 +1,58 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Radiology.IndexModel
+@{
+    ViewData["Title"] = "Radiology dashboard";
+    var d = Model.Data;
+    var m = Model.Month;
+    var title = Model.Modality is { } mod ? RadiologyCatalogService.Label(mod) : "Radiology";
+}
+<partial name="_RadNav" />
+<div class="toolbar">
+    <form method="get" class="filters wrap">
+        <input type="hidden" name="view" value="@Model.View" />
+        <partial name="/Pages/Finance/_PeriodFilter.cshtml" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" /><button class="btn btn-light" type="submit">Show</button></form>
+    <div class="toolbar-actions">
+        @if (Model.ShowXRay && Model.ShowUltrasound)
+        {
+            <div class="seg" data-rad-view>
+                <a class="btn btn-sm @(Model.Modality is null ? "btn-primary" : "btn-light")" href="/Radiology?view=all">All</a>
+                <a class="btn btn-sm @(Model.Modality == RadiologyModality.XRay ? "btn-primary" : "btn-light")" href="/Radiology?view=XRay">X-Ray</a>
+                <a class="btn btn-sm @(Model.Modality == RadiologyModality.Ultrasound ? "btn-primary" : "btn-light")" href="/Radiology?view=Ultrasound">Ultrasound</a>
+            </div>
+        }
+        <a bn-permission="@Perm.RadCreateBooking" class="btn btn-primary" href="/Radiology/Book"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New booking</a>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-scan" /></svg> @title – @BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(d.From, d.To)</h2>
+        @if (d.Urgent > 0) { <span class="status status-bad">@d.Urgent urgent examination(s) open</span> }</div>
+    <div class="card-body">
+        <div class="kpi-grid lab-kpis" data-rad-kpis>
+            @if (Model.Modality != RadiologyModality.Ultrasound)
+            {
+                <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-scan" /></svg></div><div><span class="kpi-label">X-Ray bookings</span><strong class="kpi-value" data-kpi="xray">@d.XRayBooked</strong></div></div>
+            }
+            @if (Model.Modality != RadiologyModality.XRay)
+            {
+                <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-wave" /></svg></div><div><span class="kpi-label">Ultrasound bookings</span><strong class="kpi-value" data-kpi="ultrasound">@d.UltrasoundBooked</strong></div></div>
+            }
+            <div class="kpi"><div class="kpi-icon red"><svg class="icon"><use href="#i-clock" /></svg></div><div><span class="kpi-label">Pending examinations</span><strong class="kpi-value" data-kpi="pending">@d.Pending</strong></div></div>
+            <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-users" /></svg></div><div><span class="kpi-label">Patients waiting</span><strong class="kpi-value" data-kpi="waiting">@d.Waiting</strong></div></div>
+            <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-activity" /></svg></div><div><span class="kpi-label">In progress</span><strong class="kpi-value" data-kpi="in-progress">@d.InProgress</strong></div></div>
+            <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-edit" /></svg></div><div><span class="kpi-label">Reports pending</span><strong class="kpi-value" data-kpi="reports-pending">@d.ReportsPending</strong></div></div>
+            <div class="kpi"><div class="kpi-icon red"><svg class="icon"><use href="#i-alert" /></svg></div><div><span class="kpi-label">Awaiting verification</span><strong class="kpi-value" data-kpi="awaiting">@d.AwaitingVerification</strong></div></div>
+            <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-check-circle" /></svg></div><div><span class="kpi-label">Verified · released</span><strong class="kpi-value" data-kpi="verified">@d.Verified · @d.Released</strong></div></div>
+            <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-x" /></svg></div><div><span class="kpi-label">Cancelled</span><strong class="kpi-value" data-kpi="cancelled">@d.Cancelled</strong></div></div>
+            @if (d.Revenue is decimal rev)
+            {
+                <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-wallet" /></svg></div><div><span class="kpi-label">Collection (receipts)</span><strong class="kpi-value" data-kpi="revenue">@Fmt.Money(rev)</strong></div></div>
+            }
+        </div>
+        <p class="small muted" data-month-stats>This month: @(m.XRayBooked + m.UltrasoundBooked) examination(s)@(Model.Modality is null ? $" (X-Ray {m.XRayBooked} · Ultrasound {m.UltrasoundBooked})" : "") · @(m.Verified + m.Released) verified report(s) · @m.Cancelled cancelled@(m.Revenue is decimal mr ? $" · collection {Fmt.Money(mr)}" : "").</p>
+    </div>
+</div>
+<div class="grid-3">
+    @await Html.PartialAsync("_ExamList", ("Queue – booked / waiting / in progress", "queue", Model.Queue, "No patients in the queue."))
+    @await Html.PartialAsync("_ExamList", ("Reports to write", "reporting", Model.Reporting, "No reports pending."))
+    @await Html.PartialAsync("_ExamList", ("Awaiting verification", "verification", Model.ToVerify, "Nothing to verify."))
+</div>

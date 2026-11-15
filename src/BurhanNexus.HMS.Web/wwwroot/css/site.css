@@ -590,3 +590,16 @@ form.inline { display: inline; }
 .choice:has(input:checked) { border-color: var(--blue-600); background: #f0f6ff; }
 .field-label { font-weight: 600; display: block; }
 .row-expired td { background: #fff5f5; }
+
+/* ---------- Phase 6: radiology ---------- */
+.token-badge { display: inline-block; min-width: 2.2em; text-align: center; padding: 2px 8px; border-radius: 8px; background: var(--navy-900, #0f2a4a); color: #fff; font-weight: 700; font-size: .85rem; margin-left: 4px; }
+.prewrap { white-space: pre-wrap; }
+.seg { display: inline-flex; gap: 4px; }
+.rad-visits { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.rad-visit { display: flex; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.rad-report-view h4 { margin: 10px 0 2px; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.rad-report-view p { margin: 0 0 4px; }
+.rad-report-view .strong { font-weight: 700; }
+.rad-steps:empty { display: none; }
+.stack-sm { display: flex; flex-direction: column; gap: 4px; min-width: 220px; }
+.rad-info th { white-space: nowrap; color: var(--muted); font-weight: 600; }
