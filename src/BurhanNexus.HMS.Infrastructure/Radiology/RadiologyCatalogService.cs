@@ -112,6 +112,8 @@ public sealed class RadiologyCatalogService : IRadiologyCatalogService
             .Where(s => (!activeOnly || s.IsActive) && (modality == null || s.Modality == modality))
             .OrderBy(s => s.Modality).ThenBy(s => s.SortOrder).ThenBy(s => s.Name).ToListAsync(ct);
         var today = await _clock.TodayAsync();
+        // Modality is stored as text: order X-Ray before Ultrasound in memory, not alphabetically.
+        list = list.OrderBy(s => (int)s.Modality).ThenBy(s => s.SortOrder).ThenBy(s => s.Name).ToList();
         var rows = new List<RadiologyServiceRow>();
         foreach (var s in list) rows.Add(new RadiologyServiceRow(s, await _finance.FeeOnAsync(s.ServiceItemId, today, ct), s.ServiceItem!.AllowPartialPayment));
         return rows;
