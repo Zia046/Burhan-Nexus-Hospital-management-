@@ -824,7 +824,8 @@ public sealed class RadiologyWorkflowService : IRadiologyService
             e.Id, e.OrderId, e.Order!.OrderNumber, e.Modality, e.ServiceCode, e.ServiceName, e.TokenNumber, e.ScheduledUtc, e.ScheduledDate, e.Status, e.Order.Priority,
             e.Order.PatientId, e.Order.Patient!.PatientNumber, e.Order.Patient.FullName, e.Order.Patient.Gender, e.Order.Patient.DateOfBirth, e.Order.Patient.MobileNumber,
             Department = e.Order.ReferringDepartment != null ? e.Order.ReferringDepartment.Name : null, e.Order.ReferralType,
-            Doctor = e.Order.ReferringDoctor != null ? e.Order.ReferringDoctor.Name : null, e.Order.ExternalDoctorName, e.CorrectionReason,
+            Doctor = e.Order.ReferringDoctor != null ? e.Order.ReferringDoctor.Name : null, e.Order.ExternalDoctorName,
+            CorrectionReason = e.Status == RadiologyExamStatus.Cancelled ? e.CancelReason : e.CorrectionReason,
             e.ReportingDoctorName, e.VerifiedByName,
             Attachments = _db.RadiologyAttachments.Count(a => a.ExamId == e.Id && !a.IsRemoved),
             Prints = _db.RadiologyReportPrints.Count(p => p.ExamId == e.Id)

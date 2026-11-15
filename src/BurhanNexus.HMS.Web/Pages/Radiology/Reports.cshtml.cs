@@ -5,6 +5,7 @@ using BurhanNexus.HMS.Core.Security;
 using BurhanNexus.HMS.Infrastructure.Finance;
 using BurhanNexus.HMS.Infrastructure.Patients;
 using BurhanNexus.HMS.Infrastructure.Radiology;
+using BurhanNexus.HMS.Infrastructure.Services;
 using BurhanNexus.HMS.Web.Pages.Finance;
 using BurhanNexus.HMS.Web.Security;
 using Microsoft.AspNetCore.Mvc;
