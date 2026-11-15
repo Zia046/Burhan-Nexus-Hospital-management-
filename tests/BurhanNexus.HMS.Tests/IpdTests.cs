@@ -515,7 +515,7 @@ public partial class IpdTests : Phase2TestBase
             await Assert.ThrowsAnyAsync<Exception>(() => db.Database.ExecuteSqlRawAsync("DELETE FROM \"IpdAdmissions\""));
             await Assert.ThrowsAnyAsync<Exception>(() => db.Database.ExecuteSqlRawAsync("UPDATE \"ClinicalRecords\" SET \"Notes\" = 'changed'"));
             await Assert.ThrowsAnyAsync<Exception>(() => db.Database.ExecuteSqlRawAsync("DELETE FROM \"MedicationDoses\""));
-            await Assert.ThrowsAnyAsync<Exception>(() => db.Database.ExecuteSqlRawAsync("DELETE FROM \"IpdTransfers\""));
+            await Assert.ThrowsAnyAsync<Exception>(() => db.Database.ExecuteSqlRawAsync("DELETE FROM \"IpdBedStatusChanges\""));
         }
         Assert.NotEmpty(await AuditAsync(AuditActions.IpdDoseRecorded));
         Assert.Single(await AuditAsync(AuditActions.IpdHandoverAcknowledged));
