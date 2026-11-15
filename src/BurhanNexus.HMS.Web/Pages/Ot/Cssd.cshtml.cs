@@ -20,7 +20,8 @@ public class CssdModel : OtPageModel
     [BindProperty] public string? Description { get; set; }
     [BindProperty] public int? TheatreId { get; set; }
     [BindProperty] public bool Active { get; set; } = true;
-    [BindProperty] public Dictionary<int, int> Qty { get; set; } = new();
+    /// <summary>Set contents – read from the "Qty[instrumentId]" form fields (not model-bound, so other forms are not affected).</summary>
+    public Dictionary<int, int> Qty { get; set; } = new();
     [BindProperty] public CssdBatchInput Batch { get; set; } = new();
     [BindProperty] public long ItemId { get; set; }
     [BindProperty] public bool Passed { get; set; }
@@ -68,11 +69,16 @@ public class CssdModel : OtPageModel
     }
 
     public async Task<IActionResult> OnPostInstrumentAsync() => await DoneAsync(await Cssd.SaveInstrumentAsync(EditInstrument, Code, Name, Category, Active), "Instrument saved.");
-    public async Task<IActionResult> OnPostSetAsync() => await DoneAsync(await Cssd.SaveSetAsync(EditSet, Code, Name, Description, TheatreId, Active, Qty.Where(q => q.Value > 0).ToDictionary(q => q.Key, q => q.Value)), "Instrument set saved.");
+    public async Task<IActionResult> OnPostSetAsync() => await DoneAsync(await Cssd.SaveSetAsync(EditSet, Code, Name, Description, TheatreId, Active, FormDictionary("Qty").Where(q => int.TryParse(q.Value, out var n) && n > 0).ToDictionary(q => q.Key, q => int.Parse(q.Value))), "Instrument set saved.");
     public async Task<IActionResult> OnPostBatchAsync() => await DoneAsync(await Cssd.StartBatchAsync(Batch), "Sterilisation batch started.");
     public async Task<IActionResult> OnPostResultAsync() => await DoneAsync(await Cssd.BatchResultAsync(ItemId, Passed, Reason, Expiry, EndLocal), Passed ? "Cycle recorded as passed – release it to make the sets available." : "Cycle recorded as FAILED – the sets stay non-sterile.");
     public async Task<IActionResult> OnPostReleaseAsync() => await DoneAsync(await Cssd.ReleaseAsync(ItemId), "Batch released – sets are sterile.");
     public async Task<IActionResult> OnPostIssueAsync() => await DoneAsync(await Cssd.IssueAsync((int)ItemId, null, IssuedTo), "Set issued.");
     public async Task<IActionResult> OnPostReturnAsync() => await DoneAsync(await Cssd.ReturnAsync(ItemId, Reason), "Set returned – it must be reprocessed before use.");
     public async Task<IActionResult> OnPostQuarantineAsync() => await DoneAsync(await Cssd.QuarantineAsync((int)ItemId, Reason), "Set quarantined.");
+
+    private Dictionary<int, string> FormDictionary(string name) =>
+        Request.Form.Keys.Where(k => k.StartsWith(name + "[") && k.EndsWith("]"))
+            .Select(k => (Ok: int.TryParse(k[(name.Length + 1)..^1], out var id), Id: id, Value: Request.Form[k].ToString()))
+            .Where(x => x.Ok).GroupBy(x => x.Id).ToDictionary(g => g.Key, g => g.Last().Value);
 }

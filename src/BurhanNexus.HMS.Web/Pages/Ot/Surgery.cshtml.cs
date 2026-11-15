@@ -37,8 +37,13 @@ public class SurgeryModel : OtPageModel
     [BindProperty] public SpecimenInput Specimen { get; set; } = new();
     [BindProperty] public RecoveryInput Recovery { get; set; } = new();
     [BindProperty] public RecordInput Record { get; set; } = new();
-    [BindProperty] public Dictionary<int, ChecklistAnswer> Answers { get; set; } = new();
-    [BindProperty] public Dictionary<int, string?> Remarks { get; set; } = new();
+    // Checklist answers / remarks are read from the "Answers[itemId]" / "Remarks[itemId]" fields of the checklist form only.
+    private Dictionary<int, ChecklistAnswer> Answers => FormMap("Answers").Where(x => Enum.TryParse<ChecklistAnswer>(x.Value, out _)).ToDictionary(x => x.Key, x => Enum.Parse<ChecklistAnswer>(x.Value));
+    private Dictionary<int, string?> Remarks => FormMap("Remarks").ToDictionary(x => x.Key, x => (string?)x.Value);
+    private Dictionary<int, string> FormMap(string name) => !Request.HasFormContentType ? new() :
+        Request.Form.Keys.Where(k => k.StartsWith(name + "[") && k.EndsWith("]"))
+            .Select(k => (Ok: int.TryParse(k[(name.Length + 1)..^1], out var id), Id: id, Value: Request.Form[k].ToString()))
+            .Where(x => x.Ok).GroupBy(x => x.Id).ToDictionary(g => g.Key, g => g.Last().Value);
     [BindProperty] public ChecklistStage Stage { get; set; }
     [BindProperty] public bool Exception { get; set; }
     [BindProperty] public string? Reason { get; set; }

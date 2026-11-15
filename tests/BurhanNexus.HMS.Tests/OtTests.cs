@@ -335,7 +335,7 @@ public partial class OtTests : Phase2TestBase
         Assert.Contains("Amend", await Refused(await ActAsync(admin, sid, "Note", "intraop", ("Note.ProcedurePerformed", "changed")), "Edit final note"));
         await Refused(await ActAsync(admin, sid, "Amend", "intraop", ("Note.ProcedurePerformed", "Open appendicectomy + drain")), "Amend without reason");
         await Ok(await ActAsync(admin, sid, "Amend", "intraop", ("Note.ProcedurePerformed", "Open appendicectomy + drain"), ("Note.PostOpDiagnosis", "Acute appendicitis"),
-            ("Note.SurgeonName", "Dr. Surgeon Khan"), ("Reason", "Drain placement omitted")), "Amend");
+            ("Note.SurgeonName", "Dr. Surgeon Khan"), ("Note.PostOpInstructions", "NPO 6 hours, then sips (as per surgeon)"), ("Reason", "Drain placement omitted")), "Amend");
         await Ok(await ActAsync(admin, sid, "Finalize", "intraop"), "Finalize amendment");
         await using (var db = Factory.NewDb())
         {
@@ -499,7 +499,7 @@ public partial class OtTests : Phase2TestBase
         await using (var db = Factory.NewDb()) set = await db.CssdSets.Select(s => s.Id).SingleAsync();
         async Task<long> BatchAsync()
         {
-            await Ok(await admin.PostFormAsync("/Ot/Cssd", new[] { P("Batch.Method", "Steam autoclave"), P("Batch.CycleNumber", "C-1"), P("Batch.SetIds", set.ToString()) }, "/Ot/Cssd?handler=Batch"), "Batch");
+            await Ok(await admin.PostFormAsync("/Ot/Cssd", new[] { P("Batch.Method", "Steam autoclave"), P("Batch.CycleNumber", "C-1"), P("Batch.ResponsibleStaff", "CSSD tech Rafiq"), P("Batch.SetIds", set.ToString()) }, "/Ot/Cssd?handler=Batch"), "Batch");
             await using var db = Factory.NewDb();
             return await db.CssdBatches.OrderByDescending(b => b.Id).Select(b => b.Id).FirstAsync();
         }

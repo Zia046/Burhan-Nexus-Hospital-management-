@@ -201,8 +201,10 @@ public sealed class OtQueryService : IOtQueryService
                 var ids = done.Select(r => r.Id).ToList();
                 var notes = await _db.OperativeNotes.AsNoTracking().Where(n => ids.Contains(n.SurgeryId) && n.Complications != null).OrderBy(n => n.Version).ToListAsync(ct);
                 var latest = notes.GroupBy(n => n.SurgeryId).ToDictionary(g => g.Key, g => g.Last());
-                var pacu = await _db.ClinicalRecords.AsNoTracking().Where(r => r.SurgeryId != null && ids.Contains(r.SurgeryId.Value) && r.Kind == RecordKind.PacuObservation && r.Values.Contains("complications"))
+                var pacu = await _db.ClinicalRecords.AsNoTracking().Where(r => r.SurgeryId != null && ids.Contains(r.SurgeryId.Value) && r.Kind == RecordKind.PacuObservation)
                     .Select(r => new { r.SurgeryId, r.Values }).ToListAsync(ct);
+                // Values is jsonb – filter after parsing (only entries where a complication was actually documented).
+                pacu = pacu.Where(p => !string.IsNullOrWhiteSpace(IpdQueryService.Parse(p.Values).GetValueOrDefault("complications"))).ToList();
                 var list = done.Where(r => latest.ContainsKey(r.Id) || pacu.Any(p => p.SurgeryId == r.Id))
                     .Select(r => R(r.Number, L(r.PlannedStartUtc), r.PatientName, r.Procedure, r.Surgeon, latest.TryGetValue(r.Id, out var n) ? n.Complications : "—",
                         string.Join("; ", pacu.Where(p => p.SurgeryId == r.Id).Select(p => IpdQueryService.Parse(p.Values).GetValueOrDefault("complications"))))).ToList();
