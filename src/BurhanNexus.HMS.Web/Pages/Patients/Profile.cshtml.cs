@@ -39,6 +39,8 @@ public class ProfileModel : HmsPageModel
     public IReadOnlyList<BurhanNexus.HMS.Infrastructure.Pharmacy.PatientMedicineRow>? Medicines { get; private set; }
     /// <summary>Phase 6: radiology history section (only with "View Patient Radiology History").</summary>
     public IReadOnlyList<BurhanNexus.HMS.Infrastructure.Radiology.RadiologyExamRow>? Radiology { get; private set; }
+    /// <summary>Phase 7: IPD admissions (only with "View Inpatient Records"; limited to the user's wards).</summary>
+    public IReadOnlyList<BurhanNexus.HMS.Infrastructure.Ipd.AdmissionRow>? Admissions { get; private set; }
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -53,6 +55,12 @@ public class ProfileModel : HmsPageModel
         if (await CanAsync(Perm.RadViewHistory))
             Radiology = await HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Radiology.IRadiologyService>()
                 .ExamsAsync(new BurhanNexus.HMS.Infrastructure.Radiology.RadiologyWorklistQuery { PatientId = Id, Take = 10 });
+        if (await CanAsync(Perm.IpdViewPatients))
+        {
+            var ipdQuery = HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Ipd.IIpdQueryService>();
+            var wards = await ipdQuery.VisibleWardIdsAsync(CurrentUserId, await CanAsync(Perm.IpdViewAllWards));
+            Admissions = await ipdQuery.AdmissionsAsync("all", null, null, null, wards, patientId: Id, take: 10);
+        }
         if (CanSeeVisits)
         {
             EncounterType? type = TypeFilter switch { "opd" => EncounterType.Opd, "emergency" => EncounterType.Emergency, _ => null };

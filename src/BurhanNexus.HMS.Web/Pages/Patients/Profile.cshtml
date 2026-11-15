@@ -47,6 +47,8 @@ else if (p.Status == PatientStatus.Archived)
         }
         <a bn-permission="@Perm.FinanceCollect" class="btn btn-light" href="/Finance/Collect?patientId=@p.Id"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Collect payment</a>
         <a bn-permission="@Perm.PharmIssueToPatients" class="btn btn-light" href="/Pharmacy/Issue?patientId=@p.Id" data-test="profile-issue-medicines"><svg class="icon icon-sm"><use href="#i-pill" /></svg> Issue medicines</a>
+        <a bn-permission="@Perm.IpdRegisterAdmission" class="btn btn-light" href="/Ipd/Admit?patientId=@p.Id" data-test="profile-admit"><svg class="icon icon-sm"><use href="#i-hospital" /></svg> Admit (IPD)</a>
+        @if (p.Gender == Gender.Female) { <a bn-permission="@Perm.IpdViewGynae" class="btn btn-light" href="/Ipd/Gynae/Patient/@p.Id" data-test="profile-gynae"><svg class="icon icon-sm"><use href="#i-stethoscope" /></svg> Gynae / ANC</a> }
         <a bn-permission="@Perm.RadCreateBooking" class="btn btn-light" href="/Radiology/Book?patientId=@p.Id" data-test="profile-book-radiology"><svg class="icon icon-sm"><use href="#i-scan" /></svg> X-Ray / Ultrasound</a>
         <a bn-permission="@Perm.PatientsPrint" class="btn btn-light" href="/Patients/Record/@p.Id" target="_blank"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print record</a>
     </div>
@@ -119,6 +121,16 @@ else if (p.Status == PatientStatus.Archived)
                 <div class="table-wrap"><table class="table table-compact"><tbody>
                     @foreach (var m in meds) { <tr><td class="small nowrap">@Fmt.Day(m.BusinessDate)</td><td>@m.MedicineName</td><td class="num">@m.Quantity</td><td class="mono small">@m.BatchNumber</td><td class="small">@m.EncounterNumber</td><td class="small">@m.IssuedBy</td></tr> }
                     @if (meds.Count == 0) { <tr><td class="empty">No medicines issued.</td></tr> }
+                </tbody></table></div>
+            </div>
+        }
+        @if (Model.Admissions is { } adms)
+        {
+            <div class="card" data-profile-ipd>
+                <div class="card-header"><h3><svg class="icon"><use href="#i-hospital" /></svg> IPD admissions</h3></div>
+                <div class="table-wrap"><table class="table table-compact"><tbody>
+                    @foreach (var x in adms) { <tr><td class="small nowrap">@Fmt.DateTimeText(x.AdmittedUtc)</td><td><a href="/Ipd/Admission/@x.Id">@x.AdmissionNumber</a></td><td class="small">@x.Kind · @(x.Ward ?? "—") @x.Bed</td><td class="small"><partial name="/Pages/Ipd/_AdmStatus.cshtml" model="x.Status" /></td></tr> }
+                    @if (adms.Count == 0) { <tr><td class="empty">No admissions.</td></tr> }
                 </tbody></table></div>
             </div>
         }

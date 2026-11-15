@@ -603,3 +603,50 @@ form.inline { display: inline; }
 .rad-steps:empty { display: none; }
 .stack-sm { display: flex; flex-direction: column; gap: 4px; min-width: 220px; }
 .rad-info th { white-space: nowrap; color: var(--muted); font-weight: 600; }
+
+/* ---------- Phase 7 – IPD, maternity & NICU ---------- */
+.tabs { display: flex; gap: 2px; flex-wrap: wrap; border-bottom: 2px solid var(--line); margin: 0 0 16px; }
+.tabs a { padding: 8px 12px; border-radius: 7px 7px 0 0; color: var(--ink-2); font-weight: 500; font-size: .9rem; margin-bottom: -2px; border-bottom: 2px solid transparent; }
+.tabs a:hover { background: #fff; text-decoration: none; }
+.tabs a.active { color: var(--blue-600); border-bottom-color: var(--blue-600); background: #fff; }
+.patient-banner .banner-row, .banner-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.banner-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.patient-banner h2 { margin: 0 0 4px; font-size: 1.15rem; }
+.alert.compact { padding: 5px 10px; margin: 6px 0 0; font-size: .88rem; }
+.stat-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.stat-card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; display: flex; flex-direction: column; box-shadow: var(--shadow); }
+.stat-card small { color: var(--muted); font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.stat-card strong { font-size: 1.5rem; color: var(--navy-900); }
+.wrap { flex-wrap: wrap; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.row-warn td { background: #fff7e6; }
+.text-warning { color: #b45309; }
+.text-success { color: var(--green-600); }
+.bed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; padding: 12px; }
+.bed-tile { display: flex; flex-direction: column; gap: 2px; border: 1px solid var(--line); border-left: 5px solid #94a3b8; border-radius: 8px; padding: 7px 9px; background: #fff; font-size: .82rem; color: inherit; min-height: 64px; }
+.bed-tile strong, .bed-code { font-size: .95rem; }
+.bed-tile small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-available { border-left-color: #16a34a; background: #f0fdf4; }
+.st-occupied { border-left-color: #dc2626; background: #fef2f2; }
+.st-reserved { border-left-color: #2563eb; background: #eff6ff; }
+.st-cleaningrequired { border-left-color: #f59e0b; background: #fffbeb; }
+.st-undermaintenance, .st-temporarilyunavailable { border-left-color: #64748b; background: #f1f5f9; }
+.bed-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: .82rem; color: var(--muted); padding: 0 12px 10px; }
+.bed-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: middle; border-left: 0; }
+.bed-dot.st-available { background: #16a34a; } .bed-dot.st-occupied { background: #dc2626; } .bed-dot.st-reserved { background: #2563eb; }
+.bed-dot.st-cleaningrequired { background: #f59e0b; } .bed-dot.st-undermaintenance, .bed-dot.st-temporarilyunavailable { background: #64748b; }
+.record-section { margin-bottom: 18px; }
+.record-form > summary { cursor: pointer; list-style: none; }
+.record-form > summary::-webkit-details-marker { display: none; }
+.record-table td { vertical-align: top; }
+.flag-cell { background: #fef3c7; font-weight: 700; }
+.timeline { list-style: none; margin: 0; padding: 8px 16px 14px; border-left: 2px solid var(--line); margin-left: 16px; }
+.timeline li { position: relative; padding: 6px 0 6px 12px; }
+.timeline li::before { content: ""; position: absolute; left: -7px; top: 12px; width: 10px; height: 10px; border-radius: 50%; background: var(--blue-600); }
+.handover { border-top: 1px solid var(--line); }
+.handover.pending { background: #fffbeb; }
+.mar-order { border-top: 1px solid var(--line); }
+.dose-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px 0; }
+.dose-form input, .dose-form select { max-width: 170px; }
+.confirm-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; width: 100%; }
+@media (max-width: 760px) { .tabs a { padding: 6px 8px; font-size: .82rem; } .bed-grid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); } }

@@ -1,0 +1,75 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Ipd.PregnancyModel
+@{
+    var g = Model.G; var p = g.Patient!; var i = Model.Preg; var r = Model.Risk;
+    ViewData["Title"] = $"{g.Number} – {p.FullName}";
+    var original = Model.CorrectId is long cid ? Model.Visits.FirstOrDefault(v => v.Record.Id == cid) : null;
+    var active = g.Status == PregnancyStatus.Active;
+}
+<partial name="_IpdNav" />
+<partial name="_ValidationSummary" />
+<div class="card patient-banner" data-pregnancy="@g.Id" data-high-risk="@g.IsHighRisk"><div class="card-body banner-row">
+    <div class="patient-id-box sm"><small>Pregnancy</small><strong>@g.Number</strong></div>
+    <div class="grow"><h2><a href="/Ipd/Gynae/Patient/@p.Id">@p.FullName</a> <small class="muted">@p.PatientNumber</small></h2>
+        <div class="small">@g.Status · LMP @(g.Lmp is DateOnly l ? Fmt.Day(l) : "—") · EDD @(g.Edd is DateOnly e ? Fmt.Day(e) : "—") · gestation today @(g.GestationOn(Model.Today) ?? "not calculable (LMP not recorded)") · G@(g.Gravida) P@(g.Para) A@(g.Abortions) L@(g.LivingChildren)</div>
+        @if (g.IsHighRisk) { <div class="alert alert-danger compact">⚑ High-risk pregnancy: @g.HighRiskReason</div> }</div>
+    <div class="banner-actions no-print">
+        <a bn-permission="@Perm.IpdPrintForms" class="btn btn-light btn-sm" href="/Print/Ipd/anc/@g.Id" target="_blank">Print ANC card</a>
+        @if (active) { <a bn-permission="@Perm.IpdManageLabour" class="btn btn-light btn-sm" href="/Ipd/Labour/Admit?patientId=@p.Id&pregnancyId=@g.Id">Labour admission</a> }
+    </div>
+</div></div>
+<section class="record-section" data-section="AncVisit">
+    <h2 class="section-title">ANC visits</h2>
+    @if (active || original is not null) { <div bn-permission="@Perm.IpdManageAnc">@await Html.PartialAsync("_RecordForm", (RecordKind.AncVisit, Model.Fields, $"/Ipd/Pregnancy/{g.Id}?handler=Record", original?.Record.Id, original, Model.Visits.Count == 0))</div> }
+    @await Html.PartialAsync("_RecordList", (RecordKind.AncVisit, Model.Fields, Model.Visits, (string?)$"/Ipd/Pregnancy/{g.Id}?x=1"))
+</section>
+<div class="grid-2">
+    <form bn-permission="@Perm.IpdManageAnc" method="post" asp-page-handler="Update" asp-route-id="@g.Id" class="card" novalidate>
+        <input type="hidden" name="RowVersion" value="@Model.RowVersion" />
+        <div class="card-header"><h3>Pregnancy details</h3></div>
+        <div class="card-body">
+            <div class="grid-3">
+                <div class="field"><label>LMP</label><input type="date" name="Preg.Lmp" value="@i.Lmp?.ToString("yyyy-MM-dd")" /></div>
+                <div class="field"><label>EDD</label><input type="date" name="Preg.Edd" value="@i.Edd?.ToString("yyyy-MM-dd")" /></div>
+                <div class="field"><label>Gravida</label><input type="number" min="0" name="Preg.Gravida" value="@i.Gravida" /></div>
+                <div class="field"><label>Para</label><input type="number" min="0" name="Preg.Para" value="@i.Para" /></div>
+                <div class="field"><label>Abortions</label><input type="number" min="0" name="Preg.Abortions" value="@i.Abortions" /></div>
+                <div class="field"><label>Living children</label><input type="number" min="0" name="Preg.LivingChildren" value="@i.LivingChildren" /></div>
+            </div>
+            <div class="field"><label>Previous complications</label><textarea name="Preg.PreviousComplications" rows="2" maxlength="1000">@i.PreviousComplications</textarea></div>
+            <div class="field"><label>Medical history</label><textarea name="Preg.MedicalHistory" rows="2" maxlength="2000">@i.MedicalHistory</textarea></div>
+            <div class="field"><label>Risk factors</label><textarea name="Preg.RiskFactors" rows="2" maxlength="1000">@i.RiskFactors</textarea></div>
+        </div>
+        @if (active) { <div class="card-footer"><button class="btn btn-primary" type="submit">Save details</button></div> }
+    </form>
+    <div>
+        <form bn-permission="@Perm.IpdManageAnc" method="post" asp-page-handler="Risk" asp-route-id="@g.Id" class="card" novalidate data-risk-form>
+            <div class="card-header"><h3>High-risk pregnancy</h3></div>
+            <div class="card-body">
+                <label class="check"><input type="checkbox" name="Risk.IsHighRisk" value="true" checked="@r.IsHighRisk" /> High-risk pregnancy (clinician's decision)</label><input type="hidden" name="Risk.IsHighRisk" value="false" />
+                <div class="field"><label>Reason *</label><input name="Risk.Reason" value="@r.Reason" maxlength="500" /></div>
+                <div class="field"><label>Assessment</label><textarea name="Risk.Assessment" rows="2" maxlength="1000">@r.Assessment</textarea></div>
+                <div class="grid-2">
+                    <div class="field"><label>Referral</label><input name="Risk.Referral" value="@r.Referral" maxlength="300" /></div>
+                    <div class="field"><label>Follow-up plan</label><input name="Risk.FollowUpPlan" value="@r.FollowUpPlan" maxlength="500" /></div>
+                </div>
+            </div>
+            @if (active) { <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="save-risk">Save</button></div> }
+        </form>
+        @if (active)
+        {
+            <form bn-permission="@Perm.IpdManageAnc" method="post" asp-page-handler="Close" asp-route-id="@g.Id" class="card inline-form wrap card-body" novalidate>
+                <select name="CloseAs"><option value="Ended">Ended (miscarriage / other)</option><option value="TransferredOut">Care transferred out</option></select>
+                <input name="Note" placeholder="Note *" maxlength="300" /><button class="btn btn-light btn-sm" type="submit">Close pregnancy</button>
+            </form>
+        }
+    </div>
+</div>
+<div class="card" data-timeline><div class="card-header"><h3>Pregnancy timeline</h3></div>
+    <ul class="timeline">
+    @foreach (var t in Model.Timeline)
+    {
+        <li><span class="muted small">@Fmt.DateTimeText(t.Utc)</span> <strong>@t.Category</strong> – @if (t.Link is not null) { <a href="@t.Link">@t.Title</a> } else { @t.Title } <small class="block">@t.Detail @(t.By is null ? "" : "· " + t.By)</small></li>
+    }
+    </ul>
+</div>

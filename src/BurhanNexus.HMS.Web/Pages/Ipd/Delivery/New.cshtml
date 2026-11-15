@@ -1,0 +1,65 @@
+@page "{admissionId:long}"
+@model BurhanNexus.HMS.Web.Pages.Ipd.Delivery.NewModel
+@{ var a = Model.A; var i = Model.Input; ViewData["Title"] = $"Delivery – {a.Patient!.FullName}"; }
+<partial name="_IpdNav" />
+<partial name="_ValidationSummary" />
+<form method="get" class="card card-body inline-form wrap no-print">
+    <strong>@a.Patient!.FullName</strong> <span class="muted">@a.AdmissionNumber · @(a.CurrentBed?.Code)</span>
+    <label>Number of babies <select name="babies">@for (var n = 1; n <= 6; n++) { <option value="@n" selected="@(Model.BabyCount == n)">@n</option> }</select></label>
+    <button class="btn btn-light btn-sm" type="submit">Change</button>
+</form>
+<form method="post" asp-route-admissionId="@a.Id" novalidate data-delivery-form>
+    <input type="hidden" name="Input.IdempotencyKey" value="@i.IdempotencyKey" />
+    <div class="card">
+        <div class="card-header"><h2>Delivery record</h2></div>
+        <div class="card-body">
+            <div class="grid-3">
+                <div class="field"><label>Date / time of delivery *</label><input type="datetime-local" name="Input.DeliveredLocal" value="@i.DeliveredLocal?.ToString("yyyy-MM-ddTHH:mm")" /></div>
+                <div class="field"><label>Type of delivery *</label><select name="Input.Type">@foreach (var t in Enum.GetValues<DeliveryType>()) { <option value="@t" selected="@(i.Type == t)">@MaternityService.Label(t)</option> }</select></div>
+                <div class="field"><label>Type detail (e.g. vacuum / forceps / other)</label><input name="Input.TypeDetail" value="@i.TypeDetail" maxlength="100" /></div>
+                <div class="field"><label>Gestational age</label><input name="Input.GestationalAge" value="@i.GestationalAge" maxlength="20" /></div>
+                <div class="field"><label>Delivering doctor</label><input name="Input.DeliveringDoctor" value="@i.DeliveringDoctor" maxlength="150" /></div>
+                <div class="field"><label>Attending staff</label><input name="Input.AttendingStaff" value="@i.AttendingStaff" maxlength="300" /></div>
+                <div class="field"><label>Outcome</label><input name="Input.Outcome" value="@i.Outcome" maxlength="200" /></div>
+                <div class="field"><label>Estimated blood loss (ml)</label><input type="number" min="0" name="Input.EstimatedBloodLossMl" value="@i.EstimatedBloodLossMl" /></div>
+                <div class="field"><label>Placenta</label><input name="Input.Placenta" value="@i.Placenta" maxlength="500" /></div>
+                <div class="field"><label>Perineum</label><input name="Input.Perineum" value="@i.Perineum" maxlength="500" /></div>
+                <div class="field"><label>Maternal condition</label><input name="Input.MaternalCondition" value="@i.MaternalCondition" maxlength="500" /></div>
+                <div class="field"><label>Complications</label><input name="Input.Complications" value="@i.Complications" maxlength="1000" /></div>
+            </div>
+            <div class="grid-2">
+                <div class="field"><label>Immediate postpartum care</label><textarea name="Input.ImmediateCare" rows="2" maxlength="1000">@i.ImmediateCare</textarea></div>
+                <div class="field"><label>Delivery notes</label><textarea name="Input.Notes" rows="2" maxlength="2000">@i.Notes</textarea></div>
+            </div>
+        </div>
+    </div>
+    @for (var n = 0; n < i.Babies.Count; n++)
+    {
+        var b = i.Babies[n]; var pre = $"Input.Babies[{n}]";
+        <div class="card" data-baby="@n">
+            <div class="card-header"><h3>Baby @(n + 1)</h3></div>
+            <div class="card-body">
+                <div class="grid-3">
+                    <div class="field"><label>Sex *</label><select name="@(pre).Sex">@foreach (var g in Enum.GetValues<Gender>()) { <option value="@g" selected="@(b.Sex == g)">@g</option> }</select></div>
+                    <div class="field"><label>Condition at birth *</label><select name="@(pre).Condition">@foreach (var c in Enum.GetValues<BirthCondition>()) { <option value="@c" selected="@(b.Condition == c)">@(c == BirthCondition.LiveBirth ? "Live birth" : "Stillbirth")</option> }</select></div>
+                    <div class="field"><label>Name (blank = "Baby of mother")</label><input name="@(pre).Name" value="@b.Name" maxlength="150" /></div>
+                    <div class="field"><label>Birth weight (g)</label><input type="number" min="0" name="@(pre).BirthWeightGrams" value="@b.BirthWeightGrams" /></div>
+                    <div class="field"><label>APGAR 1 min</label><input type="number" min="0" max="10" name="@(pre).Apgar1" value="@b.Apgar1" /></div>
+                    <div class="field"><label>APGAR 5 min</label><input type="number" min="0" max="10" name="@(pre).Apgar5" value="@b.Apgar5" /></div>
+                    <div class="field"><label>APGAR 10 min</label><input type="number" min="0" max="10" name="@(pre).Apgar10" value="@b.Apgar10" /></div>
+                    <div class="field"><label>Resuscitation</label><input name="@(pre).Resuscitation" value="@b.Resuscitation" maxlength="500" /></div>
+                    <div class="field"><label>Congenital observations</label><input name="@(pre).CongenitalObservations" value="@b.CongenitalObservations" maxlength="500" /></div>
+                    <div class="field"><label>Responsible staff</label><input name="@(pre).ResponsibleStaff" value="@b.ResponsibleStaff" maxlength="150" /></div>
+                    <div class="field"><label>Placement (live births)</label><select name="@(pre).Placement" data-placement>@foreach (var pl in Enum.GetValues<NewbornPlacement>()) { <option value="@pl" selected="@(b.Placement == pl)">@(pl == NewbornPlacement.WithMother ? "With mother (rooming-in)" : pl == NewbornPlacement.Nicu ? "NICU" : "Other")</option> }</select></div>
+                </div>
+                <div class="field"><label>Examination</label><textarea name="@(pre).Examination" rows="2" maxlength="1000">@b.Examination</textarea></div>
+                <div class="grid-2" data-nicu-fields>
+                    <div class="field"><label>NICU cot / incubator</label><select name="@(pre).NicuBedId"><option value="">— select —</option>@foreach (var bed in Model.NicuBeds) { <option value="@bed.Id" selected="@(b.NicuBedId == bed.Id)">@bed.Code · @bed.Type @(bed.EquipmentId is null ? "" : "(" + bed.EquipmentId + ")")</option> }</select></div>
+                    <div class="field"><label>Reason for NICU</label><input name="@(pre).NicuReason" value="@b.NicuReason" maxlength="500" /></div>
+                </div>
+            </div>
+        </div>
+    }
+    <div class="form-actions"><a class="btn btn-light" href="/Ipd/Admission/@a.Id?tab=labour">Back</a><button class="btn btn-primary btn-lg" type="submit" data-test="save-delivery" data-once>Save delivery</button></div>
+</form>
+@section Scripts { <script src="~/js/ipd.js" asp-append-version="true"></script> }

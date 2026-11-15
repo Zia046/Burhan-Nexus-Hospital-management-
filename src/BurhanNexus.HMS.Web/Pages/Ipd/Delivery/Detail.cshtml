@@ -1,0 +1,39 @@
+@page "/Ipd/Delivery/{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Ipd.Delivery.DetailModel
+@{ var d = Model.D; ViewData["Title"] = $"Delivery {d.Number}"; }
+<partial name="_IpdNav" />
+<div class="card" data-delivery="@d.Id">
+    <div class="card-header"><h2>Delivery @d.Number</h2>
+        <div class="no-print"><a bn-permission="@Perm.IpdPrintForms" class="btn btn-light btn-sm" href="/Print/Ipd/delivery/@d.Id" target="_blank" data-test="print-delivery">Print delivery record</a>
+            <a class="btn btn-light btn-sm" href="/Ipd/Admission/@d.AdmissionId?tab=labour">Mother's admission</a></div></div>
+    <div class="card-body">
+        <dl class="kv kv-tight">
+            <dt>Mother</dt><dd>@d.Mother!.FullName (@d.Mother.PatientNumber) · @d.Admission!.AdmissionNumber</dd>
+            <dt>Delivered</dt><dd>@Fmt.DateTimeText(d.DeliveredUtc) · @MaternityService.Label(d.Type) @d.TypeDetail</dd>
+            <dt>Delivering doctor / staff</dt><dd>@(d.DeliveringDoctor ?? "—") · @(d.AttendingStaff ?? "—")</dd>
+            <dt>Outcome</dt><dd>@(d.Outcome ?? "—")</dd>
+            <dt>Blood loss</dt><dd>@(d.EstimatedBloodLossMl is int ebl ? $"{ebl} ml" : "not recorded")</dd>
+            <dt>Placenta / perineum</dt><dd>@(d.Placenta ?? "—") · @(d.Perineum ?? "—")</dd>
+            <dt>Maternal condition</dt><dd>@(d.MaternalCondition ?? "—")</dd>
+            <dt>Complications</dt><dd>@(d.Complications ?? "—")</dd>
+            <dt>Immediate care</dt><dd class="prewrap">@(d.ImmediateCare ?? "—")</dd>
+            <dt>Notes</dt><dd class="prewrap">@(d.Notes ?? "—")</dd>
+            <dt>Entered</dt><dd>@Fmt.DateTimeText(d.CreatedUtc) by @d.CreatedBy</dd>
+        </dl>
+    </div>
+</div>
+<div class="card" data-newborns>
+    <div class="card-header"><h3>Babies (@d.BabyCount)</h3></div>
+    <table class="table">
+        <thead><tr><th>#</th><th>Patient ID</th><th>Sex</th><th>Weight</th><th>APGAR 1/5/10</th><th>Condition</th><th>Placement</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var n in d.Newborns.OrderBy(n => n.BirthOrder))
+        {
+            <tr data-newborn="@n.Id"><td>@n.BirthOrder</td><td>@if (n.NewbornPatient is { } np) { <a class="mono" href="/Patients/Profile/@np.Id" data-baby-id>@np.PatientNumber</a> <small class="block">@np.FullName</small> } else { <span class="muted">not registered (stillbirth)</span> }</td>
+                <td>@n.Sex</td><td>@(n.BirthWeightGrams is int w ? $"{w} g" : "not recorded")</td><td>@(n.Apgar1?.ToString() ?? "—") / @(n.Apgar5?.ToString() ?? "—") / @(n.Apgar10?.ToString() ?? "—")</td>
+                <td>@n.Condition</td><td>@n.Placement @if (n.NewbornAdmissionId is long na) { <a href="/Ipd/Admission/@na">admission</a> }</td>
+                <td><a bn-permission="@Perm.IpdPrintForms" class="btn btn-light btn-sm" href="/Print/Ipd/newborn/@n.Id" target="_blank">Newborn record</a></td></tr>
+        }
+        </tbody>
+    </table>
+</div>
