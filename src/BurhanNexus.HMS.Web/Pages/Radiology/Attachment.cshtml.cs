@@ -22,6 +22,6 @@ public class AttachmentModel : RadiologyPageModel
         // DICOM is not displayed by browsers (no PACS viewer is included): always a download.
         return download || a.Kind == Core.Domain.RadiologyFileKind.Dicom
             ? File(stream, a.ContentType, a.OriginalFileName)
-            : File(stream, a.ContentType, enableRangeProcessing: true);
+            : new FileStreamResult(stream, a.ContentType) { EnableRangeProcessing = true };
     }
 }
