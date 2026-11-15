@@ -15,6 +15,8 @@ public sealed class LabBookingInput
     public Guid IdempotencyKey { get; set; }
     public long PatientId { get; set; }
     public long? EncounterId { get; set; }
+    /// <summary>Phase 7: ordered for an inpatient admission (its fees go on the IPD bill).</summary>
+    public long? IpdAdmissionId { get; set; }
     public List<int> TestIds { get; set; } = new();
     public LabReferralType ReferralType { get; set; }
     public int? ReferringDoctorId { get; set; }
@@ -143,6 +145,8 @@ public sealed class LabService : ILabService
         errors.AddRange(await ValidateReferralAsync(i.ReferralType, i.ReferringDoctorId, i.ExternalDoctorName, ct));
         if (i.EncounterId is long eid && !await _db.PatientEncounters.AnyAsync(e => e.Id == eid && e.PatientId == i.PatientId, ct))
             errors.Add("The visit does not belong to this patient.");
+        if (i.IpdAdmissionId is long ipd && !await _db.IpdAdmissions.AnyAsync(a => a.Id == ipd && a.PatientId == i.PatientId, ct))
+            errors.Add("The admission does not belong to this patient.");
         if (i.Discounts.Any(d => d.Value != 0) && !canDiscount) errors.Add("You are not allowed to give discounts.");
         if (i.Discounts.Any(d => d.Value > 0) && T(i.DiscountReason, 200) is null) errors.Add("Enter the reason for the discount.");
         if (errors.Count > 0) return ServiceResult<LabBookingResult>.Fail(errors.ToArray());
@@ -155,7 +159,7 @@ public sealed class LabService : ILabService
             var order = new LabOrder
             {
                 OrderNumber = await FinanceDb.NextNumberAsync(_db, HmsDbContext.LabOrderNumberSequence, "LAB", today, ct),
-                IdempotencyKey = i.IdempotencyKey, PatientId = patient.Id, EncounterId = i.EncounterId, ReferralType = i.ReferralType,
+                IdempotencyKey = i.IdempotencyKey, PatientId = patient.Id, EncounterId = i.EncounterId, IpdAdmissionId = i.IpdAdmissionId, ReferralType = i.ReferralType,
                 ReferringDoctorId = i.ReferralType == LabReferralType.HospitalDoctor ? i.ReferringDoctorId : null,
                 ExternalDoctorName = i.ReferralType == LabReferralType.External ? T(i.ExternalDoctorName, 150) : null,
                 ClinicalNotes = T(i.ClinicalNotes, 1000), IsUrgent = i.IsUrgent, BusinessDate = today, BookedUtc = now, UpdatedUtc = now,
@@ -269,7 +273,7 @@ public sealed class LabService : ILabService
             var charge = new Charge
             {
                 ChargeNumber = await FinanceDb.NextNumberAsync(_db, HmsDbContext.ChargeNumberSequence, "CHG", today, ct),
-                PatientId = patient.Id, EncounterId = order.EncounterId, LabOrderId = order.Id, ServiceItemId = t.ServiceItemId, ServiceKind = ServiceKind.Laboratory,
+                PatientId = patient.Id, EncounterId = order.EncounterId, LabOrderId = order.Id, IpdAdmissionId = order.IpdAdmissionId, ServiceItemId = t.ServiceItemId, ServiceKind = ServiceKind.Laboratory,
                 ServiceName = t.Name, DepartmentId = t.ServiceItem!.DepartmentId, Fee = fee, Discount = discount, NetAmount = fee - discount,
                 AllowPartialPayment = t.ServiceItem.AllowPartialPayment, DiscountReason = discount > 0 ? discountReason : null,
                 DoctorShareType = DoctorShareType.HospitalKeepsAll, Status = fee - discount == 0 ? ChargeStatus.Paid : ChargeStatus.Unpaid,

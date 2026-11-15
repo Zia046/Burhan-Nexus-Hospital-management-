@@ -135,6 +135,41 @@ public static class AuditActions
     public const string RadAttachmentViewed = "Radiology.AttachmentDownloaded";
     public const string RadSettingsChanged = "Radiology.SettingsChanged";
     public const string RadExported = "Radiology.Exported";
+    // Phase 7 – IPD, maternity, NICU, nursing, MAR
+    public const string IpdWardSaved = "Ipd.WardSaved";
+    public const string IpdRoomSaved = "Ipd.RoomSaved";
+    public const string IpdBedSaved = "Ipd.BedSaved";
+    public const string IpdBedStatusChanged = "Ipd.BedStatusChanged";
+    public const string IpdAdmitted = "Ipd.Admitted";
+    public const string IpdAdmissionEdited = "Ipd.AdmissionEdited";
+    public const string IpdAdmissionCancelled = "Ipd.AdmissionCancelled";
+    public const string IpdDuplicateBlocked = "Ipd.DuplicateBlocked";
+    public const string IpdBedAllocated = "Ipd.BedAllocated";
+    public const string IpdTransferred = "Ipd.Transferred";
+    public const string IpdDischargeRequested = "Ipd.DischargeRequested";
+    public const string IpdDischarged = "Ipd.Discharged";
+    public const string IpdStatusChanged = "Ipd.StatusChanged";
+    public const string IpdRecordAdded = "Ipd.RecordAdded";
+    public const string IpdRecordCorrected = "Ipd.RecordCorrected";
+    public const string IpdFormFieldSaved = "Ipd.FormFieldSaved";
+    public const string IpdSettingsChanged = "Ipd.SettingsChanged";
+    public const string IpdPregnancyRegistered = "Ipd.PregnancyRegistered";
+    public const string IpdPregnancyUpdated = "Ipd.PregnancyUpdated";
+    public const string IpdLabourAdmitted = "Ipd.LabourAdmitted";
+    public const string IpdLabourStatus = "Ipd.LabourStatus";
+    public const string IpdDeliveryRecorded = "Ipd.DeliveryRecorded";
+    public const string IpdNewbornRegistered = "Ipd.NewbornRegistered";
+    public const string IpdMotherBabyLinked = "Ipd.MotherBabyLinked";
+    public const string IpdNicuAdmitted = "Ipd.NicuAdmitted";
+    public const string IpdTaskSaved = "Ipd.TaskSaved";
+    public const string IpdHandoverCreated = "Ipd.HandoverCreated";
+    public const string IpdHandoverAcknowledged = "Ipd.HandoverAcknowledged";
+    public const string IpdMedicationOrdered = "Ipd.MedicationOrdered";
+    public const string IpdMedicationStopped = "Ipd.MedicationStopped";
+    public const string IpdDoseRecorded = "Ipd.DoseRecorded";
+    public const string IpdChargePosted = "Ipd.ChargePosted";
+    public const string IpdFormPrinted = "Ipd.FormPrinted";
+
 
     // Phase 5 – pharmacy
     public const string PharmMedicineSaved = "Pharmacy.MedicineSaved";

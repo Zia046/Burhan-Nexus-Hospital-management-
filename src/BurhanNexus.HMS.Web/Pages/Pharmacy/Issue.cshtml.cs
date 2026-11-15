@@ -29,6 +29,9 @@ public class IssueModel : PharmacyPageModel
 
     [BindProperty(SupportsGet = true)] public long? PatientId { get; set; }
     [BindProperty(SupportsGet = true)] public long? EncounterId { get; set; }
+    /// <summary>Phase 7: issue for an inpatient admission (opened from the IPD record).</summary>
+    [BindProperty(SupportsGet = true)] public long? AdmissionId { get; set; }
+    public IpdAdmission? Admission { get; private set; }
     [BindProperty(SupportsGet = true, Name = "q")] public string? Q { get; set; }
     [BindProperty] public IssueInput Input { get; set; } = new();
 
@@ -47,6 +50,11 @@ public class IssueModel : PharmacyPageModel
         LocationId = (await Catalog.MainLocationAsync()).Id;
         CanDiscount = IsPrivate && await CanAsync(Perm.PharmApplyDiscount);
         ValidDays = (await Catalog.SettingsAsync()).EncounterValidDays;
+        if (AdmissionId is long aid)
+        {
+            Admission = await _db.IpdAdmissions.AsNoTracking().FirstOrDefaultAsync(a => a.Id == aid);
+            if (Admission is not null) PatientId ??= Admission.PatientId;
+        }
         if (EncounterId is long eid && PatientId is null)
             PatientId = await _db.PatientEncounters.Where(e => e.Id == eid).Select(e => (long?)e.PatientId).FirstOrDefaultAsync();
         if (PatientId is long pid)
@@ -68,12 +76,14 @@ public class IssueModel : PharmacyPageModel
     public async Task OnGetAsync()
     {
         await LoadAsync();
-        Input = new IssueInput { IdempotencyKey = Guid.NewGuid(), PatientId = PatientId ?? 0, EncounterId = EncounterId ?? Encounters.FirstOrDefault()?.Id };
+        Input = new IssueInput { IdempotencyKey = Guid.NewGuid(), PatientId = PatientId ?? 0, IpdAdmissionId = Admission?.Id,
+            EncounterId = Admission is null ? EncounterId ?? Encounters.FirstOrDefault()?.Id : null };
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
         PatientId = Input.PatientId;
+        AdmissionId = Input.IpdAdmissionId;
         await LoadAsync();
         var r = await Pharmacy.IssueAsync(Input, await RightsAsync());
         if (!r.Succeeded) { AddErrors(r); return Page(); }

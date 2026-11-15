@@ -36,6 +36,10 @@ public class ResetAndCatalogTests : HmsTestBase
         Assert.Equal(27, rad.Actions.Count);
         Assert.Null(PermissionCatalog.FindModule("XRay"));
         Assert.Contains(Perm.RadVerifyReport, PermissionCatalog.AllKeys);
+        // Phase 7: IPD, maternity and NICU.
+        var ipd = PermissionCatalog.FindModule("Ipd")!;
+        Assert.True(ipd.IsAvailable);
+        Assert.Equal(37, ipd.Actions.Count);
         foreach (var key in typeof(Perm).GetFields().Select(f => (string)f.GetValue(null)!))
             Assert.Contains(key, PermissionCatalog.AllKeys);
     }

@@ -84,6 +84,8 @@ public class RadiologyOrder
     public Patient? Patient { get; set; }
     public long? EncounterId { get; set; }
     public PatientEncounter? Encounter { get; set; }
+    /// <summary>Phase 7: ordered for an inpatient admission.</summary>
+    public long? IpdAdmissionId { get; set; }
     public int? ReferringDepartmentId { get; set; }
     public Department? ReferringDepartment { get; set; }
     public RadiologyReferralType ReferralType { get; set; }

@@ -4,6 +4,7 @@ using BurhanNexus.HMS.Infrastructure.Laboratory;
 using BurhanNexus.HMS.Infrastructure.Patients;
 using BurhanNexus.HMS.Web.Security;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace BurhanNexus.HMS.Web.Pages.Lab;
 
@@ -28,6 +29,8 @@ public class BookModel : HmsPageModel
 
     [BindProperty(SupportsGet = true)] public long? PatientId { get; set; }
     [BindProperty(SupportsGet = true)] public long? EncounterId { get; set; }
+    /// <summary>Phase 7: tests ordered for an inpatient admission.</summary>
+    [BindProperty(SupportsGet = true)] public long? AdmissionId { get; set; }
     [BindProperty(SupportsGet = true, Name = "q")] public string? Q { get; set; }
     [BindProperty] public LabBookingInput Input { get; set; } = new();
     [BindProperty] public List<int> TestIds { get; set; } = new();
@@ -52,6 +55,9 @@ public class BookModel : HmsPageModel
         CanRegister = await CanAsync(Perm.PatientsAdd) || await CanAsync(Perm.LabRegisterPatient);
         Tests = await _catalog.TestsAsync(activeOnly: true);
         Doctors = await _registration.DoctorsAsync(activeOnly: true);
+        if (AdmissionId is long aid && PatientId is null)
+            PatientId = await HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Persistence.HmsDbContext>().IpdAdmissions
+                .Where(a => a.Id == aid).Select(a => (long?)a.PatientId).FirstOrDefaultAsync();
         if (EncounterId is long eid && PatientId is null)
             PatientId = (await HttpContext.RequestServices.GetRequiredService<IEncounterService>().GetAsync(eid))?.PatientId;
         if (PatientId is long pid)
@@ -78,6 +84,7 @@ public class BookModel : HmsPageModel
     {
         Input.PatientId = PatientId ?? 0;
         Input.EncounterId = EncounterId;
+        Input.IpdAdmissionId = AdmissionId;
         Input.TestIds = TestIds;
         Input.Discounts = Discounts.Where(d => d.Value != 0).ToDictionary(d => d.Key, d => d.Value);
         var canDiscount = await CanAsync(Perm.LabViewFinancial) && await CanAsync(Perm.FinanceDiscount);

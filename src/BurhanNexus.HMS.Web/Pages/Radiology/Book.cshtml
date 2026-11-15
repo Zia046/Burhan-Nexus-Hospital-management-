@@ -42,10 +42,12 @@ else
     <form method="post" class="grid-side" novalidate data-lab-book data-rad-book>
         <input type="hidden" name="Input.IdempotencyKey" value="@Model.Input.IdempotencyKey" />
         <input type="hidden" name="PatientId" value="@p.Id" />
+        <input type="hidden" name="AdmissionId" value="@Model.AdmissionId" />
         <div class="card">
             <div class="card-header"><h2><svg class="icon"><use href="#i-scan" /></svg> Select examinations</h2><span class="pill pill-blue" data-selected-count>0 selected</span></div>
             <div class="card-body">
                 <partial name="_ValidationSummary" />
+                @if (Model.AdmissionId is not null) { <div class="alert alert-info" data-ipd-admission><svg class="icon"><use href="#i-hospital" /></svg><div>Ordered for the inpatient admission – fees go on the IPD bill; no OPD visit is needed.</div></div> }
                 <h3 class="section-title">OPD / Emergency visit</h3>
                 <div class="rad-visits" data-visits>
                     @if (Model.Settings.AllowBookingWithoutVisit) { <label class="check rad-visit"><input type="radio" name="VisitChoice" value="" checked="@(string.IsNullOrEmpty(Model.VisitChoice))" /> No visit (other authorised booking)</label> }

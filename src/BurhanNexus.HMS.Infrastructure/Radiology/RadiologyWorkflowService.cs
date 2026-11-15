@@ -14,6 +14,8 @@ public sealed class RadiologyBookingInput
     public Guid IdempotencyKey { get; set; }
     public long PatientId { get; set; }
     public long? EncounterId { get; set; }
+    /// <summary>Phase 7: ordered for an inpatient admission (its fees go on the IPD bill).</summary>
+    public long? IpdAdmissionId { get; set; }
     public List<int> ServiceIds { get; set; } = new();
     /// <summary>Hospital-local date / time of the examination (empty = now).</summary>
     public DateTime? ScheduledLocal { get; set; }
@@ -190,7 +192,11 @@ public sealed class RadiologyWorkflowService : IRadiologyService
         if (serviceIds.Count > 20) errors.Add("At most 20 examinations per booking.");
         if (!Enum.IsDefined(i.Priority)) errors.Add("Select the priority.");
         errors.AddRange(await ValidateDetailsAsync(i.ReferralType, i.ReferringDoctorId, i.ExternalDoctorName, i.ReferringDepartmentId, ct));
-        errors.AddRange(await ValidateVisitAsync(i.PatientId, i.EncounterId, ct));
+        if (i.IpdAdmissionId is long ipd)
+        {
+            if (!await _db.IpdAdmissions.AnyAsync(a => a.Id == ipd && a.PatientId == i.PatientId, ct)) errors.Add("The admission does not belong to this patient.");
+        }
+        else errors.AddRange(await ValidateVisitAsync(i.PatientId, i.EncounterId, ct));
         if (i.Discounts.Any(d => d.Value != 0) && !canDiscount) errors.Add("You are not allowed to give discounts.");
         if (i.Discounts.Any(d => d.Value < 0)) errors.Add("A discount cannot be negative.");
         if (i.Discounts.Any(d => d.Value > 0) && T(i.DiscountReason, 200) is null) errors.Add("Enter the reason for the discount.");
@@ -209,7 +215,7 @@ public sealed class RadiologyWorkflowService : IRadiologyService
             var order = new RadiologyOrder
             {
                 OrderNumber = await FinanceDb.NextNumberAsync(_db, HmsDbContext.RadiologyOrderSequence, "RAD", today, ct),
-                IdempotencyKey = i.IdempotencyKey, PatientId = patient.Id, EncounterId = i.EncounterId, ReferralType = i.ReferralType,
+                IdempotencyKey = i.IdempotencyKey, PatientId = patient.Id, EncounterId = i.EncounterId, IpdAdmissionId = i.IpdAdmissionId, ReferralType = i.ReferralType,
                 ReferringDoctorId = i.ReferralType == RadiologyReferralType.HospitalDoctor ? i.ReferringDoctorId : null,
                 ExternalDoctorName = i.ReferralType == RadiologyReferralType.External ? T(i.ExternalDoctorName, 150) : null,
                 ReferringDepartmentId = i.ReferringDepartmentId, ClinicalIndication = T(i.ClinicalIndication, 1000), Priority = i.Priority,
@@ -323,7 +329,7 @@ public sealed class RadiologyWorkflowService : IRadiologyService
             var charge = new Charge
             {
                 ChargeNumber = await FinanceDb.NextNumberAsync(_db, HmsDbContext.ChargeNumberSequence, "CHG", today, ct),
-                PatientId = order.PatientId, EncounterId = order.EncounterId, RadiologyOrderId = order.Id, ServiceItemId = s.ServiceItemId,
+                PatientId = order.PatientId, EncounterId = order.EncounterId, RadiologyOrderId = order.Id, IpdAdmissionId = order.IpdAdmissionId, ServiceItemId = s.ServiceItemId,
                 ServiceKind = s.Modality == RadiologyModality.XRay ? ServiceKind.XRay : ServiceKind.Ultrasound, ServiceName = s.Name,
                 DepartmentId = s.ServiceItem!.DepartmentId, Fee = fee, Discount = discount, NetAmount = fee - discount,
                 AllowPartialPayment = s.ServiceItem.AllowPartialPayment, DiscountReason = discount > 0 ? discountReason : null,
