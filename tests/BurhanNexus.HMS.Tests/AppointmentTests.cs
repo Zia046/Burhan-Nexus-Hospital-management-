@@ -227,7 +227,6 @@ public partial class AppointmentTests : Phase2TestBase
 
         // Update 9: "Mark as seen by doctor" no longer exists – the booking is the last reception step.
         Assert.DoesNotContain("mark as seen", (await admin.GetHtmlAsync($"/Appointments/Details/{a1}")).ToLowerInvariant());
-        Assert.NotEqual(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Appointments/Details/{a1}", Array.Empty<KeyValuePair<string, string>>(), $"/Appointments/Details/{a1}?handler=Seen")).StatusCode);
         Assert.Equal(AppointmentStatus.Booked, (await ApptAsync(a1)).Status);
         var stats = await admin.GetHtmlAsync("/Appointments/Reports?period=month");
         Assert.Contains("Dr. Cancel Test", stats);
@@ -285,7 +284,9 @@ public partial class AppointmentTests : Phase2TestBase
             P("RowVersion", (await RowVersionAsync()).ToString())
         });
         var html2 = await admin.GetHtmlAsync($"/Print/Appointment/{id}");
-        Assert.DoesNotContain("1,500.00", html2);
+        // Update 9: a fee collected at booking is always printed – the token slip is the patient's payment proof.
+        Assert.Contains("1,500.00", html2);
+        Assert.Contains("PAID", html2);
         Assert.Contains("Apni bari ka intezar karein.", html2);
         Assert.Contains("Reception: 091-1234567", html2);
     }

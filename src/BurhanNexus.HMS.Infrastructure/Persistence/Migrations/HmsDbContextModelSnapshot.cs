@@ -87,6 +87,10 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<decimal?>("AmountPaid")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
                     b.Property<DateOnly>("AppointmentDate")
                         .HasColumnType("date");
 
@@ -117,6 +121,9 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("CancelledUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<long?>("ChargeId")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Complaint")
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
@@ -131,11 +138,26 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Property<long>("EncounterId")
                         .HasColumnType("bigint");
 
+                    b.Property<Guid?>("IdempotencyKey")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
                     b.Property<long>("PatientId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("PaymentMethodName")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("PaymentStatus")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<long?>("ReceiptId")
                         .HasColumnType("bigint");
 
                     b.Property<uint>("RowVersion")
@@ -161,6 +183,37 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("UpdatedUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("WaivedAfterPayment")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal?>("WaivedAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<int?>("WaivedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("WaivedByUsername")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("WaivedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("WaiverDoctorId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("WaiverDoctorName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("WaiverReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<long?>("WaiverRefundId")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Workstation")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -170,9 +223,18 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("EncounterId")
                         .IsUnique();
 
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Appointments_Idempotency")
+                        .HasFilter("\"IdempotencyKey\" IS NOT NULL");
+
                     b.HasIndex("PatientId");
 
+                    b.HasIndex("ReceiptId");
+
                     b.HasIndex("ServiceItemId");
+
+                    b.HasIndex("PaymentStatus", "AppointmentDate");
 
                     b.HasIndex("AppointmentDate", "DoctorId", "Status");
 
@@ -1509,6 +1571,9 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                         .HasPrecision(14, 2)
                         .HasColumnType("numeric(14,2)");
 
+                    b.Property<long?>("AppointmentId")
+                        .HasColumnType("bigint");
+
                     b.Property<DateOnly>("BusinessDate")
                         .HasColumnType("date");
 
@@ -1562,6 +1627,11 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AdjustmentId");
+
+                    b.HasIndex("AppointmentId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_DoctorLedger_FeeWaiver")
+                        .HasFilter("\"AppointmentId\" IS NOT NULL AND \"EntryType\" = 'FeeWaiver'");
 
                     b.HasIndex("ReceiptId");
 
@@ -7599,12 +7669,20 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<long?>("WaiverAppointmentId")
+                        .HasColumnType("bigint");
+
                     b.HasKey("Id");
 
                     b.HasIndex("PaymentMethodId");
 
                     b.HasIndex("RefundNumber")
                         .IsUnique();
+
+                    b.HasIndex("WaiverAppointmentId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Refunds_WaiverAppointment")
+                        .HasFilter("\"WaiverAppointmentId\" IS NOT NULL AND \"Status\" <> 'Rejected'");
 
                     b.HasIndex("ReceiptId", "Status");
 
@@ -9563,6 +9641,11 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.Receipt", "Receipt")
+                        .WithMany()
+                        .HasForeignKey("ReceiptId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("BurhanNexus.HMS.Core.Domain.ServiceItem", "ServiceItem")
                         .WithMany()
                         .HasForeignKey("ServiceItemId")
@@ -9573,6 +9656,8 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Navigation("Encounter");
 
                     b.Navigation("Patient");
+
+                    b.Navigation("Receipt");
 
                     b.Navigation("ServiceItem");
                 });
