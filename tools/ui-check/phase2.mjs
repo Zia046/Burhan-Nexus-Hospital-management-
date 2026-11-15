@@ -672,18 +672,7 @@ try {
     await page.fill("#dn", n);
     await submit("button:has-text('Add doctor')");
   }
-  await go("/Patients/Register");
-  await page.fill("[name='Patient.FullName']", "Waqar Ahmed");
-  await page.selectOption("[name='Patient.Gender']", "Male");
-  await page.selectOption("[name='Patient.GuardianRelation']", "SonOf");
-  await page.fill("[name='Patient.GuardianName']", "Ahmed Gul");
-  await page.fill("[name='Patient.DateOfBirth']", "1990-05-01");
-  await page.fill("[name='Patient.MobileNumber']", "03451234567");
-  await page.fill("[name='Patient.Address']", "Hayatabad Phase 3");
-  await page.fill("[name='Patient.CityOrVillage']", "Peshawar");
-  await page.waitForTimeout(900);
-  await submit("button[value='profile']");
-  const otPatient = new URL(page.url()).pathname.split("/").pop();
+  const otPatient = ahmadId; // the discharged IPD patient now needs surgery (existing Patient ID, no new registration)
   await go(`/Ot/Book?patientId=${otPatient}&emergency=true`);
   await page.selectOption("#Input_ProcedureId", { index: 1 });
   await page.selectOption("#Input_Priority", "Emergency");
