@@ -70,7 +70,7 @@
         const price = parseFloat(opt && opt.dataset.price ? opt.dataset.price : tr.dataset.price || "0") || 0;
         const disc = discount ? parseFloat(tr.querySelector("[data-name=Discount]").value || "0") || 0 : 0;
         const line = Math.max(0, price * qty - disc);
-        tr.querySelector("[data-price]").textContent = price ? money(price) : "—";
+        tr.querySelector("[data-price-cell]").textContent = price ? money(price) : "—";
         tr.querySelector("[data-line-total]").textContent = money(line);
         total += line;
       });
@@ -96,7 +96,7 @@
       ];
       if (mode === "issue") cells.push(el("td", {}, [el("input", { "data-name": "Instructions", maxlength: "200", placeholder: "e.g. 1 tab 3 times a day", value: init ? init.instructions || "" : "" })]));
       if (prices) {
-        cells.push(el("td", { className: "num", "data-price": "" }));
+        cells.push(el("td", { className: "num", "data-price-cell": "" }));
         if (discount) cells.push(el("td", { className: "num" }, [m.discount
           ? el("input", { type: "number", min: "0", step: "0.01", "data-name": "Discount", className: "w-xs", value: init && init.discount ? init.discount : "", title: `max ${m.maxDiscount}%` })
           : el("input", { type: "hidden", "data-name": "Discount", value: "0" })]));
