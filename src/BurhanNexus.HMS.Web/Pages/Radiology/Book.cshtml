@@ -68,7 +68,7 @@ else
                         @foreach (var s in g)
                         {
                             <label class="test-choice" data-test-name="@s.Service.Name.ToLowerInvariant() @s.Service.Code.ToLowerInvariant() @(s.Service.BodyPart?.ToLowerInvariant())">
-                                <input type="checkbox" name="ServiceIds" value="@s.Service.Id" checked="@Model.ServiceIds.Contains(s.Service.Id)" data-price="@s.Fee.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-rad-service="@s.Service.Code" />
+                                <input type="checkbox" name="ServiceIds" value="@s.Service.Id" checked="@Model.ServiceIds.Contains(s.Service.Id)" data-price="@(Model.ShowFees ? s.Fee.ToString(System.Globalization.CultureInfo.InvariantCulture) : null)" data-rad-service="@s.Service.Code" />
                                 <span><strong>@s.Service.Name</strong> <small class="muted">@s.Service.Code@(s.Service.DurationMinutes is int min ? $" · ~{min} min" : "")</small>
                                     @if (s.Service.PreparationInstructions is not null) { <small class="block text-warning">Preparation: @s.Service.PreparationInstructions</small> }
                                     @if (Model.ShowFees) { <small class="block">@(s.Fee == 0 ? "Free" : Fmt.Money(s.Fee))</small> }</span>

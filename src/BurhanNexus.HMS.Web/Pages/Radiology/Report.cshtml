@@ -22,6 +22,7 @@
         @if (e.TechnicalNotes is not null) { <p class="small"><strong>Technician's notes:</strong> @e.TechnicalNotes</p> }
     </div>
 </div>
+<partial name="_ValidationSummary" />
 @if (!Model.Editable)
 {
     <div class="alert alert-info"><svg class="icon"><use href="#i-info" /></svg><div>This report cannot be edited now (@RadiologyWorkflowService.Label(e.Status)).@(e.Status is RadiologyExamStatus.Verified or RadiologyExamStatus.Released ? " A verified report is changed only by “Amend verified report” on the examination page." : " Complete the examination first.")</div></div>
@@ -47,7 +48,6 @@ else
             }
         </div>
         <div class="card-body">
-            <partial name="_ValidationSummary" />
             <div class="field"><label for="Input_ClinicalIndication">Clinical indication</label><textarea id="Input_ClinicalIndication" name="Input.ClinicalIndication" rows="2" maxlength="1000">@Model.Input.ClinicalIndication</textarea></div>
             <div class="field"><label for="Input_Technique">Technique</label><textarea id="Input_Technique" name="Input.Technique" rows="2" maxlength="2000" data-field="technique">@Model.Input.Technique</textarea></div>
             <div class="field"><label for="Input_Findings">Findings</label><textarea id="Input_Findings" name="Input.Findings" rows="12" maxlength="8000" data-field="findings">@Model.Input.Findings</textarea></div>
