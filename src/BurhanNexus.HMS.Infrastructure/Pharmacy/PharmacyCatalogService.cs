@@ -132,7 +132,7 @@ public sealed class PharmacyCatalogService : IPharmacyCatalogService
     {
         if (input.NearExpiryDays is < 1 or > 730) return ServiceResult.Fail("The near-expiry warning period must be between 1 and 730 days.");
         if (input.EncounterValidDays is < 0 or > 365) return ServiceResult.Fail("The visit validity must be between 0 and 365 days.");
-        if (input.GovernmentIssueServiceItemId is int sid && !await _db.ServiceItems.AnyAsync(s => s.Id == sid && s.IsActive && s.Kind != ServiceKind.Pharmacy, ct))
+        if (input.GovernmentIssueServiceItemId is int sid && !await _db.ServiceItems.AnyAsync(x => x.Id == sid && x.IsActive && x.Kind != ServiceKind.Pharmacy, ct))
             return ServiceResult.Fail("Select an active service for the pharmacy issue fee.");
         var s = await _db.PharmacySettings.FirstAsync(ct);
         _db.Entry(s).Property(x => x.RowVersion).OriginalValue = rowVersion;
@@ -164,7 +164,7 @@ public sealed class PharmacyCatalogService : IPharmacyCatalogService
         name = T(name, 100);
         if (name is null) return ServiceResult<int>.Fail("Enter the name.");
         if (!Enum.IsDefined(kind)) return ServiceResult<int>.Fail("Unknown list.");
-        if (await _db.PharmacyLookups.AnyAsync(l => l.Kind == kind && l.Name.ToLower() == name.ToLower() && l.Id != id, ct))
+        if (await _db.PharmacyLookups.AnyAsync(x => x.Kind == kind && x.Name.ToLower() == name.ToLower() && x.Id != id, ct))
             return ServiceResult<int>.Fail($"“{name}” already exists.");
         PharmacyLookup l;
         if (id is int lid)
@@ -371,7 +371,7 @@ public sealed class PharmacyCatalogService : IPharmacyCatalogService
         var name = T(i.Name, 150);
         if (name is null) return ServiceResult<int>.Fail("Enter the supplier name.");
         if (T(i.Email, 150) is { } email && !email.Contains('@')) return ServiceResult<int>.Fail("Enter a valid email address.");
-        if (await _db.Suppliers.AnyAsync(s => s.Name.ToLower() == name.ToLower() && s.Id != id, ct))
+        if (await _db.Suppliers.AnyAsync(x => x.Name.ToLower() == name.ToLower() && x.Id != id, ct))
             return ServiceResult<int>.Fail($"A supplier named “{name}” already exists.");
         var now = _clock.UtcNow;
         Supplier s;
@@ -411,15 +411,15 @@ public sealed class PharmacyCatalogService : IPharmacyCatalogService
         var name = T(i.Name, 100);
         var code = T(i.Code, 20)?.ToUpperInvariant();
         if (name is null || code is null) return ServiceResult<int>.Fail("Enter the code and name of the department store.");
-        if (await _db.StockLocations.AnyAsync(l => (l.Code == code || l.Name.ToLower() == name.ToLower()) && l.Id != id, ct))
+        if (await _db.StockLocations.AnyAsync(x => (x.Code == code || x.Name.ToLower() == name.ToLower()) && x.Id != id, ct))
             return ServiceResult<int>.Fail("Another stock location already uses this code or name.");
-        if (i.DepartmentId is int did && !await _db.Departments.AnyAsync(d => d.Id == did, ct)) return ServiceResult<int>.Fail("Select a valid department.");
+        if (i.DepartmentId is int did && !await _db.Departments.AnyAsync(x => x.Id == did, ct)) return ServiceResult<int>.Fail("Select a valid department.");
         StockLocation l;
         if (id is int lid)
         {
             l = await _db.StockLocations.FirstOrDefaultAsync(x => x.Id == lid, ct) ?? throw new KeyNotFoundException();
             if (l.Kind == StockLocationKind.MainPharmacy && !i.IsActive) return ServiceResult<int>.Fail("The main pharmacy cannot be deactivated.");
-            if (!i.IsActive && l.IsActive && await _db.StockBalances.AnyAsync(b => b.LocationId == l.Id && b.Quantity > 0, ct))
+            if (!i.IsActive && l.IsActive && await _db.StockBalances.AnyAsync(x => x.LocationId == lid && x.Quantity > 0, ct))
                 return ServiceResult<int>.Fail($"{l.Name} still holds stock. Transfer it back or adjust it before deactivating.");
         }
         else

@@ -132,9 +132,9 @@ public sealed class PharmacyQueryService : IPharmacyQueryService
             query = query.Where(m => EF.Functions.ILike(m.Name, like) || EF.Functions.ILike(m.GenericName ?? "", like) || EF.Functions.ILike(m.BrandName ?? "", like) || EF.Functions.ILike(m.Code, like));
         }
         var meds = await query.OrderBy(m => m.Name).Take(Math.Clamp(take, 1, 100)).ToListAsync(ct);
-        var ids = meds.Select(m => m.Id).ToList();
+        var medIds = meds.Select(m => m.Id).ToList();
         var stock = await _db.StockBalances.AsNoTracking().Include(s => s.Batch)
-            .Where(s => s.LocationId == locationId && ids.Contains(s.MedicineId) && s.Quantity > 0 && s.Batch!.ExpiryDate >= today)
+            .Where(s => s.LocationId == locationId && medIds.Contains(s.MedicineId) && s.Quantity > 0 && s.Batch!.ExpiryDate >= today)
             .OrderBy(s => s.Batch!.ExpiryDate).ThenBy(s => s.BatchId).ToListAsync(ct);
         return meds.Select(m =>
         {

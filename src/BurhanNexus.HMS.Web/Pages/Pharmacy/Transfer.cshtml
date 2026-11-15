@@ -15,7 +15,7 @@
     <input type="hidden" asp-for="Input.FromLocationId" />
     <div class="card-header"><h2><svg class="icon"><use href="#i-refresh" /></svg> Transfer from @Model.Locations.FirstOrDefault(l => l.Id == Model.Input.FromLocationId)?.Name</h2></div>
     <div class="card-body form-grid">
-        <div class="field"><label for="Input_ToLocationId">To department *</label><select asp-for="Input.ToLocationId" data-test="transfer-to">@foreach (var l in Model.Locations.Where(l => l.Id != Model.Input.FromLocationId)) { <option value="@l.Id">@l.Name</option> }</select></div>
+        <div class="field"><label for="Input_ToLocationId">To department *</label><select asp-for="Input.ToLocationId" data-test="transfer-to">@foreach (var l in Model.Locations.Where(x => x.Id != Model.Input.FromLocationId)) { <option value="@l.Id">@l.Name</option> }</select></div>
         <div class="field"><label for="Input_Reference">Reference / requisition no.</label><input asp-for="Input.Reference" maxlength="60" /></div>
         <div class="field span-2"><label for="Input_Notes">Notes</label><input asp-for="Input.Notes" maxlength="500" placeholder="e.g. weekly OT supply, dressings, TT, ARV" /></div>
     </div>

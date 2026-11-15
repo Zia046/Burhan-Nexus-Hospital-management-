@@ -18,7 +18,7 @@
         <tbody>
         @for (var k = 0; k < Model.Input.Lines.Count; k++)
         {
-            <tr><td><select name="Input.Lines[@k].BatchId"><option value="0">—</option>@foreach (var b in Model.Batches.OrderBy(b => b.MedicineName)) { <option value="@b.BatchId" selected="@(b.BatchId == Model.Input.Lines[k].BatchId)">@b.MedicineName · @b.BatchNumber · exp @Fmt.Day(b.Expiry)@(b.State == ExpiryState.Expired ? " (expired)" : "") · in stock @b.Quantity</option> }</select></td>
+            <tr><td><select name="Input.Lines[@k].BatchId"><option value="0">—</option>@foreach (var b in Model.Batches.OrderBy(x => x.MedicineName)) { <option value="@b.BatchId" selected="@(b.BatchId == Model.Input.Lines[k].BatchId)">@b.MedicineName · @b.BatchNumber · exp @Fmt.Day(b.Expiry)@(b.State == ExpiryState.Expired ? " (expired)" : "") · in stock @b.Quantity</option> }</select></td>
                 <td class="num"><input type="number" name="Input.Lines[@k].Quantity" value="@(Model.Input.Lines[k].Quantity == 0 ? null : Model.Input.Lines[k].Quantity)" min="0" class="w-xs" /></td></tr>
         }
         </tbody>

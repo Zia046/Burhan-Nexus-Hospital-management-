@@ -16,7 +16,7 @@
         <div class="card-header"><h2><svg class="icon"><use href="#i-sliders" /></svg> New adjustment – @Model.Locations.FirstOrDefault(l => l.Id == Model.Location)?.Name</h2></div>
         <div class="card-body form-grid">
             <div class="field span-3"><label for="Input_BatchId">Medicine &amp; batch *</label>
-                <select asp-for="Input.BatchId"><option value="0">— select —</option>@foreach (var b in Model.Batches.OrderBy(b => b.MedicineName)) { <option value="@b.BatchId">@b.MedicineName · batch @b.BatchNumber · exp @Fmt.Day(b.Expiry) · current @b.Quantity</option> }</select></div>
+                <select asp-for="Input.BatchId"><option value="0">— select —</option>@foreach (var b in Model.Batches.OrderBy(x => x.MedicineName)) { <option value="@b.BatchId">@b.MedicineName · batch @b.BatchNumber · exp @Fmt.Day(b.Expiry) · current @b.Quantity</option> }</select></div>
             <div class="field"><label for="Input_Increase">Type *</label><select asp-for="Input.Increase"><option value="false">Decrease (−)</option><option value="true">Increase (+)</option></select></div>
             <div class="field"><label for="Input_Quantity">Quantity *</label><input asp-for="Input.Quantity" type="number" min="1" /></div>
             <div class="field"><label for="Input_Reason">Reason *</label><select asp-for="Input.Reason">

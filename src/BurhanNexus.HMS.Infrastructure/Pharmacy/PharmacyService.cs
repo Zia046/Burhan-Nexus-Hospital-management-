@@ -294,7 +294,7 @@ public sealed class PharmacyService : IPharmacyService
 
     private void AuditFefo(string number, IEnumerable<Priced> lines)
     {
-        foreach (var l in lines.Where(l => l.FefoOverridden))
+        foreach (var l in lines.Where(x => x.FefoOverridden))
             _audit.Add(AuditActions.PharmFefoOverride, "MedicineBatch", l.Batch.BatchNumber,
                 $"{number}: {l.Medicine.Name} batch {l.Batch.BatchNumber} (expiry {l.Batch.ExpiryDate:dd MMM yyyy}) chosen instead of the earliest-expiring batch");
     }
@@ -776,7 +776,7 @@ public sealed class PharmacyService : IPharmacyService
                     Kind = MedicineReturnKind.SaleReturn, SaleId = sale.Id, LocationId = sale.LocationId, Reason = reason!, BusinessDate = today,
                     CreatedUtc = _clock.UtcNow, CreatedByUserId = _ctx.UserId, CreatedByUsername = _ctx.Username
                 };
-                foreach (var l in input.Lines.Where(l => l.Quantity > 0))
+                foreach (var l in input.Lines.Where(x => x.Quantity > 0))
                 {
                     var item = sale.Items.FirstOrDefault(i => i.Id == l.ItemId);
                     if (item is null) return Fail("Sale line not found.");
@@ -803,7 +803,7 @@ public sealed class PharmacyService : IPharmacyService
                 // The return document is insert-only: it is written once, complete.
                 _db.MedicineReturns.Add(ret);
                 await _db.SaveChangesAsync(ct);
-                foreach (var i in ret.Items.Where(i => i.Restocked))
+                foreach (var i in ret.Items.Where(x => x.Restocked))
                     if (await PostAsync(new StockMove(InventoryTxnType.SaleReturn, sale.LocationId, i.MedicineId, i.BatchId, i.Quantity, "RET", ret.Id, ret.Number, Note: reason), today, ct) is { } err)
                         return Fail(err);
                 _audit.Add(AuditActions.PharmReturn, "MedicineReturn", ret.Number,
@@ -830,7 +830,7 @@ public sealed class PharmacyService : IPharmacyService
                     CreatedUtc = now, CreatedByUserId = _ctx.UserId, CreatedByUsername = _ctx.Username
                 };
                 var refundTotal = 0m;
-                foreach (var l in input.Lines.Where(l => l.Quantity > 0))
+                foreach (var l in input.Lines.Where(x => x.Quantity > 0))
                 {
                     var item = issue.Items.FirstOrDefault(i => i.Id == l.ItemId);
                     if (item is null) return Fail("Issue line not found.");
@@ -886,7 +886,7 @@ public sealed class PharmacyService : IPharmacyService
                 }
                 _db.MedicineReturns.Add(ret);
                 await _db.SaveChangesAsync(ct);
-                foreach (var i in ret.Items.Where(i => i.Restocked))
+                foreach (var i in ret.Items.Where(x => x.Restocked))
                     if (await PostAsync(new StockMove(InventoryTxnType.IssueReturn, issue.LocationId, i.MedicineId, i.BatchId, i.Quantity, "RET", ret.Id, ret.Number,
                             PatientId: issue.PatientId, Note: reason), today, ct) is { } err) return Fail(err);
                 _audit.Add(AuditActions.PharmReturn, "MedicineReturn", ret.Number,
