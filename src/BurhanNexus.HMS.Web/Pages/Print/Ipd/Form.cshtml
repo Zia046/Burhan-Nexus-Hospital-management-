@@ -106,7 +106,7 @@
             foreach (var o in Model.Orders)
             {
                 <section class="rr-section f-keep"><h3>@o.MedicineName · @o.Dose · @o.Route · @o.Frequency (@o.Times)</h3>
-                    <p class="small">Prescribed by Dr @o.Prescriber (@o.Source) · from @D(o.StartUtc) @(o.DurationDays is int dd ? $"for {dd} days" : "") · @o.Status @o.StopReason @(o.Instructions is null ? "" : "· " + o.Instructions)</p>
+                    <p class="small">Prescribed by @o.Prescriber (@o.Source) · from @D(o.StartUtc) @(o.DurationDays is int dd ? $"for {dd} days" : "") · @o.Status @o.StopReason @(o.Instructions is null ? "" : "· " + o.Instructions)</p>
                     <table class="lr-results"><thead><tr><th>Scheduled</th><th>Status</th><th>Given</th><th>Dose / route</th><th>Nurse</th><th>Reason / remarks</th></tr></thead><tbody>
                     @foreach (var d in Model.Doses.Where(x => x.OrderId == o.Id)) { <tr><td>@D(d.ScheduledUtc)</td><td>@d.Status</td><td>@(d.GivenUtc is DateTime g ? D(g) : "")</td><td>@d.DoseGiven @d.RouteGiven</td><td>@(d.Nurse ?? d.RecordedBy)</td><td>@d.Reason @d.Remarks</td></tr> }
                     </tbody></table>
@@ -248,7 +248,10 @@
             <h3>@BurhanNexus.HMS.Web.Pages.Ipd.IpdPageModel.Title(kind) (@recs.Count)</h3>
             @if (charted)
             {
-                foreach (var f in fields.Where(x => x.Type == FieldType.Number && x.IsActive)) { @Model.Chart(recs, f) }
+                var numeric = fields.Where(x => x.Type == FieldType.Number && x.IsActive).ToList();
+                var withData = numeric.Where(x => recs.Any(r => r.Values.ContainsKey(x.Key))).ToList();
+                foreach (var f in withData) { @Model.Chart(recs, f) }
+                if (numeric.Count > withData.Count) { <p class="small">Not recorded: @string.Join(", ", numeric.Except(withData).Select(x => x.Label))</p> }
                 <p class="small">Charts show only recorded values; gaps mean “not recorded”. Dashed lines (if any) are the hospital's configured protocol limits.</p>
             }
             <table class="lr-results f-records">

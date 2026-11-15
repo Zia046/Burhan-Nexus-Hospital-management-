@@ -21,7 +21,7 @@
             <div class="small">
                 <partial name="_AdmStatus" model="a.Status" /> · @a.Kind · <strong data-adm-bed>@bed</strong> · admitted @Fmt.DateTimeText(a.AdmittedUtc)
                 @if (a.Department is not null) { <span> · @a.Department.Name</span> }
-                @if ((a.AdmittingDoctor?.Name ?? a.AdmittingDoctorName) is string dn) { <span> · Dr @dn</span> }
+                @if ((a.AdmittingDoctor?.Name ?? a.AdmittingDoctorName) is string dn) { <span> · @dn</span> }
             </div>
             @if (!string.IsNullOrWhiteSpace(a.Allergies)) { <div class="alert alert-danger compact" data-allergy><strong>Allergies:</strong> @a.Allergies</div> }
             else { <div class="small muted" data-allergy>Allergies: not recorded</div> }
@@ -238,7 +238,7 @@
         @foreach (var o in Model.Orders)
         {
             <div class="card-body mar-order @(o.Status != MedicationOrderStatus.Active ? "row-muted" : "")" data-order="@o.Id">
-                <div class="banner-row"><div class="grow"><strong>@o.MedicineName</strong> · @o.Dose · @o.Route · @o.Frequency (@o.Times) · Dr @o.Prescriber · @o.Source
+                <div class="banner-row"><div class="grow"><strong>@o.MedicineName</strong> · @o.Dose · @o.Route · @o.Frequency (@o.Times) · @o.Prescriber · @o.Source
                     <small class="block muted">from @Fmt.DateTimeText(o.StartUtc) @(o.DurationDays is int dd ? $"for {dd} days" : "") · entered by @o.EnteredBy · @o.Status @(o.StopReason is null ? "" : $"– {o.StopReason} ({o.StoppedBy})")</small>
                     @if (o.Instructions is not null) { <small class="block">@o.Instructions</small> }</div>
                     @if (o.Status == MedicationOrderStatus.Active)

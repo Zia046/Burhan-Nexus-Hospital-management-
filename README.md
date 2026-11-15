@@ -66,6 +66,7 @@ docs/                              Installation, user guide, backup, troubleshoo
 - [Phase 4 – laboratory management system](docs/LABORATORY.md) · [Phase 4 testing report](docs/PHASE4-TEST-REPORT.md) · Samples: [A4 lab report](docs/samples/sample-lab-report-A4.pdf), [lab order slip 80 mm](docs/samples/sample-lab-slip-80mm.pdf)
 - [Phase 5 – pharmacy & medicine inventory](docs/PHARMACY.md) · [Phase 5 testing report](docs/PHASE5-TEST-REPORT.md) · Samples: [pharmacy receipt 80 mm](docs/samples/sample-pharmacy-sale-receipt-80mm.pdf), [issue slip](docs/samples/sample-pharmacy-issue-slip-80mm.pdf), [Minor OT transfer slip](docs/samples/sample-pharmacy-transfer-slip-80mm.pdf)
 - [Phase 6 – radiology (X-Ray & Ultrasound)](docs/RADIOLOGY.md) · [Phase 6 testing report](docs/PHASE6-TEST-REPORT.md) · Sample: [A4 radiology report](docs/samples/sample-radiology-report-A4.pdf)
+- [Phase 7 – IPD, wards, Gynae, maternity, Labour Room & NICU](docs/IPD.md) · [Phase 7 testing report](docs/PHASE7-TEST-REPORT.md) · Samples: [discharge summary](docs/samples/sample-ipd-discharge-summary-A4.pdf), [final bill](docs/samples/sample-ipd-final-bill-A4.pdf), [partograph](docs/samples/sample-ipd-partograph-A4.pdf), [delivery record](docs/samples/sample-ipd-delivery-record-A4.pdf), [MAR](docs/samples/sample-ipd-mar-A4.pdf), [admission form](docs/samples/sample-ipd-admission-form-A4.pdf)
 
 ## Quick start (developer)
 
