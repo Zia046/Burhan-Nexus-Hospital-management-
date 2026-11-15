@@ -229,7 +229,7 @@ public sealed class LabService : ILabService
         // Age for age-specific ranges: from the date of birth, else from the age entered at registration.
         var ageDays = patient.DateOfBirth is { } dob ? today.DayNumber - dob.DayNumber
             : patient.AgeAtRegistration is int ar && patient.AgeUnitAtRegistration is AgeUnit au
-                ? today.DayNumber - AgeCalculator.EstimateDateOfBirth(ar, au, DateOnly.FromDateTime(patient.CreatedUtc)).DayNumber : (int?)null;
+                ? today.DayNumber - AgeCalculator.EstimateDateOfBirth(ar, au, DateOnly.FromDateTime(patient.RegisteredUtc)).DayNumber : (int?)null;
         var samples = await _db.LabSamples.Where(s => s.LabOrderId == order.Id && s.Status != LabSampleStatus.Rejected).ToListAsync(ct);
         var sort = await _db.LabOrderItems.Where(x => x.LabOrderId == order.Id).MaxAsync(x => (int?)x.SortOrder, ct) ?? 0;
         var newItems = new List<(LabOrderItem Item, LabTest Test)>();
