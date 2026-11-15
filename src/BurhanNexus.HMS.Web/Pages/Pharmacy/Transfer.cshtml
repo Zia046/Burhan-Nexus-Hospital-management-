@@ -1,0 +1,26 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.TransferModel
+@{ ViewData["Title"] = "Stock transfer"; }
+<partial name="_PharmNav" />
+<partial name="_ValidationSummary" />
+<div class="toolbar no-print">
+    <form method="get" class="filters">
+        <label>From <select name="From" data-autosubmit data-transfer-from>@foreach (var l in Model.Locations) { <option value="@l.Id" selected="@(l.Id == Model.Input.FromLocationId)">@l.Name</option> }</select></label>
+        <noscript><button class="btn btn-light" type="submit">Change</button></noscript>
+    </form>
+    <div class="toolbar-actions"><a bn-permission="@Perm.PharmViewDepartmentStock" class="btn btn-light" href="/Pharmacy/Stock?location=@Model.Input.ToLocationId">Department stock</a></div>
+</div>
+<form method="post" class="card" data-transfer-form novalidate>
+    <input type="hidden" asp-for="Input.IdempotencyKey" />
+    <input type="hidden" asp-for="Input.FromLocationId" />
+    <div class="card-header"><h2><svg class="icon"><use href="#i-refresh" /></svg> Transfer from @Model.Locations.FirstOrDefault(l => l.Id == Model.Input.FromLocationId)?.Name</h2></div>
+    <div class="card-body form-grid">
+        <div class="field"><label for="Input_ToLocationId">To department *</label><select asp-for="Input.ToLocationId" data-test="transfer-to">@foreach (var l in Model.Locations.Where(l => l.Id != Model.Input.FromLocationId)) { <option value="@l.Id">@l.Name</option> }</select></div>
+        <div class="field"><label for="Input_Reference">Reference / requisition no.</label><input asp-for="Input.Reference" maxlength="60" /></div>
+        <div class="field span-2"><label for="Input_Notes">Notes</label><input asp-for="Input.Notes" maxlength="500" placeholder="e.g. weekly OT supply, dressings, TT, ARV" /></div>
+    </div>
+    @await Html.PartialAsync("_MedicineLines", ("transfer", false, false, Model.Input.FromLocationId, (IEnumerable<BurhanNexus.HMS.Infrastructure.Pharmacy.StockLineInput>)Model.Input.Lines))
+    <div class="card-footer form-actions"><span class="muted">The source stock decreases and the department stock increases once. Department stock is not deducted per patient.</span>
+        <button class="btn btn-primary btn-lg" type="submit" data-test="save-transfer">Transfer stock</button></div>
+</form>
+@section Scripts { <script src="~/js/pharmacy.js" asp-append-version="true"></script> }

@@ -1,0 +1,43 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.Medicines.IndexModel
+@{ ViewData["Title"] = "Medicine catalogue"; }
+<partial name="_PharmNav" />
+<div class="toolbar">
+    <form method="get" class="filters">
+        <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Name, generic name, brand or code" maxlength="100" autofocus /></div>
+        <select name="CategoryId"><option value="">All categories</option>@foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(c.Id == Model.CategoryId)">@c.Name</option> }</select>
+        <label class="check"><input type="checkbox" name="Inactive" value="true" checked="@Model.Inactive" /> Include inactive</label>
+        <button class="btn btn-light" type="submit">Search</button>
+    </form>
+    <div class="toolbar-actions">
+        <a bn-permission="@Perm.PharmManageCategories" class="btn btn-light" href="/Pharmacy/Lookups">Categories &amp; lists</a>
+        <a bn-permission="@Perm.PharmAddMedicine" class="btn btn-primary" href="/Pharmacy/Medicines/Edit" data-test="new-medicine"><svg class="icon icon-sm"><use href="#i-plus" /></svg> Add medicine</a>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-pill" /></svg> Medicines</h2><span class="pill">@Model.Rows.Count</span></div>
+    <div class="table-wrap">
+        <table class="table" data-medicines>
+            <thead><tr><th>Code</th><th>Medicine</th><th>Generic / brand</th><th>Category</th><th class="num">Main pharmacy</th><th class="num">Departments</th><th class="num">Minimum</th><th>Next expiry</th>@if (Model.ShowPrices) { <th class="num">Sale price</th> }<th></th></tr></thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                Model.Medicines.TryGetValue(r.MedicineId, out var m);
+                <tr data-medicine="@r.Code" class="@(r.IsActive ? "" : "row-muted")">
+                    <td class="mono">@r.Code</td>
+                    <td><a href="/Pharmacy/Medicines/@r.MedicineId"><strong>@r.Name</strong></a>@if (!r.IsActive) { <span class="status">Inactive</span> }</td>
+                    <td class="small">@r.GenericName@(m?.BrandName is { } b ? " · " + b : "")</td>
+                    <td class="small">@r.Category</td>
+                    <td class="num @(r.IsLow ? "abn-text" : "")">@r.MainStock @if (r.IsLow) { <span class="status status-bad">Low</span> }</td>
+                    <td class="num">@r.DepartmentStock</td>
+                    <td class="num">@r.MinimumStock</td>
+                    <td>@(r.NextExpiry is { } ne ? Fmt.Day(ne) : "—")@if (r.Expired > 0) { <span class="status status-bad" title="Expired units still in stock">@r.Expired expired</span> }</td>
+                    @if (Model.ShowPrices) { <td class="num">@(m?.SalePrice is decimal sp ? Fmt.Money(sp) : "—")</td> }
+                    <td class="actions"><a bn-permission="@Perm.PharmEditMedicine" class="btn btn-light btn-sm" href="/Pharmacy/Medicines/Edit/@r.MedicineId">Edit</a></td>
+                </tr>
+            }
+            @if (Model.Rows.Count == 0) { <tr><td colspan="10" class="empty">No medicines found.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

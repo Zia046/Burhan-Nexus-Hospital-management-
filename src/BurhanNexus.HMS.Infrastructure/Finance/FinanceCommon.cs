@@ -1,6 +1,7 @@
 using BurhanNexus.HMS.Core.Domain;
 using BurhanNexus.HMS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -66,4 +67,22 @@ internal static class FinanceDb
 
     public static bool IsUniqueViolation(DbUpdateException ex, string? index = null) =>
         ex.InnerException is PostgresException { SqlState: "23505" } pg && (index is null || pg.ConstraintName == index);
+}
+
+/// <summary>
+/// Starts a database transaction, or joins the caller's one (Phase 5: a pharmacy sale creates its stock movements and the
+/// Phase 3 receipt atomically). Commit/rollback only act when this scope started the transaction.
+/// </summary>
+internal sealed class TxScope : IAsyncDisposable
+{
+    private readonly IDbContextTransaction? _tx;
+    private TxScope(IDbContextTransaction? tx) => _tx = tx;
+    public bool Owned => _tx is not null;
+
+    public static async Task<TxScope> BeginAsync(HmsDbContext db, CancellationToken ct) =>
+        new(db.Database.CurrentTransaction is null ? await db.Database.BeginTransactionAsync(ct) : null);
+
+    public Task CommitAsync(CancellationToken ct) => _tx?.CommitAsync(ct) ?? Task.CompletedTask;
+    public Task RollbackAsync(CancellationToken ct) => _tx?.RollbackAsync(ct) ?? Task.CompletedTask;
+    public ValueTask DisposeAsync() => _tx?.DisposeAsync() ?? ValueTask.CompletedTask;
 }

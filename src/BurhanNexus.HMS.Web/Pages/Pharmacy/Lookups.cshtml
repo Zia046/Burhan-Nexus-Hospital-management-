@@ -1,0 +1,27 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.LookupsModel
+@using BurhanNexus.HMS.Core.Domain
+@{ ViewData["Title"] = "Medicine lists"; }
+<partial name="_PharmNav" />
+<div class="grid-2">
+@foreach (var kind in Enum.GetValues<PharmacyLookupKind>())
+{
+    <div class="card" id="@kind" data-lookup="@kind">
+        <div class="card-header"><h3>@BurhanNexus.HMS.Web.Pages.Pharmacy.LookupsModel.Title(kind)</h3></div>
+        <div class="table-wrap"><table class="table table-compact"><tbody>
+            @foreach (var l in Model.Items.Where(i => i.Kind == kind))
+            {
+                <tr><td><form method="post" asp-route-id="@l.Id" class="inline-form">
+                    <input type="hidden" name="kind" value="@kind" />
+                    <input name="name" value="@l.Name" maxlength="100" required /><input name="sortOrder" type="number" value="@l.SortOrder" class="w-xs" />
+                    <label class="check"><input type="checkbox" name="isActive" value="true" checked="@l.IsActive" /> Active</label>
+                    <button class="btn btn-light btn-sm" type="submit">Save</button></form></td></tr>
+            }
+            <tr><td><form method="post" class="inline-form">
+                <input type="hidden" name="kind" value="@kind" /><input type="hidden" name="isActive" value="true" />
+                <input name="name" maxlength="100" placeholder="Add new" required /><input name="sortOrder" type="number" value="0" class="w-xs" />
+                <button class="btn btn-primary btn-sm" type="submit" data-test="add-@kind">Add</button></form></td></tr>
+        </tbody></table></div>
+    </div>
+}
+</div>

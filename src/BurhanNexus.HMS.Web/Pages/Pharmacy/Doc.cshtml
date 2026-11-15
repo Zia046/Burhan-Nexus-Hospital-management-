@@ -1,0 +1,118 @@
+@page "/Pharmacy/Doc/{type}/{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.DocModel
+@using BurhanNexus.HMS.Core.Domain
+@using BurhanNexus.HMS.Infrastructure.Pharmacy
+@{
+    ViewData["Title"] = Model.Number;
+    var showPrices = Model.ShowPrices;
+}
+<partial name="_PharmNav" />
+<div class="toolbar no-print">
+    <div class="toolbar-actions">
+        <a class="btn btn-light" href="/Print/Pharmacy/@Model.Type/@ViewContext.RouteData.Values["id"]" data-test="print-doc"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print</a>
+        @if (Model.Sale is not null) { <a bn-permission="@Perm.PharmProcessReturns" class="btn btn-light" href="/Pharmacy/Returns/Sale/@Model.Sale.Id">Return medicines</a> }
+        @if (Model.Issue is not null) { <a bn-permission="@Perm.PharmProcessReturns" class="btn btn-light" href="/Pharmacy/Returns/Issue/@Model.Issue.Id">Patient return</a> }
+        @if (Model.Issue is { Mode: HospitalType.Private } && Model.Charges.Any(c => c.Status is ChargeStatus.Unpaid or ChargeStatus.PartiallyPaid))
+        { <a bn-permission="@Perm.FinanceCollect" class="btn btn-primary" href="/Finance/Collect?patientId=@Model.Issue.PatientId&pharmacyIssueId=@Model.Issue.Id" data-test="collect-issue">Collect payment</a> }
+    </div>
+</div>
+@if (Model.Receipt is { } g)
+{
+    <div class="card" data-doc-grn="@g.Number">
+        <div class="card-header"><h2><svg class="icon"><use href="#i-download" /></svg> Stock receiving @g.Number</h2><span class="pill">@g.Location!.Name</span></div>
+        <div class="card-body"><dl class="details-grid">
+            <dt>Supplier / source</dt><dd>@(g.Supplier?.Name ?? g.SourceName)</dd><dt>Reference</dt><dd>@(g.ReferenceNumber ?? "—")@(g.InvoiceDate is { } idt ? " · " + Fmt.Day(idt) : "")</dd>
+            <dt>Received</dt><dd>@Fmt.Day(g.ReceivedDate) · @g.CreatedByUsername · @Fmt.DateTimeText(g.CreatedUtc)</dd><dt>Notes</dt><dd>@(g.Notes ?? "—")</dd>
+        </dl></div>
+        <div class="table-wrap"><table class="table table-compact">
+            <thead><tr><th>Medicine</th><th>Batch</th><th>Expiry</th><th class="num">Qty</th>@if (showPrices && g.Mode == HospitalType.Private) { <th class="num">Cost</th><th class="num">Sale</th><th class="num">Discount</th><th class="num">Total</th> }</tr></thead>
+            <tbody>@foreach (var i in g.Items) { <tr><td>@i.MedicineName</td><td class="mono">@i.BatchNumber</td><td>@Fmt.Day(i.ExpiryDate)</td><td class="num">@i.Quantity</td>
+                @if (showPrices && g.Mode == HospitalType.Private) { <td class="num">@i.UnitCost?.ToString("N2")</td><td class="num">@i.SalePrice?.ToString("N2")</td><td class="num">@i.Discount?.ToString("N2")</td><td class="num">@i.LineTotal?.ToString("N2")</td> }</tr> }</tbody>
+            @if (showPrices && g.NetAmount is decimal net)
+            { <tfoot><tr><td colspan="7" class="num">Lines @g.GrossAmount?.ToString("N2") − discount @g.DiscountAmount?.ToString("N2") + charges @g.AdditionalCharges?.ToString("N2") =</td><td class="num"><strong data-grn-net>@net.ToString("N2")</strong></td></tr></tfoot> }
+        </table></div>
+    </div>
+}
+@if (Model.Issue is { } iss)
+{
+    <div class="card" data-doc-issue="@iss.Number">
+        <div class="card-header"><h2><svg class="icon"><use href="#i-pill" /></svg> Patient issue @iss.Number</h2><span class="pill">@iss.Mode</span></div>
+        <div class="card-body lab-patient">
+            <div class="patient-id-box sm"><small>Patient ID</small><strong>@iss.Patient!.PatientNumber</strong></div>
+            <div><h3>@iss.Patient.FullName</h3><span class="muted">@(iss.Encounter is null ? "No visit linked" : $"{iss.Encounter.EncounterNumber} · {(iss.Encounter.Type == EncounterType.Opd ? "OPD" : "Emergency")} · {Fmt.Day(iss.Encounter.EncounterDate)}") · issued by @iss.CreatedByUsername · @Fmt.DateTimeText(iss.CreatedUtc)</span>
+                @if (iss.Notes is not null) { <div class="small">Notes: @iss.Notes</div> }</div>
+        </div>
+        <div class="table-wrap"><table class="table table-compact" data-issue-items>
+            <thead><tr><th>Medicine</th><th>Batch</th><th>Expiry</th><th class="num">Qty</th><th class="num">Returned</th><th>Dosage / instructions</th>@if (showPrices && iss.Mode == HospitalType.Private) { <th class="num">Price</th><th class="num">Discount</th><th class="num">Total</th> }</tr></thead>
+            <tbody>@foreach (var i in iss.Items) { <tr data-item="@i.MedicineName"><td>@i.MedicineName @if (i.FefoOverridden) { <span class="status status-warn" title="Not the earliest-expiring batch">FEFO override</span> }</td><td class="mono">@i.BatchNumber</td><td>@Fmt.Day(i.ExpiryDate)</td><td class="num">@i.Quantity</td><td class="num">@i.ReturnedQuantity</td><td>@i.Instructions</td>
+                @if (showPrices && iss.Mode == HospitalType.Private) { <td class="num">@i.UnitPrice?.ToString("N2")</td><td class="num">@i.Discount?.ToString("N2")</td><td class="num">@i.LineTotal?.ToString("N2")</td> }</tr> }</tbody>
+        </table></div>
+        @if (Model.Charges.Count > 0 && (showPrices || !Model.IsPrivate))
+        {
+            <div class="card-body small" data-issue-charges>
+                <strong>Charges (cash counter):</strong>
+                @foreach (var c in Model.Charges) { <span class="chip @(c.Status == ChargeStatus.Paid ? "chip-verified" : c.Status == ChargeStatus.Cancelled ? "chip-cancelled" : "chip-warn")">@c.ChargeNumber · @c.NetAmount.ToString("N2") · @c.Status</span> }
+            </div>
+        }
+    </div>
+}
+@if (Model.Sale is { } sale)
+{
+    <div class="card" data-doc-sale="@sale.Number">
+        <div class="card-header"><h2><svg class="icon"><use href="#i-wallet" /></svg> Retail sale @sale.Number</h2>
+            @if (sale.Receipt is { } rc) { <a class="btn btn-light btn-sm" href="/Finance/Receipts/Details/@rc.Id">Receipt @rc.ReceiptNumber</a> }</div>
+        <div class="card-body"><dl class="details-grid">
+            <dt>Customer</dt><dd>@(sale.CustomerName ?? "Walk-in customer")@(sale.CustomerPhone is null ? "" : " · " + sale.CustomerPhone)</dd>
+            <dt>Counter / payment</dt><dd>@sale.Counter!.Name · @sale.Receipt?.PaymentMethod?.Name</dd><dt>Sold by</dt><dd>@sale.CreatedByUsername · @Fmt.DateTimeText(sale.CreatedUtc)</dd>
+        </dl></div>
+        <div class="table-wrap"><table class="table table-compact" data-sale-items>
+            <thead><tr><th>Medicine</th><th>Batch</th><th>Expiry</th><th class="num">Qty</th><th class="num">Returned</th><th class="num">Price</th><th class="num">Discount</th><th class="num">Total</th></tr></thead>
+            <tbody>@foreach (var i in sale.Items) { <tr><td>@i.MedicineName</td><td class="mono">@i.BatchNumber</td><td>@Fmt.Day(i.ExpiryDate)</td><td class="num">@i.Quantity</td><td class="num">@i.ReturnedQuantity</td><td class="num">@i.UnitPrice.ToString("N2")</td><td class="num">@i.Discount.ToString("N2")</td><td class="num">@i.LineTotal.ToString("N2")</td></tr> }</tbody>
+            <tfoot><tr><td colspan="7" class="num"><strong>Net</strong></td><td class="num"><strong data-sale-net>@sale.NetAmount.ToString("N2")</strong></td></tr></tfoot>
+        </table></div>
+    </div>
+}
+@if (Model.Transfer is { } t)
+{
+    <div class="card" data-doc-transfer="@t.Number">
+        <div class="card-header"><h2><svg class="icon"><use href="#i-refresh" /></svg> Transfer @t.Number</h2><span class="pill">@t.FromLocation!.Name → @t.ToLocation!.Name</span></div>
+        <div class="card-body"><dl class="details-grid"><dt>Reference</dt><dd>@(t.Reference ?? "—")</dd><dt>By</dt><dd>@t.CreatedByUsername · @Fmt.DateTimeText(t.CreatedUtc)</dd><dt>Notes</dt><dd>@(t.Notes ?? "—")</dd></dl></div>
+        <div class="table-wrap"><table class="table table-compact">
+            <thead><tr><th>Medicine</th><th>Batch</th><th>Expiry</th><th class="num">Qty</th></tr></thead>
+            <tbody>@foreach (var i in t.Items) { <tr><td>@i.MedicineName</td><td class="mono">@i.BatchNumber</td><td>@Fmt.Day(i.ExpiryDate)</td><td class="num">@i.Quantity</td></tr> }</tbody>
+        </table></div>
+    </div>
+}
+@if (Model.Return is { } ret)
+{
+    <div class="card" data-doc-return="@ret.Number">
+        <div class="card-header"><h2>Return @ret.Number</h2><span class="pill">@(ret.Kind == MedicineReturnKind.SaleReturn ? "Sale " + ret.Sale?.Number : "Issue " + ret.Issue?.Number)</span></div>
+        <div class="card-body"><dl class="details-grid"><dt>Reason</dt><dd>@ret.Reason</dd><dt>By</dt><dd>@ret.CreatedByUsername · @Fmt.DateTimeText(ret.CreatedUtc)</dd>
+            @if (ret.Refund is { } rf) { <dt>Refund</dt><dd>@rf.RefundNumber · @rf.Amount.ToString("N2") · <span class="status @(rf.Status == RefundStatus.Completed ? "status-ok" : rf.Status == RefundStatus.Rejected ? "status-bad" : "status-warn")">@rf.Status</span></dd> }</dl></div>
+        <div class="table-wrap"><table class="table table-compact"><thead><tr><th>Medicine</th><th>Batch</th><th class="num">Qty</th><th>Back to stock</th>@if (showPrices) { <th class="num">Amount</th> }</tr></thead>
+            <tbody>@foreach (var i in ret.Items) { <tr><td>@i.MedicineName</td><td class="mono">@i.BatchNumber</td><td class="num">@i.Quantity</td><td>@(i.Restocked ? "Yes" : "No – recorded only")</td>@if (showPrices) { <td class="num">@i.Amount?.ToString("N2")</td> }</tr> }</tbody></table></div>
+    </div>
+}
+@if (Model.SupplierReturn is { } sr)
+{
+    <div class="card" data-doc-supplier-return="@sr.Number">
+        <div class="card-header"><h2>Supplier return @sr.Number</h2><span class="pill">@(sr.Supplier?.Name ?? sr.SourceName)</span></div>
+        <div class="card-body"><dl class="details-grid"><dt>Invoice</dt><dd>@(sr.ReferenceInvoice ?? "—")</dd><dt>Reason</dt><dd>@sr.Reason</dd><dt>By</dt><dd>@sr.CreatedByUsername · @Fmt.DateTimeText(sr.CreatedUtc)</dd></dl></div>
+        <div class="table-wrap"><table class="table table-compact"><thead><tr><th>Medicine</th><th>Batch</th><th>Expiry</th><th class="num">Qty</th>@if (showPrices && sr.Mode == HospitalType.Private) { <th class="num">Amount</th> }</tr></thead>
+            <tbody>@foreach (var i in sr.Items) { <tr><td>@i.MedicineName</td><td class="mono">@i.BatchNumber</td><td>@Fmt.Day(i.ExpiryDate)</td><td class="num">@i.Quantity</td>@if (showPrices && sr.Mode == HospitalType.Private) { <td class="num">@i.Amount?.ToString("N2")</td> }</tr> }</tbody></table></div>
+    </div>
+}
+@if (Model.Returns.Count > 0)
+{
+    <div class="card"><div class="card-header"><h3>Returns</h3></div>
+        <div class="table-wrap"><table class="table table-compact"><tbody>@foreach (var r in Model.Returns)
+        { <tr><td class="mono"><a href="/Pharmacy/Doc/RET/@r.Id">@r.Number</a></td><td>@Fmt.DateTimeText(r.CreatedUtc)</td><td class="num">@r.Items.Sum(i => i.Quantity) unit(s)</td><td>@r.Reason</td><td>@(r.Refund is { } rf ? $"{rf.RefundNumber} {rf.Status}" : "")</td></tr> }</tbody></table></div></div>
+}
+<div class="card">
+    <div class="card-header"><h3><svg class="icon"><use href="#i-history" /></svg> Stock movements</h3></div>
+    <div class="table-wrap"><table class="table table-compact" data-doc-movements>
+        <thead><tr><th>Movement</th><th>Location</th><th>Batch</th><th class="num">Qty</th><th class="num">Balance after</th></tr></thead>
+        <tbody>@foreach (var m in Model.Movements) { <tr><td>@PharmacyQueryService.Label(m.Type)</td><td>@m.Location!.Name</td><td class="mono">@m.Batch!.BatchNumber</td><td class="num">@(m.Quantity > 0 ? "+" : "")@m.Quantity</td><td class="num">@m.BalanceAfter</td></tr> }
+        @if (Model.Movements.Count == 0) { <tr><td colspan="5" class="empty">No stock movement.</td></tr> }</tbody>
+    </table></div>
+</div>

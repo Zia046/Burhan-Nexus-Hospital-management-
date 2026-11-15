@@ -1,0 +1,35 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.ReportsModel
+@{
+    ViewData["Title"] = "Pharmacy reports";
+    var r = Model.Report!;
+    var q = $"report={Model.Key}&period={Model.PresetKey}&from={Model.From:yyyy-MM-dd}&to={Model.To:yyyy-MM-dd}&locationId={Model.LocationId}&medicineId={Model.MedicineId}&categoryId={Model.CategoryId}&supplierId={Model.SupplierId}&batch={Uri.EscapeDataString(Model.Batch ?? "")}";
+}
+<partial name="_PharmNav" />
+<form method="get" class="toolbar filters wrap no-print" data-report-form>
+    <select name="report" aria-label="Report" data-autosubmit>
+        @foreach (var g in Model.Available.GroupBy(a => a.Group))
+        { <optgroup label="@g.Key">@foreach (var a in g) { <option value="@a.Key" selected="@(a.Key == Model.Key)">@a.Title</option> }</optgroup> }
+    </select>
+    <partial name="/Pages/Finance/_PeriodFilter.cshtml" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" />
+    <select name="LocationId" aria-label="Location"><option value="">All locations</option>@foreach (var l in Model.Locations) { <option value="@l.Id" selected="@(l.Id == Model.LocationId)">@l.Name</option> }</select>
+    <select name="CategoryId" aria-label="Category"><option value="">All categories</option>@foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(c.Id == Model.CategoryId)">@c.Name</option> }</select>
+    <select name="MedicineId" aria-label="Medicine"><option value="">All medicines</option>@foreach (var m in Model.Medicines) { <option value="@m.Id" selected="@(m.Id == Model.MedicineId)">@m.DisplayName</option> }</select>
+    <input name="Batch" value="@Model.Batch" placeholder="Batch" class="w-sm" maxlength="50" />
+    <select name="SupplierId" aria-label="Supplier"><option value="">All suppliers</option>@foreach (var s in Model.Suppliers) { <option value="@s.Id" selected="@(s.Id == Model.SupplierId)">@s.Name</option> }</select>
+    <button class="btn btn-light" type="submit">Show</button>
+    <span class="spacer"></span>
+    <a class="btn btn-light" href="/Pharmacy/Reports?handler=Export&format=xlsx&@q" data-test="pharm-export-xlsx"><svg class="icon icon-sm"><use href="#i-download" /></svg> Excel</a>
+    <a class="btn btn-light" href="/Pharmacy/Reports?handler=Export&format=csv&@q">CSV</a>
+    <button class="btn btn-light" type="button" data-print><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print / PDF</button>
+</form>
+<div class="card">
+    <div class="card-header"><h2>@r.Title <small class="muted">@BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(Model.From!.Value, Model.To!.Value)</small></h2><span class="pill">@r.Rows.Count row(s)</span></div>
+    @if (r.Note is not null) { <div class="card-body small muted">@r.Note</div> }
+    <div class="table-wrap"><table class="table table-compact" data-report="@r.Key">
+        <thead><tr>@foreach (var c in r.Columns) { <th>@c</th> }</tr></thead>
+        <tbody>@foreach (var row in r.Rows) { <tr>@foreach (var v in row) { <td class="@(v is decimal or int ? "num" : "")">@Model.Cell(v)</td> }</tr> }
+        @if (r.Rows.Count == 0) { <tr><td colspan="@r.Columns.Count" class="empty">No data for this selection.</td></tr> }</tbody>
+        @if (r.Totals is not null && r.Rows.Count > 0) { <tfoot><tr>@foreach (var v in r.Totals) { <td class="@(v is decimal or int ? "num" : "")"><strong>@Model.Cell(v)</strong></td> }</tr></tfoot> }
+    </table></div>
+</div>

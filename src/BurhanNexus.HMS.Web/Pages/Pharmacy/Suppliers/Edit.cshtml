@@ -1,0 +1,19 @@
+@page "{id:int?}"
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.Suppliers.EditModel
+@{ ViewData["Title"] = Model.IsNew ? "Add supplier" : "Edit supplier"; }
+<partial name="_PharmNav" />
+<partial name="_ValidationSummary" />
+<form method="post" class="card card-medium">
+    <div class="card-header"><h2>@ViewData["Title"]</h2></div>
+    <div class="card-body form-grid">
+        <div class="field span-2"><label for="Input_Name">Supplier name *</label><input asp-for="Input.Name" maxlength="150" required autofocus /></div>
+        <div class="field"><label for="Input_ContactPerson">Contact person</label><input asp-for="Input.ContactPerson" maxlength="100" /></div>
+        <div class="field"><label for="Input_Phone">Phone</label><input asp-for="Input.Phone" maxlength="30" /></div>
+        <div class="field"><label for="Input_Email">Email</label><input asp-for="Input.Email" maxlength="150" type="email" /></div>
+        <div class="field"><label for="Input_City">City</label><input asp-for="Input.City" maxlength="60" /></div>
+        <div class="field span-3"><label for="Input_Address">Address</label><input asp-for="Input.Address" maxlength="300" /></div>
+        <div class="field span-3"><label for="Input_Notes">Notes</label><textarea asp-for="Input.Notes" rows="2" maxlength="500"></textarea></div>
+        <label class="check"><input type="checkbox" asp-for="Input.IsActive" /> Active</label>
+    </div>
+    <div class="card-footer form-actions"><button class="btn btn-primary" type="submit" data-test="save-supplier">Save supplier</button></div>
+</form>

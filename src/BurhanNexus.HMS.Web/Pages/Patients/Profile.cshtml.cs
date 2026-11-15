@@ -35,6 +35,8 @@ public class ProfileModel : HmsPageModel
     public PagedResult<EncounterListItem> Visits { get; private set; } = new(Array.Empty<EncounterListItem>(), 0, 1, 25);
     public int OpdCount { get; private set; }
     public int EmergencyCount { get; private set; }
+    /// <summary>Phase 5: recent medicines issued to the patient (only with "View Patient Medicine History").</summary>
+    public IReadOnlyList<BurhanNexus.HMS.Infrastructure.Pharmacy.PatientMedicineRow>? Medicines { get; private set; }
 
     public async Task<IActionResult> OnGetAsync()
     {
@@ -44,6 +46,8 @@ public class ProfileModel : HmsPageModel
         Patient = p;
         AgeText = AgeCalculator.Of(p, await _clock.TodayAsync())?.ToString() ?? "—";
         CanSeeVisits = await CanAsync(Perm.PatientsVisits);
+        if (await CanAsync(Perm.PharmViewPatientHistory))
+            Medicines = (await HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Pharmacy.IPharmacyQueryService>().PatientHistoryAsync(Id, false)).Take(10).ToList();
         if (CanSeeVisits)
         {
             EncounterType? type = TypeFilter switch { "opd" => EncounterType.Opd, "emergency" => EncounterType.Emergency, _ => null };

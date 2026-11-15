@@ -71,6 +71,9 @@ public static class DependencyInjection
         services.AddScoped<Laboratory.ILabCatalogService, Laboratory.LabCatalogService>();
         services.AddScoped<Laboratory.ILabService, Laboratory.LabService>();
         services.AddScoped<Laboratory.ILabReportService, Laboratory.LabReportService>();
+        services.AddScoped<Pharmacy.IPharmacyCatalogService, Pharmacy.PharmacyCatalogService>();
+        services.AddScoped<Pharmacy.IPharmacyService, Pharmacy.PharmacyService>();
+        services.AddScoped<Pharmacy.IPharmacyQueryService, Pharmacy.PharmacyQueryService>();
         return services;
     }
 
@@ -90,6 +93,7 @@ public static class DependencyInjection
         await Patients.RegistrationSetupService.SeedAsync(db, DateTime.UtcNow, ct);
         var tz = Patients.HospitalClock.Resolve(await db.HospitalConfigurations.Select(c => c.TimeZoneId).FirstOrDefaultAsync(ct) ?? "Asia/Karachi");
         await Laboratory.LabCatalogService.SeedAsync(db, DateTime.UtcNow, ct);
+        await Pharmacy.PharmacyCatalogService.SeedAsync(db, DateTime.UtcNow, ct);
         await Finance.FinanceSetupService.SeedAsync(db, DateTime.UtcNow, DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz)), ct);
         if (await db.HospitalConfigurations.AnyAsync(c => c.SetupCompleted, ct))
             await scope.ServiceProvider.GetRequiredService<ILicenseService>().EnsureInitializedAsync(ct);

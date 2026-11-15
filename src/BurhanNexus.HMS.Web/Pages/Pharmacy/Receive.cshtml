@@ -1,0 +1,48 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.ReceiveModel
+@using System.Text.Json
+@{
+    ViewData["Title"] = Model.WithPrices ? "Purchase / receive stock" : "Receive stock";
+    var initial = JsonSerializer.Serialize(Model.Lines.Where(l => l.MedicineId > 0).Select(l => new { id = l.MedicineId, name = l.MedicineName, batch = l.BatchNumber, expiry = l.Expiry, mfg = l.Manufactured, qty = l.Quantity, cost = l.UnitCost, sale = l.SalePrice, discount = l.Discount }));
+}
+<partial name="_PharmNav" />
+<partial name="_ValidationSummary" />
+<form method="post" class="card" data-receive-form novalidate>
+    <input type="hidden" asp-for="Input.IdempotencyKey" />
+    <div class="card-header"><h2><svg class="icon"><use href="#i-download" /></svg> @ViewData["Title"] <small class="muted">into Main Pharmacy</small></h2></div>
+    <div class="card-body form-grid">
+        <div class="field"><label for="Input_SupplierId">Supplier</label><select asp-for="Input.SupplierId"><option value="">— no supplier record —</option>@foreach (var s in Model.Suppliers) { <option value="@s.Id">@s.Name</option> }</select></div>
+        <div class="field"><label for="Input_SourceName">or stock source</label><input asp-for="Input.SourceName" maxlength="150" placeholder="e.g. District Health Office, donation" /></div>
+        <div class="field"><label for="Input_ReferenceNumber">@(Model.WithPrices ? "Supplier invoice no." : "Reference / document no.")</label><input asp-for="Input.ReferenceNumber" maxlength="60" /></div>
+        @if (Model.WithPrices) { <div class="field"><label for="Input_InvoiceDate">Invoice date</label><input asp-for="Input.InvoiceDate" type="date" /></div> }
+        <div class="field"><label for="Input_ReceivedDate">Received on</label><input asp-for="Input.ReceivedDate" type="date" /></div>
+        <div class="field span-2"><label for="Input_Notes">Notes</label><input asp-for="Input.Notes" maxlength="500" /></div>
+    </div>
+    <div class="card-body">
+        <div class="med-search" data-med-search-box>
+            <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input data-med-search placeholder="Type medicine name, generic name or code to add a line…" autocomplete="off" /></div>
+            <div class="med-results" data-med-results hidden></div>
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table class="table lines-table" data-receive-lines data-prices="@(Model.WithPrices ? "1" : "0")" data-saleprice="@(Model.CanSalePrice ? "1" : "0")" data-initial="@initial">
+            <thead><tr><th>Medicine</th><th>Batch no. *</th><th>Expiry *</th><th>Mfg</th><th class="num">Quantity *</th>
+                @if (Model.WithPrices) { <th class="num">Cost / unit</th>@if (Model.CanSalePrice) { <th class="num">Sale price</th> }<th class="num">Discount</th><th class="num">Line total</th> }<th></th></tr></thead>
+            <tbody></tbody>
+            @if (Model.WithPrices)
+            {
+                <tfoot><tr><td colspan="@(Model.CanSalePrice ? 8 : 7)" class="num">Lines total</td><td class="num" data-receive-total>0.00</td><td></td></tr></tfoot>
+            }
+        </table>
+    </div>
+    @if (Model.WithPrices)
+    {
+        <div class="card-body form-grid">
+            <div class="field"><label for="Input_DiscountAmount">Invoice discount</label><input asp-for="Input.DiscountAmount" type="number" min="0" step="0.01" /></div>
+            <div class="field"><label for="Input_AdditionalCharges">Additional charges (freight etc.)</label><input asp-for="Input.AdditionalCharges" type="number" min="0" step="0.01" /></div>
+        </div>
+    }
+    <div class="card-footer form-actions"><span class="muted">Each line creates a permanent stock entry. Expired stock cannot be received.</span>
+        <button class="btn btn-primary" type="submit" data-test="save-receipt">Save receiving</button></div>
+</form>
+@section Scripts { <script src="~/js/pharmacy.js" asp-append-version="true"></script> }

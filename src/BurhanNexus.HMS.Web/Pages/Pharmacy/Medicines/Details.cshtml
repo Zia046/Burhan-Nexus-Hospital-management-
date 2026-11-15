@@ -1,0 +1,67 @@
+@page "/Pharmacy/Medicines/{id:int}"
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.Medicines.DetailsModel
+@using BurhanNexus.HMS.Infrastructure.Pharmacy
+@{
+    var m = Model.Medicine;
+    ViewData["Title"] = m.DisplayName;
+}
+<partial name="_PharmNav" />
+<div class="card">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-pill" /></svg> @m.DisplayName <small class="muted mono">@m.Code</small> @if (!m.IsActive) { <span class="status">Inactive</span> }</h2>
+        <div class="actions"><a bn-permission="@Perm.PharmEditMedicine" class="btn btn-light btn-sm" href="/Pharmacy/Medicines/Edit/@m.Id">Edit</a></div></div>
+    <div class="card-body">
+        <dl class="details-grid">
+            <dt>Generic</dt><dd>@(m.GenericName ?? "—")</dd><dt>Brand</dt><dd>@(m.BrandName ?? "—")</dd>
+            <dt>Manufacturer</dt><dd>@(m.Manufacturer?.Name ?? "—")</dd><dt>Category</dt><dd>@(m.Category?.Name ?? "—")</dd>
+            <dt>Pack</dt><dd>@(m.PackSize ?? "—") · @m.UnitsPerPack @m.Unit(s) per pack</dd><dt>Minimum stock</dt><dd>@m.MinimumStock @m.Unit(s)</dd>
+            <dt>Storage</dt><dd>@(m.StorageInstructions ?? "—")</dd>
+            @if (Model.ShowPrices) { <dt>Purchase / sale price</dt><dd>@(m.PurchasePrice?.ToString("N2") ?? "—") / @(m.SalePrice is decimal sp ? Fmt.Money(sp) : "—") @(m.AllowDiscount ? $"· discount up to {m.MaxDiscountPercent:0.##} %" : "· no discount")</dd> }
+        </dl>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header"><h3>Batches</h3><span class="pill">@Model.Batches.Where(b => b.Quantity > 0).Sum(b => b.Quantity) @m.Unit(s) in stock</span></div>
+    <div class="table-wrap"><table class="table table-compact" data-batches>
+        <thead><tr><th>Batch</th><th>Expiry</th><th>Location</th><th class="num">Quantity</th><th>Supplier</th>@if (Model.ShowPrices) { <th class="num">Unit cost</th><th class="num">Sale price</th> }</tr></thead>
+        <tbody>
+        @foreach (var b in Model.Batches)
+        {
+            <tr data-batch="@b.BatchNumber" class="@(b.Quantity == 0 ? "row-muted" : "")">
+                <td class="mono">@b.BatchNumber</td>
+                <td>@Fmt.Day(b.Expiry) @if (b.State != ExpiryState.Ok) { <span class="status @(b.State == ExpiryState.Expired ? "status-bad" : "status-warn")">@(b.State == ExpiryState.Expired ? "Expired" : "Near expiry")</span> }</td>
+                <td>@b.LocationName</td><td class="num">@b.Quantity</td><td>@b.Supplier</td>
+                @if (Model.ShowPrices)
+                {
+                    <td class="num">@(b.UnitCost?.ToString("N2") ?? "—")</td>
+                    <td class="num">
+                        @if (Model.CanPrices)
+                        {
+                            <form method="post" asp-page-handler="BatchPrice" asp-route-batchId="@b.BatchId" class="inline-form"><input name="salePrice" value="@b.SalePrice?.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)" inputmode="decimal" class="w-xs" /><button class="btn btn-light btn-sm" type="submit">Set</button></form>
+                        }
+                        else { @(b.SalePrice?.ToString("N2") ?? "—") }
+                    </td>
+                }
+            </tr>
+        }
+        @if (Model.Batches.Count == 0) { <tr><td colspan="7" class="empty">No stock received yet.</td></tr> }
+        </tbody>
+    </table></div>
+</div>
+<div class="card">
+    <div class="card-header"><h3><svg class="icon"><use href="#i-history" /></svg> Stock movements</h3></div>
+    <div class="table-wrap"><table class="table table-compact" data-movements>
+        <thead><tr><th>Date</th><th>Document</th><th>Movement</th><th>Location</th><th>Batch</th><th class="num">Qty</th><th class="num">Balance</th><th>By</th><th>Note</th></tr></thead>
+        <tbody>@foreach (var t in Model.Movements)
+        { <tr><td class="nowrap small">@Fmt.DateTimeText(t.CreatedUtc)</td><td class="mono"><a href="/Pharmacy/Doc/@t.DocumentType/@t.DocumentId">@t.DocumentNumber</a></td><td>@PharmacyQueryService.Label(t.Type)</td><td>@t.Location</td><td class="mono">@t.BatchNumber</td>
+            <td class="num @(t.Quantity < 0 ? "abn-text" : "")">@(t.Quantity > 0 ? "+" : "")@t.Quantity</td><td class="num">@t.BalanceAfter</td><td>@t.By</td><td class="small">@t.Note</td></tr> }
+        @if (Model.Movements.Count == 0) { <tr><td colspan="9" class="empty">No movements.</td></tr> }</tbody>
+    </table></div>
+</div>
+@if (Model.Prices.Count > 0)
+{
+    <div class="card"><div class="card-header"><h3>Price history</h3></div>
+        <div class="table-wrap"><table class="table table-compact">
+            <thead><tr><th>Date</th><th>Batch / note</th><th class="num">Purchase</th><th class="num">Sale</th><th>By</th></tr></thead>
+            <tbody>@foreach (var p in Model.Prices) { <tr><td class="small">@Fmt.DateTimeText(p.ChangedUtc)</td><td>@p.Note</td><td class="num">@(p.OldPurchasePrice?.ToString("N2") ?? "—") → @(p.NewPurchasePrice?.ToString("N2") ?? "—")</td><td class="num">@(p.OldSalePrice?.ToString("N2") ?? "—") → @(p.NewSalePrice?.ToString("N2") ?? "—")</td><td>@p.ChangedByUsername</td></tr> }</tbody>
+        </table></div></div>
+}

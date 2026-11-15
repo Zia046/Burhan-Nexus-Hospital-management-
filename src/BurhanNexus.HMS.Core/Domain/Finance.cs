@@ -55,7 +55,7 @@ public class PaymentMethod
 
 public enum ServiceKind
 {
-    OpdRegistration = 1, EmergencyRegistration = 2, Consultation = 3, Laboratory = 4, XRay = 5, Ultrasound = 6, Procedure = 7, Other = 99
+    OpdRegistration = 1, EmergencyRegistration = 2, Consultation = 3, Laboratory = 4, XRay = 5, Ultrasound = 6, Procedure = 7, Pharmacy = 8, Other = 99
 }
 
 /// <summary>Fee history of a service: a change only affects transactions on/after its effective date.</summary>
@@ -113,6 +113,9 @@ public class Charge
     public PatientEncounter? Encounter { get; set; }
     /// <summary>Phase 4: laboratory order that created this charge.</summary>
     public long? LabOrderId { get; set; }
+    /// <summary>Phase 5: pharmacy retail sale / patient medicine issue that created this charge.</summary>
+    public long? PharmacySaleId { get; set; }
+    public long? PharmacyIssueId { get; set; }
     public int ServiceItemId { get; set; }
     public ServiceItem? ServiceItem { get; set; }
     public ServiceKind ServiceKind { get; set; }

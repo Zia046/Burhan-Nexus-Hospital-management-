@@ -123,6 +123,40 @@
             }
         }
 
+        @if (Any(Perm.PharmDashboard, Perm.PharmViewCatalogue, Perm.PharmIssueToPatients, Perm.PharmRetailSales, Perm.PharmReceiveStock, Perm.PharmTransferStock,
+                 Perm.PharmViewStockReports, Perm.PharmViewDepartmentStock, Perm.PharmAdjustStock, Perm.PharmApproveAdjustments, Perm.PharmManageSuppliers, Perm.PharmSettings))
+        {
+            <div class="nav-section">Pharmacy</div>
+            @if (perms.Contains(Perm.PharmDashboard))
+            {
+                <a class="nav-link @Active("pharm-dashboard")" href="/Pharmacy" data-nav="pharm-dashboard"><svg class="icon"><use href="#i-pill" /></svg><span>Pharmacy Dashboard</span></a>
+            }
+            @if (perms.Contains(Perm.PharmIssueToPatients))
+            {
+                <a class="nav-link @Active("pharm-issue")" href="/Pharmacy/Issue" data-nav="pharm-issue"><svg class="icon"><use href="#i-users-round" /></svg><span>Patient Issue</span></a>
+            }
+            @if (perms.Contains(Perm.PharmRetailSales) && isPrivate)
+            {
+                <a class="nav-link @Active("pharm-sale")" href="/Pharmacy/Sale" data-nav="pharm-sale" data-private-only><svg class="icon"><use href="#i-wallet" /></svg><span>Retail Sale</span></a>
+            }
+            @if (perms.Contains(Perm.PharmReceiveStock))
+            {
+                <a class="nav-link @Active("pharm-receive")" href="/Pharmacy/Receive" data-nav="pharm-receive"><svg class="icon"><use href="#i-download" /></svg><span>Receive Stock</span></a>
+            }
+            @if (perms.Contains(Perm.PharmTransferStock))
+            {
+                <a class="nav-link @Active("pharm-transfer")" href="/Pharmacy/Transfer" data-nav="pharm-transfer"><svg class="icon"><use href="#i-refresh" /></svg><span>Stock Transfer</span></a>
+            }
+            @if (Any(Perm.PharmViewStockReports, Perm.PharmViewDepartmentStock))
+            {
+                <a class="nav-link @Active("pharm-stock")" href="/Pharmacy/Stock" data-nav="pharm-stock"><svg class="icon"><use href="#i-database" /></svg><span>Stock &amp; Batches</span></a>
+            }
+            @if (perms.Contains(Perm.PharmViewCatalogue))
+            {
+                <a class="nav-link @Active("pharm-medicines")" href="/Pharmacy/Medicines" data-nav="pharm-medicines"><svg class="icon"><use href="#i-sliders" /></svg><span>Medicines</span></a>
+            }
+        }
+
         @if (Any(Perm.FinanceViewOwnAccount, Perm.FinanceCollect, Perm.FinanceViewOwnReceipts, Perm.FinanceDashboard, Perm.FinanceConfirmDeposits, Perm.FinanceManageDoctorAccounts, Perm.FinanceCounterReports, Perm.FinanceManageServiceFees))
         {
             <div class="nav-section">Finance</div>

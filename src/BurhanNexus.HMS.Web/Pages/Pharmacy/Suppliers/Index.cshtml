@@ -1,0 +1,23 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.Suppliers.IndexModel
+@{ ViewData["Title"] = "Suppliers"; }
+<partial name="_PharmNav" />
+<div class="toolbar">
+    <form method="get" class="filters"><div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Name, contact, phone or city" maxlength="100" /></div>
+        <label class="check"><input type="checkbox" name="Inactive" value="true" checked="@Model.Inactive" /> Include inactive</label><button class="btn btn-light" type="submit">Search</button></form>
+    <div class="toolbar-actions"><a bn-permission="@Perm.PharmManageSuppliers" class="btn btn-primary" href="/Pharmacy/Suppliers/Edit" data-test="new-supplier"><svg class="icon icon-sm"><use href="#i-plus" /></svg> Add supplier</a></div>
+</div>
+<div class="card">
+    <div class="table-wrap"><table class="table" data-suppliers>
+        <thead><tr><th>Code</th><th>Supplier</th><th>Contact</th><th>Phone</th><th>City</th>@if (Model.Balances.Count > 0) { <th class="num">Outstanding</th> }<th></th></tr></thead>
+        <tbody>
+        @foreach (var s in Model.Suppliers)
+        {
+            <tr data-supplier="@s.Name" class="@(s.IsActive ? "" : "row-muted")"><td class="mono">@s.Code</td><td><a href="/Pharmacy/Suppliers/@s.Id"><strong>@s.Name</strong></a></td><td>@s.ContactPerson</td><td>@s.Phone</td><td>@s.City</td>
+                @if (Model.Balances.Count > 0) { <td class="num">@Fmt.Money(Model.Balances.GetValueOrDefault(s.Id))</td> }
+                <td class="actions"><a bn-permission="@Perm.PharmManageSuppliers" class="btn btn-light btn-sm" href="/Pharmacy/Suppliers/Edit/@s.Id">Edit</a></td></tr>
+        }
+        @if (Model.Suppliers.Count == 0) { <tr><td colspan="7" class="empty">No suppliers.</td></tr> }
+        </tbody>
+    </table></div>
+</div>

@@ -17,6 +17,12 @@ public sealed class NewChargeLine
     public string? DiscountReason { get; set; }
     /// <summary>Amount paid now. Null = full net amount.</summary>
     public decimal? PayNow { get; set; }
+
+    // Phase 5 – set only by the pharmacy service (internal: never bound from a web form).
+    /// <summary>Price fixed by the caller (medicine line total) instead of the service fee.</summary>
+    internal decimal? PresetFee { get; set; }
+    internal string? PresetName { get; set; }
+    internal long? PharmacySaleId { get; set; }
 }
 
 public sealed class BalancePayment
@@ -151,6 +157,7 @@ public sealed class BillingService : IBillingService
         foreach (var l in lines)
         {
             if (!services.TryGetValue(l.ServiceItemId, out var s) || !s.IsActive) { errors.Add("A selected service is not available."); continue; }
+            if (s.Kind == ServiceKind.Pharmacy && l.PresetFee is null) { errors.Add("Medicines are billed from the Pharmacy module (sale or patient issue)."); continue; }
             if (s.Counters.Count > 0 && s.Counters.All(c => c.CounterId != input.CounterId)) { errors.Add($"{s.Name} cannot be collected at {counter!.Name}."); continue; }
             var doctorId = l.DoctorId ?? s.DoctorId;
             Doctor? doctor = null;
@@ -160,7 +167,7 @@ public sealed class BillingService : IBillingService
                 if (s.DoctorId is int fixedDoc && fixedDoc != did) { errors.Add($"{s.Name} belongs to {s.Doctor!.Name}."); continue; }
             }
             if (s.Kind == ServiceKind.Consultation && doctor is null) { errors.Add($"Select the doctor for {s.Name}."); continue; }
-            var fee = await _setup.FeeOnAsync(s.Id, today, ct);
+            var fee = l.PresetFee ?? await _setup.FeeOnAsync(s.Id, today, ct);
             var discount = l.Discount;
             if (discount != 0 && !canDiscount) { errors.Add("You are not allowed to give discounts."); continue; }
             if (discount < 0 || discount > fee || !FinanceMath.IsMoney(discount)) { errors.Add($"Discount on {s.Name} must be between 0 and {fee:N2}."); continue; }
@@ -178,7 +185,7 @@ public sealed class BillingService : IBillingService
         if (balances.Any(b => !FinanceMath.IsMoney(b.PayNow))) errors.Add("Use at most 2 decimals.");
         if (errors.Count > 0) return ServiceResult<CollectResult>.Fail(errors.Distinct().ToArray());
 
-        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        await using var tx = await TxScope.BeginAsync(_db, ct);
         try
         {
             // ---- outstanding balances: lock the charges so two counters cannot over-collect the same balance ----
@@ -212,7 +219,7 @@ public sealed class BillingService : IBillingService
                 {
                     ChargeNumber = await FinanceDb.NextNumberAsync(_db, HmsDbContext.ChargeNumberSequence, "CHG", today, ct),
                     PatientId = input.PatientId, EncounterId = p.Line.EncounterId, ServiceItemId = p.Service.Id, ServiceKind = p.Service.Kind,
-                    ServiceName = p.Service.Name, DepartmentId = p.Service.DepartmentId ?? p.Doctor?.DepartmentId, DoctorId = p.Doctor?.Id, DoctorName = p.Doctor?.Name,
+                    ServiceName = p.Line.PresetName ?? p.Service.Name, PharmacySaleId = p.Line.PharmacySaleId, DepartmentId = p.Service.DepartmentId ?? p.Doctor?.DepartmentId, DoctorId = p.Doctor?.Id, DoctorName = p.Doctor?.Name,
                     Fee = p.Fee, Discount = p.Discount, NetAmount = p.Net, PaidAmount = 0, AllowPartialPayment = p.Service.AllowPartialPayment,
                     DiscountReason = p.Discount > 0 ? T(p.Line.DiscountReason, 200) : null,
                     DoctorShareType = p.Doctor?.ShareType ?? DoctorShareType.HospitalKeepsAll, DoctorShareValue = p.Doctor?.ShareValue ?? 0, DoctorShareAmount = share,
@@ -285,7 +292,7 @@ public sealed class BillingService : IBillingService
             await tx.CommitAsync(ct);
             return ServiceResult<CollectResult>.Ok(new CollectResult(receipt, false, freeCharges));
         }
-        catch (DbUpdateException ex) when (FinanceDb.IsUniqueViolation(ex, "UX_Receipts_Idempotency"))
+        catch (DbUpdateException ex) when (tx.Owned && FinanceDb.IsUniqueViolation(ex, "UX_Receipts_Idempotency"))
         {
             await tx.RollbackAsync(CancellationToken.None);
             _db.ChangeTracker.Clear();
@@ -484,7 +491,7 @@ public sealed class BillingService : IBillingService
         if (amount <= 0 || !FinanceMath.IsMoney(amount)) return ServiceResult<Refund>.Fail("Enter a valid refund amount.");
         var method = await _db.PaymentMethods.AsNoTracking().FirstOrDefaultAsync(m => m.Id == paymentMethodId && m.IsActive, ct);
         if (method is null) return ServiceResult<Refund>.Fail("Select the refund payment method.");
-        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        await using var tx = await TxScope.BeginAsync(_db, ct);
         await FinanceDb.LockAsync(_db, $"RECEIPT|{receiptId}", ct);
         var r = await _db.Receipts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == receiptId, ct);
         if (r is null) return ServiceResult<Refund>.Fail("Receipt not found.");

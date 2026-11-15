@@ -1,0 +1,28 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.Returns.IssueModel
+@using BurhanNexus.HMS.Core.Domain
+@{ ViewData["Title"] = "Patient return " + Model.Issue.Number; }
+<partial name="_PharmNav" />
+<partial name="_ValidationSummary" />
+<form method="post" class="card" data-return-form>
+    <input type="hidden" asp-for="Input.IdempotencyKey" />
+    <div class="card-header"><h2>Return against issue <a class="mono" href="/Pharmacy/Doc/ISS/@Model.Issue.Id">@Model.Issue.Number</a></h2><span class="pill">@Model.Issue.Patient!.PatientNumber · @Model.Issue.Patient.FullName</span></div>
+    <div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>Medicine</th><th>Batch</th><th class="num">Issued</th><th class="num">Already returned</th><th class="num">Return qty</th><th>Undamaged – back to stock</th></tr></thead>
+        <tbody>
+        @for (var k = 0; k < Model.Issue.Items.Count; k++)
+        {
+            var i = Model.Issue.Items[k];
+            var line = Model.Input.Lines.FirstOrDefault(l => l.ItemId == i.Id);
+            <tr data-return-item="@i.MedicineName"><td>@i.MedicineName<input type="hidden" name="Input.Lines[@k].ItemId" value="@i.Id" /></td><td class="mono">@i.BatchNumber</td><td class="num">@i.Quantity</td><td class="num">@i.ReturnedQuantity</td>
+                <td class="num"><input type="number" name="Input.Lines[@k].Quantity" value="@line?.Quantity" min="0" max="@(i.Quantity - i.ReturnedQuantity)" class="w-xs" disabled="@(i.Quantity == i.ReturnedQuantity)" /></td>
+                <td><label class="check"><input type="checkbox" name="Input.Lines[@k].Restock" value="true" checked="@(line?.Restock ?? true)" /> Yes</label></td></tr>
+        }
+        </tbody>
+    </table></div>
+    <div class="card-body form-grid">
+        <div class="field span-2"><label for="Input_Reason">Reason *</label><input asp-for="Input.Reason" maxlength="300" required /></div>
+        @if (Model.Issue.Mode == HospitalType.Private) { <div class="field"><label for="Input_RefundPaymentMethodId">Refund by (if already paid)</label><select asp-for="Input.RefundPaymentMethodId">@foreach (var m in Model.Methods) { <option value="@m.Id">@m.Name</option> }</select></div> }
+    </div>
+    <div class="card-footer form-actions"><button class="btn btn-primary" type="submit" data-test="save-return">Save return</button></div>
+</form>
