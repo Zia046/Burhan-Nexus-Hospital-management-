@@ -10,6 +10,24 @@
     string Active(string key) => nav == key ? "active" : "";
     bool Any(params string[] keys) => keys.Any(perms.Contains);
     var isPrivate = profile?.HospitalType == HospitalType.Private;
+    // Phase 7.1: the system administrator keeps 11 pages in the sidebar; every other category moves to the top taskbar.
+    var isAdmin = User.IsSystemAdministrator();
+    var menu = NavMenu.Build(perms, isPrivate);
+    var adminBar = isAdmin
+        ? menu.Where(m => m.Visible).Select(m => m with { Items = m.Items.Where(i => !NavMenu.AdminSidebar.Contains(i.Nav)).ToList() }).Where(m => m.Items.Count > 0).ToList()
+        : new List<NavSection>();
+}
+@functions {
+    private Microsoft.AspNetCore.Html.IHtmlContent NavLink(NavItem i, string cls)
+    {
+        var nav = ViewData["Nav"] as string ?? "";
+        var active = nav == i.Nav ? " active" : "";
+        var dataNav = i.EmitDataNav ? $" data-nav=\"{i.Nav}\"" : "";
+        var priv = i.PrivateOnly ? " data-private-only" : "";
+        var enc = System.Text.Encodings.Web.HtmlEncoder.Default;
+        return new Microsoft.AspNetCore.Html.HtmlString(
+            $"<a class=\"{cls}{active}\" href=\"{enc.Encode(i.Href)}\"{dataNav}{priv}><svg class=\"icon\"><use href=\"#i-{i.Icon}\" /></svg><span>{enc.Encode(i.Label)}</span></a>");
+    }
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -30,307 +48,17 @@
             <small>Burhan Nexus HMS</small>
         </span>
     </a>
-    <nav class="nav">
-        @if (perms.Contains(Perm.DashboardView))
+    <nav class="nav" data-sidebar-nav="@(isAdmin ? "admin" : "user")">
+        @if (perms.Contains(Perm.DashboardView) && !isAdmin)
         {
             <a class="nav-link @Active("dashboard")" href="/"><svg class="icon"><use href="#i-home" /></svg><span>Dashboard</span></a>
         }
-
-        @if (isPrivate && Any(Perm.AppointmentsView, Perm.AppointmentsAdd, Perm.AppointmentsReports))
+        @foreach (var section in menu.Where(m => m.Visible))
         {
-            <div class="nav-section">Appointments</div>
-            @if (perms.Contains(Perm.AppointmentsAdd))
-            {
-                <a class="nav-link @Active("appointment-book")" href="/Appointments/Book" data-nav="appointment-book"><svg class="icon"><use href="#i-plus" /></svg><span>New Appointment</span></a>
-            }
-            @if (perms.Contains(Perm.AppointmentsView))
-            {
-                <a class="nav-link @Active("appointments")" href="/Appointments" data-nav="appointments"><svg class="icon"><use href="#i-calendar" /></svg><span>Doctor-wise Lists</span></a>
-            }
-            @if (perms.Contains(Perm.AppointmentsReports))
-            {
-                <a class="nav-link @Active("appointment-reports")" href="/Appointments/Reports"><svg class="icon"><use href="#i-chart" /></svg><span>Appointment Reports</span></a>
-            }
-        }
-
-        @if (Any(Perm.PatientsAdd, Perm.PatientsSearch, Perm.OpdView, Perm.OpdAdd, Perm.EmergencyView, Perm.EmergencyAdd))
-        {
-            <div class="nav-section">Patients &amp; Visits</div>
-            @if (perms.Contains(Perm.PatientsAdd))
-            {
-                <a class="nav-link @Active("patient-register")" href="/Patients/Register"><svg class="icon"><use href="#i-plus" /></svg><span>Register Patient</span></a>
-            }
-            @if (perms.Contains(Perm.PatientsSearch))
-            {
-                <a class="nav-link @Active("patients")" href="/Patients"><svg class="icon"><use href="#i-search" /></svg><span>Patient Search</span></a>
-            }
-            @if (perms.Contains(Perm.OpdView))
-            {
-                <a class="nav-link @Active("opd")" href="/Opd"><svg class="icon"><use href="#i-stethoscope" /></svg><span>OPD</span></a>
-            }
-            else if (perms.Contains(Perm.OpdAdd) && !(isPrivate && perms.Contains(Perm.AppointmentsAdd)))
-            {
-                <a class="nav-link @Active("opd")" href="/Opd/Register"><svg class="icon"><use href="#i-stethoscope" /></svg><span>OPD Registration</span></a>
-            }
-            @if (perms.Contains(Perm.EmergencyView))
-            {
-                <a class="nav-link @Active("emergency")" href="/Emergency"><svg class="icon"><use href="#i-siren" /></svg><span>Emergency</span></a>
-            }
-            else if (perms.Contains(Perm.EmergencyAdd))
-            {
-                <a class="nav-link @Active("emergency")" href="/Emergency/Register"><svg class="icon"><use href="#i-siren" /></svg><span>Emergency Registration</span></a>
-            }
-        }
-
-        @if (Any(Perm.LabDashboard, Perm.LabBook, Perm.LabCollectSamples, Perm.LabEnterResults, Perm.LabVerifyResults, Perm.LabApproveReports, Perm.LabViewResults, Perm.LabReports, Perm.LabManageCatalogue, Perm.LabSettings))
-        {
-            <div class="nav-section">Laboratory</div>
-            @if (perms.Contains(Perm.LabDashboard))
-            {
-                <a class="nav-link @Active("lab-dashboard")" href="/Lab" data-nav="lab-dashboard"><svg class="icon"><use href="#i-flask" /></svg><span>Lab Dashboard</span></a>
-            }
-            @if (perms.Contains(Perm.LabBook))
-            {
-                <a class="nav-link @Active("lab-book")" href="/Lab/Book" data-nav="lab-book"><svg class="icon"><use href="#i-plus" /></svg><span>New Lab Visit</span></a>
-            }
-            @if (perms.Contains(Perm.LabCollectSamples))
-            {
-                <a class="nav-link @Active("lab-samples")" href="/Lab/Samples" data-nav="lab-samples"><svg class="icon"><use href="#i-scan" /></svg><span>Sample Collection</span></a>
-            }
-            @if (perms.Contains(Perm.LabEnterResults))
-            {
-                <a class="nav-link @Active("lab-pending")" href="/Lab/Pending" data-nav="lab-pending"><svg class="icon"><use href="#i-edit" /></svg><span>Pending Tests</span></a>
-            }
-            @if (Any(Perm.LabVerifyResults, Perm.LabApproveReports))
-            {
-                <a class="nav-link @Active("lab-verify")" href="/Lab/Verify" data-nav="lab-verify"><svg class="icon"><use href="#i-check-circle" /></svg><span>Verification</span></a>
-            }
-            @if (perms.Contains(Perm.LabViewResults))
-            {
-                <a class="nav-link @Active("lab-results")" href="/Lab/Results" data-nav="lab-results"><svg class="icon"><use href="#i-file" /></svg><span>Lab Results</span></a>
-            }
-            @if (perms.Contains(Perm.LabReports))
-            {
-                <a class="nav-link @Active("lab-reports")" href="/Lab/Reports" data-nav="lab-reports"><svg class="icon"><use href="#i-chart" /></svg><span>Lab Reports</span></a>
-            }
-            @if (perms.Contains(Perm.LabManageCatalogue))
-            {
-                <a class="nav-link @Active("lab-catalogue")" href="/Lab/Catalogue" data-nav="lab-catalogue"><svg class="icon"><use href="#i-sliders" /></svg><span>Test Catalogue</span></a>
-            }
-            @if (perms.Contains(Perm.LabSettings))
-            {
-                <a class="nav-link @Active("lab-settings")" href="/Lab/Settings" data-nav="lab-settings"><svg class="icon"><use href="#i-settings" /></svg><span>Lab Settings</span></a>
-            }
-        }
-
-        @if (Any(Perm.IpdDashboard, Perm.IpdViewPatients, Perm.IpdRegisterAdmission, Perm.IpdAllocateBed, Perm.IpdViewGynae, Perm.IpdManageLabour, Perm.IpdLabourObservations,
-                 Perm.IpdManageNicu, Perm.IpdNicuObservations, Perm.IpdManageNursing, Perm.IpdNursingNotes, Perm.IpdRecordMedication, Perm.IpdHandover,
-                 Perm.IpdManageWards, Perm.IpdManageRooms, Perm.IpdManageBeds, Perm.IpdSettings))
-        {
-            <div class="nav-section">IPD &amp; Maternity</div>
-            @if (perms.Contains(Perm.IpdDashboard))
-            {
-                <a class="nav-link @Active("ipd-dashboard")" href="/Ipd" data-nav="ipd-dashboard"><svg class="icon"><use href="#i-hospital" /></svg><span>IPD Dashboard</span></a>
-            }
-            @if (perms.Contains(Perm.IpdRegisterAdmission))
-            {
-                <a class="nav-link @Active("ipd-admit")" href="/Ipd/Admit" data-nav="ipd-admit"><svg class="icon"><use href="#i-plus" /></svg><span>Admit Patient</span></a>
-            }
-            @if (perms.Contains(Perm.IpdViewPatients))
-            {
-                <a class="nav-link @Active("ipd-patients")" href="/Ipd/Admissions" data-nav="ipd-patients"><svg class="icon"><use href="#i-users" /></svg><span>Inpatients</span></a>
-            }
-            @if (Any(Perm.IpdViewPatients, Perm.IpdAllocateBed, Perm.IpdManageBeds))
-            {
-                <a class="nav-link @Active("ipd-beds")" href="/Ipd/Beds" data-nav="ipd-beds"><svg class="icon"><use href="#i-hospital" /></svg><span>Bed Map</span></a>
-            }
-            @if (perms.Contains(Perm.IpdViewGynae))
-            {
-                <a class="nav-link @Active("ipd-gynae")" href="/Ipd/Gynae" data-nav="ipd-gynae"><svg class="icon"><use href="#i-stethoscope" /></svg><span>Gynae &amp; ANC</span></a>
-            }
-            @if (Any(Perm.IpdManageLabour, Perm.IpdLabourObservations))
-            {
-                <a class="nav-link @Active("ipd-labour")" href="/Ipd/Labour" data-nav="ipd-labour"><svg class="icon"><use href="#i-activity" /></svg><span>Labour Room</span></a>
-            }
-            @if (Any(Perm.IpdManageNicu, Perm.IpdNicuObservations))
-            {
-                <a class="nav-link @Active("ipd-nicu")" href="/Ipd/Nicu" data-nav="ipd-nicu"><svg class="icon"><use href="#i-users-round" /></svg><span>NICU</span></a>
-            }
-            @if (Any(Perm.IpdManageNursing, Perm.IpdNursingNotes, Perm.IpdRecordMedication, Perm.IpdHandover))
-            {
-                <a class="nav-link @Active("ipd-nursing")" href="/Ipd/Nursing" data-nav="ipd-nursing"><svg class="icon"><use href="#i-check-circle" /></svg><span>Nursing</span></a>
-            }
-            @if (Any(Perm.IpdManageWards, Perm.IpdManageRooms, Perm.IpdManageBeds))
-            {
-                <a class="nav-link @Active("ipd-wards")" href="/Ipd/Wards" data-nav="ipd-wards"><svg class="icon"><use href="#i-sliders" /></svg><span>Wards &amp; Beds</span></a>
-            }
-            @if (perms.Contains(Perm.IpdSettings))
-            {
-                <a class="nav-link @Active("ipd-settings")" href="/Ipd/Settings" data-nav="ipd-settings"><svg class="icon"><use href="#i-settings" /></svg><span>IPD Settings</span></a>
-            }
-        }
-
-        @if (Any(Perm.RadDashboard, Perm.RadCreateBooking, Perm.RadViewXRay, Perm.RadViewUltrasound, Perm.RadEnterReport, Perm.RadEditDraft, Perm.RadVerifyReport,
-                 Perm.RadViewHistory, Perm.RadViewStatistics, Perm.RadManageServices, Perm.RadManageTemplates, Perm.RadSettings))
-        {
-            <div class="nav-section">Radiology</div>
-            @if (perms.Contains(Perm.RadDashboard))
-            {
-                <a class="nav-link @Active("rad-dashboard")" href="/Radiology" data-nav="rad-dashboard"><svg class="icon"><use href="#i-scan" /></svg><span>Radiology Dashboard</span></a>
-            }
-            @if (perms.Contains(Perm.RadCreateBooking))
-            {
-                <a class="nav-link @Active("rad-book")" href="/Radiology/Book" data-nav="rad-book"><svg class="icon"><use href="#i-plus" /></svg><span>New Booking</span></a>
-            }
-            @if (perms.Contains(Perm.RadViewXRay))
-            {
-                <a class="nav-link @Active("rad-xray")" href="/Radiology/Worklist/XRay" data-nav="rad-xray"><svg class="icon"><use href="#i-scan" /></svg><span>X-Ray Worklist</span></a>
-            }
-            @if (perms.Contains(Perm.RadViewUltrasound))
-            {
-                <a class="nav-link @Active("rad-ultrasound")" href="/Radiology/Worklist/Ultrasound" data-nav="rad-ultrasound"><svg class="icon"><use href="#i-wave" /></svg><span>Ultrasound Worklist</span></a>
-            }
-            @if (Any(Perm.RadCreateBooking, Perm.RadEditBooking, Perm.RadViewXRay, Perm.RadViewUltrasound))
-            {
-                <a class="nav-link @Active("rad-bookings")" href="/Radiology/Bookings" data-nav="rad-bookings"><svg class="icon"><use href="#i-calendar" /></svg><span>Bookings</span></a>
-            }
-            @if (Any(Perm.RadEnterReport, Perm.RadEditDraft))
-            {
-                <a class="nav-link @Active("rad-reporting")" href="/Radiology/Reporting" data-nav="rad-reporting"><svg class="icon"><use href="#i-edit" /></svg><span>Reporting</span></a>
-            }
-            @if (perms.Contains(Perm.RadVerifyReport))
-            {
-                <a class="nav-link @Active("rad-verify")" href="/Radiology/Verify" data-nav="rad-verify"><svg class="icon"><use href="#i-check-circle" /></svg><span>Report Verification</span></a>
-            }
-            @if (perms.Contains(Perm.RadViewHistory))
-            {
-                <a class="nav-link @Active("rad-history")" href="/Radiology/History" data-nav="rad-history"><svg class="icon"><use href="#i-history" /></svg><span>Patient History</span></a>
-            }
-            @if (perms.Contains(Perm.RadViewStatistics))
-            {
-                <a class="nav-link @Active("rad-reports")" href="/Radiology/Reports" data-nav="rad-reports"><svg class="icon"><use href="#i-chart" /></svg><span>Radiology Reports</span></a>
-            }
-            @if (Any(Perm.RadManageServices, Perm.RadManageTemplates))
-            {
-                <a class="nav-link @Active("rad-services")" href="/Radiology/Services" data-nav="rad-services"><svg class="icon"><use href="#i-sliders" /></svg><span>Services &amp; Templates</span></a>
-            }
-            @if (perms.Contains(Perm.RadSettings))
-            {
-                <a class="nav-link @Active("rad-settings")" href="/Radiology/Settings" data-nav="rad-settings"><svg class="icon"><use href="#i-settings" /></svg><span>Radiology Settings</span></a>
-            }
-        }
-
-        @if (Any(Perm.PharmDashboard, Perm.PharmViewCatalogue, Perm.PharmIssueToPatients, Perm.PharmRetailSales, Perm.PharmReceiveStock, Perm.PharmTransferStock,
-                 Perm.PharmViewStockReports, Perm.PharmViewDepartmentStock, Perm.PharmAdjustStock, Perm.PharmApproveAdjustments, Perm.PharmManageSuppliers, Perm.PharmSettings))
-        {
-            <div class="nav-section">Pharmacy</div>
-            @if (perms.Contains(Perm.PharmDashboard))
-            {
-                <a class="nav-link @Active("pharm-dashboard")" href="/Pharmacy" data-nav="pharm-dashboard"><svg class="icon"><use href="#i-pill" /></svg><span>Pharmacy Dashboard</span></a>
-            }
-            @if (perms.Contains(Perm.PharmIssueToPatients))
-            {
-                <a class="nav-link @Active("pharm-issue")" href="/Pharmacy/Issue" data-nav="pharm-issue"><svg class="icon"><use href="#i-users-round" /></svg><span>Patient Issue</span></a>
-            }
-            @if (perms.Contains(Perm.PharmRetailSales) && isPrivate)
-            {
-                <a class="nav-link @Active("pharm-sale")" href="/Pharmacy/Sale" data-nav="pharm-sale" data-private-only><svg class="icon"><use href="#i-wallet" /></svg><span>Retail Sale</span></a>
-            }
-            @if (perms.Contains(Perm.PharmReceiveStock))
-            {
-                <a class="nav-link @Active("pharm-receive")" href="/Pharmacy/Receive" data-nav="pharm-receive"><svg class="icon"><use href="#i-download" /></svg><span>Receive Stock</span></a>
-            }
-            @if (perms.Contains(Perm.PharmTransferStock))
-            {
-                <a class="nav-link @Active("pharm-transfer")" href="/Pharmacy/Transfer" data-nav="pharm-transfer"><svg class="icon"><use href="#i-refresh" /></svg><span>Stock Transfer</span></a>
-            }
-            @if (Any(Perm.PharmViewStockReports, Perm.PharmViewDepartmentStock))
-            {
-                <a class="nav-link @Active("pharm-stock")" href="/Pharmacy/Stock" data-nav="pharm-stock"><svg class="icon"><use href="#i-database" /></svg><span>Stock &amp; Batches</span></a>
-            }
-            @if (perms.Contains(Perm.PharmViewCatalogue))
-            {
-                <a class="nav-link @Active("pharm-medicines")" href="/Pharmacy/Medicines" data-nav="pharm-medicines"><svg class="icon"><use href="#i-sliders" /></svg><span>Medicines</span></a>
-            }
-        }
-
-        @if (Any(Perm.FinanceViewOwnAccount, Perm.FinanceCollect, Perm.FinanceViewOwnReceipts, Perm.FinanceDashboard, Perm.FinanceConfirmDeposits, Perm.FinanceManageDoctorAccounts, Perm.FinanceCounterReports, Perm.FinanceManageServiceFees))
-        {
-            <div class="nav-section">Finance</div>
-            @if (perms.Contains(Perm.FinanceCollect))
-            {
-                <a class="nav-link @Active("finance-collect")" href="/Finance/Collect" data-nav="finance-collect"><svg class="icon"><use href="#i-plus" /></svg><span>Collect Payment</span></a>
-            }
-            @if (perms.Contains(Perm.FinanceViewOwnAccount))
-            {
-                <a class="nav-link @Active("finance-account")" href="/Finance" data-nav="finance-account"><svg class="icon"><use href="#i-wallet" /></svg><span>My Financial Account</span></a>
-            }
-            @if (perms.Contains(Perm.FinanceViewOwnReceipts))
-            {
-                <a class="nav-link @Active("finance-receipts")" href="/Finance/Receipts" data-nav="finance-receipts"><svg class="icon"><use href="#i-file" /></svg><span>Receipts</span></a>
-            }
-            @if (perms.Contains(Perm.FinanceDashboard))
-            {
-                <a class="nav-link @Active("finance-dashboard")" href="/Finance/Dashboard" data-nav="finance-dashboard"><svg class="icon"><use href="#i-chart" /></svg><span>Financial Dashboard</span></a>
-            }
-            @if (perms.Contains(Perm.FinanceConfirmDeposits))
-            {
-                <a class="nav-link @Active("finance-deposits")" href="/Finance/Deposits" data-nav="finance-deposits"><svg class="icon"><use href="#i-download" /></svg><span>Cash Deposits</span></a>
-            }
-            @if (perms.Contains(Perm.FinanceManageDoctorAccounts))
-            {
-                <a class="nav-link @Active("finance-doctors")" href="/Finance/Doctors" data-nav="finance-doctors"><svg class="icon"><use href="#i-stethoscope" /></svg><span>Doctor Accounts</span></a>
-            }
-            @if (perms.Contains(Perm.FinanceManageServiceFees))
-            {
-                <a class="nav-link @Active("finance-services")" href="/Finance/Services" data-nav="finance-services"><svg class="icon"><use href="#i-sliders" /></svg><span>Services &amp; Fees</span></a>
-            }
-        }
-
-        @if (Any(Perm.UsersView, Perm.DepartmentsManage, Perm.RolesManage, Perm.LoginHistoryView, Perm.AuditView))
-        {
-            <div class="nav-section">Administration</div>
-            @if (perms.Contains(Perm.UsersView))
-            {
-                <a class="nav-link @Active("users")" href="/Users"><svg class="icon"><use href="#i-users" /></svg><span>Users</span></a>
-            }
-            @if (perms.Contains(Perm.DepartmentsManage))
-            {
-                <a class="nav-link @Active("departments")" href="/Departments"><svg class="icon"><use href="#i-building" /></svg><span>Departments</span></a>
-            }
-            @if (perms.Contains(Perm.RolesManage))
-            {
-                <a class="nav-link @Active("roles")" href="/Roles"><svg class="icon"><use href="#i-badge" /></svg><span>Responsibilities</span></a>
-            }
-            @if (perms.Contains(Perm.LoginHistoryView))
-            {
-                <a class="nav-link @Active("logins")" href="/Users/LoginHistory"><svg class="icon"><use href="#i-history" /></svg><span>Login History</span></a>
-            }
-            @if (perms.Contains(Perm.AuditView))
-            {
-                <a class="nav-link @Active("audit")" href="/Audit"><svg class="icon"><use href="#i-shield" /></svg><span>Audit Log</span></a>
-            }
-        }
-
-        @if (Any(Perm.SettingsView, Perm.LicenseView, Perm.BackupView, Perm.PatientsSettings))
-        {
-            <div class="nav-section">System</div>
-            @if (perms.Contains(Perm.PatientsSettings) && !perms.Contains(Perm.SettingsView))
-            {
-                <a class="nav-link @Active("registration-settings")" href="/Settings/Registration"><svg class="icon"><use href="#i-badge" /></svg><span>Patient ID &amp; Slips</span></a>
-            }
-            @if (perms.Contains(Perm.SettingsView))
-            {
-                <a class="nav-link @Active("settings")" href="/Settings"><svg class="icon"><use href="#i-settings" /></svg><span>Hospital Settings</span></a>
-            }
-            @if (perms.Contains(Perm.LicenseView))
-            {
-                <a class="nav-link @Active("license")" href="/Settings/License"><svg class="icon"><use href="#i-key" /></svg><span>License</span></a>
-            }
-            @if (perms.Contains(Perm.BackupView))
-            {
-                <a class="nav-link @Active("backup")" href="/Backup"><svg class="icon"><use href="#i-database" /></svg><span>Backup &amp; Restore</span></a>
-            }
+            var items = isAdmin ? section.Items.Where(i => NavMenu.AdminSidebar.Contains(i.Nav)).ToList() : section.Items.ToList();
+            if (isAdmin && items.Count == 0) { continue; }
+            <div class="nav-section">@section.Title</div>
+            foreach (var item in items) { @NavLink(item, "nav-link") }
         }
     </nav>
     <div class="sidebar-footer">Burhan Nexus · v1.7 · Phase 7</div>
@@ -367,6 +95,26 @@
             </div>
         </div>
     </header>
+    @if (isAdmin && adminBar.Count > 0)
+    {
+        <nav class="adm-bar" data-adm-bar aria-label="Modules">
+            @if (perms.Contains(Perm.DashboardView))
+            {
+                <a class="adm-home @Active("dashboard")" href="/" data-adm-home><svg class="icon icon-sm"><use href="#i-home" /></svg><span>Dashboard</span></a>
+            }
+            @foreach (var cat in adminBar)
+            {
+                var catActive = cat.Items.Any(i => i.Nav == nav);
+                <details class="adm-cat @(catActive ? "active" : "")" data-adm-cat="@cat.Key">
+                    <summary><svg class="icon icon-sm"><use href="#i-@cat.Icon" /></svg><span>@cat.Title</span><svg class="icon icon-xs adm-caret"><use href="#i-chevron-down" /></svg></summary>
+                    <div class="adm-menu" role="menu">
+                        <div class="adm-menu-title">@cat.Title</div>
+                        @foreach (var item in cat.Items) { @NavLink(item, "adm-link") }
+                    </div>
+                </details>
+            }
+        </nav>
+    }
     <main class="content">
         <partial name="_Flash" />
         @RenderBody()

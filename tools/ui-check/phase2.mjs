@@ -648,6 +648,25 @@ try {
   await pdf(admUrl.replace("/Ipd/Admission/", "/Print/Ipd/mar/"), "sample-ipd-mar-A4.pdf");
   await go("/Ipd");
   await shot(page, "p7-18-ipd-dashboard");
+
+  // ---- Navigation: administrator sidebar (11 pages) + top taskbar categories ----
+  await go("/");
+  await shot(page, "nav-01-admin-sidebar-and-taskbar", false);
+  await page.click("[data-adm-cat='lab'] > summary");
+  await shot(page, "nav-02-taskbar-laboratory-menu", false);
+  await page.click("[data-adm-cat='ipd'] > summary");
+  await shot(page, "nav-03-taskbar-ipd-menu", false);
+  await go("/Radiology");
+  await shot(page, "nav-04-active-category-highlight", false);
+  await page.setViewportSize({ width: 820, height: 1000 });
+  await go("/");
+  await page.click("[data-adm-cat='pharmacy'] > summary");
+  await shot(page, "nav-05-tablet", false);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await go("/");
+  await page.click("[data-adm-cat='finance'] > summary");
+  await shot(page, "nav-06-mobile", false);
+  await page.setViewportSize({ width: 1440, height: 900 });
 } catch (e) {
   errors.push("SCRIPT FAILURE: " + (e && e.stack || e));
   try { await shot(page, "p2-zz-failure"); } catch {}

@@ -15,6 +15,12 @@
   });
   document.addEventListener("click", () => $$("[data-dropdown].open").forEach(d => d.classList.remove("open")));
 
+  // ---- Admin top taskbar: one category menu open at a time; closes on outside click / Escape ----
+  const admCats = $$("[data-adm-cat]");
+  admCats.forEach(d => d.addEventListener("toggle", () => { if (d.open) admCats.forEach(o => { if (o !== d) o.open = false; }); }));
+  document.addEventListener("click", e => { if (!e.target.closest("[data-adm-cat]")) admCats.forEach(d => d.open = false); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") admCats.forEach(d => d.open = false); });
+
   // ---- Show / hide password ----
   $$("[data-toggle-password]").forEach(btn => btn.addEventListener("click", () => {
     const input = btn.parentElement.querySelector("input");
