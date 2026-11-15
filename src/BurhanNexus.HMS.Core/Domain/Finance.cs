@@ -116,6 +116,8 @@ public class Charge
     /// <summary>Phase 5: pharmacy retail sale / patient medicine issue that created this charge.</summary>
     public long? PharmacySaleId { get; set; }
     public long? PharmacyIssueId { get; set; }
+    /// <summary>Phase 6: radiology order that created this charge.</summary>
+    public long? RadiologyOrderId { get; set; }
     public int ServiceItemId { get; set; }
     public ServiceItem? ServiceItem { get; set; }
     public ServiceKind ServiceKind { get; set; }

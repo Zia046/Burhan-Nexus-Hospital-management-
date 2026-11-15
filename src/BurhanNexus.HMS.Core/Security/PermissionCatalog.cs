@@ -152,8 +152,37 @@ public static class PermissionCatalog
                 new(LabActions.ViewFinancial, "View Laboratory Financial Information", "Laboratory fees, payment status and collection"),
                 new(LabActions.ManageFees, "Manage Laboratory Fees", "Set test prices (fee history kept)"),
             }),
-        Future("XRay", "X-Ray Management", "X-Ray department", "scan"),
-        Future("Ultrasound", "Ultrasound Management", "Ultrasound department", "wave"),
+        new(Modules_.Radiology, "Radiology Management (X-Ray & Ultrasound)", "Radiology bookings, worklists, examinations, reporting, verification and A4 reports", "scan", true, "/Radiology",
+            new PermissionAction[]
+            {
+                new(RadiologyActions.Dashboard, "View Radiology Dashboard", "Radiology counts and work-lists"),
+                new(RadiologyActions.ViewXRay, "View X-Ray Worklist", "X-Ray queue and examinations"),
+                new(RadiologyActions.ViewUltrasound, "View Ultrasound Worklist", "Ultrasound queue and examinations"),
+                new(RadiologyActions.CreateBooking, "Create Booking", "Book X-Ray / Ultrasound examinations (from the doctor's handwritten advice)"),
+                new(RadiologyActions.EditBooking, "Edit Booking", "Change date / time, referral, indication and priority; add examinations"),
+                new(RadiologyActions.CancelBooking, "Cancel Booking", "Cancel examinations with a reason (kept in history)"),
+                new(RadiologyActions.StartExam, "Start Examination", "Mark patient arrived and start the examination"),
+                new(RadiologyActions.CompleteExam, "Complete Examination", "Record completion, technician and technical notes"),
+                new(RadiologyActions.EnterReport, "Enter Report", "Write a new report (findings, impression …)"),
+                new(RadiologyActions.EditDraft, "Edit Draft Report", "Change a saved draft or a report sent back for correction"),
+                new(RadiologyActions.SubmitReport, "Submit Report", "Submit a report for verification"),
+                new(RadiologyActions.VerifyReport, "Verify Report", "Approve or reject reports awaiting verification"),
+                new(RadiologyActions.VerifyOwnReport, "Verify Own Report", "Verify a report one entered oneself (only if the radiology settings allow it)"),
+                new(RadiologyActions.ReleaseReport, "Release Report", "Release verified reports as final"),
+                new(RadiologyActions.AmendReport, "Amend Verified Report", "Re-open a verified report for correction with a reason (revision kept)"),
+                new(RadiologyActions.PrintReport, "Print Report", "Print released reports"),
+                new(RadiologyActions.ReprintReport, "Reprint Previous Report", "Print further copies and historical reports"),
+                new(RadiologyActions.ExportPdf, "Export PDF", "Save reports and statistics as PDF"),
+                new(RadiologyActions.ViewHistory, "View Patient Radiology History", "Patient's earlier examinations and reports"),
+                new(RadiologyActions.ViewAttachments, "View Attachments", "Open / download examination images and documents"),
+                new(RadiologyActions.ManageAttachments, "Manage Attachments", "Upload images / documents and remove them with a reason"),
+                new(RadiologyActions.ManageServices, "Manage Radiology Services", "Add / edit / deactivate X-Ray and Ultrasound services"),
+                new(RadiologyActions.ManageTemplates, "Manage Report Templates", "Create and edit report templates"),
+                new(RadiologyActions.ViewStatistics, "View Statistics", "Radiology reports and statistics"),
+                new(RadiologyActions.ViewFinancial, "View Financial Information", "Radiology fees, payment status and revenue"),
+                new(RadiologyActions.ManageFees, "Manage Radiology Fees", "Set examination fees (fee history kept)"),
+                new(RadiologyActions.Settings, "Manage Settings", "Report header / footer, letterhead, verification and booking rules"),
+            }),
         new(Modules_.Pharmacy, "Pharmacy Management", "Medicine catalogue, stock, batches & expiry, patient issue, retail sales, department transfers and reports", "pill", true, "/Pharmacy",
             new PermissionAction[]
             {
@@ -299,6 +328,38 @@ public static class PermissionCatalog
         public const string Finance = "Finance";
         public const string Laboratory = "Laboratory";
         public const string Pharmacy = "Pharmacy";
+        public const string Radiology = "Radiology";
+    }
+
+    public static class RadiologyActions
+    {
+        public const string Dashboard = "Dashboard";
+        public const string ViewXRay = "ViewXRayWorklist";
+        public const string ViewUltrasound = "ViewUltrasoundWorklist";
+        public const string CreateBooking = "CreateBooking";
+        public const string EditBooking = "EditBooking";
+        public const string CancelBooking = "CancelBooking";
+        public const string StartExam = "StartExamination";
+        public const string CompleteExam = "CompleteExamination";
+        public const string EnterReport = "EnterReport";
+        public const string EditDraft = "EditDraftReport";
+        public const string SubmitReport = "SubmitReport";
+        public const string VerifyReport = "VerifyReport";
+        public const string VerifyOwnReport = "VerifyOwnReport";
+        public const string ReleaseReport = "ReleaseReport";
+        public const string AmendReport = "AmendReport";
+        public const string PrintReport = "PrintReport";
+        public const string ReprintReport = "ReprintReport";
+        public const string ExportPdf = "ExportPdf";
+        public const string ViewHistory = "ViewHistory";
+        public const string ViewAttachments = "ViewAttachments";
+        public const string ManageAttachments = "ManageAttachments";
+        public const string ManageServices = "ManageServices";
+        public const string ManageTemplates = "ManageTemplates";
+        public const string ViewStatistics = "ViewStatistics";
+        public const string ViewFinancial = "ViewFinancial";
+        public const string ManageFees = "ManageFees";
+        public const string Settings = "Settings";
     }
 
     public static class PharmacyActions
@@ -536,6 +597,34 @@ public static class Perm
     public const string FinanceAdjustments = "Finance.Adjustments";
     public const string FinanceExport = "Finance.Export";
     public const string FinanceSettings = "Finance.Settings";
+    public const string RadDashboard = "Radiology.Dashboard";
+    public const string RadViewXRay = "Radiology.ViewXRayWorklist";
+    public const string RadViewUltrasound = "Radiology.ViewUltrasoundWorklist";
+    public const string RadCreateBooking = "Radiology.CreateBooking";
+    public const string RadEditBooking = "Radiology.EditBooking";
+    public const string RadCancelBooking = "Radiology.CancelBooking";
+    public const string RadStartExam = "Radiology.StartExamination";
+    public const string RadCompleteExam = "Radiology.CompleteExamination";
+    public const string RadEnterReport = "Radiology.EnterReport";
+    public const string RadEditDraft = "Radiology.EditDraftReport";
+    public const string RadSubmitReport = "Radiology.SubmitReport";
+    public const string RadVerifyReport = "Radiology.VerifyReport";
+    public const string RadVerifyOwnReport = "Radiology.VerifyOwnReport";
+    public const string RadReleaseReport = "Radiology.ReleaseReport";
+    public const string RadAmendReport = "Radiology.AmendReport";
+    public const string RadPrintReport = "Radiology.PrintReport";
+    public const string RadReprintReport = "Radiology.ReprintReport";
+    public const string RadExportPdf = "Radiology.ExportPdf";
+    public const string RadViewHistory = "Radiology.ViewHistory";
+    public const string RadViewAttachments = "Radiology.ViewAttachments";
+    public const string RadManageAttachments = "Radiology.ManageAttachments";
+    public const string RadManageServices = "Radiology.ManageServices";
+    public const string RadManageTemplates = "Radiology.ManageTemplates";
+    public const string RadViewStatistics = "Radiology.ViewStatistics";
+    public const string RadViewFinancial = "Radiology.ViewFinancial";
+    public const string RadManageFees = "Radiology.ManageFees";
+    public const string RadSettings = "Radiology.Settings";
+
     public const string LabDashboard = "Laboratory.Dashboard";
     public const string LabRegisterPatient = "Laboratory.RegisterPatient";
     public const string LabBook = "Laboratory.Book";

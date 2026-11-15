@@ -222,6 +222,7 @@ public sealed class SetupService : ISetupService
             await Patients.RegistrationSetupService.SeedAsync(_db, now, ct);
             await Laboratory.LabCatalogService.SeedAsync(_db, now, ct);
             await Pharmacy.PharmacyCatalogService.SeedAsync(_db, now, ct);
+            await Radiology.RadiologyCatalogService.SeedAsync(_db, now, ct);
             await Finance.FinanceSetupService.SeedAsync(_db, now,
                 DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(now, Patients.HospitalClock.Resolve(config.TimeZoneId))), ct);
         }

@@ -99,6 +99,17 @@ public class HmsDbContext : DbContext
     public DbSet<SupplierPayment> SupplierPayments => Set<SupplierPayment>();
     public DbSet<PharmacySettings> PharmacySettings => Set<PharmacySettings>();
 
+    // Phase 6 – radiology
+    public DbSet<RadiologyService> RadiologyServices => Set<RadiologyService>();
+    public DbSet<RadiologyTemplate> RadiologyTemplates => Set<RadiologyTemplate>();
+    public DbSet<RadiologyOrder> RadiologyOrders => Set<RadiologyOrder>();
+    public DbSet<RadiologyExam> RadiologyExams => Set<RadiologyExam>();
+    public DbSet<RadiologyExamEvent> RadiologyExamEvents => Set<RadiologyExamEvent>();
+    public DbSet<RadiologyReportRevision> RadiologyReportRevisions => Set<RadiologyReportRevision>();
+    public DbSet<RadiologyReportPrint> RadiologyReportPrints => Set<RadiologyReportPrint>();
+    public DbSet<RadiologyAttachment> RadiologyAttachments => Set<RadiologyAttachment>();
+    public DbSet<RadiologySettings> RadiologySettings => Set<RadiologySettings>();
+
     public const string PatientNumberSequence = "patient_number_seq";
     public const string OpdNumberSequence = "opd_number_seq";
     public const string EmergencyNumberSequence = "emergency_number_seq";
@@ -120,6 +131,8 @@ public class HmsDbContext : DbContext
     public const string MedicineReturnSequence = "pharm_return_seq";
     public const string SupplierReturnSequence = "pharm_supplier_return_seq";
     public const string SupplierPaymentSequence = "pharm_supplier_payment_seq";
+    public const string RadiologyOrderSequence = "radiology_order_seq";
+    public const string RadiologyServiceCodeSequence = "radiology_service_code_seq";
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -129,7 +142,7 @@ public class HmsDbContext : DbContext
         b.HasSequence<long>(OpdNumberSequence).StartsAt(1).IncrementsBy(1);
         b.HasSequence<long>(EmergencyNumberSequence).StartsAt(1).IncrementsBy(1);
         foreach (var seq in new[] { MedicineCodeSequence, SupplierCodeSequence, StockReceiptSequence, MedicineIssueSequence, PharmacySaleSequence, StockTransferSequence,
-                                     StockAdjustmentSequence, MedicineReturnSequence, SupplierReturnSequence, SupplierPaymentSequence, LabOrderNumberSequence, LabSampleNumberSequence, ReceiptNumberSequence, ChargeNumberSequence, RefundNumberSequence, DepositNumberSequence, SettlementNumberSequence, AdjustmentNumberSequence })
+                                     StockAdjustmentSequence, MedicineReturnSequence, SupplierReturnSequence, SupplierPaymentSequence, RadiologyOrderSequence, RadiologyServiceCodeSequence, LabOrderNumberSequence, LabSampleNumberSequence, ReceiptNumberSequence, ChargeNumberSequence, RefundNumberSequence, DepositNumberSequence, SettlementNumberSequence, AdjustmentNumberSequence })
             b.HasSequence<long>(seq).StartsAt(1).IncrementsBy(1);
 
         b.Entity<HospitalSettings>(e =>
@@ -393,6 +406,7 @@ public class HmsDbContext : DbContext
         ConfigureFinance(b);
         ConfigureLaboratory(b);
         ConfigurePharmacy(b);
+        ConfigureRadiology(b);
 
         b.Entity<BackupHistory>(e =>
         {
@@ -479,6 +493,8 @@ public class HmsDbContext : DbContext
             e.HasIndex(x => x.PharmacySaleId);
             e.HasOne<PatientMedicineIssue>().WithMany().HasForeignKey(x => x.PharmacyIssueId).OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => x.PharmacyIssueId);
+            e.HasOne<RadiologyOrder>().WithMany().HasForeignKey(x => x.RadiologyOrderId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.RadiologyOrderId);
         });
         b.Entity<Receipt>(e =>
         {
@@ -703,6 +719,93 @@ public class HmsDbContext : DbContext
             e.HasIndex(x => x.Code).IsUnique();
             e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.ReorderLevel).HasPrecision(14, 2);
+        });
+    }
+
+    private static void ConfigureRadiology(ModelBuilder b)
+    {
+        b.Entity<RadiologyTemplate>(e =>
+        {
+            e.ToTable("RadiologyTemplates");
+            e.Property(x => x.Modality).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => new { x.Modality, x.Name }).IsUnique();
+        });
+        b.Entity<RadiologyService>(e =>
+        {
+            e.ToTable("RadiologyServices");
+            e.HasIndex(x => x.Code).IsUnique();
+            e.HasIndex(x => x.ServiceItemId).IsUnique();
+            e.Property(x => x.Modality).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.ServiceItem).WithMany().HasForeignKey(x => x.ServiceItemId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.DefaultTemplate).WithMany().HasForeignKey(x => x.DefaultTemplateId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<RadiologyOrder>(e =>
+        {
+            e.ToTable("RadiologyOrders");
+            e.HasIndex(x => x.OrderNumber).IsUnique();
+            e.HasIndex(x => x.IdempotencyKey).IsUnique().HasDatabaseName("UX_RadiologyOrders_Idempotency");
+            e.HasIndex(x => new { x.PatientId, x.BusinessDate });
+            e.HasIndex(x => x.BusinessDate);
+            e.Property(x => x.ReferralType).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Priority).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.Ignore(x => x.ReferredBy);
+            e.HasOne(x => x.Patient).WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Encounter).WithMany().HasForeignKey(x => x.EncounterId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ReferringDepartment).WithMany().HasForeignKey(x => x.ReferringDepartmentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ReferringDoctor).WithMany().HasForeignKey(x => x.ReferringDoctorId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<RadiologyExam>(e =>
+        {
+            e.ToTable("RadiologyExams", t => t.HasCheckConstraint("CK_RadiologyExams_Token", "\"TokenNumber\" > 0"));
+            e.HasIndex(x => new { x.Status, x.Modality, x.ScheduledDate });
+            e.HasIndex(x => new { x.Modality, x.ScheduledDate, x.TokenNumber });
+            e.HasIndex(x => x.ChargeId).IsUnique();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
+            e.Property(x => x.Modality).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne(x => x.Order).WithMany(x => x.Exams).HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Service).WithMany().HasForeignKey(x => x.ServiceId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Charge).WithMany().HasForeignKey(x => x.ChargeId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<RadiologyExamEvent>(e =>
+        {
+            e.ToTable("RadiologyExamEvents");
+            e.Property(x => x.EventType).HasConversion<string>().HasMaxLength(30);
+            e.HasIndex(x => x.ExamId);
+            e.HasIndex(x => new { x.EventType, x.BusinessDate });
+            e.HasOne<RadiologyExam>().WithMany().HasForeignKey(x => x.ExamId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<RadiologyReportRevision>(e =>
+        {
+            e.ToTable("RadiologyReportRevisions");
+            e.Property(x => x.Snapshot).HasColumnType("jsonb");
+            e.Property(x => x.PreviousStatus).HasConversion<string>().HasMaxLength(30);
+            e.HasIndex(x => new { x.ExamId, x.RevisionNo }).IsUnique();
+            e.HasOne<RadiologyExam>().WithMany().HasForeignKey(x => x.ExamId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<RadiologyReportPrint>(e =>
+        {
+            e.ToTable("RadiologyReportPrints");
+            e.HasIndex(x => new { x.ExamId, x.CopyNumber }).IsUnique();
+            e.HasOne<RadiologyExam>().WithMany().HasForeignKey(x => x.ExamId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<RadiologyAttachment>(e =>
+        {
+            e.ToTable("RadiologyAttachments", t => t.HasCheckConstraint("CK_RadiologyAttachments_Size", "\"SizeBytes\" > 0"));
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(10);
+            e.HasIndex(x => x.ExamId);
+            e.HasIndex(x => x.PatientId);
+            e.HasIndex(x => x.StoredPath).IsUnique();
+            e.HasOne<RadiologyExam>().WithMany().HasForeignKey(x => x.ExamId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Patient>().WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<RadiologySettings>(e =>
+        {
+            e.ToTable("RadiologySettings", t => t.HasCheckConstraint("CK_RadiologySettings_Singleton", "\"Id\" = 1"));
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.RowVersion).IsRowVersion();
         });
     }
 
