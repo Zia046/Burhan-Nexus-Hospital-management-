@@ -4,7 +4,7 @@
 @{
     var a = Model.A; var p = Model.P;
     ViewData["Title"] = $"{a.AdmissionNumber} – {p.FullName}";
-    var tab = Model.Tab;
+    var tab = Model.Tab ?? "overview";
     string Cls(string t) => t == tab ? "active" : "";
     var bed = a.CurrentBed is { } cb ? $"{a.CurrentWard?.Name} / {cb.Room?.Name} / {cb.Code}" : a.CurrentWard?.Name ?? "No bed allocated";
     var recordAction = $"/Ipd/Admission/{a.Id}?handler=Record";

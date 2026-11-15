@@ -22,7 +22,7 @@ public class AdmissionModel : IpdPageModel
     public AdmissionModel(HmsDbContext db) => _db = db;
 
     [BindProperty(SupportsGet = true)] public long Id { get; set; }
-    [BindProperty(SupportsGet = true, Name = "tab")] public string Tab { get; set; } = "overview";
+    [BindProperty(SupportsGet = true, Name = "tab")] public string? Tab { get; set; }
     [BindProperty(SupportsGet = true, Name = "correct")] public long? CorrectId { get; set; }
 
     [BindProperty] public RecordInput Record { get; set; } = new();
@@ -95,6 +95,7 @@ public class AdmissionModel : IpdPageModel
     private async Task<bool> LoadAsync()
     {
         Nav("ipd-patients", "patients");
+        Tab ??= "overview";
         var a = await Query.AdmissionAsync(Id);
         if (a is null || !await CanAccessAsync(a)) return false;
         A = a;

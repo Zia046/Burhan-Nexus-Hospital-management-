@@ -562,6 +562,7 @@ try {
   await page.fill("[name='Order.Frequency']", "TDS");
   await page.fill("[name='Order.Times']", "08:00, 14:00, 20:00");
   await page.fill("[name='Order.DurationDays']", "3");
+  await page.fill("[name='Order.Prescriber']", "Dr. Imran Ali");
   await submit("button[data-test='save-order']");
   await page.click("[data-dose] details summary");
   for (const c of ["ConfirmPatient", "ConfirmMedicine", "ConfirmDose", "ConfirmRoute", "ConfirmTime"]) await page.check(`[data-dose] details[open] [name='Dose.${c}']`);
