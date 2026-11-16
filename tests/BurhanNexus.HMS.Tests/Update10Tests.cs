@@ -157,7 +157,7 @@ public partial class Update10Tests : Phase2TestBase
 
     // =========================================================================== 1B – simplified laboratory
 
-    [GeneratedRegex(@"/Lab/Order/(\d+)")] private static partial System.Text.RegularExpressions.Regex LabOrderRegex();
+    [System.Text.RegularExpressions.GeneratedRegex(@"/Lab/Order/(\d+)")] private static partial System.Text.RegularExpressions.Regex LabOrderRegex();
 
     private async Task SetFeeAsync(Browser admin, string serviceCode, decimal fee)
     {
