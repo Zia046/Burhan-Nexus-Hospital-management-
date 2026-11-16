@@ -278,6 +278,11 @@ public partial class Update10Tests : Phase2TestBase
         Assert.NotEqual(HttpStatusCode.Redirect, techEdit.StatusCode);
         await using (var db = Factory.NewDb()) Assert.Equal("95", (await db.LabResultValues.SingleAsync(v => v.Id == glu.Id)).Value);
 
+        // The "Save corrected report" button must post to this test (regression: the item was lost from the form action).
+        var reviewPage = await admin.GetHtmlAsync($"/Lab/Entry/{orderId}?item={fbsItem.Id}&review=true");
+        var action = System.Text.RegularExpressions.Regex.Match(reviewPage, "formaction=\"([^\"]*)\"[^>]*data-test=\"review-save\"").Groups[1].Value.Replace("&amp;", "&");
+        Assert.Contains("handler=Review", action);
+        Assert.Contains($"item={fbsItem.Id}", action);
         // 14–16. Review report: reason required; the corrected result stays VERIFIED, the original is kept in history.
         Assert.NotEqual(HttpStatusCode.Redirect, (await EntryAsync(admin, orderId, fbsItem.Id, "review", (glu.Id, "110"))).StatusCode);
         Assert.Equal(HttpStatusCode.Redirect, (await EntryAsync(admin, orderId, fbsItem.Id, "review:Typing error", (glu.Id, "110"))).StatusCode);
