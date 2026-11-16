@@ -74,6 +74,10 @@ public class FormModel : IpdPageModel
     public IpdTransfer? Transfer { get; private set; }
     public ShiftHandover? Handover { get; private set; }
     public IReadOnlyList<BillLine> Bill { get; private set; } = Array.Empty<BillLine>();
+    /// <summary>Update 10: admission fee shown on the two-copy admission form.</summary>
+    public Charge? AdmissionFeeCharge { get; private set; }
+    public bool ShowFee { get; private set; }
+    public string FeeStatus => AdmissionFeeCharge is not { } c ? "—" : c.Fee > 0 && c.NetAmount == 0 ? "FREE (waived)" : c.PaidAmount >= c.NetAmount ? "PAID" : c.PaidAmount > 0 ? "PARTIAL" : "UNPAID";
     public IReadOnlyList<MedicationOrder> Orders { get; private set; } = Array.Empty<MedicationOrder>();
     public IReadOnlyList<MedicationDose> Doses { get; private set; } = Array.Empty<MedicationDose>();
     public IReadOnlyList<InvestigationRow> Investigations { get; private set; } = Array.Empty<InvestigationRow>();
@@ -184,6 +188,14 @@ public class FormModel : IpdPageModel
                 {
                     Orders = await _db.MedicationOrders.AsNoTracking().Where(o => o.AdmissionId == Id).OrderBy(o => o.StartUtc).ToListAsync();
                     Doses = await _db.MedicationDoses.AsNoTracking().Where(d => d.AdmissionId == Id).OrderBy(d => d.ScheduledUtc).ToListAsync();
+                }
+                if (Form == "admission")
+                {
+                    // Update 10: admission fee and its payment status on both copies of the admission form.
+                    var feeSvc = Settings.AdmissionServiceItemId;
+                    AdmissionFeeCharge = A.AdmissionFeeChargeId is long fc ? await _db.Charges.AsNoTracking().FirstOrDefaultAsync(c => c.Id == fc)
+                        : feeSvc is null ? null : await _db.Charges.AsNoTracking().Where(c => c.IpdAdmissionId == Id && c.ServiceItemId == feeSvc && c.Status != ChargeStatus.Cancelled).OrderBy(c => c.Id).FirstOrDefaultAsync();
+                    ShowFee = await CanAsync(Perm.IpdViewFinancial) || await CanAsync(Perm.IpdRecordAdmissionPayment);
                 }
                 if (Form is "bill" or "daily-bill")
                 {

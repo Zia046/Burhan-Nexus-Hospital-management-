@@ -58,6 +58,25 @@ public enum ServiceKind
     OpdRegistration = 1, EmergencyRegistration = 2, Consultation = 3, Laboratory = 4, XRay = 5, Ultrasound = 6, Procedure = 7, Pharmacy = 8, Inpatient = 9, Other = 99
 }
 
+/// <summary>Update 10: how a service is charged (shown on bills; quantity is days, hours, sessions … accordingly).</summary>
+public enum ChargeUnit { Fixed = 0, PerTest = 1, PerVisit = 2, PerAdmission = 3, PerDay = 4, PerHour = 5, PerSession = 6, PerProcedure = 7, PerItem = 8 }
+
+/// <summary>Update 10: whether a service is offered in government mode, private mode or both.</summary>
+public enum ServiceApplicability { Both = 0, GovernmentOnly = 1, PrivateOnly = 2 }
+
+/// <summary>Update 10: category of the central Fees &amp; Services catalogue (OPD, Laboratory, IPD, Radiology …). Never deleted.</summary>
+public class ServiceCategory
+{
+    public int Id { get; set; }
+    [MaxLength(20)] public string Code { get; set; } = string.Empty;
+    [MaxLength(100)] public string Name { get; set; } = string.Empty;
+    [MaxLength(300)] public string? Description { get; set; }
+    public bool IsActive { get; set; } = true;
+    public int SortOrder { get; set; }
+    public DateTime CreatedUtc { get; set; }
+    public DateTime UpdatedUtc { get; set; }
+}
+
 /// <summary>Fee history of a service: a change only affects transactions on/after its effective date.</summary>
 public class ServiceFee
 {
@@ -65,6 +84,8 @@ public class ServiceFee
     public int ServiceItemId { get; set; }
     public ServiceItem? ServiceItem { get; set; }
     public decimal Fee { get; set; }
+    /// <summary>Update 10: separate rate used when the hospital runs in Government mode (empty = same as <see cref="Fee"/>).</summary>
+    public decimal? GovernmentFee { get; set; }
     public DateOnly EffectiveFrom { get; set; }
     public DateTime CreatedUtc { get; set; }
     public int? CreatedByUserId { get; set; }
@@ -132,6 +153,9 @@ public class Charge
     public Doctor? Doctor { get; set; }
     [MaxLength(150)] public string? DoctorName { get; set; }
     public decimal Fee { get; set; }
+    /// <summary>Update 10: quantity (days, hours, sessions, items …) and unit price; <see cref="Fee"/> stays the total charged.</summary>
+    public decimal Quantity { get; set; } = 1;
+    public decimal? UnitPrice { get; set; }
     public decimal Discount { get; set; }
     public decimal NetAmount { get; set; }
     /// <summary>Sum of valid (not cancelled) receipt lines.</summary>
@@ -284,7 +308,9 @@ public class CashDeposit
     public uint RowVersion { get; set; }
 }
 
-public enum CashierEntryType { Collection = 1, ReceiptCancellation = 2, Refund = 3, DepositConfirmed = 4, Adjustment = 5 }
+public enum CashierEntryType { Collection = 1, ReceiptCancellation = 2, Refund = 3, DepositConfirmed = 4, Adjustment = 5,
+    /// <summary>Update 10: patient advance deposit received / returned (cash in hand of the cashier).</summary>
+    AdvanceReceived = 6, AdvanceRefunded = 7 }
 
 /// <summary>
 /// Individual cashier ledger. Positive = the cashier holds more hospital money; negative = less.
@@ -304,6 +330,8 @@ public class CashierLedgerEntry
     public long? RefundId { get; set; }
     public long? DepositId { get; set; }
     public long? AdjustmentId { get; set; }
+    /// <summary>Update 10: patient advance deposit.</summary>
+    public long? AdvanceId { get; set; }
     [MaxLength(30)] public string Reference { get; set; } = string.Empty;
     [MaxLength(300)] public string? Description { get; set; }
     public DateOnly BusinessDate { get; set; }
@@ -416,6 +444,8 @@ public class FinanceSettings
     public bool ShowCashierOnReceipt { get; set; } = true;
     [MaxLength(200)] public string? ReceiptFooter { get; set; } = "Thank you. Please keep this receipt.";
     public int DefaultReceiptWidthMm { get; set; } = 80;
+    /// <summary>Update 10: version of the standard Fees &amp; Services catalogue already added (added once; admin changes kept).</summary>
+    public int ServiceCatalogueVersion { get; set; }
     public DateTime UpdatedUtc { get; set; }
     public uint RowVersion { get; set; }
 }

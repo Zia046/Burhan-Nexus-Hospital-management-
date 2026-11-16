@@ -63,3 +63,8 @@ body.a4 .t-hosp, body.a4 .t-title, body.a4 .t-small, body.a4 .t-msgline, body.a4
 body.a4 .t-logo { max-height: 22mm; }
 .t-slip.receipt { text-align: center; }
 .t-slip.receipt .t-kv, .t-slip.receipt .t-items { text-align: left; }
+
+/* Update 10: two-copy laboratory / admission receipt – each copy on its own slip */
+.lab-receipt-copy + .lab-receipt-copy { margin-top: 18px; border-top: 1px dashed #999; padding-top: 10px; }
+@media print { .lab-receipt-copy + .lab-receipt-copy { break-before: page; page-break-before: always; border-top: 0; margin-top: 0; } }
+.t-copy { text-align: center; font-size: 11px; letter-spacing: .08em; margin: 2px 0 4px; }

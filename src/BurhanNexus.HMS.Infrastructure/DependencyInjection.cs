@@ -75,6 +75,7 @@ public static class DependencyInjection
         services.AddScoped<Pharmacy.IPharmacyService, Pharmacy.PharmacyService>();
         services.AddScoped<Pharmacy.IPharmacyQueryService, Pharmacy.PharmacyQueryService>();
         services.AddScoped<Pharmacy.IMedicineRequestService, Pharmacy.MedicineRequestService>();
+        services.AddScoped<Ipd.IIpdBillingService, Ipd.IpdBillingService>();
         services.AddSingleton<Radiology.RadiologyFileStore>();
         services.AddScoped<Radiology.IRadiologyCatalogService, Radiology.RadiologyCatalogService>();
         services.AddScoped<Radiology.IRadiologyService, Radiology.RadiologyWorkflowService>();
@@ -113,6 +114,7 @@ public static class DependencyInjection
         await Ipd.IpdSetupService.SeedAsync(db, DateTime.UtcNow, ct);
         await Ot.OtSetupService.SeedAsync(db, DateTime.UtcNow, ct);
         await Finance.FinanceSetupService.SeedAsync(db, DateTime.UtcNow, DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz)), ct);
+        await Ipd.IpdBillingService.SeedAsync(db, DateTime.UtcNow, ct);
         if (await db.HospitalConfigurations.AnyAsync(c => c.SetupCompleted, ct))
             await scope.ServiceProvider.GetRequiredService<ILicenseService>().EnsureInitializedAsync(ct);
         logger.LogInformation("Database ready.");

@@ -170,8 +170,7 @@ public sealed class AppointmentService : IAppointmentService
         if (errors.Count > 0) return ServiceResult<Appointment>.Fail(errors.ToArray());
 
         var service = await DoctorServiceAsync(doctor!.Id, ct);
-        var fee = service is null ? 0m : await _db.ServiceFees.Where(f => f.ServiceItemId == service.Id && f.EffectiveFrom <= today)
-            .OrderByDescending(f => f.EffectiveFrom).ThenByDescending(f => f.Id).Select(f => (decimal?)f.Fee).FirstOrDefaultAsync(ct) ?? service.DefaultFee;
+        var fee = service is null ? 0m : await Finance.ServiceCatalogue.FeeOnAsync(_db, service.Id, today, ct);
 
         // ---- how the consultation fee is settled ----
         var payment = fee <= 0 ? AppointmentPayment.Free

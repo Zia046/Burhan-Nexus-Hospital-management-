@@ -93,5 +93,29 @@ public static class PermissionSeeder
         [Perm.AppointmentsCollectFee] = Perm.AppointmentsAdd,
         [Perm.IpdRequestMedicines] = Perm.IpdRecordMedication,
         [Perm.PharmProcessWardRequests] = Perm.PharmIssueToPatients,
+        // update 10: whoever managed service fees in Finance manages the central Fees & Services catalogue
+        [Perm.SvcViewFees] = Perm.FinanceManageServiceFees,
+        [Perm.SvcManageCatalogue] = Perm.FinanceManageServiceFees,
+        [Perm.SvcManageCategories] = Perm.FinanceManageServiceFees,
+        [Perm.SvcManageServices] = Perm.FinanceManageServiceFees,
+        [Perm.SvcManageFees] = Perm.FinanceManageServiceFees,
+        [Perm.SvcReports] = Perm.FinanceDashboard,
+        // update 10 laboratory: correcting saved results was "withdraw result"; receipts go with booking; payments with the cashier task
+        [Perm.LabReviewResults] = Perm.LabDeleteResults,
+        [Perm.LabPrintReceipts] = Perm.LabBook,
+        [Perm.LabCollectPayments] = Perm.FinanceCollect,
+        // update 10 IPD billing: split from the earlier IPD finance / billing / settings tasks (financial clearance override is never inherited)
+        [Perm.IpdViewLedger] = Perm.IpdViewFinancial,
+        [Perm.IpdViewStatements] = Perm.IpdViewFinancial,
+        [Perm.IpdViewBillingHistory] = Perm.IpdViewFinancial,
+        [Perm.IpdPostCharges] = Perm.IpdManageBilling,
+        [Perm.IpdManageAdmissionFee] = Perm.IpdSettings,
+        [Perm.IpdRecordAdmissionPayment] = Perm.FinanceCollect,
+        [Perm.IpdManageWardCharges] = Perm.IpdSettings,
+        [Perm.IpdRecordEquipment] = Perm.IpdManageNicu,
+        [Perm.IpdManagePackages] = Perm.IpdSettings,
+        [Perm.FinanceReceiveInpatientPayments] = Perm.FinanceCollect,
+        [Perm.FinanceReceiveAdvances] = Perm.FinanceCollect,
+        [Perm.FinanceViewClearance] = Perm.IpdViewFinancial,
     };
 }

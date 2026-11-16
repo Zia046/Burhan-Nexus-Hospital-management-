@@ -12,7 +12,8 @@
     var isPrivate = profile?.HospitalType == HospitalType.Private;
     // Phase 7.1: the system administrator keeps 11 pages in the sidebar; every other category moves to the top taskbar.
     var isAdmin = User.IsSystemAdministrator();
-    var menu = NavMenu.Build(perms, isPrivate);
+    var labSimple = (await Context.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Laboratory.ILabCatalogService>().SettingsAsync()).SimpleWorkflow;
+    var menu = NavMenu.Build(perms, isPrivate, labSimple);
     var adminBar = isAdmin
         ? menu.Where(m => m.Visible).Select(m => m with { Items = m.Items.Where(i => !NavMenu.AdminSidebar.Contains(i.Nav)).ToList() }).Where(m => m.Items.Count > 0).ToList()
         : new List<NavSection>();
@@ -61,7 +62,7 @@
             foreach (var item in items) { @NavLink(item, "nav-link") }
         }
     </nav>
-    <div class="sidebar-footer">Burhan Nexus · v1.9 · Update 9</div>
+    <div class="sidebar-footer">Burhan Nexus · v2.0 · Update 10</div>
 </aside>
 <div class="sidebar-backdrop" data-sidebar-close></div>
 

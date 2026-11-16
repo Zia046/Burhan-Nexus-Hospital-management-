@@ -83,7 +83,7 @@
             @foreach (var i in g)
             {
                 <div class="lr-test" data-report-test="@i.TestCode">
-                    <h3>@i.TestName @if (i.Method is not null) { <small>(@i.Method)</small> }</h3>
+                    <h3>@i.TestName @if (i.Method is not null) { <small>(@i.Method)</small> }@if (i.RevisionNo > 0) { <span class="lr-amended" data-amended> AMENDED REPORT (revision @i.RevisionNo)</span> }</h3>
                     <table class="lr-results">
                         <thead><tr><th>Test</th><th>Result</th><th>Flag</th><th>Unit</th><th>Reference range</th></tr></thead>
                         <tbody>

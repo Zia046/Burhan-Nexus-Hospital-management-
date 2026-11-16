@@ -32,7 +32,10 @@
     </div>
     <div class="lr-status">For a PDF choose “Save as PDF” in the print dialog. Reprinting only reads the stored record – nothing is created. @(s.PrintHeader ? "" : "Header off – printing on the hospital letterhead.")</div>
 </div>
-<main class="lr-page rr-page" data-form-page>
+@{ var copyLabels = Model.Form == "admission" ? new string?[] { "PATIENT / ATTENDANT COPY", "HOSPITAL / ADMISSION OFFICE COPY" } : new string?[] { null }; }
+@foreach (var copyLabel in copyLabels)
+{
+<main class="lr-page rr-page @(copyLabel is null ? "" : "f-two-copy")" data-form-page data-copy="@copyLabel">
     @if (s.PrintHeader)
     {
         <header class="lr-head" data-form-header>
@@ -46,6 +49,7 @@
     }
     else { <div class="rr-letterhead" style="height:@(s.LetterheadTopMarginMm)mm" data-letterhead-space></div> }
     <h1 class="lr-title">@Model.Title.ToUpperInvariant()</h1>
+    @if (copyLabel is not null) { <div class="f-copy" data-copy-label>@copyLabel</div> }
     <table class="lr-info">
         <tr><th>Patient</th><td><strong>@p.FullName</strong></td><th>Patient ID</th><td class="mono">@p.PatientNumber</td></tr>
         <tr><th>Age / Gender</th><td>@Model.AgeText / @p.Gender</td><th>Father / Husband</th><td>@V(p.GuardianName)</td></tr>
@@ -70,6 +74,10 @@
                     <tr><th>Phone / CNIC</th><td>@V(p.MobileNumber)</td><td colspan="2">@V(p.Cnic)</td></tr>
                     <tr><th>Address</th><td colspan="3">@V(p.Address ?? p.CityOrVillage)</td></tr>
                     <tr><th>Registered by</th><td>@a.CreatedByUsername</td><th></th><td></td></tr>
+                    @if (Model.ShowFee && Model.AdmissionFeeCharge is { } fee)
+                    {
+                        <tr data-admission-fee><th>Admission fee</th><td>@Fmt.Money(fee.Fee)@(fee.Discount > 0 ? " (waived " + Fmt.Money(fee.Discount) + ")" : "")</td><th>Payment status</th><td data-fee-status><strong>@Model.FeeStatus</strong></td></tr>
+                    }
                 </table>
             </section>
             <section class="rr-section"><h3>Consent</h3>
@@ -275,5 +283,6 @@
         <div class="lr-end">Printed @Fmt.DateTimeText(DateTime.UtcNow) · @Model.Title</div>
     </footer>
 </main>
+}
 </body>
 </html>

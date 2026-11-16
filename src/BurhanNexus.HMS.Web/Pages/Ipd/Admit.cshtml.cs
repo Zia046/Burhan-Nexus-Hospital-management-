@@ -36,10 +36,29 @@ public class AdmitModel : IpdPageModel
     public IReadOnlyList<Doctor> Doctors { get; private set; } = Array.Empty<Doctor>();
     public IpdAdmission? Current { get; private set; }
     public bool IsGynae => Kind == "gynae";
+    // ---- Update 10: admission fee ----
+    public decimal? AdmissionFee { get; private set; }
+    public bool CanPayFee { get; private set; }
+    public bool CanWaiveFee { get; private set; }
+    public IReadOnlyList<PaymentMethod> Methods { get; private set; } = Array.Empty<PaymentMethod>();
+    /// <summary>pay | waive | later</summary>
+    [BindProperty] public string? FeeAction { get; set; }
+    [BindProperty] public int? FeeMethodId { get; set; }
+    [BindProperty] public string? FeeReference { get; set; }
+    [BindProperty] public string? FeeWaiverReason { get; set; }
 
     private async Task LoadAsync()
     {
         Nav("ipd-admit", "admit");
+        var ipdSettings = await Setup.SettingsAsync();
+        if (ipdSettings.AdmissionServiceItemId is int feeSvc && await CanAsync(Perm.IpdViewFinancial) | await CanAsync(Perm.IpdRecordAdmissionPayment))
+        {
+            var finance = HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Finance.IFinanceSetupService>();
+            AdmissionFee = await finance.FeeOnAsync(feeSvc, await Clock.TodayAsync());
+            CanPayFee = await CanAsync(Perm.IpdRecordAdmissionPayment);
+            CanWaiveFee = await CanAsync(Perm.IpdManageAdmissionFee);
+            if (CanPayFee) Methods = await finance.PaymentMethodsAsync(activeOnly: true);
+        }
         if (EncounterId is long eid && PatientId is null)
             PatientId = await _db.PatientEncounters.Where(e => e.Id == eid).Select(e => (long?)e.PatientId).FirstOrDefaultAsync();
         if (PatientId is long pid)
@@ -91,6 +110,18 @@ public class AdmitModel : IpdPageModel
             return Page();
         }
         FlashSuccess = $"Patient admitted: {r.Value!.AdmissionNumber}.";
+        // Update 10: admission fee – recorded only when actually received, or waived by an authorised user with a reason.
+        var billing = HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Ipd.IIpdBillingService>();
+        if (FeeAction == "pay" && FeeMethodId is int m && await CanAsync(Perm.IpdRecordAdmissionPayment))
+        {
+            var pay = await billing.PayAdmissionFeeAsync(r.Value.Id, Input.IdempotencyKey == Guid.Empty ? Guid.NewGuid() : Input.IdempotencyKey, m, null, FeeReference);
+            if (pay.Succeeded) FlashSuccess += " Admission fee received."; else FlashError = "Admission saved, but the admission fee was not recorded: " + pay.ErrorText;
+        }
+        else if (FeeAction == "waive" && await CanAsync(Perm.IpdManageAdmissionFee))
+        {
+            var w = await billing.WaiveAdmissionFeeAsync(r.Value.Id, FeeWaiverReason);
+            if (w.Succeeded) FlashSuccess += " Free admission recorded."; else FlashError = "Admission saved, but the waiver was not recorded: " + w.ErrorText;
+        }
         return Redirect($"/Ipd/Admission/{r.Value.Id}");
     }
 }

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System.Globalization;
 using System.Text.Json;
 using BurhanNexus.HMS.Core.Abstractions;
@@ -132,6 +133,8 @@ public interface IIpdService
     Task<ServiceResult> RecordDoseAsync(long doseId, DoseInput input, CancellationToken ct = default);
 
     Task<ServiceResult<int>> PostBedChargesAsync(long admissionId, bool atDischarge, CancellationToken ct = default);
+    /// <summary>Update 10: final bill before discharge – bed charges up to now and running equipment stopped, so the clearance balance is final.</summary>
+    Task<ServiceResult<int>> FinaliseBillAsync(long admissionId, CancellationToken ct = default);
     Task<ServiceResult> AddServiceChargeAsync(long admissionId, int serviceItemId, int quantity, decimal discount, string? reason, bool canDiscount, CancellationToken ct = default);
 
     /// <summary>Opens a bed for an admission inside the caller's transaction (used by admission, maternity and NICU).</summary>
@@ -148,9 +151,11 @@ public sealed class IpdService : IIpdService
     private readonly HospitalClock _clock;
     private readonly IFinanceSetupService _finance;
     private readonly IIpdSetupService _setup;
+    private readonly IServiceProvider _services;
 
-    public IpdService(HmsDbContext db, IAuditService audit, IRequestContext ctx, HospitalClock clock, IFinanceSetupService finance, IIpdSetupService setup)
+    public IpdService(HmsDbContext db, IAuditService audit, IRequestContext ctx, HospitalClock clock, IFinanceSetupService finance, IIpdSetupService setup, IServiceProvider services)
     {
+        _services = services;
         _db = db;
         _audit = audit;
         _ctx = ctx;
@@ -284,7 +289,7 @@ public sealed class IpdService : IIpdService
         // Phase 3: admission fee (configurable) on the patient's IPD bill.
         var settings = await _setup.SettingsAsync(ct);
         if (settings.AdmissionServiceItemId is int svc && a.Kind is not AdmissionKind.Newborn)
-            await ChargeAsync(a, svc, 1, 0, null, today, ct);
+            a.AdmissionFeeChargeId = (await ChargeAsync(a, svc, 1, 0, null, today, ct, (await _db.ServiceItems.Where(s => s.Id == svc).Select(s => s.Name).FirstAsync(ct)))).Id;
         _audit.Add(AuditActions.IpdAdmitted, "IpdAdmission", a.AdmissionNumber,
             $"{a.Kind} admission {a.AdmissionNumber} for {patient.PatientNumber} from {a.Source}" + (a.AdmissionDiagnosis is null ? "" : $" – {a.AdmissionDiagnosis}"));
         await _db.SaveChangesAsync(ct);
@@ -555,10 +560,20 @@ public sealed class IpdService : IIpdService
             errors.Add("A newborn is rooming-in with the mother – discharge or transfer the baby first.");
         if (errors.Count > 0) return ServiceResult.Fail(errors.ToArray());
         var posted = await PostBedChargesWithinAsync(a, atDischarge: true, ct);
+        // Update 10: running equipment stops at discharge (charged up to now).
+        var billing = _services.GetRequiredService<IIpdBillingService>();
+        await billing.EndAllEquipmentAsync(a.Id, "Stopped at discharge", ct);
+        await _db.SaveChangesAsync(ct);
         if ((await _setup.SettingsAsync(ct)).RequireBillClearanceForDischarge)
         {
-            var due = await _db.Charges.Where(c => c.IpdAdmissionId == a.Id && c.Status != ChargeStatus.Cancelled).SumAsync(c => (decimal?)(c.NetAmount - c.PaidAmount), ct) ?? 0;
-            if (due > 0) { await tx.RollbackAsync(ct); _db.ChangeTracker.Clear(); return ServiceResult.Fail($"The bill has an outstanding balance of {due:N2}. The hospital settings require payment before discharge."); }
+            // Financial clearance: the balance after the unused advance must be zero, unless an authorised user recorded an override.
+            var (due, overridden) = await billing.ClearanceAsync(a.Id, ct);
+            if (due > 0 && !overridden)
+            {
+                await tx.RollbackAsync(ct);
+                _db.ChangeTracker.Clear();
+                return ServiceResult.Fail($"The bill has an outstanding balance of {due:N2}. Receive the payment in Financial clearance, or an authorised user must override the clearance with a reason.");
+            }
         }
         // The bed is released only now, when the discharge is complete.
         await ReleaseBedAsync(a, ct);
@@ -589,15 +604,23 @@ public sealed class IpdService : IIpdService
     // Billing (Phase 3 charges only)
     // =====================================================================================
 
-    private async Task<Charge> ChargeAsync(IpdAdmission a, int serviceItemId, int quantity, decimal discount, string? reason, DateOnly date, CancellationToken ct, string? name = null)
+    private Task<Charge> ChargeAsync(IpdAdmission a, int serviceItemId, int quantity, decimal discount, string? reason, DateOnly date, CancellationToken ct, string? name = null) =>
+        ChargeAsync(a, serviceItemId, (decimal)quantity, discount, reason, date, ct, name);
+
+    private async Task<Charge> ChargeAsync(IpdAdmission a, int serviceItemId, decimal quantity, decimal discount, string? reason, DateOnly date, CancellationToken ct, string? name = null)
     {
         var svc = await _db.ServiceItems.AsNoTracking().FirstAsync(s => s.Id == serviceItemId, ct);
         var unit = await _finance.FeeOnAsync(svc.Id, date, ct);
-        var fee = unit * quantity;
+        var fee = decimal.Round(unit * quantity, 2, MidpointRounding.AwayFromZero);
+        // Update 10: a service included in a package of this admission is shown on the bill but not charged again.
+        var package = await _db.AdmissionPackages.Where(x => x.AdmissionId == a.Id && x.IsActive && x.Package!.Items.Any(i => i.ServiceItemId == serviceItemId))
+            .Select(x => x.Package!.Name).FirstOrDefaultAsync(ct);
+        if (package is not null && fee > 0) { discount = fee; reason = T($"Included in package {package}", 200); }
         var c = new Charge
         {
             ChargeNumber = await FinanceDb.NextNumberAsync(_db, HmsDbContext.ChargeNumberSequence, "CHG", await _clock.TodayAsync(), ct),
-            PatientId = a.PatientId, IpdAdmissionId = a.Id, ServiceItemId = svc.Id, ServiceKind = svc.Kind, ServiceName = name ?? (quantity > 1 ? $"{svc.Name} × {quantity}" : svc.Name),
+            PatientId = a.PatientId, IpdAdmissionId = a.Id, ServiceItemId = svc.Id, ServiceKind = svc.Kind, ServiceName = name ?? (quantity != 1 ? $"{svc.Name} × {quantity:0.##}" : svc.Name),
+            Quantity = quantity, UnitPrice = unit,
             DepartmentId = svc.DepartmentId, Fee = fee, Discount = discount, NetAmount = fee - discount, AllowPartialPayment = true,
             DiscountReason = discount > 0 ? reason : null, DoctorShareType = DoctorShareType.HospitalKeepsAll, Status = fee - discount == 0 ? ChargeStatus.Paid : ChargeStatus.Unpaid,
             BusinessDate = await _clock.TodayAsync(), CreatedUtc = _clock.UtcNow, CreatedByUserId = _ctx.UserId, CreatedByUsername = _ctx.Username
@@ -605,6 +628,20 @@ public sealed class IpdService : IIpdService
         _db.Charges.Add(c);
         await _db.SaveChangesAsync(ct);
         return c;
+    }
+
+    public async Task<ServiceResult<int>> FinaliseBillAsync(long admissionId, CancellationToken ct = default)
+    {
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        var a = await LockAdmissionAsync(admissionId, ct);
+        if (a is null) return ServiceResult<int>.Fail("Admission not found.");
+        if (!a.IsActive) return ServiceResult<int>.Fail("This admission is already closed.");
+        var n = await PostBedChargesWithinAsync(a, atDischarge: true, ct);
+        n += await _services.GetRequiredService<IIpdBillingService>().EndAllEquipmentAsync(a.Id, "Stopped for the final bill", ct);
+        _audit.Add(AuditActions.IpdChargePosted, "IpdAdmission", a.AdmissionNumber, $"Final bill prepared for {a.AdmissionNumber}: {n} charge(s) posted");
+        await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return ServiceResult<int>.Ok(n);
     }
 
     public async Task<ServiceResult<int>> PostBedChargesAsync(long admissionId, bool atDischarge, CancellationToken ct = default)
@@ -628,6 +665,9 @@ public sealed class IpdService : IIpdService
         var allocations = await _db.IpdBedAllocations.AsNoTracking().Where(x => x.AdmissionId == a.Id && !x.IsShared).OrderBy(x => x.FromUtc).ToListAsync(ct);
         if (allocations.Count == 0) return 0;
         var zone = await _clock.ZoneAsync();
+        var policy = await _setup.SettingsAsync(ct);
+        if (policy.BedChargePolicy != BedChargePolicy.PerNight)
+            return await PostPolicyBedChargesAsync(a, allocations, policy, atDischarge, zone, ct);
         var today = await _clock.TodayAsync();
         var start = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(allocations[0].FromUtc, zone));
         var endExclusive = atDischarge ? (today > start ? today : start.AddDays(1)) : today;
@@ -647,6 +687,70 @@ public sealed class IpdService : IIpdService
             posted++;
         }
         return posted;
+    }
+
+    /// <summary>
+    /// Update 10: one bed charge per billing day (unique per admission and day – never twice, never overlapping). The billing day starts
+    /// at the cutoff time (cutoff / half-day policies) or at midnight (hourly). After a transfer the day is charged at the ward where the
+    /// patient spent most of it. Only completed billing days are posted, plus the running day at discharge.
+    /// </summary>
+    private async Task<int> PostPolicyBedChargesAsync(IpdAdmission a, IReadOnlyList<IpdBedAllocation> allocations, IpdSettings s, bool atDischarge, TimeZoneInfo zone, CancellationToken ct)
+    {
+        var now = _clock.UtcNow;
+        var days = BedDays(allocations.Select(x => (x.FromUtc, x.ToUtc, x.WardId)).ToList(), s.BedChargePolicy, s.BedChargeCutoff, s.HalfDayHours, now, atDischarge, zone);
+        var done = (await _db.IpdBedCharges.Where(x => x.AdmissionId == a.Id).Select(x => x.Night).ToListAsync(ct)).ToHashSet();
+        var wards = await _db.IpdWards.AsNoTracking().ToDictionaryAsync(w => w.Id, ct);
+        var posted = 0;
+        foreach (var d in days)
+        {
+            if (done.Contains(d.Day) || d.Quantity <= 0) continue;
+            if (!wards.TryGetValue(d.WardId, out var ward) || ward.BedChargeServiceItemId is not int svc) continue;
+            var label = s.BedChargePolicy == BedChargePolicy.Hourly ? $"{ward.Name} – bed {d.Day:dd MMM yyyy} ({d.Quantity:0.##} h)"
+                : d.Quantity == 1 ? $"{ward.Name} – bed day {d.Day:dd MMM yyyy}" : $"{ward.Name} – bed {d.Day:dd MMM yyyy} (½ day)";
+            var c = await ChargeAsync(a, svc, d.Quantity, 0, null, d.Day, ct, label);
+            _db.IpdBedCharges.Add(new IpdBedCharge { AdmissionId = a.Id, Night = d.Day, WardId = ward.Id, ChargeId = c.Id, Quantity = d.Quantity });
+            await _db.SaveChangesAsync(ct);
+            posted++;
+        }
+        return posted;
+    }
+
+    /// <summary>Billing days of the bed periods under a charging policy (pure function – also used by the tests).</summary>
+    public static IReadOnlyList<(DateOnly Day, int WardId, decimal Quantity)> BedDays(IReadOnlyList<(DateTime FromUtc, DateTime? ToUtc, int WardId)> periods, BedChargePolicy policy,
+        TimeOnly cutoff, int halfDayHours, DateTime nowUtc, bool atDischarge, TimeZoneInfo zone)
+    {
+        var result = new List<(DateOnly, int, decimal)>();
+        if (periods.Count == 0) return result;
+        var start = periods.Min(p => p.FromUtc);
+        var end = periods.Max(p => p.ToUtc ?? nowUtc);
+        if (end > nowUtc) end = nowUtc;
+        var dayStart = policy == BedChargePolicy.Hourly ? TimeOnly.MinValue : cutoff;
+        var local = TimeZoneInfo.ConvertTimeFromUtc(start, zone);
+        var day = DateOnly.FromDateTime(local);
+        if (TimeOnly.FromDateTime(local) < dayStart) day = day.AddDays(-1);
+        for (; ; day = day.AddDays(1))
+        {
+            var winStart = TimeZoneInfo.ConvertTimeToUtc(day.ToDateTime(dayStart), zone);
+            var winEnd = TimeZoneInfo.ConvertTimeToUtc(day.AddDays(1).ToDateTime(dayStart), zone);
+            if (winStart >= end) break;
+            if (winEnd > nowUtc && !atDischarge) break; // the running billing day is charged when it is complete (or at discharge)
+            var byWard = periods.Select(p => (p.WardId, Hours: (Min(p.ToUtc ?? nowUtc, winEnd) - Max(p.FromUtc, winStart)).TotalHours))
+                .Where(x => x.Hours > 0).GroupBy(x => x.WardId).Select(g => (Ward: g.Key, Hours: g.Sum(x => x.Hours))).ToList();
+            if (byWard.Count == 0) continue;
+            var hours = byWard.Sum(x => x.Hours);
+            var ward = byWard.OrderByDescending(x => x.Hours).First().Ward;
+            var qty = policy switch
+            {
+                BedChargePolicy.Hourly => Math.Max(1m, Math.Ceiling((decimal)hours)),
+                BedChargePolicy.HalfDay => hours < halfDayHours ? 0.5m : 1m,
+                _ => 1m,
+            };
+            result.Add((day, ward, qty));
+        }
+        return result;
+
+        static DateTime Min(DateTime x, DateTime y) => x < y ? x : y;
+        static DateTime Max(DateTime x, DateTime y) => x > y ? x : y;
     }
 
     public async Task<ServiceResult> AddServiceChargeAsync(long admissionId, int serviceItemId, int quantity, decimal discount, string? reason, bool canDiscount, CancellationToken ct = default)

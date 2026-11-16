@@ -48,6 +48,28 @@ else
                 <h3 class="section-title">Ward, room &amp; bed</h3>
                 <div bn-permission="@Perm.IpdAllocateBed">@await Html.PartialAsync("_BedSelect", (Model.Beds, "Input.BedId", i.BedId, false))</div>
             </div>
+            @if (Model.AdmissionFee is decimal fee)
+            {
+                <fieldset class="fee-box" data-admission-fee="@fee.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                    <legend>Admission fee: <strong>@Fmt.Money(fee)</strong></legend>
+                    @if (fee > 0)
+                    {
+                        <div class="checks">
+                            <label class="check"><input type="radio" name="FeeAction" value="later" checked="@(Model.FeeAction is null or "later")" /> Not received now (stays on the patient's account)</label>
+                            @if (Model.CanPayFee) { <label class="check"><input type="radio" name="FeeAction" value="pay" checked="@(Model.FeeAction == "pay")" data-test="fee-pay" /> Received now</label> }
+                            @if (Model.CanWaiveFee) { <label class="check"><input type="radio" name="FeeAction" value="waive" checked="@(Model.FeeAction == "waive")" /> Free admission (authorised waiver)</label> }
+                        </div>
+                        <div class="grid-2">
+                            @if (Model.CanPayFee)
+                            {
+                                <div class="field"><label for="fm">Payment method</label><select id="fm" name="FeeMethodId">@foreach (var pm in Model.Methods) { <option value="@pm.Id" selected="@(pm.Code == "CASH")">@pm.Name</option> }</select></div>
+                                <div class="field"><label for="fr">Reference</label><input id="fr" name="FeeReference" maxlength="100" /></div>
+                            }
+                            @if (Model.CanWaiveFee) { <div class="field"><label for="fw">Reason for free admission</label><input id="fw" name="FeeWaiverReason" maxlength="200" /></div> }
+                        </div>
+                    }
+                </fieldset>
+            }
             <div class="card-footer form-actions"><a class="btn btn-light" href="/Ipd/Admit">Change patient</a><button class="btn btn-primary btn-lg" type="submit" data-test="ipd-admit-save" data-once>Admit patient</button></div>
         </div>
         <div class="card patient-mini"><div class="card-body">

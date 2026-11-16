@@ -48,6 +48,11 @@ public class EntryModel : HmsPageModel
     public LabOrderItem? Current { get; private set; }
     public bool CanEdit { get; private set; }
     public bool CanEnter { get; private set; }
+    /// <summary>Update 10: simple workflow (save = verified) and the "Review report" correction mode.</summary>
+    public bool Simple { get; private set; }
+    public bool CanReview { get; private set; }
+    [BindProperty(SupportsGet = true, Name = "review")] public bool Review { get; set; }
+    [BindProperty] public string? Reason { get; set; }
 
     private static bool Editable(LabOrderItem i) => LabService.OpenStatuses.Contains(i.Status) || i.Status == LabOrderItemStatus.AwaitingVerification;
 
@@ -60,6 +65,8 @@ public class EntryModel : HmsPageModel
         Order = o;
         CanEnter = await CanAsync(Perm.LabEnterResults);
         CanEdit = await CanAsync(Perm.LabEditResults);
+        CanReview = await CanAsync(Perm.LabReviewResults);
+        Simple = (await HttpContext.RequestServices.GetRequiredService<ILabCatalogService>().SettingsAsync()).SimpleWorkflow;
         Current = Item is long iid ? o.Items.FirstOrDefault(i => i.Id == iid)
             : o.Items.FirstOrDefault(i => LabService.OpenStatuses.Contains(i.Status) && i.Status != LabOrderItemStatus.SamplePending)
               ?? o.Items.FirstOrDefault(i => LabService.OpenStatuses.Contains(i.Status))
@@ -104,7 +111,8 @@ public class EntryModel : HmsPageModel
             AddErrors(r);
             return Page();
         }
-        FlashSuccess = submit ? $"{item.TestName}: result saved – sent for verification." : $"{item.TestName}: draft saved.";
+        var verified = submit && (await _lab.ItemAsync(item.Id))?.Status == LabOrderItemStatus.Verified;
+        FlashSuccess = verified ? $"{item.TestName}: report saved and VERIFIED – it can be printed now." : submit ? $"{item.TestName}: result saved – sent for verification." : $"{item.TestName}: draft saved.";
         if (Mode == "next")
         {
             var order = (await _lab.OrderAsync(id))!;
@@ -114,6 +122,25 @@ public class EntryModel : HmsPageModel
             FlashSuccess += " All available tests of this visit are entered.";
             return Redirect("/Lab/Pending");
         }
+        return Redirect($"/Lab/Entry/{id}?item={item.Id}");
+    }
+
+    /// <summary>Update 10: correct a saved report (permission "Review / Edit Saved Results"); the previous result stays in history.</summary>
+    public async Task<IActionResult> OnPostReviewAsync(long id)
+    {
+        if (await DenyUnlessAsync(Perm.LabReviewResults) is { } deny) return deny;
+        var item = Item is long iid ? await _lab.ItemAsync(iid) : null;
+        if (item is null || item.LabOrderId != id) return NotFound();
+        var culture = Culture.Select(c => new CultureLineInput(c.ValueId, c.Organism, c.Antibiotic, c.Result, c.Mic)).ToList();
+        var r = await _lab.ReviewResultAsync(item.Id, Values, culture, Comment, Reason);
+        if (!r.Succeeded)
+        {
+            Review = true;
+            await LoadAsync(id);
+            AddErrors(r);
+            return Page();
+        }
+        FlashSuccess = $"{item.TestName}: corrected report saved (still VERIFIED). The previous result is kept in the report history.";
         return Redirect($"/Lab/Entry/{id}?item={item.Id}");
     }
 

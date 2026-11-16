@@ -1,0 +1,54 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Ipd.EquipmentModel
+@{
+    var a = Model.A;
+    ViewData["Title"] = "NICU equipment " + a.AdmissionNumber;
+    var open = a.Status is AdmissionStatus.Registered or AdmissionStatus.Admitted or AdmissionStatus.UnderTreatment or AdmissionStatus.Transferred or AdmissionStatus.DischargeRequested;
+}
+<partial name="_IpdNav" />
+<div class="page-header">
+    <div><h1>NICU equipment</h1><p class="muted">@a.Patient?.FullName · @a.Patient?.PatientNumber · @a.AdmissionNumber · @(a.CurrentBed?.Code)</p></div>
+    <div class="actions"><a class="btn btn-light" href="/Ipd/Admission/@a.Id">Admission</a> <a bn-permission="@Perm.IpdViewLedger" class="btn btn-light" href="/Ipd/Account/@a.Id">Account</a></div>
+</div>
+<partial name="_ValidationSummary" />
+@if (open)
+{
+    <form method="post" asp-page-handler="Start" class="card" novalidate data-equipment-start>
+        <div class="card-header"><h2>Start equipment</h2><span class="muted small">Rate and unit come from Fees &amp; Services; the charge is posted when the equipment is stopped.</span></div>
+        <input type="hidden" name="Start.IdempotencyKey" value="@Model.Start.IdempotencyKey" />
+        <div class="form-grid card-body">
+            <div class="field"><label for="eq">Equipment</label><select id="eq" name="Start.EquipmentId">@foreach (var e in Model.Catalogue) { <option value="@e.Id">@e.Name</option> }</select></div>
+            <div class="field"><label for="idf">Device / serial no.</label><input id="idf" name="Start.Identifier" maxlength="50" /></div>
+            <div class="field"><label for="st">Start (empty = now)</label><input id="st" name="Start.StartLocal" type="datetime-local" /></div>
+            <div class="field"><label for="nt">Notes</label><input id="nt" name="Start.Notes" maxlength="300" /></div>
+        </div>
+        <div class="card-footer"><button class="btn btn-primary" data-test="equipment-start">Start</button></div>
+    </form>
+}
+<div class="card">
+    <table class="table" data-equipment>
+        <thead><tr><th>Equipment</th><th>Device</th><th>Started</th><th>Stopped</th><th class="num">Rate</th><th class="num">Qty</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var u in Model.Usages)
+        {
+            <tr data-usage="@u.EquipmentName" data-status="@u.Status">
+                <td>@u.EquipmentName</td><td>@u.Identifier</td><td>@Fmt.DateTimeText(u.StartUtc) <small class="muted block">@u.StartedByUsername</small></td>
+                <td>@(u.EndUtc is null ? "running" : Fmt.DateTimeText(u.EndUtc)) <small class="muted block">@u.EndReason</small></td>
+                <td class="num">@Fmt.Money(u.UnitPrice) / @u.ChargeUnit</td><td class="num">@u.Quantity?.ToString("0.##")</td><td>@u.Status</td>
+                <td>@if (u.Status == EquipmentUsageStatus.Active)
+                    {
+                        <form method="post" asp-page-handler="Stop" asp-route-usageId="@u.Id" class="inline-form" novalidate>
+                            <input name="EndLocal" type="datetime-local" aria-label="Stop time (empty = now)" /><input name="Reason" maxlength="300" placeholder="Reason" aria-label="Reason" />
+                            <button class="btn btn-light btn-sm" data-test="equipment-stop">Stop</button></form>
+                        <details class="inline-details"><summary class="btn btn-light btn-sm">Replace</summary>
+                            <form method="post" asp-page-handler="Replace" asp-route-usageId="@u.Id" class="inline-form" novalidate>
+                                <input type="hidden" name="ReplaceKey" value="@Guid.NewGuid()" />
+                                <input name="NewIdentifier" maxlength="50" placeholder="New device no." aria-label="New device" /><input name="Reason" maxlength="200" placeholder="Reason" aria-label="Reason" />
+                                <button class="btn btn-light btn-sm" data-test="equipment-replace">Replace</button></form></details>
+                    }</td>
+            </tr>
+        }
+        @if (Model.Usages.Count == 0) { <tr><td colspan="8" class="empty">No equipment recorded.</td></tr> }
+        </tbody>
+    </table>
+</div>

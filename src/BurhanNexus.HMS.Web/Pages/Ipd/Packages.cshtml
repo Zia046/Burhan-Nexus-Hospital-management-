@@ -1,0 +1,37 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ipd.PackagesModel
+@{ ViewData["Title"] = "Packages"; var f = Model.Form; }
+<partial name="_IpdNav" />
+<div class="page-header"><div><h1>NICU / IPD packages</h1><p class="muted">The package price is a service in Fees &amp; Services. Included services are shown on the bill but not charged again; everything else (medicines, tests …) is billed separately.</p></div></div>
+<partial name="_ValidationSummary" />
+<div class="grid-side">
+    <div class="card">
+        <table class="table" data-packages>
+            <thead><tr><th>Code</th><th>Package</th><th>Price service</th><th>Included</th><th>Excluded</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var p in Model.Packages)
+            {
+                <tr data-package="@p.Code"><td class="mono">@p.Code</td><td><strong>@p.Name</strong> <small class="muted block">@p.Description</small></td><td>@p.ServiceItem?.Name</td>
+                    <td>@string.Join(", ", p.Items.Select(i => i.ServiceItem?.Name))</td><td>@p.Excluded</td><td>@(p.IsActive ? "Active" : "Inactive")</td>
+                    <td><a class="btn btn-light btn-sm" href="/Ipd/Packages?id=@p.Id">Edit</a></td></tr>
+            }
+            @if (Model.Packages.Count == 0) { <tr><td colspan="7" class="empty">No packages yet.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+    <form method="post" asp-route-id="@Model.Id" class="card" novalidate data-package-form>
+        <div class="card-header"><h3>@(Model.Id is null ? "New package" : "Edit package")</h3></div>
+        <div class="card-body">
+            <div class="field"><label for="pc">Code</label><input id="pc" name="Form.Code" value="@f.Code" maxlength="30" required /></div>
+            <div class="field"><label for="pn">Name</label><input id="pn" name="Form.Name" value="@f.Name" maxlength="150" required /></div>
+            <div class="field"><label for="ps">Price (service)</label><select id="ps" name="Form.ServiceItemId"><option value="0">—</option>
+                @foreach (var s in Model.Services) { <option value="@s.Item.Id" selected="@(f.ServiceItemId == s.Item.Id)">@s.Item.Name (@Fmt.Money(s.CurrentFee))</option> }</select></div>
+            <div class="field"><label for="pi">Included services</label><select id="pi" name="Form.IncludedServiceIds" multiple size="10">
+                @foreach (var s in Model.Services) { <option value="@s.Item.Id" selected="@f.IncludedServiceIds.Contains(s.Item.Id)">@(s.Item.ServiceCategory?.Name) · @s.Item.Name</option> }</select></div>
+            <div class="field"><label for="pd">Description</label><input id="pd" name="Form.Description" value="@f.Description" maxlength="500" /></div>
+            <div class="field"><label for="px">Excluded (charged separately)</label><input id="px" name="Form.Excluded" value="@f.Excluded" maxlength="500" placeholder="Medicines, laboratory tests, oxygen …" /></div>
+            <label class="check"><input type="checkbox" name="Form.IsActive" value="true" checked="@f.IsActive" /> Active</label><input type="hidden" name="Form.IsActive" value="false" />
+        </div>
+        <div class="card-footer"><button class="btn btn-primary">Save package</button></div>
+    </form>
+</div>

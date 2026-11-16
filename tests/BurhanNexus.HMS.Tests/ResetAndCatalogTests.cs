@@ -19,11 +19,11 @@ public class ResetAndCatalogTests : HmsTestBase
         var finance = PermissionCatalog.FindModule("Finance")!;
         Assert.True(finance.IsAvailable);
         Assert.True(finance.IsFinancialModule);
-        Assert.Equal(24, finance.Actions.Count);
+        Assert.Equal(28, finance.Actions.Count); // update 10: inpatient payments, advances, clearance
         // Phase 4: Laboratory became a real module with its own specific permissions.
         var lab = PermissionCatalog.FindModule("Laboratory")!;
         Assert.True(lab.IsAvailable);
-        Assert.Equal(25, lab.Actions.Count);
+        Assert.Equal(28, lab.Actions.Count); // update 10: payments, receipts, review
         Assert.Contains(Perm.LabVerifyOwnResults, PermissionCatalog.AllKeys);
         // Phase 5: Pharmacy became a real module.
         var pharm = PermissionCatalog.FindModule("Pharmacy")!;
@@ -39,7 +39,7 @@ public class ResetAndCatalogTests : HmsTestBase
         // Phase 7: IPD, maternity and NICU.
         var ipd = PermissionCatalog.FindModule("Ipd")!;
         Assert.True(ipd.IsAvailable);
-        Assert.Equal(38, ipd.Actions.Count); // update 9: nursing medicine demand
+        Assert.Equal(47, ipd.Actions.Count); // update 10: ledger, statements, admission fee, ward charges, equipment, packages
         // Phase 8: Operation Theatre (the Minor OT stays a pharmacy department location – no module of its own).
         var ot = PermissionCatalog.FindModule("Ot")!;
         Assert.True(ot.IsAvailable);

@@ -35,6 +35,7 @@ public class HmsDbContext : DbContext
     public DbSet<EmergencyCategory> EmergencyCategories => Set<EmergencyCategory>();
     public DbSet<Doctor> Doctors => Set<Doctor>();
     public DbSet<ServiceItem> ServiceItems => Set<ServiceItem>();
+    public DbSet<ServiceCategory> ServiceCategories => Set<ServiceCategory>();
     public DbSet<PrintedDocument> PrintedDocuments => Set<PrintedDocument>();
     public DbSet<RegistrationSettings> RegistrationSettings => Set<RegistrationSettings>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
@@ -159,6 +160,14 @@ public class HmsDbContext : DbContext
     public DbSet<CssdIssue> CssdIssues => Set<CssdIssue>();
     // Update 9
     public DbSet<MedicineRequest> MedicineRequests => Set<MedicineRequest>();
+    public DbSet<NicuEquipment> NicuEquipment => Set<NicuEquipment>();
+    public DbSet<EquipmentUsage> EquipmentUsages => Set<EquipmentUsage>();
+    public DbSet<ServicePackage> ServicePackages => Set<ServicePackage>();
+    public DbSet<ServicePackageItem> ServicePackageItems => Set<ServicePackageItem>();
+    public DbSet<AdmissionPackage> AdmissionPackages => Set<AdmissionPackage>();
+    public DbSet<PatientAdvance> PatientAdvances => Set<PatientAdvance>();
+    public DbSet<PatientAdvanceEntry> PatientAdvanceEntries => Set<PatientAdvanceEntry>();
+    public DbSet<DischargeClearanceOverride> DischargeClearanceOverrides => Set<DischargeClearanceOverride>();
     public DbSet<MedicineRequestLine> MedicineRequestLines => Set<MedicineRequestLine>();
     public DbSet<MedicineRequestEvent> MedicineRequestEvents => Set<MedicineRequestEvent>();
     public DbSet<LabCultureResult> LabCultureResults => Set<LabCultureResult>();
@@ -194,6 +203,7 @@ public class HmsDbContext : DbContext
     public const string SurgerySequence = "surgery_seq";
     public const string CssdBatchSequence = "cssd_batch_seq";
     public const string MedicineRequestSequence = "medicine_request_seq";
+    public const string AdvanceSequence = "patient_advance_seq";
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -203,7 +213,7 @@ public class HmsDbContext : DbContext
         b.HasSequence<long>(OpdNumberSequence).StartsAt(1).IncrementsBy(1);
         b.HasSequence<long>(EmergencyNumberSequence).StartsAt(1).IncrementsBy(1);
         foreach (var seq in new[] { MedicineCodeSequence, SupplierCodeSequence, StockReceiptSequence, MedicineIssueSequence, PharmacySaleSequence, StockTransferSequence,
-                                     StockAdjustmentSequence, MedicineReturnSequence, SupplierReturnSequence, SupplierPaymentSequence, RadiologyOrderSequence, RadiologyServiceCodeSequence, IpdAdmissionSequence, PregnancySequence, DeliverySequence, SurgerySequence, CssdBatchSequence, MedicineRequestSequence, LabOrderNumberSequence, LabSampleNumberSequence, ReceiptNumberSequence, ChargeNumberSequence, RefundNumberSequence, DepositNumberSequence, SettlementNumberSequence, AdjustmentNumberSequence })
+                                     StockAdjustmentSequence, MedicineReturnSequence, SupplierReturnSequence, SupplierPaymentSequence, RadiologyOrderSequence, RadiologyServiceCodeSequence, IpdAdmissionSequence, PregnancySequence, DeliverySequence, SurgerySequence, CssdBatchSequence, MedicineRequestSequence, AdvanceSequence, LabOrderNumberSequence, LabSampleNumberSequence, ReceiptNumberSequence, ChargeNumberSequence, RefundNumberSequence, DepositNumberSequence, SettlementNumberSequence, AdjustmentNumberSequence })
             b.HasSequence<long>(seq).StartsAt(1).IncrementsBy(1);
 
         b.Entity<HospitalSettings>(e =>
@@ -418,6 +428,16 @@ public class HmsDbContext : DbContext
             e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(30);
             e.HasOne(x => x.Doctor).WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Department).WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ServiceCategory).WithMany().HasForeignKey(x => x.ServiceCategoryId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.ChargeUnit).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Applicability).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => x.ServiceCategoryId);
+        });
+        b.Entity<ServiceCategory>(e =>
+        {
+            e.ToTable("ServiceCategories");
+            e.HasIndex(x => x.Code).IsUnique();
+            e.HasIndex(x => x.Name).IsUnique();
         });
 
         b.Entity<PrintedDocument>(e =>
@@ -479,6 +499,7 @@ public class HmsDbContext : DbContext
         ConfigureIpd(b);
         ConfigureOt(b);
         ConfigureUpdate9(b);
+        ConfigureUpdate10(b);
         b.Entity<LabOrder>().HasOne<IpdAdmission>().WithMany().HasForeignKey(x => x.IpdAdmissionId).OnDelete(DeleteBehavior.Restrict);
         b.Entity<RadiologyOrder>().HasOne<IpdAdmission>().WithMany().HasForeignKey(x => x.IpdAdmissionId).OnDelete(DeleteBehavior.Restrict);
         b.Entity<PatientMedicineIssue>().HasOne<IpdAdmission>().WithMany().HasForeignKey(x => x.IpdAdmissionId).OnDelete(DeleteBehavior.Restrict);
@@ -1009,6 +1030,7 @@ public class HmsDbContext : DbContext
         {
             e.ToTable("IpdBedCharges");
             e.HasIndex(x => new { x.AdmissionId, x.Night }).IsUnique();
+            e.Property(x => x.Quantity).HasPrecision(10, 2);
             e.HasOne<IpdAdmission>().WithMany().HasForeignKey(x => x.AdmissionId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Charge>().WithMany().HasForeignKey(x => x.ChargeId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -1586,6 +1608,86 @@ public class HmsDbContext : DbContext
     }
 
     /// <summary>Update 9: nursing medicine demand and laboratory culture / sensitivity results.</summary>
+    private static void ConfigureUpdate10(ModelBuilder b)
+    {
+        b.Entity<IpdSettings>(e => e.Property(x => x.BedChargePolicy).HasConversion<string>().HasMaxLength(20));
+        b.Entity<NicuEquipment>(e =>
+        {
+            e.ToTable("NicuEquipment");
+            e.HasIndex(x => x.Code).IsUnique();
+            e.HasOne(x => x.ServiceItem).WithMany().HasForeignKey(x => x.ServiceItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<EquipmentUsage>(e =>
+        {
+            e.ToTable("EquipmentUsages", t => t.HasCheckConstraint("CK_EquipmentUsages_Period", "\"EndUtc\" IS NULL OR \"EndUtc\" >= \"StartUtc\""));
+            e.Property(x => x.ChargeUnit).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.UnitPrice).HasPrecision(14, 2);
+            e.Property(x => x.Quantity).HasPrecision(10, 2);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasIndex(x => x.IdempotencyKey).IsUnique();
+            e.HasIndex(x => x.AdmissionId);
+            // one running period per equipment type and patient, and one patient per device at a time
+            e.HasIndex(x => new { x.AdmissionId, x.EquipmentId }).IsUnique().HasFilter("\"Status\" = 'Active'").HasDatabaseName("UX_EquipmentUsages_ActivePerAdmission");
+            e.HasIndex(x => new { x.EquipmentId, x.Identifier }).IsUnique().HasFilter("\"Status\" = 'Active' AND \"Identifier\" IS NOT NULL").HasDatabaseName("UX_EquipmentUsages_ActiveDevice");
+            e.HasIndex(x => x.ChargeId).IsUnique().HasFilter("\"ChargeId\" IS NOT NULL");
+            e.HasOne(x => x.Admission).WithMany().HasForeignKey(x => x.AdmissionId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Equipment).WithMany().HasForeignKey(x => x.EquipmentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Charge>().WithMany().HasForeignKey(x => x.ChargeId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<ServicePackage>(e =>
+        {
+            e.ToTable("ServicePackages");
+            e.HasIndex(x => x.Code).IsUnique();
+            e.HasOne(x => x.ServiceItem).WithMany().HasForeignKey(x => x.ServiceItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<ServicePackageItem>(e =>
+        {
+            e.ToTable("ServicePackageItems");
+            e.HasKey(x => new { x.PackageId, x.ServiceItemId });
+            e.HasOne(x => x.Package).WithMany(p => p.Items).HasForeignKey(x => x.PackageId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.ServiceItem).WithMany().HasForeignKey(x => x.ServiceItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<AdmissionPackage>(e =>
+        {
+            e.ToTable("AdmissionPackages");
+            e.HasIndex(x => new { x.AdmissionId, x.PackageId }).IsUnique().HasFilter("\"IsActive\"").HasDatabaseName("UX_AdmissionPackages_Active");
+            e.HasOne<IpdAdmission>().WithMany().HasForeignKey(x => x.AdmissionId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Package).WithMany().HasForeignKey(x => x.PackageId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Charge>().WithMany().HasForeignKey(x => x.ChargeId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<PatientAdvance>(e =>
+        {
+            e.ToTable("PatientAdvances", t => t.HasCheckConstraint("CK_PatientAdvances_Balance", "\"Amount\" > 0 AND \"AppliedAmount\" >= 0 AND \"RefundedAmount\" >= 0 AND \"AppliedAmount\" + \"RefundedAmount\" <= \"Amount\""));
+            foreach (var p in new[] { nameof(PatientAdvance.Amount), nameof(PatientAdvance.AppliedAmount), nameof(PatientAdvance.RefundedAmount) }) e.Property(p).HasPrecision(14, 2);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasIndex(x => x.Number).IsUnique();
+            e.HasIndex(x => x.IdempotencyKey).IsUnique().HasDatabaseName("UX_PatientAdvances_Idempotency");
+            e.HasIndex(x => new { x.PatientId, x.AdmissionId });
+            e.HasOne(x => x.Patient).WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<IpdAdmission>().WithMany().HasForeignKey(x => x.AdmissionId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.PaymentMethod).WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Counter>().WithMany().HasForeignKey(x => x.CounterId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<PatientAdvanceEntry>(e =>
+        {
+            e.ToTable("PatientAdvanceEntries");
+            e.Property(x => x.Amount).HasPrecision(14, 2);
+            e.Property(x => x.EntryType).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => x.AdvanceId);
+            e.HasIndex(x => x.ReceiptId);
+            e.HasOne<PatientAdvance>().WithMany().HasForeignKey(x => x.AdvanceId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<DischargeClearanceOverride>(e =>
+        {
+            e.ToTable("DischargeClearanceOverrides");
+            e.Property(x => x.Outstanding).HasPrecision(14, 2);
+            e.HasIndex(x => x.AdmissionId);
+            e.HasOne<IpdAdmission>().WithMany().HasForeignKey(x => x.AdmissionId).OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
     private static void ConfigureUpdate9(ModelBuilder b)
     {
         b.Entity<MedicineRequest>(e =>

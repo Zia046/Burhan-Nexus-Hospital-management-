@@ -12,7 +12,20 @@
             {
                 <div class="field"><label for="Input_AdmissionServiceItemId">Admission fee (Phase 3 service)</label><select id="Input_AdmissionServiceItemId" name="Input.AdmissionServiceItemId"><option value="">No admission fee</option>
                     @foreach (var s in Model.Services) { <option value="@s.Item.Id" selected="@(i.AdmissionServiceItemId == s.Item.Id)">@s.Item.Name · @Fmt.Money(s.CurrentFee)</option> }</select></div>
-                <label class="check"><input type="checkbox" name="Input.RequireBillClearanceForDischarge" value="true" checked="@i.RequireBillClearanceForDischarge" /> Final bill must be cleared before discharge</label><input type="hidden" name="Input.RequireBillClearanceForDischarge" value="false" />
+                <label class="check"><input type="checkbox" name="Input.RequireBillClearanceForDischarge" value="true" checked="@i.RequireBillClearanceForDischarge" /> Final bill must be cleared before discharge <span class="muted">(authorised users can override with a reason)</span></label><input type="hidden" name="Input.RequireBillClearanceForDischarge" value="false" />
+                <fieldset class="fee-box" data-bed-policy>
+                    <legend>Daily ward / bed charges</legend>
+                    <div class="grid-2">
+                        <div class="field"><label for="bp">Charging policy</label><select id="bp" name="Input.BedChargePolicy">
+                            <option value="PerNight" selected="@(i.BedChargePolicy == BedChargePolicy.PerNight)">Per night spent in a bed</option>
+                            <option value="CutoffDay" selected="@(i.BedChargePolicy == BedChargePolicy.CutoffDay)">Full day from the cutoff time (any part counts)</option>
+                            <option value="HalfDay" selected="@(i.BedChargePolicy == BedChargePolicy.HalfDay)">From the cutoff time, short days charged half</option>
+                            <option value="Hourly" selected="@(i.BedChargePolicy == BedChargePolicy.Hourly)">Hourly (ward service fee per hour)</option></select></div>
+                        <div class="field"><label for="bc">Daily cutoff time</label><input id="bc" name="Input.BedChargeCutoff" type="time" value="@i.BedChargeCutoff?.ToString("HH:mm")" /></div>
+                        <div class="field"><label for="hd">Half-day if used less than (hours)</label><input id="hd" name="Input.HalfDayHours" type="number" min="1" max="23" value="@i.HalfDayHours" /></div>
+                    </div>
+                    <p class="small muted">The rate of each ward is its bed-charge service in Fees &amp; Services. A transfer closes the earlier period; each billing day is charged once (to the ward used most that day).</p>
+                </fieldset>
             }
             else { <p class="small muted">Government mode: services are recorded for statistics; no purchase, sale or profit information is shown.</p><input type="hidden" name="Input.AdmissionServiceItemId" value="@i.AdmissionServiceItemId" /> }
             <label class="check"><input type="checkbox" name="Input.AllowDirectAdmission" value="true" checked="@i.AllowDirectAdmission" /> Allow direct admission (without an OPD / Emergency visit)</label><input type="hidden" name="Input.AllowDirectAdmission" value="false" />

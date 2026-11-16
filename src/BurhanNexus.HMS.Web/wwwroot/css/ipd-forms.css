@@ -27,3 +27,8 @@
 /* OT specimen labels */
 .f-labels { display: flex; flex-wrap: wrap; gap: 4mm; }
 .f-label { border: 1px dashed #555; width: 62mm; padding: 2mm 3mm; font-size: 9pt; line-height: 1.35; break-inside: avoid; }
+
+/* Update 10: two-copy admission form */
+.f-copy { text-align: center; font-weight: 700; letter-spacing: .08em; font-size: 11px; border: 1px solid #111; padding: 2px 6px; margin: -4px auto 8px; width: max-content; }
+.f-two-copy + .f-two-copy { margin-top: 24px; }
+@media print { .f-two-copy + .f-two-copy { break-before: page; page-break-before: always; margin-top: 0; } }

@@ -41,7 +41,27 @@ public sealed class ServiceInput
     public bool IsActive { get; set; } = true;
     public string? Description { get; set; }
     public List<int> CounterIds { get; set; } = new();
+    // ---- Update 10 ----
+    public int? ServiceCategoryId { get; set; }
+    /// <summary>Empty = keep the current one (forms that do not show it).</summary>
+    public ChargeUnit? ChargeUnit { get; set; }
+    public ServiceApplicability? Applicability { get; set; }
+    /// <summary>Separate government rate (empty = same as the fee).</summary>
+    public decimal? GovernmentFee { get; set; }
+    /// <summary>The form shows the government rate (an empty value then means "same as the fee").</summary>
+    public bool SetGovernmentFee { get; set; }
 }
+
+public sealed class ServiceCategoryInput
+{
+    public string? Code { get; set; }
+    public string? Name { get; set; }
+    public string? Description { get; set; }
+    public bool IsActive { get; set; } = true;
+    public int SortOrder { get; set; }
+}
+
+public sealed record ServiceCategoryRow(ServiceCategory Category, int Services, int ActiveServices);
 
 public sealed class FinanceSettingsInput
 {
@@ -54,7 +74,7 @@ public sealed class FinanceSettingsInput
 
 public sealed record CounterRow(Counter Counter, IReadOnlyList<(int UserId, string Username, string FullName, DateTime AssignedUtc)> Staff);
 
-public sealed record ServiceRow(ServiceItem Item, decimal CurrentFee, ServiceFee? NextChange, IReadOnlyList<string> CounterNames);
+public sealed record ServiceRow(ServiceItem Item, decimal CurrentFee, ServiceFee? NextChange, IReadOnlyList<string> CounterNames, decimal? CurrentGovernmentFee = null, bool HasTransactions = false);
 
 public interface IFinanceSetupService
 {
@@ -76,6 +96,8 @@ public interface IFinanceSetupService
     Task<ServiceRow?> ServiceAsync(int id, CancellationToken ct = default);
     Task<IReadOnlyList<ServiceFee>> FeeHistoryAsync(int serviceId, CancellationToken ct = default);
     Task<ServiceResult<int>> SaveServiceAsync(int? id, ServiceInput input, CancellationToken ct = default);
+    Task<IReadOnlyList<ServiceCategoryRow>> CategoriesAsync(bool activeOnly, CancellationToken ct = default);
+    Task<ServiceResult<int>> SaveCategoryAsync(int? id, ServiceCategoryInput input, CancellationToken ct = default);
     /// <summary>Fee that applies on <paramref name="date"/> (history aware).</summary>
     Task<decimal> FeeOnAsync(int serviceId, DateOnly date, CancellationToken ct = default);
 
@@ -111,6 +133,9 @@ public sealed class FinanceSetupService : IFinanceSetupService
             db.PaymentMethods.Add(new PaymentMethod { Code = "BANK", Name = "Bank Transfer", RequiresReference = true, SortOrder = 20, CreatedUtc = now, UpdatedUtc = now });
             db.PaymentMethods.Add(new PaymentMethod { Code = "CARD", Name = "Card", RequiresReference = true, SortOrder = 30, CreatedUtc = now, UpdatedUtc = now });
         }
+        // Update 10: bills settled from an advance deposit (inactive so that it is never chosen at the counter; not cash in hand).
+        if (!await db.PaymentMethods.AnyAsync(m => m.Code == BillingService.AdvanceMethodCode, ct))
+            db.PaymentMethods.Add(new PaymentMethod { Code = BillingService.AdvanceMethodCode, Name = "Advance deposit (adjusted)", CountsAsCashInHand = false, IsActive = false, SortOrder = 900, CreatedUtc = now, UpdatedUtc = now });
         if (!await db.Counters.AnyAsync(ct))
             db.Counters.Add(new Counter { Code = "MAIN", Name = "Main Reception Counter", CreatedUtc = now, UpdatedUtc = now });
 
@@ -139,6 +164,7 @@ public sealed class FinanceSetupService : IFinanceSetupService
         foreach (var f in current)
             if (items.TryGetValue(f.ServiceItemId, out var item) && item.DefaultFee != f.Fee) { item.DefaultFee = f.Fee; item.UpdatedUtc = now; }
         await db.SaveChangesAsync(ct);
+        await ServiceCatalogue.SeedAsync(db, now, ct);
     }
 
     // ---------------- settings ----------------
@@ -290,18 +316,13 @@ public sealed class FinanceSetupService : IFinanceSetupService
 
     // ---------------- services & fees ----------------
 
-    public async Task<decimal> FeeOnAsync(int serviceId, DateOnly date, CancellationToken ct = default)
-    {
-        var fee = await _db.ServiceFees.AsNoTracking().Where(f => f.ServiceItemId == serviceId && f.EffectiveFrom <= date)
-            .OrderByDescending(f => f.EffectiveFrom).ThenByDescending(f => f.Id).Select(f => (decimal?)f.Fee).FirstOrDefaultAsync(ct);
-        return fee ?? await _db.ServiceItems.Where(s => s.Id == serviceId).Select(s => s.DefaultFee).FirstAsync(ct);
-    }
+    public Task<decimal> FeeOnAsync(int serviceId, DateOnly date, CancellationToken ct = default) => ServiceCatalogue.FeeOnAsync(_db, serviceId, date, ct);
 
     public async Task<IReadOnlyList<ServiceRow>> ServicesAsync(bool activeOnly, CancellationToken ct = default)
     {
         var today = await _clock.TodayAsync();
         var items = await _db.ServiceItems.AsNoTracking().Include(s => s.Doctor).Include(s => s.Department)
-            .Include(s => s.Counters).ThenInclude(c => c.Counter)
+            .Include(s => s.Counters).ThenInclude(c => c.Counter).Include(s => s.ServiceCategory)
             .Where(s => !activeOnly || s.IsActive).OrderBy(s => s.Kind).ThenBy(s => s.Name).ToListAsync(ct);
         var fees = await _db.ServiceFees.AsNoTracking().ToListAsync(ct);
         return items.Select(s => Row(s, fees.Where(f => f.ServiceItemId == s.Id).ToList(), today)).ToList();
@@ -311,16 +332,16 @@ public sealed class FinanceSetupService : IFinanceSetupService
     {
         var current = fees.Where(f => f.EffectiveFrom <= today).OrderByDescending(f => f.EffectiveFrom).ThenByDescending(f => f.Id).FirstOrDefault();
         var next = fees.Where(f => f.EffectiveFrom > today).OrderBy(f => f.EffectiveFrom).ThenByDescending(f => f.Id).FirstOrDefault();
-        return new ServiceRow(s, current?.Fee ?? s.DefaultFee, next, s.Counters.Select(c => c.Counter!.Name).OrderBy(n => n).ToList());
+        return new ServiceRow(s, current?.Fee ?? s.DefaultFee, next, s.Counters.Select(c => c.Counter!.Name).OrderBy(n => n).ToList(), current?.GovernmentFee);
     }
 
     public async Task<ServiceRow?> ServiceAsync(int id, CancellationToken ct = default)
     {
-        var s = await _db.ServiceItems.AsNoTracking().Include(x => x.Doctor).Include(x => x.Department)
+        var s = await _db.ServiceItems.AsNoTracking().Include(x => x.Doctor).Include(x => x.Department).Include(x => x.ServiceCategory)
             .Include(x => x.Counters).ThenInclude(c => c.Counter).FirstOrDefaultAsync(x => x.Id == id, ct);
         if (s is null) return null;
         var fees = await _db.ServiceFees.AsNoTracking().Where(f => f.ServiceItemId == id).ToListAsync(ct);
-        return Row(s, fees, await _clock.TodayAsync());
+        return Row(s, fees, await _clock.TodayAsync()) with { HasTransactions = await _db.Charges.AnyAsync(c => c.ServiceItemId == id, ct) };
     }
 
     public async Task<IReadOnlyList<ServiceFee>> FeeHistoryAsync(int serviceId, CancellationToken ct = default) =>
@@ -347,12 +368,20 @@ public sealed class FinanceSetupService : IFinanceSetupService
         var effective = i.FeeEffectiveFrom ?? today;
         if (effective < today) errors.Add("A fee change cannot be back-dated – it only affects new transactions (today or later).");
         if ((i.Description?.Length ?? 0) > 300) errors.Add("Description must not exceed 300 characters.");
+        if (i.ChargeUnit is { } cu && !Enum.IsDefined(cu)) errors.Add("Select the charging method.");
+        if (i.Applicability is { } ap && !Enum.IsDefined(ap)) errors.Add("Select where the service applies (government / private).");
+        // Forms without the government-rate field keep the current one.
+        var keepGov = i.GovernmentFee is null && !i.SetGovernmentFee;
+        var govFee = i.IsFree ? (decimal?)null : i.GovernmentFee;
+        if (govFee is decimal gf && (gf < 0 || gf > 10_000_000 || !FinanceMath.IsMoney(gf))) errors.Add("Government rate must be a valid amount (0 or more, 2 decimals).");
+        if (i.ServiceCategoryId is int sc && !await _db.ServiceCategories.AnyAsync(c => c.Id == sc, ct)) errors.Add("Unknown category.");
         if (errors.Count > 0) return ServiceResult<int>.Fail(errors.ToArray());
 
         var now = _clock.UtcNow;
         ServiceItem s;
         object? old = null;
         decimal? oldFee = null;
+        decimal? oldGov = null;
         if (id is null)
         {
             s = new ServiceItem { CreatedUtc = now };
@@ -361,11 +390,17 @@ public sealed class FinanceSetupService : IFinanceSetupService
         else
         {
             s = await _db.ServiceItems.Include(x => x.Counters).FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new KeyNotFoundException();
-            oldFee = await FeeOnAsync(s.Id, effective, ct);
-            old = new { s.Code, s.Name, s.Kind, s.DepartmentId, s.DoctorId, s.AllowPartialPayment, s.IsActive, Fee = oldFee };
+            var row = await _db.ServiceFees.AsNoTracking().Where(f => f.ServiceItemId == s.Id && f.EffectiveFrom <= effective)
+                .OrderByDescending(f => f.EffectiveFrom).ThenByDescending(f => f.Id).Select(f => new { f.Fee, f.GovernmentFee }).FirstOrDefaultAsync(ct);
+            oldFee = row?.Fee ?? s.DefaultFee;
+            oldGov = row?.GovernmentFee;
+            if (keepGov) govFee = i.IsFree ? null : oldGov;
+            old = new { s.Code, s.Name, s.Kind, s.DepartmentId, s.DoctorId, s.AllowPartialPayment, s.IsActive, s.ServiceCategoryId, s.ChargeUnit, s.Applicability, Fee = oldFee, GovernmentFee = oldGov };
         }
         s.Code = code!; s.Name = name!; s.Kind = i.Kind; s.DepartmentId = i.DepartmentId; s.DoctorId = i.DoctorId;
         s.AllowPartialPayment = i.AllowPartialPayment; s.IsActive = i.IsActive; s.Description = T(i.Description); s.UpdatedUtc = now;
+        s.ServiceCategoryId = i.ServiceCategoryId ?? s.ServiceCategoryId ?? await ServiceCatalogue.CategoryIdAsync(_db, i.Kind, ct);
+        s.ChargeUnit = i.ChargeUnit ?? s.ChargeUnit; s.Applicability = i.Applicability ?? s.Applicability;
         // Registration services keep their OPD/ER category; everything else is billed at the counter only.
         s.Category = i.Kind switch
         {
@@ -379,21 +414,64 @@ public sealed class FinanceSetupService : IFinanceSetupService
             s.Counters.Add(new ServiceCounter { CounterId = cid });
         await _db.SaveChangesAsync(ct);
 
-        if (oldFee != fee)
+        if (oldFee != fee || oldGov != govFee)
         {
             _db.ServiceFees.Add(new ServiceFee
             {
-                ServiceItemId = s.Id, Fee = fee, EffectiveFrom = id is null ? DateOnly.MinValue : effective, CreatedUtc = now,
+                ServiceItemId = s.Id, Fee = fee, GovernmentFee = govFee, EffectiveFrom = id is null ? DateOnly.MinValue : effective, CreatedUtc = now,
                 CreatedByUserId = _ctx.UserId, CreatedByUsername = _ctx.Username, Note = T(i.FeeNote)
             });
             if (id is not null)
                 _audit.Add(AuditActions.ServiceFeeChanged, "ServiceItem", s.Code,
-                    $"Fee of {s.Name} changed from {oldFee:N2} to {fee:N2} effective {effective:yyyy-MM-dd}", new { Fee = oldFee }, new { Fee = fee, EffectiveFrom = effective });
+                    $"Fee of {s.Name} changed from {oldFee:N2} to {fee:N2}{(oldGov != govFee ? $" (government rate {oldGov?.ToString("N2") ?? "same"} → {govFee?.ToString("N2") ?? "same"})" : "")} effective {effective:yyyy-MM-dd}",
+                    new { Fee = oldFee, GovernmentFee = oldGov }, new { Fee = fee, GovernmentFee = govFee, EffectiveFrom = effective });
         }
         _audit.Add(AuditActions.ServiceSaved, "ServiceItem", s.Code, $"Service {s.Name} {(id is null ? "created" : "updated")}", old,
-            new { s.Code, s.Name, s.Kind, s.DepartmentId, s.DoctorId, s.AllowPartialPayment, s.IsActive, Fee = fee, Counters = counterIds });
+            new { s.Code, s.Name, s.Kind, s.DepartmentId, s.DoctorId, s.AllowPartialPayment, s.IsActive, s.ServiceCategoryId, s.ChargeUnit, s.Applicability, Fee = fee, GovernmentFee = govFee, Counters = counterIds });
         await _db.SaveChangesAsync(ct);
         return ServiceResult<int>.Ok(s.Id);
+    }
+
+    // ---------------- service categories (update 10) ----------------
+
+    public async Task<IReadOnlyList<ServiceCategoryRow>> CategoriesAsync(bool activeOnly, CancellationToken ct = default)
+    {
+        var cats = await _db.ServiceCategories.AsNoTracking().Where(c => !activeOnly || c.IsActive).OrderBy(c => c.SortOrder).ThenBy(c => c.Name).ToListAsync(ct);
+        var counts = await _db.ServiceItems.Where(s => s.ServiceCategoryId != null).GroupBy(s => s.ServiceCategoryId!.Value)
+            .Select(g => new { g.Key, All = g.Count(), Active = g.Count(s => s.IsActive) }).ToDictionaryAsync(x => x.Key, ct);
+        return cats.Select(c => new ServiceCategoryRow(c, counts.GetValueOrDefault(c.Id)?.All ?? 0, counts.GetValueOrDefault(c.Id)?.Active ?? 0)).ToList();
+    }
+
+    public async Task<ServiceResult<int>> SaveCategoryAsync(int? id, ServiceCategoryInput i, CancellationToken ct = default)
+    {
+        var errors = new List<string>();
+        var code = T(i.Code)?.ToUpperInvariant();
+        var name = T(i.Name);
+        if (code is null || code.Length > 20) errors.Add("Category code is required (max 20 characters).");
+        if (name is null || name.Length > 100) errors.Add("Category name is required (max 100 characters).");
+        if ((i.Description?.Length ?? 0) > 300) errors.Add("Description must not exceed 300 characters.");
+        if (code is not null && await _db.ServiceCategories.AnyAsync(c => c.Id != id && c.Code == code, ct)) errors.Add("Another category already uses this code.");
+        if (name is not null && await _db.ServiceCategories.AnyAsync(c => c.Id != id && c.Name.ToLower() == name.ToLower(), ct)) errors.Add("Another category already has this name.");
+        if (errors.Count > 0) return ServiceResult<int>.Fail(errors.ToArray());
+        var now = _clock.UtcNow;
+        ServiceCategory c;
+        object? old = null;
+        if (id is null)
+        {
+            c = new ServiceCategory { CreatedUtc = now, SortOrder = (await _db.ServiceCategories.MaxAsync(x => (int?)x.SortOrder, ct) ?? 0) + 10 };
+            _db.ServiceCategories.Add(c);
+        }
+        else
+        {
+            c = await _db.ServiceCategories.FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new KeyNotFoundException();
+            old = new { c.Code, c.Name, c.Description, c.IsActive, c.SortOrder };
+            if (i.SortOrder > 0) c.SortOrder = i.SortOrder;
+        }
+        c.Code = code!; c.Name = name!; c.Description = T(i.Description); c.IsActive = i.IsActive; c.UpdatedUtc = now;
+        _audit.Add(AuditActions.ServiceCategorySaved, "ServiceCategory", c.Code, $"Service category {c.Name} {(id is null ? "created" : "updated")}{(c.IsActive ? "" : " (inactive)")}",
+            old, new { c.Code, c.Name, c.Description, c.IsActive, c.SortOrder });
+        await _db.SaveChangesAsync(ct);
+        return ServiceResult<int>.Ok(c.Id);
     }
 
     // ---------------- doctors ----------------

@@ -129,6 +129,8 @@ public class LabOrder
     public long? IpdAdmissionId { get; set; }
     /// <summary>Update 9: pregnancy-specific reference ranges apply (ongoing pregnancy record, or marked at booking).</summary>
     public bool PatientPregnant { get; set; }
+    /// <summary>Update 10: receipt of the payment recorded when the visit was booked (the two-copy laboratory receipt).</summary>
+    public long? BookingReceiptId { get; set; }
     public LabReferralType ReferralType { get; set; }
     public int? ReferringDoctorId { get; set; }
     public Doctor? ReferringDoctor { get; set; }
@@ -329,6 +331,11 @@ public class LabSettings
     public bool RequirePaymentBeforeRelease { get; set; }
     /// <summary>Update 9: version of the standard catalogue already added (it is added once; later changes by the laboratory are kept).</summary>
     public int StandardCatalogueVersion { get; set; }
+    /// <summary>
+    /// Update 10: simple laboratory workflow – no sample collection step and no separate verification: saving a complete report
+    /// verifies it (the saving user is the responsible person). Corrections go through "Review report" with history.
+    /// </summary>
+    public bool SimpleWorkflow { get; set; } = true;
     public DateTime UpdatedUtc { get; set; }
     public uint RowVersion { get; set; }
 }

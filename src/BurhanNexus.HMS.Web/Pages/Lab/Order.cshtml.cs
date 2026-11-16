@@ -31,6 +31,8 @@ public class OrderModel : HmsPageModel
     public IReadOnlyList<LabTestRow> Tests { get; private set; } = Array.Empty<LabTestRow>();
     public IReadOnlyList<Doctor> Doctors { get; private set; } = Array.Empty<Doctor>();
     public bool ShowFees { get; private set; }
+    /// <summary>Update 10: simple workflow – no sample and verification controls.</summary>
+    public bool Simple { get; private set; }
 
     [BindProperty] public string? Reason { get; set; }
     [BindProperty] public List<int> AddTestIds { get; set; } = new();
@@ -48,6 +50,7 @@ public class OrderModel : HmsPageModel
         if (o is null) return false;
         Order = o;
         ShowFees = await CanAsync(Perm.LabViewFinancial);
+        Simple = (await HttpContext.RequestServices.GetRequiredService<ILabCatalogService>().SettingsAsync()).SimpleWorkflow;
         Payments = await _lab.PaymentsAsync(id);
         Payment = await _lab.OrderPaymentAsync(id);
         Events = await _lab.EventsAsync(id);

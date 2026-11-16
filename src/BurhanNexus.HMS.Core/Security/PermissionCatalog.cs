@@ -151,6 +151,9 @@ public static class PermissionCatalog
                 new(LabActions.Settings, "Manage Laboratory Settings", "Laboratory branding, signatory and report settings"),
                 new(LabActions.ViewFinancial, "View Laboratory Financial Information", "Laboratory fees, payment status and collection"),
                 new(LabActions.ManageFees, "Manage Laboratory Fees", "Set test prices (fee history kept)"),
+                new(LabActions.CollectPayments, "Collect Laboratory Payments", "Record the payment when booking a laboratory visit (Phase 3 receipt)"),
+                new(LabActions.PrintReceipts, "Print Laboratory Receipts", "Print the two-copy laboratory receipt (patient and laboratory copy)"),
+                new(LabActions.ReviewResults, "Review / Edit Saved Results", "Correct a saved (verified) result with a reason – the previous result is kept in history"),
             }),
         new(Modules_.Radiology, "Radiology Management (X-Ray & Ultrasound)", "Radiology bookings, worklists, examinations, reporting, verification and A4 reports", "scan", true, "/Radiology",
             new PermissionAction[]
@@ -272,6 +275,15 @@ public static class PermissionCatalog
                 new(IpdActions.CorrectRecords, "Correct Clinical Records", "Enter corrections of clinical records (the original is kept)"),
                 new(IpdActions.ViewFinancial, "View Patient Financial Details", "Charges, payments and balance of an admission"),
                 new(IpdActions.ManageBilling, "Manage IPD Billing", "Post bed and service charges, final bill"),
+                new(IpdActions.ViewLedger, "View Inpatient Financial Ledger", "All charges, payments, advances and balance of an admission"),
+                new(IpdActions.ViewStatements, "View Patient Account Statements", "Patient-wise and admission-wise account statements"),
+                new(IpdActions.ViewBillingHistory, "View Inpatient Billing History", "Bed charge, equipment and package history of an admission"),
+                new(IpdActions.PostCharges, "Post Authorised Inpatient Charges", "Add services (procedures, oxygen, nursing …) to the admission account"),
+                new(IpdActions.ManageAdmissionFee, "Manage Admission Fee", "Choose the admission-fee service and waive the admission fee with a reason"),
+                new(IpdActions.RecordAdmissionPayment, "Record Admission Payments", "Receive the admission fee when admitting"),
+                new(IpdActions.ManageWardCharges, "Manage Ward / Bed Charges", "Ward rates and the daily charging policy (cutoff, half day, hourly)"),
+                new(IpdActions.RecordEquipment, "Record NICU Equipment Usage", "Start / stop / replace equipment on a newborn (charged by usage)"),
+                new(IpdActions.ManagePackages, "Manage Packages", "Create NICU / IPD packages and apply them to admissions"),
                 new(IpdActions.PrintForms, "Print Forms", "Print clinical forms and summaries"),
                 new(IpdActions.ExportPdf, "Export PDF", "Save forms as PDF"),
                 new(IpdActions.Settings, "Manage IPD Settings", "Clinical form fields, alert limits, charges and printing"),
@@ -335,6 +347,20 @@ public static class PermissionCatalog
                 new(FinanceActions.Adjustments, "Record Financial Adjustments", "Correct cashier / doctor balances with a reason"),
                 new(FinanceActions.Export, "Export Financial Reports", "Excel / CSV export of financial reports"),
                 new(FinanceActions.Settings, "Manage Financial Settings", "Payment methods and receipt settings"),
+                new(FinanceActions.ReceiveInpatientPayments, "Receive Inpatient Payments", "Collect payments against an admission account"),
+                new(FinanceActions.ReceiveAdvances, "Receive Advance Deposits", "Take advance deposits and adjust them against the bill"),
+                new(FinanceActions.ViewClearance, "View Discharge Financial Clearance", "Final bill, advances and outstanding balance before discharge"),
+                new(FinanceActions.OverrideClearance, "Override Financial Clearance", "Allow discharge with an outstanding balance (reason required, audited)"),
+            }, IsFinancialModule: true),
+        new(Modules_.Services, "Fees & Services", "Central catalogue of service categories, services and fees used by every department", "sliders", true, "/Fees",
+            new PermissionAction[]
+            {
+                new(ServicesActions.ViewFees, "View Service Fees", "See the service catalogue and current fees"),
+                new(ServicesActions.ManageCatalogue, "Manage Service Catalogue", "Search and organise the catalogue (categories, charging methods)"),
+                new(ServicesActions.ManageCategories, "Add Service Categories", "Add, rename and deactivate service categories"),
+                new(ServicesActions.ManageServices, "Add / Edit / Deactivate Services", "Create services and change their details (never deleted)"),
+                new(ServicesActions.ManageFees, "Manage Service Fees", "Change fees and government rates (history kept, old bills unchanged)"),
+                new(ServicesActions.Reports, "View Service-wise Reports", "Usage and revenue of each service"),
             }, IsFinancialModule: true),
         Future("Reports", "Reports", "Operational and financial reports", "chart"),
 
@@ -406,6 +432,17 @@ public static class PermissionCatalog
         public const string Radiology = "Radiology";
         public const string Ipd = "Ipd";
         public const string Ot = "Ot";
+        public const string Services = "Services";
+    }
+
+    public static class ServicesActions
+    {
+        public const string ViewFees = "ViewFees";
+        public const string ManageCatalogue = "ManageCatalogue";
+        public const string ManageCategories = "ManageCategories";
+        public const string ManageServices = "ManageServices";
+        public const string ManageFees = "ManageFees";
+        public const string Reports = "Reports";
     }
 
     public static class OtActions
@@ -475,6 +512,15 @@ public static class PermissionCatalog
         public const string CorrectRecords = "CorrectRecords";
         public const string ViewFinancial = "ViewFinancial";
         public const string ManageBilling = "ManageBilling";
+        public const string ViewLedger = "ViewLedger";
+        public const string ViewStatements = "ViewStatements";
+        public const string ViewBillingHistory = "ViewBillingHistory";
+        public const string PostCharges = "PostCharges";
+        public const string ManageAdmissionFee = "ManageAdmissionFee";
+        public const string RecordAdmissionPayment = "RecordAdmissionPayment";
+        public const string ManageWardCharges = "ManageWardCharges";
+        public const string RecordEquipment = "RecordEquipment";
+        public const string ManagePackages = "ManagePackages";
         public const string PrintForms = "PrintForms";
         public const string ExportPdf = "ExportPdf";
         public const string Settings = "Settings";
@@ -568,6 +614,9 @@ public static class PermissionCatalog
         public const string Settings = "Settings";
         public const string ViewFinancial = "ViewFinancial";
         public const string ManageFees = "ManageFees";
+        public const string CollectPayments = "CollectPayments";
+        public const string PrintReceipts = "PrintReceipts";
+        public const string ReviewResults = "ReviewResults";
     }
 
     public static class FinanceActions
@@ -596,6 +645,10 @@ public static class PermissionCatalog
         public const string Adjustments = "Adjustments";
         public const string Export = "Export";
         public const string Settings = "Settings";
+        public const string ReceiveInpatientPayments = "ReceiveInpatientPayments";
+        public const string ReceiveAdvances = "ReceiveAdvances";
+        public const string ViewClearance = "ViewClearance";
+        public const string OverrideClearance = "OverrideClearance";
     }
 
     public static class AppointmentActions
@@ -751,6 +804,17 @@ public static class Perm
     public const string FinanceAdjustments = "Finance.Adjustments";
     public const string FinanceExport = "Finance.Export";
     public const string FinanceSettings = "Finance.Settings";
+    public const string FinanceReceiveInpatientPayments = "Finance.ReceiveInpatientPayments";
+    public const string FinanceReceiveAdvances = "Finance.ReceiveAdvances";
+    public const string FinanceViewClearance = "Finance.ViewClearance";
+    public const string FinanceOverrideClearance = "Finance.OverrideClearance";
+    // ---- Update 10: Fees & Services ----
+    public const string SvcViewFees = "Services.ViewFees";
+    public const string SvcManageCatalogue = "Services.ManageCatalogue";
+    public const string SvcManageCategories = "Services.ManageCategories";
+    public const string SvcManageServices = "Services.ManageServices";
+    public const string SvcManageFees = "Services.ManageFees";
+    public const string SvcReports = "Services.Reports";
     public const string IpdDashboard = "Ipd.Dashboard";
     public const string IpdViewPatients = "Ipd.ViewPatients";
     public const string IpdViewAllWards = "Ipd.ViewAllWards";
@@ -786,6 +850,15 @@ public static class Perm
     public const string IpdCorrectRecords = "Ipd.CorrectRecords";
     public const string IpdViewFinancial = "Ipd.ViewFinancial";
     public const string IpdManageBilling = "Ipd.ManageBilling";
+    public const string IpdViewLedger = "Ipd.ViewLedger";
+    public const string IpdViewStatements = "Ipd.ViewStatements";
+    public const string IpdViewBillingHistory = "Ipd.ViewBillingHistory";
+    public const string IpdPostCharges = "Ipd.PostCharges";
+    public const string IpdManageAdmissionFee = "Ipd.ManageAdmissionFee";
+    public const string IpdRecordAdmissionPayment = "Ipd.RecordAdmissionPayment";
+    public const string IpdManageWardCharges = "Ipd.ManageWardCharges";
+    public const string IpdRecordEquipment = "Ipd.RecordEquipment";
+    public const string IpdManagePackages = "Ipd.ManagePackages";
     public const string IpdPrintForms = "Ipd.PrintForms";
     public const string IpdExportPdf = "Ipd.ExportPdf";
     public const string IpdSettings = "Ipd.Settings";
@@ -868,6 +941,9 @@ public static class Perm
     public const string LabSettings = "Laboratory.Settings";
     public const string LabViewFinancial = "Laboratory.ViewFinancial";
     public const string LabManageFees = "Laboratory.ManageFees";
+    public const string LabCollectPayments = "Laboratory.CollectPayments";
+    public const string LabPrintReceipts = "Laboratory.PrintReceipts";
+    public const string LabReviewResults = "Laboratory.ReviewResults";
     public const string PharmDashboard = "Pharmacy.Dashboard";
     public const string PharmViewCatalogue = "Pharmacy.ViewCatalogue";
     public const string PharmAddMedicine = "Pharmacy.AddMedicine";

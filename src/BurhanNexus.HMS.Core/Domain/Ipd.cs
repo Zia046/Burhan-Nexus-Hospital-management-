@@ -124,6 +124,8 @@ public class IpdAdmission
     [MaxLength(200)] public string? AttentionNote { get; set; }
     public int? CreatedByUserId { get; set; }
     [MaxLength(64)] public string? CreatedByUsername { get; set; }
+    // ---- Update 10: admission fee ----
+    public long? AdmissionFeeChargeId { get; set; }
     // ---- discharge ----
     public DischargeType? DischargeType { get; set; }
     [MaxLength(1000)] public string? FinalDiagnosis { get; set; }
@@ -527,6 +529,8 @@ public class IpdBedCharge
     public DateOnly Night { get; set; }
     public int WardId { get; set; }
     public long ChargeId { get; set; }
+    /// <summary>Update 10: days (1 or 0.5) or hours charged for this billing day.</summary>
+    public decimal Quantity { get; set; } = 1;
 }
 
 public class IpdSettings
@@ -535,12 +539,19 @@ public class IpdSettings
     /// <summary>Phase 3 service charged once at admission (empty = none).</summary>
     public int? AdmissionServiceItemId { get; set; }
     public bool AllowDirectAdmission { get; set; } = true;
-    public bool RequireBillClearanceForDischarge { get; set; }
+    /// <summary>Update 10 default: discharge needs a zero balance (or an authorised, audited override).</summary>
+    public bool RequireBillClearanceForDischarge { get; set; } = true;
     public bool PrintHeader { get; set; } = true;
     public int LetterheadTopMarginMm { get; set; } = 45;
     [MaxLength(300)] public string? FormFooter { get; set; }
     /// <summary>MAR safety confirmations (patient, medicine, dose, route, time) before recording a dose.</summary>
     public bool RequireMarConfirmations { get; set; } = true;
+    // ---- Update 10: ward / bed charging policy ----
+    public BedChargePolicy BedChargePolicy { get; set; } = BedChargePolicy.PerNight;
+    /// <summary>Start of the billing day for the cutoff / half-day policies (e.g. 12:00).</summary>
+    public TimeOnly BedChargeCutoff { get; set; } = new(12, 0);
+    /// <summary>Half-day policy: a billing day used for fewer hours than this is charged half.</summary>
+    public int HalfDayHours { get; set; } = 6;
     public DateTime UpdatedUtc { get; set; }
     public uint RowVersion { get; set; }
 }

@@ -1,0 +1,82 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Ipd.ClearanceModel
+@using BurhanNexus.HMS.Infrastructure.Ipd
+@{
+    var L = Model.L;
+    var a = L.Admission;
+    ViewData["Title"] = "Financial clearance " + a.AdmissionNumber;
+    var due = L.BalanceDue;
+    var open = a.Status is AdmissionStatus.Registered or AdmissionStatus.Admitted or AdmissionStatus.UnderTreatment or AdmissionStatus.Transferred or AdmissionStatus.DischargeRequested;
+}
+<partial name="_IpdNav" />
+<div class="page-header">
+    <div><h1>Discharge financial clearance <span class="mono">@a.AdmissionNumber</span></h1>
+        <p class="muted">@a.Patient?.FullName · @a.Patient?.PatientNumber · @(a.CurrentWard?.Name ?? "—") @(a.CurrentBed?.Code)</p></div>
+    <div class="actions"><a class="btn btn-light" href="/Ipd/Account/@a.Id">Full account</a> <a class="btn btn-light" href="/Ipd/Admission/@a.Id">Admission</a></div>
+</div>
+<partial name="_ValidationSummary" />
+@if (Model.LastReceiptId is long lr) { <div class="alert alert-success"><div>Payment recorded. <a href="/Print/Receipt/@lr" target="_blank" data-test="print-receipt">Print the receipt</a></div></div> }
+@if (due > 0)
+{
+    <div class="alert alert-danger" data-outstanding-warning><svg class="icon"><use href="#i-alert" /></svg><div><strong>Outstanding balance: @Fmt.Money(due)</strong>
+        @(Model.RequireClearance ? (L.Overrides.Count > 0 ? " – clearance was overridden; the patient may be discharged." : " – the hospital requires payment (or an authorised override) before discharge.") : "")</div></div>
+}
+else
+{
+    <div class="alert alert-success" data-cleared><div><strong>Cleared</strong> – nothing is outstanding@(due < 0 ? $"; {Fmt.Money(-due)} of the advance is unused and can be returned" : "").</div></div>
+}
+<div class="grid-side">
+    <div class="card" data-clearance-summary>
+        <table class="table">
+            <tbody>
+            @foreach (var g in Enum.GetValues<LedgerGroup>()) { <tr data-row="@g"><td>@IpdLedger.Label(g)</td><td class="num">@Fmt.Money(L.Total(g))</td></tr> }
+            <tr class="row-strong"><th>Total bill (after discounts / waivers)</th><th class="num" data-total>@Fmt.Money(L.Net)</th></tr>
+            <tr><td>Discounts / waivers given</td><td class="num">@Fmt.Money(L.Discounts)</td></tr>
+            <tr><td>Advance deposits received</td><td class="num" data-advance>@Fmt.Money(L.AdvanceReceived)</td></tr>
+            <tr><td>Payments received (incl. adjusted advance @Fmt.Money(L.PaidFromAdvance))</td><td class="num" data-paid>@Fmt.Money(L.Paid)</td></tr>
+            <tr><td>Refunds / adjustments</td><td class="num">@Fmt.Money(L.Refunded + L.AdvanceRefunded)</td></tr>
+            <tr><td>Unused advance</td><td class="num">@Fmt.Money(L.AdvanceAvailable)</td></tr>
+            <tr class="row-strong"><th>Remaining balance</th><th class="num" data-due>@Fmt.Money(Math.Max(0, due))</th></tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="stack">
+        @if (open)
+        {
+            <form bn-permission="@Perm.IpdManageBilling" method="post" asp-page-handler="Finalise" class="card card-body" novalidate>
+                <p class="small">Post the bed charges up to now and stop running equipment, so the balance is final.</p>
+                <button class="btn btn-light" data-test="finalise-bill">Prepare final bill</button>
+            </form>
+        }
+        @if (L.Outstanding > 0)
+        {
+            <form bn-permission="@Perm.FinanceReceiveInpatientPayments" method="post" asp-page-handler="Pay" class="card" novalidate data-pay-form>
+                <div class="card-header"><h3>Receive payment</h3></div>
+                <div class="card-body">
+                    <input type="hidden" name="IdempotencyKey" value="@Model.Key" />
+                    <div class="field"><label for="amt">Amount received</label><input id="amt" name="Amount" type="number" step="0.01" min="0.01" max="@L.Outstanding" value="@(L.Outstanding.ToString(System.Globalization.CultureInfo.InvariantCulture))" /></div>
+                    <div class="field"><label for="pm">Payment method</label><select id="pm" name="PaymentMethodId">@foreach (var m in Model.Methods) { <option value="@m.Id" selected="@(m.Code == "CASH")">@m.Name</option> }</select></div>
+                    <div class="field"><label for="ref">Reference</label><input id="ref" name="Reference" maxlength="100" /></div>
+                </div>
+                <div class="card-footer"><button class="btn btn-primary" data-test="receive-payment">Receive payment</button></div>
+            </form>
+            @if (L.AdvanceAvailable > 0)
+            {
+                <form bn-permission="@Perm.FinanceReceiveAdvances" method="post" asp-page-handler="ApplyAdvance" class="card card-body" novalidate>
+                    <input type="hidden" name="IdempotencyKey" value="@Model.Key" />
+                    <button class="btn btn-light">Adjust unused advance (@Fmt.Money(L.AdvanceAvailable))</button>
+                </form>
+            }
+        }
+        @if (due > 0 && open && Model.RequireClearance && L.Overrides.Count == 0)
+        {
+            <form bn-permission="@Perm.FinanceOverrideClearance" method="post" asp-page-handler="Override" class="card" novalidate data-override-form>
+                <div class="card-header"><h3>Override financial clearance</h3></div>
+                <div class="card-body"><div class="field"><label for="why">Reason <em>*</em></label><input id="why" name="Reason" maxlength="300" required /></div>
+                    <p class="small muted">The balance stays on the patient's account. The override is recorded in the audit log.</p></div>
+                <div class="card-footer"><button class="btn btn-danger" data-test="override-clearance">Allow discharge with balance</button></div>
+            </form>
+        }
+        @foreach (var o in L.Overrides) { <div class="card card-body small" data-override>Overridden by @o.Username, @Fmt.DateTimeText(o.CreatedUtc) with @Fmt.Money(o.Outstanding) outstanding: @o.Reason</div> }
+    </div>
+</div>

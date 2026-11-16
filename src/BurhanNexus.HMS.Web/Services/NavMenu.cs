@@ -23,7 +23,10 @@ public static class NavMenu
         "users", "departments", "audit", "settings", "backup",
     };
 
-    public static IReadOnlyList<NavSection> Build(IReadOnlySet<string> perms, bool isPrivate)
+    public static IReadOnlyList<NavSection> Build(IReadOnlySet<string> perms, bool isPrivate) => Build(perms, isPrivate, labSimple: false);
+
+    /// <param name="labSimple">Update 10: laboratory simple workflow – no sample collection or verification pages in the menu.</param>
+    public static IReadOnlyList<NavSection> Build(IReadOnlySet<string> perms, bool isPrivate, bool labSimple)
     {
         bool Has(string p) => perms.Contains(p);
         bool Any(params string[] keys) => keys.Any(perms.Contains);
@@ -47,9 +50,9 @@ public static class NavMenu
         Add("lab", "Laboratory", "flask", Any(Perm.LabDashboard, Perm.LabBook, Perm.LabCollectSamples, Perm.LabEnterResults, Perm.LabVerifyResults, Perm.LabApproveReports, Perm.LabViewResults, Perm.LabReports, Perm.LabManageCatalogue, Perm.LabSettings),
             (Has(Perm.LabDashboard), new("lab-dashboard", "/Lab", "flask", "Lab Dashboard")),
             (Has(Perm.LabBook), new("lab-book", "/Lab/Book", "plus", "New Lab Visit")),
-            (Has(Perm.LabCollectSamples), new("lab-samples", "/Lab/Samples", "scan", "Sample Collection")),
-            (Has(Perm.LabEnterResults), new("lab-pending", "/Lab/Pending", "edit", "Pending Tests")),
-            (Any(Perm.LabVerifyResults, Perm.LabApproveReports), new("lab-verify", "/Lab/Verify", "check-circle", "Verification")),
+            (Has(Perm.LabCollectSamples) && !labSimple, new("lab-samples", "/Lab/Samples", "scan", "Sample Collection")),
+            (Has(Perm.LabEnterResults), new("lab-pending", "/Lab/Pending", "edit", labSimple ? "Pending Lab Results" : "Pending Tests")),
+            (Any(Perm.LabVerifyResults, Perm.LabApproveReports) && !labSimple, new("lab-verify", "/Lab/Verify", "check-circle", "Verification")),
             (Has(Perm.LabViewResults), new("lab-results", "/Lab/Results", "file", "Lab Results")),
             (Has(Perm.LabReports), new("lab-reports", "/Lab/Reports", "chart", "Lab Reports")),
             (Has(Perm.LabManageCatalogue), new("lab-catalogue", "/Lab/Catalogue", "sliders", "Test Catalogue")),
@@ -66,6 +69,7 @@ public static class NavMenu
             (Any(Perm.IpdManageNicu, Perm.IpdNicuObservations), new("ipd-nicu", "/Ipd/Nicu", "users-round", "NICU")),
             (Any(Perm.IpdManageNursing, Perm.IpdNursingNotes, Perm.IpdRecordMedication, Perm.IpdHandover), new("ipd-nursing", "/Ipd/Nursing", "check-circle", "Nursing")),
             (Any(Perm.IpdManageWards, Perm.IpdManageRooms, Perm.IpdManageBeds), new("ipd-wards", "/Ipd/Wards", "sliders", "Wards & Beds")),
+            (Has(Perm.IpdManagePackages), new("ipd-packages", "/Ipd/Packages", "database", "Packages", EmitDataNav: false)),
             (Has(Perm.IpdSettings), new("ipd-settings", "/Ipd/Settings", "settings", "IPD Settings")));
 
         Add("ot", "Operation Theatre", "scissors", Any(Perm.OtDashboard, Perm.OtCreateBooking, Perm.OtManageRecovery, Perm.OtManageCssd, Perm.OtViewStatistics,
@@ -111,9 +115,15 @@ public static class NavMenu
             (Has(Perm.FinanceViewOwnAccount), new("finance-account", "/Finance", "wallet", "My Financial Account")),
             (Has(Perm.FinanceViewOwnReceipts), new("finance-receipts", "/Finance/Receipts", "file", "Receipts")),
             (Has(Perm.FinanceDashboard), new("finance-dashboard", "/Finance/Dashboard", "chart", "Financial Dashboard")),
+            (Has(Perm.FinanceDashboard), new("finance-revenue", "/Finance/Revenue", "chart", "Revenue & Outstanding", EmitDataNav: false)),
             (Has(Perm.FinanceConfirmDeposits), new("finance-deposits", "/Finance/Deposits", "download", "Cash Deposits")),
             (Has(Perm.FinanceManageDoctorAccounts), new("finance-doctors", "/Finance/Doctors", "stethoscope", "Doctor Accounts")),
-            (Has(Perm.FinanceManageServiceFees), new("finance-services", "/Finance/Services", "sliders", "Services & Fees")));
+            (Has(Perm.FinanceManageServiceFees), new("finance-services", "/Finance/Services", "sliders", "Counters per Service")));
+
+        Add("fees", "Fees & Services", "sliders", Any(Perm.SvcViewFees, Perm.SvcManageCatalogue, Perm.SvcManageServices, Perm.SvcManageFees, Perm.SvcManageCategories, Perm.SvcReports),
+            (Any(Perm.SvcViewFees, Perm.SvcManageCatalogue, Perm.SvcManageServices, Perm.SvcManageFees), new("fees-catalogue", "/Fees", "sliders", "Service Catalogue")),
+            (Has(Perm.SvcManageCategories), new("fees-categories", "/Fees/Categories", "database", "Categories")),
+            (Has(Perm.SvcReports), new("fees-reports", "/Fees/Reports", "chart", "Service-wise Report")));
 
         Add("admin", "Administration", "building", Any(Perm.UsersView, Perm.DepartmentsManage, Perm.RolesManage, Perm.LoginHistoryView, Perm.AuditView),
             (Has(Perm.UsersView), new("users", "/Users", "users", "Users", EmitDataNav: false)),

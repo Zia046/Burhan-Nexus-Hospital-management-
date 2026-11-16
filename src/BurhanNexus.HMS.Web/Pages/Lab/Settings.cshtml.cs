@@ -33,7 +33,7 @@ public class SettingsModel : HmsPageModel
             LaboratoryName = s.LaboratoryName, HospitalName = s.HospitalName, Address = s.Address, ContactNumber = s.ContactNumber, Email = s.Email,
             ReportHeader = s.ReportHeader, ReportFooter = s.ReportFooter, Layout = s.Layout, SignatoryName = s.SignatoryName,
             SignatoryDesignation = s.SignatoryDesignation, ShowVerifiedBy = s.ShowVerifiedBy, AllowSelfVerification = s.AllowSelfVerification,
-            RequirePaymentBeforeRelease = s.RequirePaymentBeforeRelease
+            RequirePaymentBeforeRelease = s.RequirePaymentBeforeRelease, SimpleWorkflow = s.SimpleWorkflow
         };
     }
 

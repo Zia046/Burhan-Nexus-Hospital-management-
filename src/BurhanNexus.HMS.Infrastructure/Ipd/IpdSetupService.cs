@@ -68,6 +68,10 @@ public sealed class IpdSettingsInput
     public int LetterheadTopMarginMm { get; set; } = 45;
     public string? FormFooter { get; set; }
     public bool RequireMarConfirmations { get; set; } = true;
+    /// <summary>Update 10: bed charging policy (empty = keep).</summary>
+    public BedChargePolicy? BedChargePolicy { get; set; }
+    public TimeOnly? BedChargeCutoff { get; set; }
+    public int? HalfDayHours { get; set; }
 }
 
 public interface IIpdSetupService
@@ -255,15 +259,18 @@ public sealed class IpdSetupService : IIpdSetupService
     public async Task<ServiceResult> SaveSettingsAsync(IpdSettingsInput i, uint rowVersion, CancellationToken ct = default)
     {
         if (i.LetterheadTopMarginMm is < 0 or > 120) return ServiceResult.Fail("Letterhead space must be between 0 and 120 mm.");
+        if (i.BedChargePolicy is { } bp && !Enum.IsDefined(bp)) return ServiceResult.Fail("Select the bed charging policy.");
+        if (i.HalfDayHours is < 1 or > 23) return ServiceResult.Fail("Half-day hours must be between 1 and 23.");
         if (i.AdmissionServiceItemId is int s && !await _db.ServiceItems.AnyAsync(x => x.Id == s && x.IsActive, ct)) return ServiceResult.Fail("Select an active admission service.");
         var x = await _db.IpdSettings.FirstAsync(ct);
         _db.Entry(x).Property(p => p.RowVersion).OriginalValue = rowVersion;
-        var old = new { x.AdmissionServiceItemId, x.AllowDirectAdmission, x.RequireBillClearanceForDischarge, x.PrintHeader, x.RequireMarConfirmations };
+        var old = new { x.AdmissionServiceItemId, x.AllowDirectAdmission, x.RequireBillClearanceForDischarge, x.PrintHeader, x.RequireMarConfirmations, x.BedChargePolicy, x.BedChargeCutoff, x.HalfDayHours };
+        x.BedChargePolicy = i.BedChargePolicy ?? x.BedChargePolicy; x.BedChargeCutoff = i.BedChargeCutoff ?? x.BedChargeCutoff; x.HalfDayHours = i.HalfDayHours ?? x.HalfDayHours;
         x.AdmissionServiceItemId = i.AdmissionServiceItemId; x.AllowDirectAdmission = i.AllowDirectAdmission; x.RequireBillClearanceForDischarge = i.RequireBillClearanceForDischarge;
         x.PrintHeader = i.PrintHeader; x.LetterheadTopMarginMm = i.LetterheadTopMarginMm; x.FormFooter = T(i.FormFooter, 300); x.RequireMarConfirmations = i.RequireMarConfirmations;
         x.UpdatedUtc = _clock.UtcNow;
         _audit.Add(AuditActions.IpdSettingsChanged, "IpdSettings", "1", "IPD settings changed", old,
-            new { x.AdmissionServiceItemId, x.AllowDirectAdmission, x.RequireBillClearanceForDischarge, x.PrintHeader, x.RequireMarConfirmations });
+            new { x.AdmissionServiceItemId, x.AllowDirectAdmission, x.RequireBillClearanceForDischarge, x.PrintHeader, x.RequireMarConfirmations, x.BedChargePolicy, x.BedChargeCutoff, x.HalfDayHours });
         try { await _db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException) { return ServiceResult.Fail("Settings were changed by someone else. Please reload."); }
         return ServiceResult.Ok();

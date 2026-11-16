@@ -39,6 +39,7 @@ public class SettingsModel : IpdPageModel
         {
             AdmissionServiceItemId = s.AdmissionServiceItemId, AllowDirectAdmission = s.AllowDirectAdmission, RequireBillClearanceForDischarge = s.RequireBillClearanceForDischarge,
             PrintHeader = s.PrintHeader, LetterheadTopMarginMm = s.LetterheadTopMarginMm, FormFooter = s.FormFooter, RequireMarConfirmations = s.RequireMarConfirmations,
+            BedChargePolicy = s.BedChargePolicy, BedChargeCutoff = s.BedChargeCutoff, HalfDayHours = s.HalfDayHours,
         };
         if (Fields.FirstOrDefault(f => f.Id == EditField) is { } f)
             Field = new FieldInput { Kind = f.Kind, Key = f.Key, Label = f.Label, Section = f.Section, Type = f.Type, Unit = f.Unit, Choices = f.Choices, IsRequired = f.IsRequired,

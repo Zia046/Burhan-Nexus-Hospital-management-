@@ -1,0 +1,43 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Fees.IndexModel
+@using BurhanNexus.HMS.Web.Pages.Fees
+@{ ViewData["Title"] = "Fees & Services"; }
+<div class="page-header">
+    <div><h1>Fees &amp; Services</h1><p class="muted">One catalogue for every department. A fee change applies to new transactions only – old bills keep the fee that was charged.</p></div>
+</div>
+<partial name="_FeesNav" />
+<form method="get" class="card filters" data-fees-search>
+    <div class="form-grid">
+        <div class="field span-2"><label for="q">Search</label><input id="q" name="q" value="@Model.Q" placeholder="Service name, code, department" autocomplete="off" /></div>
+        <div class="field"><label for="cat">Category</label><select id="cat" name="category"><option value="">All categories</option>
+            @foreach (var c in Model.Categories) { <option value="@c.Category.Id" selected="@(Model.Category == c.Category.Id)">@c.Category.Name</option> }
+            <option value="0" selected="@(Model.Category == 0)">Uncategorised</option></select></div>
+        <div class="field"><label for="st">Status</label><select id="st" name="status"><option value="">Active</option><option value="inactive" selected="@(Model.Status == "inactive")">Inactive</option><option value="all" selected="@(Model.Status == "all")">All</option></select></div>
+    </div>
+    <div class="form-actions"><button class="btn btn-primary">Search</button> <a class="btn btn-light" href="/Fees">Clear</a></div>
+</form>
+<div class="card">
+    <div class="card-header"><h2>@Model.Rows.Count service(s)</h2>@if (Model.Government) { <span class="status">Government mode – government rates are used where set</span> }</div>
+    <div class="table-wrap">
+        <table class="table table-compact" data-fee-catalogue>
+            <thead><tr><th>Category</th><th>Code</th><th>Service</th><th>Department</th><th>Charging</th><th class="num">Fee</th><th class="num">Government rate</th><th>Applies to</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                var s = r.Item;
+                <tr class="@(s.IsActive ? "" : "row-muted")" data-service="@s.Code">
+                    <td>@(s.ServiceCategory?.Name ?? "—")</td><td class="mono">@s.Code</td>
+                    <td><strong>@s.Name</strong>@if (s.Description is not null) { <small class="muted block">@s.Description</small> }</td>
+                    <td>@s.Department?.Name @s.Doctor?.Name</td><td>@IndexModel.Unit(s.ChargeUnit)</td>
+                    <td class="num" data-fee>@(r.CurrentFee == 0 ? "0 (set the fee)" : Fmt.Money(r.CurrentFee))@if (r.NextChange is { } n) { <small class="muted block">@Fmt.Money(n.Fee) from @Fmt.Day(n.EffectiveFrom)</small> }</td>
+                    <td class="num" data-gov-fee>@(r.CurrentGovernmentFee is decimal g ? Fmt.Money(g) : "same")</td>
+                    <td>@IndexModel.Applies(s.Applicability)</td>
+                    <td>@(s.IsActive ? "Active" : "Inactive")</td>
+                    <td class="actions">@if (Model.CanEdit) { <a class="btn btn-light btn-sm" href="/Fees/Service?id=@s.Id">Edit</a> }</td>
+                </tr>
+            }
+            @if (Model.Rows.Count == 0) { <tr><td colspan="10" class="empty">No services match.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+</div>

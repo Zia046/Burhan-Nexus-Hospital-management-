@@ -1,0 +1,78 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Fees.ServiceModel
+@using BurhanNexus.HMS.Web.Pages.Fees
+@{
+    ViewData["Title"] = Model.Editing is null ? "New service" : Model.Editing.Item.Name;
+    var f = Model.Form;
+    var detailsLocked = !Model.CanServices;
+    var feeLocked = !Model.CanFees;
+}
+<div class="page-header">
+    <div><h1>@(Model.Editing is null ? "New service" : Model.Editing.Item.Name)</h1>
+        @if (Model.Editing is { } e) { <p class="muted mono">@e.Item.Code @if (e.HasTransactions) { <span class="status" data-has-history>Used in patient bills – cannot be deleted, only deactivated</span> }</p> }</div>
+    <a class="btn btn-light" href="/Fees">Back to catalogue</a>
+</div>
+<partial name="_FeesNav" />
+<partial name="_ValidationSummary" />
+<div class="grid-side">
+    <form method="post" asp-route-id="@Model.Id" class="card" novalidate data-service-form>
+        <div class="card-body">
+            <fieldset disabled="@detailsLocked">
+                <div class="grid-2">
+                    <div class="field"><label for="Form_Code">Unique service code <em>*</em></label><input id="Form_Code" name="Form.Code" value="@f.Code" maxlength="30" required /></div>
+                    <div class="field"><label for="Form_ServiceCategoryId">Category</label><select id="Form_ServiceCategoryId" name="Form.ServiceCategoryId"><option value="">—</option>
+                        @foreach (var c in Model.Categories.Where(c => c.Category.IsActive || c.Category.Id == f.ServiceCategoryId)) { <option value="@c.Category.Id" selected="@(f.ServiceCategoryId == c.Category.Id)">@c.Category.Name</option> }</select></div>
+                </div>
+                <div class="field"><label for="Form_Name">Service name <em>*</em></label><input id="Form_Name" name="Form.Name" value="@f.Name" maxlength="150" required /></div>
+                <div class="grid-2">
+                    <div class="field"><label for="Form_Kind">Type</label><select id="Form_Kind" name="Form.Kind">
+                        @foreach (var k in Enum.GetValues<ServiceKind>()) { <option value="@k" selected="@(f.Kind == k)">@k</option> }</select></div>
+                    <div class="field"><label for="Form_ChargeUnit">Charging method</label><select id="Form_ChargeUnit" name="Form.ChargeUnit">
+                        @foreach (var u in Enum.GetValues<ChargeUnit>()) { <option value="@u" selected="@((f.ChargeUnit ?? ChargeUnit.Fixed) == u)">@IndexModel.Unit(u)</option> }</select></div>
+                </div>
+                <div class="grid-2">
+                    <div class="field"><label for="Form_DepartmentId">Department</label><select id="Form_DepartmentId" name="Form.DepartmentId"><option value="">—</option>
+                        @foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(f.DepartmentId == d.Id)">@d.Name</option> }</select></div>
+                    <div class="field"><label for="Form_DoctorId">Doctor (consultation)</label><select id="Form_DoctorId" name="Form.DoctorId"><option value="">—</option>
+                        @foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(f.DoctorId == d.Id)">@d.Name</option> }</select></div>
+                </div>
+                <div class="field"><label for="Form_Applicability">Applies to</label><select id="Form_Applicability" name="Form.Applicability">
+                    @foreach (var a in Enum.GetValues<ServiceApplicability>()) { <option value="@a" selected="@((f.Applicability ?? ServiceApplicability.Both) == a)">@IndexModel.Applies(a)</option> }</select></div>
+                <div class="field"><label for="Form_Description">Description</label><input id="Form_Description" name="Form.Description" value="@f.Description" maxlength="300" /></div>
+                <label class="check"><input type="checkbox" name="Form.AllowPartialPayment" value="true" checked="@f.AllowPartialPayment" /> Allow partial payment</label>
+                <input type="hidden" name="Form.AllowPartialPayment" value="false" />
+                <label class="check" data-active><input type="checkbox" name="Form.IsActive" value="true" checked="@f.IsActive" /> Active <span class="muted">(untick to deactivate – history is kept)</span></label>
+                <input type="hidden" name="Form.IsActive" value="false" />
+            </fieldset>
+            <fieldset disabled="@feeLocked" class="fee-box">
+                <legend>Fee</legend>
+                <label class="check"><input type="checkbox" name="Form.IsFree" value="true" checked="@f.IsFree" /> Free service</label>
+                <input type="hidden" name="Form.IsFree" value="false" />
+                <div class="grid-2">
+                    <div class="field"><label for="Form_Fee">Fee (private / standard rate)</label><input id="Form_Fee" name="Form.Fee" type="number" step="0.01" min="0" value="@f.Fee.ToString(System.Globalization.CultureInfo.InvariantCulture)" /></div>
+                    <div class="field"><label for="Form_GovernmentFee">Government rate <span class="muted">(empty = same)</span></label><input id="Form_GovernmentFee" name="Form.GovernmentFee" type="number" step="0.01" min="0" value="@f.GovernmentFee?.ToString(System.Globalization.CultureInfo.InvariantCulture)" /></div>
+                </div>
+                <div class="grid-2">
+                    <div class="field"><label for="Form_FeeEffectiveFrom">Effective date</label><input id="Form_FeeEffectiveFrom" name="Form.FeeEffectiveFrom" type="date" value="@f.FeeEffectiveFrom?.ToString("yyyy-MM-dd")" /></div>
+                    <div class="field"><label for="Form_FeeNote">Reason for fee change</label><input id="Form_FeeNote" name="Form.FeeNote" maxlength="300" /></div>
+                </div>
+            </fieldset>
+            @if (detailsLocked)
+            {
+                @* the disabled fieldset is not posted: send the current details so model binding sees them (the server keeps them anyway) *@
+                <input type="hidden" name="Form.Code" value="@f.Code" /><input type="hidden" name="Form.Name" value="@f.Name" /><input type="hidden" name="Form.Kind" value="@f.Kind" /><input type="hidden" name="Form.IsActive" value="@f.IsActive.ToString().ToLowerInvariant()" />
+            }
+        </div>
+        <div class="card-footer"><button class="btn btn-primary" data-test="save-service">Save</button></div>
+    </form>
+    @if (Model.FeeHistory.Count > 0)
+    {
+        <div class="card">
+            <div class="card-header"><h3>Fee history</h3></div>
+            <table class="table table-compact" data-fee-history>
+                <thead><tr><th>From</th><th class="num">Fee</th><th class="num">Govt</th><th>By</th><th>Note</th></tr></thead>
+                <tbody>@foreach (var h in Model.FeeHistory) { <tr><td>@(h.EffectiveFrom == DateOnly.MinValue ? "Start" : Fmt.Day(h.EffectiveFrom))</td><td class="num">@Fmt.Money(h.Fee)</td><td class="num">@(h.GovernmentFee is decimal g ? Fmt.Money(g) : "same")</td><td>@h.CreatedByUsername</td><td>@h.Note</td></tr> }</tbody>
+            </table>
+        </div>
+    }
+</div>
