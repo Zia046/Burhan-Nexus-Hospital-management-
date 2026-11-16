@@ -611,8 +611,8 @@ public sealed class MaternityService : IMaternityService
             open.ReleasedBy = _ctx.Username;
             if (!open.IsShared && await _db.IpdBeds.FirstOrDefaultAsync(b => b.Id == open.BedId, ct) is { } cot && cot.CurrentAdmissionId == baby.Id)
             {
-                _db.IpdBedStatusChanges.Add(new IpdBedStatusChange { BedId = cot.Id, From = cot.Status, To = BedStatus.CleaningRequired, Note = $"Released by {baby.AdmissionNumber}", CreatedUtc = _clock.UtcNow, Username = _ctx.Username });
-                cot.Status = BedStatus.CleaningRequired;
+                _db.IpdBedStatusChanges.Add(new IpdBedStatusChange { BedId = cot.Id, From = cot.Status, To = BedStatus.Available, Note = $"Released by {baby.AdmissionNumber}", CreatedUtc = _clock.UtcNow, Username = _ctx.Username });
+                cot.Status = BedStatus.Available;
                 cot.CurrentAdmissionId = null;
             }
             await _db.SaveChangesAsync(ct);

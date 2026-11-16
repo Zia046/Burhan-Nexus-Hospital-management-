@@ -42,6 +42,9 @@ public class AdmitModel : IpdPageModel
     public bool CanWaiveFee { get; private set; }
     public IReadOnlyList<PaymentMethod> Methods { get; private set; } = Array.Empty<PaymentMethod>();
     /// <summary>pay | waive | later</summary>
+    /// <summary>Update 11: admission date and time are separate inputs (the date picker closes on pick); combined into Input.AdmittedLocal.</summary>
+    [BindProperty] public string? AdmitDate { get; set; }
+    [BindProperty] public string? AdmitTime { get; set; }
     [BindProperty] public string? FeeAction { get; set; }
     [BindProperty] public int? FeeMethodId { get; set; }
     [BindProperty] public string? FeeReference { get; set; }
@@ -83,6 +86,9 @@ public class AdmitModel : IpdPageModel
     public async Task<IActionResult> OnGetAsync()
     {
         await LoadAsync();
+        var localNow = await Clock.LocalNowAsync();
+        AdmitDate = localNow.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        AdmitTime = localNow.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
         Input.IdempotencyKey = Guid.NewGuid();
         Input.Kind = IsGynae ? AdmissionKind.Gynae : AdmissionKind.General;
         var since = (await Clock.TodayAsync()).AddDays(-1);
@@ -102,6 +108,16 @@ public class AdmitModel : IpdPageModel
     {
         Input.PatientId = PatientId ?? 0;
         if (Input.Kind is not (AdmissionKind.General or AdmissionKind.Gynae)) Input.Kind = AdmissionKind.General;
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        if (string.IsNullOrWhiteSpace(AdmitDate) && string.IsNullOrWhiteSpace(AdmitTime)) Input.AdmittedLocal = null; // posted without the fields → current time
+        else if (!DateOnly.TryParseExact(AdmitDate, "yyyy-MM-dd", inv, System.Globalization.DateTimeStyles.None, out var ad)
+            || !TimeOnly.TryParseExact(AdmitTime, new[] { "HH:mm", "HH:mm:ss" }, inv, System.Globalization.DateTimeStyles.None, out var at))
+        {
+            await LoadAsync();
+            ModelState.AddModelError(string.Empty, "Enter a valid admission date and time.");
+            return Page();
+        }
+        else Input.AdmittedLocal = ad.ToDateTime(at);
         var r = await Ipd.AdmitAsync(Input);
         if (!r.Succeeded)
         {

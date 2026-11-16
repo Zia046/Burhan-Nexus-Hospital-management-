@@ -405,11 +405,34 @@
       if (count) count.textContent = n + " selected";
       if (total) total.textContent = money(sum);
     };
-    choices.forEach(c => c.querySelectorAll("input").forEach(i => i.addEventListener(i.type === "checkbox" ? "change" : "input", recalc)));
-    if (filter) filter.addEventListener("input", () => {
-      const q = filter.value.trim().toLowerCase();
-      choices.forEach(c => { c.style.display = !q || (c.dataset.testName || "").includes(q) ? "" : "none"; });
-    });
+    choices.forEach(c => c.querySelectorAll("input").forEach(i => i.addEventListener(i.type === "checkbox" ? "change" : "input", () => { recalc(); show(); })));
+    // Update 11: no categories – frequently used tests below the search bar, any test through the search; each test exists once (no duplicates).
+    const names = book.querySelector("[data-selected-names]");
+    const selList = book.querySelector("[data-selected-list]");
+    const freqTitle = book.querySelector("[data-frequent-title]");
+    const hint = book.querySelector("[data-search-hint]");
+    const none = book.querySelector("[data-no-match]");
+    const show = () => {
+      const q = filter ? filter.value.trim().toLowerCase() : "";
+      let shown = 0;
+      choices.forEach(c => {
+        const on = c.querySelector("input[type=checkbox]").checked;
+        const vis = q ? (c.dataset.testName || "").includes(q) && shown < 40 : (c.dataset.frequent === "1" || on);
+        c.style.display = vis ? "" : "none";
+        if (vis) shown++;
+      });
+      if (freqTitle) freqTitle.hidden = !!q;
+      if (hint) hint.hidden = !q;
+      if (none) none.hidden = !q || shown > 0;
+      const sel = choices.filter(c => c.querySelector("input[type=checkbox]").checked).map(c => c.querySelector("strong").textContent);
+      if (selList) selList.hidden = sel.length === 0;
+      if (names) names.textContent = sel.join(", ");
+    };
+    if (filter) {
+      filter.addEventListener("input", show);
+      filter.addEventListener("keydown", e => { if (e.key === "Enter") e.preventDefault(); });
+    }
+    show();
     const ref = book.querySelector("[data-referral]");
     const refresh = () => {
       if (!ref) return;

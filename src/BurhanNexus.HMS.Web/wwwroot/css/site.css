@@ -709,3 +709,4 @@ form.inline { display: inline; }
 .kpi-icon.amber { background: var(--amber-100); color: var(--amber-600); }
 .sensitivity-table input, .sensitivity-table select { width: 100%; min-width: 0; }
 .culture-row > td { background: var(--blue-50); }
+.selected-tests { margin: 8px 0; padding: 8px 10px; background: var(--blue-50); border-radius: 8px; font-size: 13px; }

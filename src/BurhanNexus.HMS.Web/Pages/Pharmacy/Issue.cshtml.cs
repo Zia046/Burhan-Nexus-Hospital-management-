@@ -70,7 +70,7 @@ public class IssueModel : PharmacyPageModel
             if (await CanAsync(Perm.PharmViewPatientHistory)) History = (await Query.PatientHistoryAsync(pid, ShowPrices)).Take(15).ToList();
         }
         else if (!string.IsNullOrWhiteSpace(Q))
-            Matches = (await _patients.SearchAsync(new PatientSearchQuery { Q = Q, PageSize = 15 })).Items;
+            Matches = (await _patients.SearchAsync(new PatientSearchQuery { Q = Q, PageSize = 15, Routine = true })).Items;
     }
 
     public async Task OnGetAsync()

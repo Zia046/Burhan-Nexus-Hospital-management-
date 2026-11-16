@@ -205,7 +205,7 @@ public partial class IpdTests : Phase2TestBase
         // Transfer to another bed: history kept, old bed needs cleaning, new bed occupied.
         Assert.Contains("reason", (await Refused(await ActAsync(admin, adm, "Transfer", ("BedId", b2.ToString())), "Transfer without reason")).ToLowerInvariant());
         await Ok(await ActAsync(admin, adm, "Transfer", ("BedId", b2.ToString()), ("Reason", "Closer to the nursing station"), ("Receiving", "Nurse Ayesha")), "Transfer");
-        Assert.Equal((BedStatus.CleaningRequired, BedStatus.Occupied), (await BedStatusAsync(b1), await BedStatusAsync(b2)));
+        Assert.Equal((BedStatus.Available, BedStatus.Occupied), (await BedStatusAsync(b1), await BedStatusAsync(b2)));
         await using (var db = Factory.NewDb())
         {
             Assert.Equal(1, await db.IpdTransfers.CountAsync(t => t.AdmissionId == adm));
@@ -232,7 +232,7 @@ public partial class IpdTests : Phase2TestBase
         a = await AdmissionAsync(adm);
         Assert.Equal(AdmissionStatus.Discharged, a.Status);
         Assert.Null(a.CurrentBedId);
-        Assert.Equal(BedStatus.CleaningRequired, await BedStatusAsync(b2));
+        Assert.Equal(BedStatus.Available, await BedStatusAsync(b2));
         int charges;
         await using (var db = Factory.NewDb())
         {
@@ -396,7 +396,7 @@ public partial class IpdTests : Phase2TestBase
         Assert.Contains("data-nicu-list", await admin.GetHtmlAsync("/Ipd/Nicu"));
         Assert.Contains("data-chart=\"hr\"", await admin.GetHtmlAsync($"/Print/Ipd/nicu-chart/{b2Adm}"));
         await Ok(await ActAsync(admin, b2Adm, "ReturnToMother", ("Reason", "Stable, weight gain")), "Return to mother");
-        Assert.Equal(BedStatus.CleaningRequired, await BedStatusAsync(cot));
+        Assert.Equal(BedStatus.Available, await BedStatusAsync(cot));
         Assert.Equal(lr, (await AdmissionAsync(b2Adm)).CurrentBedId);
 
         // Mother cannot be discharged while a baby is rooming-in; babies are discharged first.
@@ -405,7 +405,7 @@ public partial class IpdTests : Phase2TestBase
         await Ok(await ActAsync(admin, b2Adm, "Discharge", Discharge), "Baby 2 discharge");
         Assert.Equal(BedStatus.Occupied, await BedStatusAsync(lr)); // still the mother's bed
         await Ok(await ActAsync(admin, madm, "Discharge", Discharge), "Mother discharge");
-        Assert.Equal(BedStatus.CleaningRequired, await BedStatusAsync(lr));
+        Assert.Equal(BedStatus.Available, await BedStatusAsync(lr));
         await using (var db = Factory.NewDb()) Assert.Equal(LabourStatus.Discharged, (await db.LabourRecords.SingleAsync(l => l.AdmissionId == madm)).Status);
         Assert.Contains("data-form-page", await admin.GetHtmlAsync($"/Print/Ipd/nicu-discharge/{b2Adm}"));
         Assert.Single(await AuditAsync(AuditActions.IpdDeliveryRecorded));
