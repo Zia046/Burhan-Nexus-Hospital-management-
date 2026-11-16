@@ -140,7 +140,7 @@ public partial class Update10Tests : Phase2TestBase
         // Permissions are enforced on the server: view-only cannot save; details-only cannot change the fee.
         var viewer = await UserWithAsync(admin, "feeviewer", Perm.DashboardView, Perm.SvcViewFees);
         Assert.Contains("SVC-NICU-INC", await viewer.GetHtmlAsync("/Fees"));
-        var denied = await viewer.PostFormAsync($"/Fees/Service?id={svc}", ServiceForm("PHY-1", "Hacked", cat, "PerSession", 1, null));
+        var denied = await viewer.PostFormAsync("/Fees", ServiceForm("PHY-1", "Hacked", cat, "PerSession", 1, null), $"/Fees/Service?id={svc}");
         Assert.True(denied.StatusCode is HttpStatusCode.Forbidden || denied.Headers.Location?.ToString().Contains("AccessDenied") == true, $"viewer save: {(int)denied.StatusCode}");
         Assert.NotEqual(HttpStatusCode.OK, (await viewer.Http.GetAsync("/Fees/Categories")).StatusCode);
         var editor = await UserWithAsync(admin, "feeeditor", Perm.DashboardView, Perm.SvcManageServices);
