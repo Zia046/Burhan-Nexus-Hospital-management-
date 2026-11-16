@@ -564,7 +564,8 @@ public partial class Update10Tests : Phase2TestBase
             var adv = await db.PatientAdvances.SingleAsync();
             Assert.Equal((500m, 500m), (adv.Amount, adv.AppliedAmount));
             var applyReceipt = await db.PatientAdvanceEntries.Where(x => x.AdvanceId == adv.Id && x.ReceiptId != null).Select(x => x.ReceiptId!.Value).SingleAsync();
-            Assert.Equal((500m, true), await db.CashierLedger.Where(e => e.AdvanceId == adv.Id).Select(e => ValueTuple.Create(e.Amount, e.AffectsCashInHand)).SingleAsync());
+            var received = await db.CashierLedger.Where(e => e.AdvanceId == adv.Id).SingleAsync();
+            Assert.Equal((500m, true), (received.Amount, received.AffectsCashInHand));
             Assert.False(await db.CashierLedger.Where(e => e.ReceiptId == applyReceipt).Select(e => e.AffectsCashInHand).SingleAsync()); // the adjustment is not cash again
         }
         var t1 = await TotalsAsync(adm);
