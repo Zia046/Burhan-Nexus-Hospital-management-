@@ -3110,6 +3110,9 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("BookedUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<long?>("BookingReceiptId")
+                        .HasColumnType("bigint");
+
                     b.Property<DateOnly>("BusinessDate")
                         .HasColumnType("date");
 
@@ -3713,6 +3716,9 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Property<string>("SignatureContentType")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<bool>("SimpleWorkflow")
+                        .HasColumnType("boolean");
 
                     b.Property<int>("StandardCatalogueVersion")
                         .HasColumnType("integer");

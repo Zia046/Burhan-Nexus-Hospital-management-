@@ -23,7 +23,7 @@ public class ResetAndCatalogTests : HmsTestBase
         // Phase 4: Laboratory became a real module with its own specific permissions.
         var lab = PermissionCatalog.FindModule("Laboratory")!;
         Assert.True(lab.IsAvailable);
-        Assert.Equal(25, lab.Actions.Count);
+        Assert.Equal(28, lab.Actions.Count); // update 10: payments, receipts, review
         Assert.Contains(Perm.LabVerifyOwnResults, PermissionCatalog.AllKeys);
         // Phase 5: Pharmacy became a real module.
         var pharm = PermissionCatalog.FindModule("Pharmacy")!;
