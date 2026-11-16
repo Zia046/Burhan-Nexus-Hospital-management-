@@ -40,6 +40,27 @@ public class BookModel : HmsPageModel
     public string AgeText { get; private set; } = "—";
     public IReadOnlyList<PatientListItem> Matches { get; private set; } = Array.Empty<PatientListItem>();
     public IReadOnlyList<LabTestRow> Tests { get; private set; } = Array.Empty<LabTestRow>();
+    /// <summary>Update 11: most frequently booked tests (last 90 days), shown below the search bar instead of categories.</summary>
+    public IReadOnlyList<int> Frequent { get; private set; } = Array.Empty<int>();
+
+    private static readonly string[] CommonCodes = { "CBC-FULL", "RBS", "FBS", "UCE", "LFT-FULL", "RFT-FULL", "HBSAG", "AHCV", "MP", "WIDAL", "ESR", "LIPID-FULL" };
+
+    private async Task<IReadOnlyList<int>> FrequentAsync()
+    {
+        var db = HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Persistence.HmsDbContext>();
+        var since = DateTime.UtcNow.AddDays(-90);
+        var active = Tests.Select(t => t.Test.Id).ToHashSet();
+        var used = (await db.LabOrderItems.Where(i => i.Order!.BookedUtc >= since && i.Status != LabOrderItemStatus.Cancelled)
+            .GroupBy(i => i.LabTestId).Select(g => new { g.Key, N = g.Count() }).OrderByDescending(x => x.N).Take(30).ToListAsync())
+            .Where(x => active.Contains(x.Key)).Select(x => x.Key).ToList();
+        foreach (var code in CommonCodes)
+        {
+            if (used.Count >= 8) break;
+            if (Tests.FirstOrDefault(t => t.Test.Code == code) is { } t && !used.Contains(t.Test.Id)) used.Add(t.Test.Id);
+        }
+        foreach (var t in Tests) { if (used.Count >= 8) break; if (!used.Contains(t.Test.Id)) used.Add(t.Test.Id); }
+        return used.Take(Math.Max(8, used.Count > 12 ? 12 : used.Count)).ToList();
+    }
     public IReadOnlyList<Doctor> Doctors { get; private set; } = Array.Empty<Doctor>();
     public IReadOnlyList<LabOrderSummary> Previous { get; private set; } = Array.Empty<LabOrderSummary>();
     public bool ShowFees { get; private set; }
@@ -67,6 +88,7 @@ public class BookModel : HmsPageModel
             else if (CurrentUserId is int uid) Counters = await finance.CountersOfUserAsync(uid);
         }
         Tests = await _catalog.TestsAsync(activeOnly: true);
+        Frequent = await FrequentAsync();
         Doctors = await _registration.DoctorsAsync(activeOnly: true);
         if (AdmissionId is long aid && PatientId is null)
             PatientId = await HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Persistence.HmsDbContext>().IpdAdmissions
@@ -83,7 +105,7 @@ public class BookModel : HmsPageModel
             }
         }
         else if (!string.IsNullOrWhiteSpace(Q))
-            Matches = (await _patients.SearchAsync(new PatientSearchQuery { Q = Q, PageSize = 15 })).Items;
+            Matches = (await _patients.SearchAsync(new PatientSearchQuery { Q = Q, PageSize = 15, Routine = true })).Items;
     }
 
     public async Task<IActionResult> OnGetAsync()

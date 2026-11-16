@@ -117,5 +117,8 @@ public static class PermissionSeeder
         [Perm.FinanceReceiveInpatientPayments] = Perm.FinanceCollect,
         [Perm.FinanceReceiveAdvances] = Perm.FinanceCollect,
         [Perm.FinanceViewClearance] = Perm.IpdViewFinancial,
+        // update 11: doctor accounts – handing to the Admin and printing go with the existing doctor-payment / doctor-account tasks
+        [Perm.FinanceHandDoctorMoneyToAdmin] = Perm.FinanceRecordDoctorPayments,
+        [Perm.FinancePrintDoctorReports] = Perm.FinanceManageDoctorAccounts,
     };
 }

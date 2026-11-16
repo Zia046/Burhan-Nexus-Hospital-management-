@@ -51,6 +51,12 @@ public sealed class PatientSearchQuery
     public string? Status { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = 25;
+    /// <summary>
+    /// Update 11: routine patient-selection boxes (OPD, emergency, laboratory, radiology, appointments, pharmacy) show only today's
+    /// patients – registered or seen today (hospital date), patients registered from 22:00 until 02:00 of the next night, and every
+    /// currently admitted patient. The Patients page searches everyone.
+    /// </summary>
+    public bool Routine { get; set; }
 }
 
 public sealed class RegistrationResult : ServiceResult
@@ -400,6 +406,20 @@ public sealed partial class PatientService : IPatientService
 
     // ---------------- Search ----------------
 
+    private static readonly AdmissionStatus[] OpenAdmission =
+        { AdmissionStatus.Registered, AdmissionStatus.Admitted, AdmissionStatus.UnderTreatment, AdmissionStatus.Transferred, AdmissionStatus.DischargeRequested };
+
+    /// <summary>
+    /// Start of the routine search window (UTC): today's hospital midnight, or – between 00:00 and 02:00 – 22:00 of the previous
+    /// evening, so that patients registered late at night stay suggested until 02:00 (one continuous night window).
+    /// </summary>
+    public async Task<DateTime> RoutineWindowStartUtcAsync(CancellationToken ct = default)
+    {
+        var local = await _clock.LocalNowAsync();
+        var midnight = await _clock.StartOfDayUtcAsync(DateOnly.FromDateTime(local));
+        return local.Hour < 2 ? midnight.AddHours(-2) : midnight;
+    }
+
     public async Task<PagedResult<PatientListItem>> SearchAsync(PatientSearchQuery q, CancellationToken ct = default)
     {
         var page = Math.Max(1, q.Page);
@@ -445,6 +465,13 @@ public sealed partial class PatientService : IPatientService
             }
         }
 
+        if (q.Routine)
+        {
+            var since = await RoutineWindowStartUtcAsync(ct);
+            query = query.Where(p => p.RegisteredUtc >= since
+                                     || _db.PatientEncounters.Any(e => e.PatientId == p.Id && e.EncounterUtc >= since)
+                                     || _db.IpdAdmissions.Any(a => a.PatientId == p.Id && OpenAdmission.Contains(a.Status)));
+        }
         if (q.RegisteredFrom is { } from) { var f = await _clock.StartOfDayUtcAsync(from); query = query.Where(p => p.RegisteredUtc >= f); }
         if (q.RegisteredTo is { } to) { var t = await _clock.StartOfDayUtcAsync(to.AddDays(1)); query = query.Where(p => p.RegisteredUtc < t); }
         if (q.Gender is { } g) query = query.Where(p => p.Gender == g);

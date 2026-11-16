@@ -684,6 +684,7 @@ public class HmsDbContext : DbContext
             Money(e);
             e.HasIndex(x => x.SettlementNumber).IsUnique();
             e.HasIndex(x => new { x.DoctorId, x.BusinessDate });
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
             e.HasOne(x => x.Doctor).WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.PaymentMethod).WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.Restrict);
         });

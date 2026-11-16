@@ -110,14 +110,14 @@ public static class NavMenu
             (Has(Perm.PharmViewCatalogue), new("pharm-medicines", "/Pharmacy/Medicines", "sliders", "Medicines")));
 
         Add("finance", "Finance", "wallet", Any(Perm.FinanceViewOwnAccount, Perm.FinanceCollect, Perm.FinanceViewOwnReceipts, Perm.FinanceDashboard, Perm.FinanceConfirmDeposits,
-                Perm.FinanceManageDoctorAccounts, Perm.FinanceCounterReports, Perm.FinanceManageServiceFees),
+                Perm.FinanceManageDoctorAccounts, Perm.FinanceViewOwnDoctorAccount, Perm.FinanceCounterReports, Perm.FinanceManageServiceFees),
             (Has(Perm.FinanceCollect), new("finance-collect", "/Finance/Collect", "plus", "Collect Payment")),
             (Has(Perm.FinanceViewOwnAccount), new("finance-account", "/Finance", "wallet", "My Financial Account")),
             (Has(Perm.FinanceViewOwnReceipts), new("finance-receipts", "/Finance/Receipts", "file", "Receipts")),
             (Has(Perm.FinanceDashboard), new("finance-dashboard", "/Finance/Dashboard", "chart", "Financial Dashboard")),
             (Has(Perm.FinanceDashboard), new("finance-revenue", "/Finance/Revenue", "chart", "Revenue & Outstanding", EmitDataNav: false)),
             (Has(Perm.FinanceConfirmDeposits), new("finance-deposits", "/Finance/Deposits", "download", "Cash Deposits")),
-            (Has(Perm.FinanceManageDoctorAccounts), new("finance-doctors", "/Finance/Doctors", "stethoscope", "Doctor Accounts")),
+            (Has(Perm.FinanceManageDoctorAccounts) || Has(Perm.FinanceViewOwnDoctorAccount), new("finance-doctors", "/Finance/Doctors", "stethoscope", Has(Perm.FinanceManageDoctorAccounts) ? "Doctor Accounts" : "My Doctor Account")),
             (Has(Perm.FinanceManageServiceFees), new("finance-services", "/Finance/Services", "sliders", "Counters per Service")));
 
         Add("fees", "Fees & Services", "sliders", Any(Perm.SvcViewFees, Perm.SvcManageCatalogue, Perm.SvcManageServices, Perm.SvcManageFees, Perm.SvcManageCategories, Perm.SvcReports),

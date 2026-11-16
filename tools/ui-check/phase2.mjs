@@ -20,6 +20,13 @@ page.on("console", m => { if (m.type() === "error") errors.push("console: " + m.
 page.on("response", r => { if (r.status() >= 500) errors.push(`HTTP ${r.status()} on ${r.url()}`); });
 
 const go = async (url) => { await page.goto(base + url); };
+// Update 11: bed selection is Ward → Room → vacant Bed.
+const pickBed = async (scope = "") => {
+  const first = (sel) => page.$eval(sel, s => [...s.options].find(o => o.value && !o.disabled)?.value);
+  await page.selectOption(`${scope} select[data-bed-ward]`, { index: 1 });
+  await page.selectOption(`${scope} select[data-bed-room]`, await first(`${scope} select[data-bed-room]`));
+  await page.selectOption(`${scope} select[data-bed-list]`, await first(`${scope} select[data-bed-list]`));
+};
 const submit = async (selector) => { await Promise.all([page.waitForNavigation(), page.click(selector)]); };
 const pdf = async (url, file) => {
   const p = await ctx.newPage();
@@ -539,7 +546,7 @@ try {
   step("ipd patient: " + page.url());
   const ahmadId = new URL(page.url()).pathname.split("/").pop();
   await go(`/Ipd/Admit?patientId=${ahmadId}`);
-  await page.selectOption("select[data-bed-list]", { index: 1 });
+  await pickBed();
   await page.fill("#Input_AdmissionDiagnosis", "Fever with abdominal pain (as written by the doctor)");
   await page.fill("#Input_Allergies", "Penicillin");
   await page.fill("#Input_AttendantName", "Gul Khan");
@@ -597,7 +604,7 @@ try {
   await submit("button[data-test='save-AncVisit']");
   await shot(page, "p7-09-pregnancy-anc-timeline");
   await go(`/Ipd/Labour/Admit?patientId=${rukhsanaId}`);
-  await page.selectOption("select[data-bed-list]", { index: 1 });
+  await pickBed();
   await page.fill("[name='Labour.MembraneStatus']", "Intact");
   await page.fill("[name='Labour.PresentingComplaints']", "Labour pains since morning");
   await submit("button[data-test='labour-admit']");
@@ -815,6 +822,24 @@ try {
     await shot(page, name);
   }
   await pdf(admUrl.replace("/Ipd/Admission/", "/Print/Ipd/admission/"), "sample-ipd-admission-form-2-copies-A4.pdf");
+
+  // ---- Update 11: frequent lab tests, Ward → Room → Bed, admitted list, ward request alert, supplier invoice, doctor account ----
+  for (const [url, name] of [[`/Lab/Book?patientId=${ahmadId}`, "p11-01-lab-frequent-tests"], ["/Ipd/Admit", "p11-02-admit-search"],
+                             ["/Ipd/Admissions?scope=active", "p11-03-admitted-list"], ["/Ipd", "p11-04-ipd-dashboard-admitted"],
+                             ["/Pharmacy/WardRequests", "p11-05-ward-requests-alert"], ["/Pharmacy/Receive", "p11-06-supplier-invoice"],
+                             ["/Finance/Doctors", "p11-07-doctor-accounts"], ["/", "p11-08-dashboard-admitted"]]) {
+    const r = await page.goto(base + url);
+    if (!r || r.status() >= 400) errors.push(`HTTP ${r && r.status()} on ${url}`);
+    await page.waitForTimeout(400);
+    await shot(page, name);
+  }
+  const docLink = await page.goto(base + "/Finance/Doctors").then(() => page.$eval("a[href^='/Finance/Doctors/Account/']", a => a.getAttribute("href"))).catch(() => null);
+  if (docLink) {
+    const r = await page.goto(base + docLink);
+    if (!r || r.status() >= 400) errors.push(`HTTP ${r && r.status()} on ${docLink}`);
+    await shot(page, "p11-09-doctor-account");
+    await pdf(docLink.replace("/Finance/Doctors/Account/", "/Print/Doctor/"), "sample-doctor-daily-opd-list-A4.pdf");
+  }
 
   // ---- Navigation: administrator sidebar (11 pages) + top taskbar categories ----
   await go("/");

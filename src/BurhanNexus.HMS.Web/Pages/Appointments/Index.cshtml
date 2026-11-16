@@ -54,6 +54,7 @@
         <div class="card-header">
             <h3><svg class="icon"><use href="#i-stethoscope" /></svg> @g.Key.DoctorName @if (g.Key.DoctorSpecialty is not null) { <small class="muted">· @g.Key.DoctorSpecialty</small> }</h3>
             <span class="pill pill-blue">@g.Count(i => i.Status != AppointmentStatus.Cancelled) patient(s)</span>
+            <a bn-permission="@Perm.FinanceManageDoctorAccounts" class="btn btn-light btn-sm" href="/Finance/Doctors/Account/@g.Key.DoctorId?day=@date.ToString("yyyy-MM-dd")" data-test="doctor-account-link"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Doctor account</a>
         </div>
         <div class="table-wrap">
             <table class="table table-compact">

@@ -42,6 +42,10 @@ else
                 <a class="kpi kpi-link" href="/Emergency?status=all"><div class="kpi-icon red"><svg class="icon"><use href="#i-siren" /></svg></div><div><span class="kpi-label">Emergency today</span><strong class="kpi-value" data-kpi="er">@cl.EmergencyToday</strong></div></a>
                 <a class="kpi kpi-link" href="/Emergency"><div class="kpi-icon red"><svg class="icon"><use href="#i-activity" /></svg></div><div><span class="kpi-label">Active emergencies</span><strong class="kpi-value" data-kpi="er-active">@cl.EmergencyActive</strong></div></a>
             }
+            @if (Model.AdmittedNow is int admittedNow)
+            {
+                <a class="kpi kpi-link" href="/Ipd/Admissions?scope=active" data-test="dashboard-admitted"><div class="kpi-icon navy"><svg class="icon"><use href="#i-hospital" /></svg></div><div><span class="kpi-label">Admitted patients</span><strong class="kpi-value" data-kpi="admitted">@admittedNow</strong></div></a>
+            }
         </div>
     }
     @if (Model.DoctorsToday is { } docs)

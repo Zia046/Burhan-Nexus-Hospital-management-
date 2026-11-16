@@ -1,18 +1,28 @@
 @model (IReadOnlyList<IpdBed> Beds, string Name, int? Selected, bool Required)
+@{
+    // Update 11: Ward → rooms of that ward → vacant beds of that room. No bed-type filter (the type stays on the bed record).
+    var selectedBed = Model.Beds.FirstOrDefault(b => b.Id == Model.Selected);
+    var wards = Model.Beds.Select(b => b.Ward!).DistinctBy(w => w.Id).OrderBy(w => w.Name).ToList();
+    var rooms = Model.Beds.Select(b => b.Room!).DistinctBy(r => r.Id).OrderBy(r => r.Name).ToList();
+}
 <div class="field" data-bed-select>
-    <label>Bed @(Model.Required ? "*" : "(optional – can be allocated later)")</label>
-    <div class="inline-form wrap">
-        <select data-bed-filter="ward" aria-label="Filter by ward"><option value="">All wards</option>@foreach (var w in Model.Beds.Select(b => b.Ward!).DistinctBy(w => w.Id)) { <option value="@w.Id">@w.Name</option> }</select>
-        <select data-bed-filter="type" aria-label="Filter by bed type"><option value="">All bed types</option>@foreach (var t in Model.Beds.Select(b => b.Type).Distinct()) { <option value="@t">@t</option> }</select>
+    <label>Ward → room → bed @(Model.Required ? "*" : "(optional – can be allocated later)")</label>
+    <div class="grid-3">
+        <select data-bed-ward aria-label="Ward" data-test="bed-ward">
+            <option value="">— select ward —</option>
+            @foreach (var w in wards) { <option value="@w.Id" selected="@(selectedBed?.WardId == w.Id)">@w.Name (@Model.Beds.Count(b => b.WardId == w.Id) vacant)</option> }
+        </select>
+        <select data-bed-room aria-label="Room" data-test="bed-room">
+            <option value="">— select room —</option>
+            @foreach (var r in rooms) { <option value="@r.Id" data-ward="@r.WardId" selected="@(selectedBed?.RoomId == r.Id)">@r.Name (@Model.Beds.Count(b => b.RoomId == r.Id) vacant)</option> }
+        </select>
+        <select name="@Model.Name" data-bed-list aria-label="Bed" data-test="bed-bed">
+            <option value="">@(Model.Required ? "— select a bed —" : "— no bed yet —")</option>
+            @foreach (var b in Model.Beds.OrderBy(b => b.Code))
+            {
+                <option value="@b.Id" data-ward="@b.WardId" data-room="@b.RoomId" selected="@(Model.Selected == b.Id)">@b.Code@(b.Status == BedStatus.Reserved ? " (reserved)" : "")@(b.EquipmentId is null ? "" : " · " + b.EquipmentId)</option>
+            }
+        </select>
     </div>
-    <select name="@Model.Name" data-bed-list aria-label="Bed">
-        <option value="">@(Model.Required ? "— select a bed —" : "— no bed yet —")</option>
-        @foreach (var g in Model.Beds.GroupBy(b => b.Ward!.Name))
-        {
-            <optgroup label="@g.Key">
-                @foreach (var b in g) { <option value="@b.Id" data-ward="@b.WardId" data-type="@b.Type" selected="@(Model.Selected == b.Id)">@b.Code · @b.Room!.Name · @b.Type@(b.Status == BedStatus.Reserved ? " (reserved)" : "")@(b.EquipmentId is null ? "" : " · " + b.EquipmentId)</option> }
-            </optgroup>
-        }
-    </select>
-    @if (Model.Beds.Count == 0) { <small class="text-warning">No free bed of this kind – free a bed (cleaning done) or add beds.</small> }
+    @if (Model.Beds.Count == 0) { <small class="text-warning">No vacant bed – discharge / transfer a patient or add beds.</small> }
 </div>

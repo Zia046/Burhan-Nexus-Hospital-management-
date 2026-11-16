@@ -7,7 +7,7 @@
         <span class="pill pill-blue">Payable to doctors @Fmt.Money(Model.Accounts.Where(a => a.Payable > 0).Sum(a => a.Payable))</span></div>
     <div class="table-wrap">
         <table class="table" data-doctor-accounts>
-            <thead><tr><th>Doctor</th><th>Fee arrangement</th><th class="num">Consult. fee</th><th class="num">Consultations</th><th class="num">Fees collected</th><th class="num">Hospital share</th><th class="num">Doctor's share</th><th class="num">Fee waivers</th><th class="num">Paid</th><th class="num">Payable</th><th></th></tr></thead>
+            <thead><tr><th>Doctor</th><th>Fee arrangement</th><th class="num">Consult. fee</th><th class="num">Consultations</th><th class="num">Fees collected</th><th class="num">Hospital share</th><th class="num">Doctor's share</th><th class="num">Fee waivers</th><th class="num">Handed to doctor</th><th class="num">Handed to Admin</th><th class="num">Payable</th><th></th></tr></thead>
             <tbody>
             @foreach (var a in Model.Accounts)
             {
@@ -15,13 +15,13 @@
                     <td><strong>@a.Name</strong> <small class="muted block">@a.Specialty</small></td><td>@a.Arrangement</td>
                     <td class="num">@(a.ConsultationFee is decimal f ? Fmt.Money(f) : "—")</td><td class="num">@a.Consultations</td>
                     <td class="num">@Fmt.Money(a.FeesCollected)</td><td class="num">@Fmt.Money(a.HospitalShare)</td><td class="num">@Fmt.Money(a.DoctorEarned + a.Adjustments)</td><td class="num" data-fee-waivers>@Fmt.Money(a.FeeWaivers)</td>
-                    <td class="num">@Fmt.Money(a.PaidToDoctor)</td><td class="num"><strong data-payable>@Fmt.Money(a.Payable)</strong></td>
+                    <td class="num">@Fmt.Money(a.PaidToDoctor)</td><td class="num" data-handed-admin>@Fmt.Money(a.HandedToAdmin)</td><td class="num"><strong data-payable>@Fmt.Money(a.Payable)</strong></td>
                     <td class="actions"><a class="btn btn-light btn-sm" href="/Finance/Doctors/Account/@a.DoctorId">Account</a></td>
                 </tr>
             }
-            @if (Model.Accounts.Count == 0) { <tr><td colspan="10" class="empty">No doctors. Add doctors under OPD setup.</td></tr> }
+            @if (Model.Accounts.Count == 0) { <tr><td colspan="12" class="empty">No doctors. Add doctors under OPD setup.</td></tr> }
             </tbody>
         </table>
     </div>
-    <div class="card-body small muted">Fees collected = consultation money received from patients (after refunds/cancellations). Doctor's share follows each doctor's arrangement at the time of the consultation. Payable = doctor's share − money paid to the doctor.</div>
+    <div class="card-body small muted">Fees collected = consultation money received from patients (after refunds/cancellations). Doctor's share follows each doctor's arrangement at the time of the consultation. Payable = doctor's share − money handed to the doctor − money handed to the Admin on the doctor's behalf. An unpaid payable simply stays for the next day.</div>
 </div>

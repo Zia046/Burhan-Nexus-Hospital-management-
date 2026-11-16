@@ -342,7 +342,12 @@ public class CashierLedgerEntry
 
 public enum DoctorEntryType { ConsultationShare = 1, ShareReversal = 2, Settlement = 3, Adjustment = 4,
     /// <summary>The doctor waived a consultation fee that had been collected ("Free by Doctor") – reduces the doctor's earnings; not a cash refund.</summary>
-    FeeWaiver = 5 }
+    FeeWaiver = 5,
+    /// <summary>Update 11: the doctor's collected money handed to the Admin (not to the doctor) – reduces the hospital-side payable; recorded separately.</summary>
+    HandedToAdmin = 6 }
+
+/// <summary>Update 11: who received a doctor-account handover.</summary>
+public enum DoctorSettlementKind { ToDoctor = 1, ToAdmin = 2 }
 
 /// <summary>Doctor ledger. Positive = payable to the doctor; settlements are negative.</summary>
 public class DoctorLedgerEntry
@@ -374,6 +379,10 @@ public class DoctorSettlement
 {
     public long Id { get; set; }
     [MaxLength(30)] public string SettlementNumber { get; set; } = string.Empty;
+    /// <summary>Update 11: handed to the doctor, or to the Admin on the doctor's behalf.</summary>
+    public DoctorSettlementKind Kind { get; set; } = DoctorSettlementKind.ToDoctor;
+    /// <summary>Update 11: name of the person who received the money (e.g. the Admin).</summary>
+    [MaxLength(150)] public string? ReceivedBy { get; set; }
     public int DoctorId { get; set; }
     public Doctor? Doctor { get; set; }
     public decimal Amount { get; set; }

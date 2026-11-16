@@ -250,6 +250,9 @@ public sealed class IpdService : IIpdService
         }
     }
 
+    /// <summary>How far back an admission time may be entered (late paperwork after a night admission).</summary>
+    public const int MaxBackdatedAdmissionDays = 7;
+
     private async Task<List<string>> ValidateAdmitAsync(AdmitInput i, Patient patient, CancellationToken ct)
     {
         var errors = new List<string>();
@@ -260,6 +263,13 @@ public sealed class IpdService : IIpdService
         if (i.SourceEncounterId is long eid && !await _db.PatientEncounters.AnyAsync(e => e.Id == eid && e.PatientId == patient.Id, ct))
             errors.Add("The OPD / Emergency visit does not belong to this patient.");
         if (i.DepartmentId is int d && !await _db.Departments.AnyAsync(x => x.Id == d, ct)) errors.Add("Select a valid department.");
+        // Update 11: the admission date/time is entered (defaults to the current hospital time) and validated – never silently replaced.
+        if (i.AdmittedLocal is DateTime at)
+        {
+            var localNow = await _clock.LocalNowAsync();
+            if (at > localNow.AddMinutes(5)) errors.Add("The admission time cannot be in the future.");
+            else if (at < localNow.AddDays(-MaxBackdatedAdmissionDays)) errors.Add($"The admission time cannot be more than {MaxBackdatedAdmissionDays} days in the past.");
+        }
         if (i.AdmittingDoctorId is int doc && !await _db.Doctors.AnyAsync(x => x.Id == doc, ct)) errors.Add("Select a valid admitting doctor.");
         if (i.PregnancyId is long pg && !await _db.Pregnancies.AnyAsync(p => p.Id == pg && p.PatientId == patient.Id, ct)) errors.Add("The pregnancy record does not belong to this patient.");
         if (await _db.IpdAdmissions.AnyAsync(a => a.PatientId == patient.Id && ActiveStatuses.Contains(a.Status), ct))
@@ -271,7 +281,9 @@ public sealed class IpdService : IIpdService
     {
         var now = _clock.UtcNow;
         var local = i.AdmittedLocal;
-        var admittedUtc = local is DateTime l && l <= await _clock.LocalNowAsync() ? await _clock.LocalToUtcAsync(l) : now;
+        var admittedUtc = local is DateTime l ? await _clock.LocalToUtcAsync(l) : now;
+        if (admittedUtc > now) admittedUtc = now; // within the 5-minute tolerance
+        var adjusted = Math.Abs((admittedUtc - now).TotalMinutes) > 2;
         var a = new IpdAdmission
         {
             AdmissionNumber = await FinanceDb.NextNumberAsync(_db, HmsDbContext.IpdAdmissionSequence, "IPD", today, ct),
@@ -291,7 +303,8 @@ public sealed class IpdService : IIpdService
         if (settings.AdmissionServiceItemId is int svc && a.Kind is not AdmissionKind.Newborn)
             a.AdmissionFeeChargeId = (await ChargeAsync(a, svc, 1, 0, null, today, ct, (await _db.ServiceItems.Where(s => s.Id == svc).Select(s => s.Name).FirstAsync(ct)))).Id;
         _audit.Add(AuditActions.IpdAdmitted, "IpdAdmission", a.AdmissionNumber,
-            $"{a.Kind} admission {a.AdmissionNumber} for {patient.PatientNumber} from {a.Source}" + (a.AdmissionDiagnosis is null ? "" : $" – {a.AdmissionDiagnosis}"));
+            $"{a.Kind} admission {a.AdmissionNumber} for {patient.PatientNumber} from {a.Source}" + (a.AdmissionDiagnosis is null ? "" : $" – {a.AdmissionDiagnosis}")
+            + $"; admitted at {TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(admittedUtc, DateTimeKind.Utc), await _clock.ZoneAsync()):dd-MM-yyyy HH:mm}" + (adjusted ? $" (time entered by {_ctx.Username})" : ""));
         await _db.SaveChangesAsync(ct);
         return a;
     }
@@ -336,7 +349,7 @@ public sealed class IpdService : IIpdService
         return null;
     }
 
-    /// <summary>Closes the admission's open bed; the released bed needs cleaning before the next patient.</summary>
+    /// <summary>Closes the admission's open bed; the released bed becomes vacant (Available) at once (Update 11).</summary>
     private async Task ReleaseBedAsync(IpdAdmission a, CancellationToken ct)
     {
         var now = _clock.UtcNow;
@@ -346,8 +359,8 @@ public sealed class IpdService : IIpdService
             open.ReleasedBy = _ctx.Username;
             if (!open.IsShared && await _db.IpdBeds.FirstOrDefaultAsync(b => b.Id == open.BedId, ct) is { } bed && bed.CurrentAdmissionId == a.Id)
             {
-                _db.IpdBedStatusChanges.Add(new IpdBedStatusChange { BedId = bed.Id, From = bed.Status, To = BedStatus.CleaningRequired, Note = $"Released by {a.AdmissionNumber}", CreatedUtc = now, Username = _ctx.Username });
-                bed.Status = BedStatus.CleaningRequired;
+                _db.IpdBedStatusChanges.Add(new IpdBedStatusChange { BedId = bed.Id, From = bed.Status, To = BedStatus.Available, Note = $"Released by {a.AdmissionNumber}", CreatedUtc = now, Username = _ctx.Username });
+                bed.Status = BedStatus.Available;
                 bed.CurrentAdmissionId = null;
                 bed.UpdatedUtc = now;
             }

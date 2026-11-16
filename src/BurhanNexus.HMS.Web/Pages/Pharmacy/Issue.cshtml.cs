@@ -53,7 +53,7 @@ public class IssueModel : PharmacyPageModel
         if (AdmissionId is long aid)
         {
             Admission = await _db.IpdAdmissions.AsNoTracking().FirstOrDefaultAsync(a => a.Id == aid);
-            if (Admission is not null) PatientId ??= Admission.PatientId;
+            if (Admission is not null) { PatientId ??= Admission.PatientId; await LoadIpdPaymentAsync(); }
         }
         if (EncounterId is long eid && PatientId is null)
             PatientId = await _db.PatientEncounters.Where(e => e.Id == eid).Select(e => (long?)e.PatientId).FirstOrDefaultAsync();
@@ -70,7 +70,7 @@ public class IssueModel : PharmacyPageModel
             if (await CanAsync(Perm.PharmViewPatientHistory)) History = (await Query.PatientHistoryAsync(pid, ShowPrices)).Take(15).ToList();
         }
         else if (!string.IsNullOrWhiteSpace(Q))
-            Matches = (await _patients.SearchAsync(new PatientSearchQuery { Q = Q, PageSize = 15 })).Items;
+            Matches = (await _patients.SearchAsync(new PatientSearchQuery { Q = Q, PageSize = 15, Routine = true })).Items;
     }
 
     public async Task OnGetAsync()
@@ -88,6 +88,7 @@ public class IssueModel : PharmacyPageModel
         var r = await Pharmacy.IssueAsync(Input, await RightsAsync());
         if (!r.Succeeded) { AddErrors(r); return Page(); }
         FlashSuccess = r.Value!.WasDuplicate ? $"{r.Value.Number} was already saved – stock was not deducted twice." : $"Medicines issued: {r.Value.Number}.";
+        if (Input.IpdAdmissionId is long aid) await SettleIpdIssueAsync(aid, r.Value.Id, r.Value.Number, Input.IdempotencyKey);
         return Redirect($"/Pharmacy/Doc/ISS/{r.Value.Id}");
     }
 }

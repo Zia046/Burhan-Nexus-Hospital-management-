@@ -709,3 +709,13 @@ form.inline { display: inline; }
 .kpi-icon.amber { background: var(--amber-100); color: var(--amber-600); }
 .sensitivity-table input, .sensitivity-table select { width: 100%; min-width: 0; }
 .culture-row > td { background: var(--blue-50); }
+.selected-tests { margin: 8px 0; padding: 8px 10px; background: var(--blue-50); border-radius: 8px; font-size: 13px; }
+
+/* Update 11: red navigation alert with a pending count */
+a.nav-alert { color: #fff !important; background: #c62828 !important; border-radius: 6px; }
+a.nav-alert svg { color: #fff; }
+.nav-badge { display: inline-block; min-width: 1.4em; margin-left: .4em; padding: 0 .4em; border-radius: 999px; background: #fff; color: #c62828; font-weight: 700; font-size: .78em; line-height: 1.5em; text-align: center; }
+.date-time-pair input[type=date] { min-width: 10em; }
+.date-time-pair input[type=time] { min-width: 7em; }
+a.kpi-link { text-decoration: none; color: inherit; cursor: pointer; }
+a.kpi-link:hover { outline: 2px solid var(--primary, #1565c0); outline-offset: -2px; }

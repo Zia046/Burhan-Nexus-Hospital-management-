@@ -47,7 +47,7 @@ public class RegisterModel : HmsPageModel
             if (Existing is not null) AgeText = AgeCalculator.Of(Existing, await _clock.TodayAsync())?.ToString() ?? "—";
         }
         else if (!string.IsNullOrWhiteSpace(Q))
-            Matches = (await _patients.SearchAsync(new PatientSearchQuery { Q = Q, PageSize = 10 })).Items;
+            Matches = (await _patients.SearchAsync(new PatientSearchQuery { Q = Q, PageSize = 10, Routine = true })).Items;
     }
 
     public async Task OnGetAsync()

@@ -64,7 +64,7 @@ public class RegisterModel : HmsPageModel
         }
         else if (!string.IsNullOrWhiteSpace(Q))
         {
-            Matches = (await _patients.SearchAsync(new PatientSearchQuery { Q = Q, PageSize = 15 })).Items;
+            Matches = (await _patients.SearchAsync(new PatientSearchQuery { Q = Q, PageSize = 15, Routine = true })).Items;
         }
     }
 

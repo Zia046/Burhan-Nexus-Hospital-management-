@@ -405,11 +405,36 @@
       if (count) count.textContent = n + " selected";
       if (total) total.textContent = money(sum);
     };
-    choices.forEach(c => c.querySelectorAll("input").forEach(i => i.addEventListener(i.type === "checkbox" ? "change" : "input", recalc)));
-    if (filter) filter.addEventListener("input", () => {
-      const q = filter.value.trim().toLowerCase();
-      choices.forEach(c => { c.style.display = !q || (c.dataset.testName || "").includes(q) ? "" : "none"; });
-    });
+    choices.forEach(c => c.querySelectorAll("input").forEach(i => i.addEventListener(i.type === "checkbox" ? "change" : "input", () => { recalc(); show(); })));
+    // Update 11: no categories – frequently used tests below the search bar, any test through the search; each test exists once (no duplicates).
+    const names = book.querySelector("[data-selected-names]");
+    const selList = book.querySelector("[data-selected-list]");
+    const freqTitle = book.querySelector("[data-frequent-title]");
+    const hint = book.querySelector("[data-search-hint]");
+    const none = book.querySelector("[data-no-match]");
+    const show = () => {
+      const q = filter ? filter.value.trim().toLowerCase() : "";
+      let shown = 0;
+      choices.forEach(c => {
+        const on = c.querySelector("input[type=checkbox]").checked;
+        // Frequent-test mode only on the laboratory booking (it has the "Frequently used" title); radiology keeps the full list.
+        const vis = !freqTitle ? (!q || (c.dataset.testName || "").includes(q))
+          : q ? (c.dataset.testName || "").includes(q) && shown < 40 : (c.dataset.frequent === "1" || on);
+        c.style.display = vis ? "" : "none";
+        if (vis) shown++;
+      });
+      if (freqTitle) freqTitle.hidden = !!q;
+      if (hint) hint.hidden = !q;
+      if (none) none.hidden = !q || shown > 0;
+      const sel = choices.filter(c => c.querySelector("input[type=checkbox]").checked).map(c => c.querySelector("strong").textContent);
+      if (selList) selList.hidden = sel.length === 0;
+      if (names) names.textContent = sel.join(", ");
+    };
+    if (filter) {
+      filter.addEventListener("input", show);
+      filter.addEventListener("keydown", e => { if (e.key === "Enter") e.preventDefault(); });
+    }
+    show();
     const ref = book.querySelector("[data-referral]");
     const refresh = () => {
       if (!ref) return;
@@ -472,4 +497,31 @@ document.querySelectorAll("select[data-autosubmit]").forEach(s => s.addEventList
         var b = e.target.closest && e.target.closest('[data-print-now]');
         if (b && !document.body.hasAttribute('data-lab-slip') && !document.body.hasAttribute('data-lab-receipt') && !document.querySelector('[data-form-page]')) window.print();
     });
+})();
+
+/* Update 11: live navigation alerts – the Ward Requests links turn red with the pending count while any ward medicine
+   request is waiting (Pending / Approved / Partly issued). Polled every 20 s; viewing the list does not clear it. */
+(function () {
+  "use strict";
+  const links = () => document.querySelectorAll('a[href="/Pharmacy/WardRequests"]');
+  if (links().length === 0) return;
+  const paint = (n) => {
+    links().forEach(a => {
+      let b = a.querySelector(".nav-badge");
+      if (n > 0) {
+        a.classList.add("nav-alert");
+        if (!b) { b = document.createElement("span"); b.className = "nav-badge"; b.setAttribute("data-ward-request-count", ""); a.appendChild(b); }
+        b.textContent = String(n);
+        a.title = n + " ward medicine request(s) pending";
+      } else {
+        a.classList.remove("nav-alert");
+        if (b) b.remove();
+        a.removeAttribute("title");
+      }
+    });
+  };
+  const poll = () => fetch("/api/alerts", { headers: { "Accept": "application/json" }, credentials: "same-origin" })
+    .then(r => r.ok ? r.json() : null).then(d => { if (d && typeof d.wardRequests === "number") paint(d.wardRequests); }).catch(() => { });
+  poll();
+  setInterval(poll, 20000);
 })();

@@ -28,7 +28,7 @@
                                 <td class="actions"><a class="btn btn-primary btn-sm" href="/Lab/Book?patientId=@m.Id">Select</a>
                                     <a bn-permission="@Perm.LabViewPrevious" class="btn btn-light btn-sm" href="/Lab/Patient/@m.Id">Lab history</a></td></tr>
                         }
-                        @if (Model.Matches.Count == 0) { <tr><td colspan="6" class="empty">No patient found – register a new patient.</td></tr> }
+                        @if (Model.Matches.Count == 0) { <tr><td colspan="6" class="empty">No patient of today found (only today's and admitted patients are listed here). A returning patient: open him in <a href="/Patients">Patients</a> – or register a new patient.</td></tr> }
                         </tbody>
                     </table>
                 </div>
@@ -48,22 +48,23 @@ else
             <div class="card-body">
                 <partial name="_ValidationSummary" />
                 @if (Model.Tests.Count == 0) { <div class="alert alert-warning"><svg class="icon"><use href="#i-info" /></svg><div>No active tests. Activate tests in the <a href="/Lab/Catalogue">test catalogue</a>.</div></div> }
-                <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input type="search" placeholder="Filter tests…" data-test-filter aria-label="Filter tests" /></div>
-                @foreach (var g in Model.Tests.GroupBy(t => t.Test.Category!.Name))
-                {
-                    <h3 class="section-title">@g.Key</h3>
-                    <div class="test-picker">
-                        @foreach (var t in g)
-                        {
-                            <label class="test-choice" data-test-name="@t.Test.Name.ToLowerInvariant() @t.Test.Code.ToLowerInvariant()">
+                <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input type="search" placeholder="Search any test by name or code…" data-test-filter aria-label="Search tests" autofocus /></div>
+                <div class="selected-tests" data-selected-list hidden><strong>Selected:</strong> <span data-selected-names></span></div>
+                <h3 class="section-title" data-frequent-title>Frequently used</h3>
+                <p class="small muted" data-search-hint hidden>Search results</p>
+                @{ var freq = Model.Frequent.ToList(); }
+                <div class="test-picker" data-test-list>
+                    @foreach (var t in Model.Tests.OrderBy(t => freq.IndexOf(t.Test.Id) is var ix && ix >= 0 ? ix : 999).ThenBy(t => t.Test.Name))
+                    {
+                        <label class="test-choice" data-test-name="@t.Test.Name.ToLowerInvariant() @t.Test.Code.ToLowerInvariant()" data-frequent="@(freq.Contains(t.Test.Id) ? "1" : null)" data-rank="@(freq.IndexOf(t.Test.Id) is var ix && ix >= 0 ? ix : 999)">
                                 <input type="checkbox" name="TestIds" value="@t.Test.Id" checked="@Model.TestIds.Contains(t.Test.Id)" data-price="@t.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
                                 <span><strong>@t.Test.Name</strong> <small class="muted">@t.Test.Code · @t.Test.SampleType!.Name</small>
                                     @if (Model.ShowFees) { <small class="block">@(t.Price == 0 ? "Free" : Fmt.Money(t.Price))</small> }</span>
                                 @if (Model.CanDiscount && t.Price > 0) { <input class="input-num" type="number" step="0.01" min="0" max="@t.Price" name="Discounts[@t.Test.Id]" placeholder="disc." aria-label="Discount" /> }
                             </label>
-                        }
-                    </div>
-                }
+                    }
+                </div>
+                <p class="small muted" data-no-match hidden>No test matches the search.</p>
                 <h3 class="section-title">Referral &amp; notes</h3>
                 <div class="grid-2">
                     <div class="field"><label for="Input_ReferralType">Referred by</label>

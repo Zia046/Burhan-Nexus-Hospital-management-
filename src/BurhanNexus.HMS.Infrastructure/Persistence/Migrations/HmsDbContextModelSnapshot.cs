@@ -1768,6 +1768,11 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("DoctorId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("Notes")
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
@@ -1781,6 +1786,10 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Property<string>("PaymentReference")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ReceivedBy")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
 
                     b.Property<int?>("RecordedByUserId")
                         .HasColumnType("integer");

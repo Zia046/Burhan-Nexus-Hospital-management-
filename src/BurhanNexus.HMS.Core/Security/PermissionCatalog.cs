@@ -351,6 +351,9 @@ public static class PermissionCatalog
                 new(FinanceActions.ReceiveAdvances, "Receive Advance Deposits", "Take advance deposits and adjust them against the bill"),
                 new(FinanceActions.ViewClearance, "View Discharge Financial Clearance", "Final bill, advances and outstanding balance before discharge"),
                 new(FinanceActions.OverrideClearance, "Override Financial Clearance", "Allow discharge with an outstanding balance (reason required, audited)"),
+                new(FinanceActions.ViewOwnDoctorAccount, "View Own Doctor Account", "A doctor sees only his own account, daily OPD list and handover history"),
+                new(FinanceActions.HandDoctorMoneyToAdmin, "Hand Doctor Money to Admin", "Record a doctor's collected money handed to the Admin (separate from paying the doctor)"),
+                new(FinanceActions.PrintDoctorReports, "Print Doctor OPD Lists & Settlements", "Daily OPD list, settlement report and handover vouchers"),
             }, IsFinancialModule: true),
         new(Modules_.Services, "Fees & Services", "Central catalogue of service categories, services and fees used by every department", "sliders", true, "/Fees",
             new PermissionAction[]
@@ -649,6 +652,9 @@ public static class PermissionCatalog
         public const string ReceiveAdvances = "ReceiveAdvances";
         public const string ViewClearance = "ViewClearance";
         public const string OverrideClearance = "OverrideClearance";
+        public const string ViewOwnDoctorAccount = "ViewOwnDoctorAccount";
+        public const string HandDoctorMoneyToAdmin = "HandDoctorMoneyToAdmin";
+        public const string PrintDoctorReports = "PrintDoctorReports";
     }
 
     public static class AppointmentActions
@@ -808,6 +814,9 @@ public static class Perm
     public const string FinanceReceiveAdvances = "Finance.ReceiveAdvances";
     public const string FinanceViewClearance = "Finance.ViewClearance";
     public const string FinanceOverrideClearance = "Finance.OverrideClearance";
+    public const string FinanceViewOwnDoctorAccount = "Finance.ViewOwnDoctorAccount";
+    public const string FinanceHandDoctorMoneyToAdmin = "Finance.HandDoctorMoneyToAdmin";
+    public const string FinancePrintDoctorReports = "Finance.PrintDoctorReports";
     // ---- Update 10: Fees & Services ----
     public const string SvcViewFees = "Services.ViewFees";
     public const string SvcManageCatalogue = "Services.ManageCatalogue";

@@ -31,7 +31,12 @@ else
                     <div class="field"><label for="Input_AdmittingDoctorId">Admitting doctor</label><select id="Input_AdmittingDoctorId" name="Input.AdmittingDoctorId"><option value="">—</option>
                         @foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(i.AdmittingDoctorId == d.Id)">@d.Name</option> }</select></div>
                     <div class="field"><label for="Input_AdmittingDoctorName">Admitting doctor (if not listed)</label><input id="Input_AdmittingDoctorName" name="Input.AdmittingDoctorName" value="@i.AdmittingDoctorName" maxlength="150" /></div>
-                    <div class="field"><label for="Input_AdmittedLocal">Admission date / time</label><input id="Input_AdmittedLocal" type="datetime-local" name="Input.AdmittedLocal" value="@i.AdmittedLocal?.ToString("yyyy-MM-ddTHH:mm")" /></div>
+                    <div class="field"><label for="AdmitDate">Admission date &amp; time *</label>
+                        <div class="inline-form date-time-pair" data-admit-datetime>
+                            <input id="AdmitDate" type="date" name="AdmitDate" value="@Model.AdmitDate" required data-close-on-pick data-test="admit-date" aria-label="Admission date" />
+                            <input id="AdmitTime" type="time" name="AdmitTime" value="@Model.AdmitTime" required data-test="admit-time" aria-label="Admission time" />
+                        </div>
+                        <small class="muted">Defaults to the current hospital time; change it only if the patient was admitted earlier.</small></div>
                 </div>
                 <div class="field"><label for="Input_AdmissionDiagnosis">Admission diagnosis (as written by the doctor)</label><input id="Input_AdmissionDiagnosis" name="Input.AdmissionDiagnosis" value="@i.AdmissionDiagnosis" maxlength="500" /></div>
                 <div class="grid-2">

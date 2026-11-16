@@ -19,7 +19,7 @@ public class ResetAndCatalogTests : HmsTestBase
         var finance = PermissionCatalog.FindModule("Finance")!;
         Assert.True(finance.IsAvailable);
         Assert.True(finance.IsFinancialModule);
-        Assert.Equal(28, finance.Actions.Count); // update 10: inpatient payments, advances, clearance
+        Assert.Equal(31, finance.Actions.Count); // update 10: inpatient payments, advances, clearance; update 11: own doctor account, hand to admin, doctor reports
         // Phase 4: Laboratory became a real module with its own specific permissions.
         var lab = PermissionCatalog.FindModule("Laboratory")!;
         Assert.True(lab.IsAvailable);

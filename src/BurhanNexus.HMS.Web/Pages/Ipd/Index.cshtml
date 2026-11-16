@@ -22,7 +22,7 @@
     <div class="card-header"><h2><svg class="icon"><use href="#i-hospital" /></svg> Inpatients – @BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(d.From, d.To)</h2></div>
     <div class="card-body">
         <div class="kpi-grid lab-kpis" data-ipd-kpis>
-            <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-users" /></svg></div><div><span class="kpi-label">Admitted now</span><strong class="kpi-value" data-kpi="admitted">@d.Admitted</strong></div></div>
+            <a class="kpi kpi-link" href="/Ipd/Admissions?scope=active" data-test="admitted-count" title="Open the list of admitted patients"><div class="kpi-icon navy"><svg class="icon"><use href="#i-users" /></svg></div><div><span class="kpi-label">Admitted now</span><strong class="kpi-value" data-kpi="admitted">@d.Admitted</strong></div></a>
             <div class="kpi"><div class="kpi-icon blue"><svg class="icon"><use href="#i-hospital" /></svg></div><div><span class="kpi-label">Occupied beds</span><strong class="kpi-value" data-kpi="occupied">@d.Occupied</strong></div></div>
             <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-check" /></svg></div><div><span class="kpi-label">Available beds</span><strong class="kpi-value" data-kpi="available">@d.Available</strong></div></div>
             <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-lock" /></svg></div><div><span class="kpi-label">Reserved · cleaning · unavailable</span><strong class="kpi-value" data-kpi="other-beds">@d.Reserved · @d.Cleaning · @d.Unavailable</strong></div></div>
@@ -50,7 +50,7 @@
             <table class="table table-compact" data-ward-occupancy>
                 <thead><tr><th>Ward</th><th class="num">Beds</th><th class="num">Occupied</th><th class="num">Free</th><th class="num">Other</th></tr></thead>
                 <tbody>
-                @foreach (var w in d.Wards) { <tr data-ward="@w.Ward"><td>@w.Ward</td><td class="num">@w.Beds</td><td class="num">@w.Occupied</td><td class="num">@w.Available</td><td class="num">@(w.Reserved + w.Cleaning + w.Unavailable)</td></tr> }
+                @foreach (var w in d.Wards) { <tr data-ward="@w.Ward"><td><a href="/Ipd/Admissions?scope=active&amp;wardId=@w.WardId">@w.Ward</a></td><td class="num">@w.Beds</td><td class="num">@w.Occupied</td><td class="num">@w.Available</td><td class="num">@(w.Reserved + w.Cleaning + w.Unavailable)</td></tr> }
                 @if (d.Wards.Count == 0) { <tr><td colspan="5" class="empty">No beds configured yet – add them under Wards &amp; beds.</td></tr> }
                 </tbody>
             </table>

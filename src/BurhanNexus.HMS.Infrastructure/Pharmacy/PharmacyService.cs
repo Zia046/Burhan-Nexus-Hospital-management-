@@ -325,7 +325,7 @@ public sealed class PharmacyService : IPharmacyService
                 var source = T(input.SourceName, 150);
                 if (supplier is null && source is null) errors.Add("Select the supplier or enter the stock source.");
                 var reference = T(input.ReferenceNumber, 60);
-                if (reference is not null && supplier is not null && await _db.StockReceipts.AnyAsync(r => r.SupplierId == supplier.Id && r.ReferenceNumber == reference, ct))
+                if (reference is not null && supplier is not null && await _db.StockReceipts.AnyAsync(r => r.SupplierId == supplier.Id && r.ReferenceNumber != null && r.ReferenceNumber.ToUpper() == reference.ToUpper(), ct))
                     errors.Add($"Invoice / reference {reference} of {supplier.Name} was already received. Check for a duplicate entry.");
                 var received = input.ReceivedDate ?? today;
                 if (received > today) errors.Add("The receiving date cannot be in the future.");
@@ -338,6 +338,9 @@ public sealed class PharmacyService : IPharmacyService
                 var lines = input.Lines.Where(l => l.MedicineId > 0).ToList();
                 if (lines.Count == 0) errors.Add("Add at least one medicine.");
                 if (lines.Count > 100) errors.Add("At most 100 lines per receiving.");
+                // Update 11: the batch number is optional on a supplier invoice – without one, the line is kept as the batch of its expiry date.
+                foreach (var l in lines)
+                    if (T(l.BatchNumber, 50) is null && l.ExpiryDate is DateOnly autoExp) l.BatchNumber = $"AUTO-{autoExp:yyyyMMdd}";
                 var meds = await MedicinesAsync(lines.Select(l => l.MedicineId), ct);
                 foreach (var l in lines)
                 {
@@ -517,6 +520,7 @@ public sealed class PharmacyService : IPharmacyService
                             i.Discount > 0 ? T(input.DiscountReason, 200) : null, today, now, ct);
                         charge.PharmacyIssueId = issue.Id;
                         charge.IpdAdmissionId = input.IpdAdmissionId;
+                        if (input.IpdAdmissionId is not null) charge.AllowPartialPayment = true; // update 11: like every IPD charge (part payments on the admission account)
                         charge.Quantity = i.Quantity; // update 10: medicine quantity and unit price on the patient's account
                         charge.UnitPrice = i.UnitPrice;
                         _db.Charges.Add(charge);
@@ -533,6 +537,7 @@ public sealed class PharmacyService : IPharmacyService
                         var charge = await NewChargeAsync(svc, patient.Id, encounter?.Id, svc.Name, fee, 0, null, today, now, ct);
                         charge.PharmacyIssueId = issue.Id;
                         charge.IpdAdmissionId = input.IpdAdmissionId;
+                        if (input.IpdAdmissionId is not null) charge.AllowPartialPayment = true; // update 11: like every IPD charge (part payments on the admission account)
                         _db.Charges.Add(charge);
                     }
                 }
