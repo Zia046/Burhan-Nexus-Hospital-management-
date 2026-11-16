@@ -280,7 +280,8 @@ public partial class Update10Tests : Phase2TestBase
 
         // The "Save corrected report" button must post to this test (regression: the item was lost from the form action).
         var reviewPage = await admin.GetHtmlAsync($"/Lab/Entry/{orderId}?item={fbsItem.Id}&review=true");
-        var action = System.Text.RegularExpressions.Regex.Match(reviewPage, "formaction=\"([^\"]*)\"[^>]*data-test=\"review-save\"").Groups[1].Value.Replace("&amp;", "&");
+        var button = System.Text.RegularExpressions.Regex.Match(reviewPage, "<button[^>]*data-test=\"review-save\"[^>]*>").Value;
+        var action = System.Text.RegularExpressions.Regex.Match(button, "formaction=\"([^\"]*)\"").Groups[1].Value.Replace("&amp;", "&");
         Assert.Contains("handler=Review", action);
         Assert.Contains($"item={fbsItem.Id}", action);
         // 14–16. Review report: reason required; the corrected result stays VERIFIED, the original is kept in history.
