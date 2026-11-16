@@ -17,6 +17,7 @@ const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 const page = await ctx.newPage();
 page.on("pageerror", e => errors.push("pageerror: " + e.message));
 page.on("console", m => { if (m.type() === "error") errors.push("console: " + m.text()); });
+page.on("response", r => { if (r.status() >= 500) errors.push(`HTTP ${r.status()} on ${r.url()}`); });
 
 const go = async (url) => { await page.goto(base + url); };
 const submit = async (selector) => { await Promise.all([page.waitForNavigation(), page.click(selector)]); };
@@ -250,39 +251,36 @@ try {
   await page.check("#Input_AllowSelfVerification");
   await submit("button[data-test='save-lab-settings']");
   await shot(page, "p4-01-lab-settings");
-  for (const [code, price] of [["CBC", "800"], ["BSR", "250"]]) {
+  // Update 9/10: standard catalogue (active, price 0, "Review") – set the price and mark two tests reviewed
+  for (const [code, price] of [["CBC-FULL", "800"], ["RBS", "250"]]) {
     await go("/Lab/Catalogue");
     await submit(`a[data-test='edit-${code}']`);
     await page.check("#Input_IsActive");
-    await page.uncheck("#Input_IsFree");
+    if (await page.$("#Input_IsFree")) await page.uncheck("#Input_IsFree");
     await page.fill("#Input_Price", price);
-    if (code === "CBC") await shot(page, "p4-03-test-definition");
+    const rev = await page.$("[data-review-box] input");
+    if (rev) await rev.check();
+    if (code === "CBC-FULL") await shot(page, "p4-03-test-definition");
     await submit("button[data-test='save-test']");
   }
   await go("/Lab/Catalogue");
   await shot(page, "p4-02-test-catalogue");
   await go(`/Lab/Book?patientId=${pid}`);
-  for (const code of ["cbc", "bsr"]) await page.check(`label.test-choice[data-test-name$=' ${code}'] input[type=checkbox]`);
+  for (const code of ["cbc-full", "rbs"]) await page.check(`label.test-choice[data-test-name$=' ${code}'] input[type=checkbox]`);
   await page.selectOption("#Input_ReferralType", "External");
   await page.fill("#Input_ExternalDoctorName", "Dr. Kamran (City Clinic)");
   await page.fill("#Input_ClinicalNotes", "Fever for 3 days");
   await shot(page, "p4-04-lab-booking");
-  await submit("button[data-test='lab-book-save']");
+  // Update 10: payment recorded with the booking (two-copy laboratory receipt)
+  if (await page.$("button[data-test='lab-book-pay']")) await submit("button[data-test='lab-book-pay']");
+  else await submit("button[data-test='lab-book-save']");
   const orderPath = new URL(page.url()).pathname;
   const orderId = orderPath.split("/").pop();
   step("lab order: " + orderPath);
   await shot(page, "p4-05-lab-visit");
-  await pdf(`/Print/LabSlip/${orderId}`, "sample-lab-slip-80mm.pdf");
-  await go(`/Finance/Collect?patientId=${pid}&labOrderId=${orderId}`);
-  await shot(page, "p4-06-lab-payment-at-cashier");
-  await go(orderPath);
-  for (let i = 0; i < 4; i++) {
-    const btn = await page.$("button[data-test^='collect-']");
-    if (!btn) break;
-    await Promise.all([page.waitForNavigation(), btn.click()]);
-  }
-  await go("/Lab/Samples");
-  await shot(page, "p4-07-sample-collection");
+  await pdf(`/Print/LabReceipt/${orderId}`, "sample-lab-receipt-2-copies-80mm.pdf");
+  await go(`/Print/LabReceipt/${orderId}`);
+  await shot(page, "p4-06-lab-receipt-two-copies");
   await go("/Lab/Pending");
   await shot(page, "p4-08-pending-tests");
   await go(`/Lab/Entry/${orderId}`);
@@ -303,12 +301,18 @@ try {
     if (!next) break;
     await Promise.all([page.waitForNavigation(), next.click()]);
   }
-  await go("/Lab/Verify");
-  await shot(page, "p4-10-verification-queue");
-  await go(`/Lab/Verify/${orderId}`);
-  await shot(page, "p4-11-patient-verification");
-  const all = await page.$("button[data-test='verify-all']");
-  if (all) await Promise.all([page.waitForNavigation(), all.click()]);
+  // Update 10: saving verified the report – review (correct) one result with a reason
+  await go(`/Lab/Entry/${orderId}`);
+  await shot(page, "p4-10-saved-verified-report");
+  const review = await page.$("a[data-test='review-report']");
+  if (review) {
+    await Promise.all([page.waitForNavigation(), review.click()]);
+    const first = await page.$(".result-input:not([disabled])");
+    if (first && (await first.evaluate(e => e.tagName)) === "INPUT") await first.fill(((parseFloat(await first.inputValue()) || 5) + 1).toString());
+    await page.fill("#Reason", "Typing error corrected");
+    await shot(page, "p4-11-review-report");
+    await submit("button[data-test='review-save']");
+  } else errors.push("review-report button missing");
   await go(`/Print/LabReport/${orderId}`);
   await shot(page, "p4-12-lab-report-preview");
   const printBtn = await page.$("button[data-test='lab-report-print']");
@@ -632,6 +636,15 @@ try {
   await go("/Ipd/Nursing");
   await shot(page, "p7-16-nursing-dashboard");
 
+  // Update 10: inpatient account, final bill and payment in financial clearance (discharge needs a zero balance)
+  const clearUrl = admUrl.replace("/Ipd/Admission/", "/Ipd/Clearance/");
+  await go(admUrl.replace("/Ipd/Admission/", "/Ipd/Account/"));
+  await shot(page, "p10-01-inpatient-account");
+  await go(clearUrl);
+  if (await page.$("button[data-test='finalise-bill']")) await submit("button[data-test='finalise-bill']");
+  await shot(page, "p10-02-financial-clearance");
+  if (await page.$("button[data-test='receive-payment']")) await submit("button[data-test='receive-payment']");
+  await shot(page, "p10-03-clearance-paid");
   // Discharge of the general patient → discharge summary and final bill.
   await go(admUrl + "?tab=discharge");
   await page.selectOption("[name='Discharge.Type']", "Routine");
@@ -791,6 +804,17 @@ try {
   await go("/");
   await page.click("[data-adm-cat='ot'] > summary").catch(() => {});
   await shot(page, "p8-18-taskbar-ot-menu", false);
+
+  // ---- Update 10: Fees & Services, revenue, packages, NICU equipment ----
+  for (const [url, name] of [["/Fees", "p10-04-fees-catalogue"], ["/Fees/Categories", "p10-05-fee-categories"], ["/Fees/Service", "p10-06-new-service"],
+                             ["/Fees/Reports", "p10-07-service-report"], ["/Finance/Revenue", "p10-08-revenue-report"], ["/Ipd/Packages", "p10-09-packages"],
+                             ["/Ipd/Settings", "p10-10-ipd-bed-policy"], [`/Finance/Statement/${ahmadId}`, "p10-11-patient-statement"],
+                             [admUrl.replace("/Ipd/Admission/", "/Ipd/Equipment/"), "p10-12-nicu-equipment"], ["/Lab/Settings", "p10-13-lab-simple-workflow"]]) {
+    const r = await page.goto(base + url);
+    if (!r || r.status() >= 400) errors.push(`HTTP ${r && r.status()} on ${url}`);
+    await shot(page, name);
+  }
+  await pdf(admUrl.replace("/Ipd/Admission/", "/Print/Ipd/admission/"), "sample-ipd-admission-form-2-copies-A4.pdf");
 
   // ---- Navigation: administrator sidebar (11 pages) + top taskbar categories ----
   await go("/");
