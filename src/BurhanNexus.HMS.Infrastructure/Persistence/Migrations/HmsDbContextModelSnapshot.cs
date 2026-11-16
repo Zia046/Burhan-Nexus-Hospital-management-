@@ -1854,6 +1854,9 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<int>("ServiceCatalogueVersion")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("ShowCashierOnReceipt")
                         .HasColumnType("boolean");
 
@@ -8099,6 +8102,51 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.ToTable("RolePermissions", (string)null);
                 });
 
+            modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.ServiceCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("ServiceCategories", (string)null);
+                });
+
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.ServiceCounter", b =>
                 {
                     b.Property<int>("ServiceItemId")
@@ -8139,6 +8187,10 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                         .HasPrecision(14, 2)
                         .HasColumnType("numeric(14,2)");
 
+                    b.Property<decimal?>("GovernmentFee")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
                     b.Property<string>("Note")
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
@@ -8167,7 +8219,17 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Property<bool>("AllowPartialPayment")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("Applicability")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ChargeUnit")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
@@ -8207,6 +8269,9 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<int?>("ServiceCategoryId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("UpdatedUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -8218,6 +8283,8 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.HasIndex("DepartmentId");
 
                     b.HasIndex("DoctorId");
+
+                    b.HasIndex("ServiceCategoryId");
 
                     b.ToTable("ServiceItems", (string)null);
                 });
@@ -11620,9 +11687,16 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                         .HasForeignKey("DoctorId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("BurhanNexus.HMS.Core.Domain.ServiceCategory", "ServiceCategory")
+                        .WithMany()
+                        .HasForeignKey("ServiceCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Department");
 
                     b.Navigation("Doctor");
+
+                    b.Navigation("ServiceCategory");
                 });
 
             modelBuilder.Entity("BurhanNexus.HMS.Core.Domain.ShiftHandover", b =>
