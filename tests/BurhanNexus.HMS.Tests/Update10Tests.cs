@@ -152,6 +152,6 @@ public partial class Update10Tests : Phase2TestBase
             Assert.Equal(("Physiotherapy (renamed)", 700m), (s.Name, s.DefaultFee));
         }
         Assert.Single(await AuditAsync(AuditActions.ServiceCategorySaved));
-        Assert.Contains(await AuditAsync(AuditActions.ServiceFeeChanged), a => a.Details.Contains("500.00 to 700.00"));
+        Assert.Contains(await AuditAsync(AuditActions.ServiceFeeChanged), a => a.Description!.Contains("500.00 to 700.00"));
     }
 }
