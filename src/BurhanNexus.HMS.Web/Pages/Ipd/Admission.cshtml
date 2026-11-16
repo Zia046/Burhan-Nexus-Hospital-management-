@@ -31,6 +31,9 @@
         </div>
         <div class="banner-actions no-print">
             <a bn-permission="@Perm.IpdRequestMedicines" class="btn btn-light btn-sm" href="/Ipd/Medicines/@a.Id" data-test="request-medicines">Request medicines</a>
+            <a bn-permission="@Perm.IpdViewLedger" class="btn btn-light btn-sm" href="/Ipd/Account/@a.Id" data-test="ipd-account">Account</a>
+            <a bn-permission="@Perm.FinanceViewClearance" class="btn btn-light btn-sm" href="/Ipd/Clearance/@a.Id" data-test="ipd-clearance">Financial clearance</a>
+            @if (a.Kind == AdmissionKind.Nicu || a.Kind == AdmissionKind.Newborn) { <a bn-permission="@Perm.IpdRecordEquipment" class="btn btn-light btn-sm" href="/Ipd/Equipment/@a.Id" data-test="ipd-equipment">NICU equipment</a> }
             <a bn-permission="@Perm.IpdPrintForms" class="btn btn-light btn-sm" href="/Print/Ipd/admission/@a.Id" target="_blank">Print admission form</a>
             @if (closed) { <a bn-permission="@Perm.IpdPrintForms" class="btn btn-light btn-sm" href="/Print/Ipd/discharge/@a.Id" target="_blank" data-test="print-discharge">Discharge summary</a> }
         </div>

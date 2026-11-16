@@ -246,4 +246,17 @@ public static class AuditActions
     public const string PharmSettingsChanged = "Pharmacy.SettingsChanged";
     public const string PharmExported = "Pharmacy.Exported";
     public const string PharmSlipPrinted = "Pharmacy.SlipPrinted";
+
+    // ---- Update 10: inpatient billing ----
+    public const string IpdAdvanceReceived = "Ipd.AdvanceReceived";
+    public const string IpdAdvanceApplied = "Ipd.AdvanceApplied";
+    public const string IpdAdvanceRefunded = "Ipd.AdvanceRefunded";
+    public const string IpdClearanceOverride = "Ipd.FinancialClearanceOverride";
+    public const string IpdEquipmentStarted = "Ipd.EquipmentStarted";
+    public const string IpdEquipmentEnded = "Ipd.EquipmentEnded";
+    public const string IpdPackageSaved = "Ipd.PackageSaved";
+    public const string IpdPackageApplied = "Ipd.PackageApplied";
+    public const string IpdAdmissionFeePaid = "Ipd.AdmissionFeePaid";
+    public const string IpdAdmissionFeeWaived = "Ipd.AdmissionFeeWaived";
+    public const string IpdDuplicateChargeBlocked = "Ipd.DuplicateChargeBlocked";
 }

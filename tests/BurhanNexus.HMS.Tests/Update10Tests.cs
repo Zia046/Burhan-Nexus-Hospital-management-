@@ -305,4 +305,327 @@ public partial class Update10Tests : Phase2TestBase
         Assert.NotEqual(HttpStatusCode.Redirect, refused.StatusCode);
         await using (var db = Factory.NewDb()) Assert.Equal((1, 1), (await db.LabOrders.CountAsync(), await db.Receipts.CountAsync()));
     }
+
+    // =========================================================================== 1C–1F – inpatient account, admission fee, ward / NICU billing, clearance
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"/Ipd/Admission/(\d+)")] private static partial System.Text.RegularExpressions.Regex AdmissionRegex();
+
+    private async Task<int> SvcAsync(Browser admin, string code, decimal fee)
+    {
+        await SetFeeAsync(admin, code, fee);
+        await using var db = Factory.NewDb();
+        return await db.ServiceItems.Where(s => s.Code == code).Select(s => s.Id).SingleAsync();
+    }
+
+    private async Task<int> BedAsync(Browser admin, string wardCode, string code)
+    {
+        int room;
+        await using (var db = Factory.NewDb()) room = await db.IpdRooms.Where(r => r.Ward!.Code == wardCode).Select(r => r.Id).FirstAsync();
+        var r = await admin.PostFormAsync("/Ipd/Wards", new[] { P("Bed.RoomId", room.ToString()), P("Bed.Code", code), P("Bed.Type", "Standard"), P("Bed.IsActive", "true") }, "/Ipd/Wards?handler=Bed");
+        Assert.True(r.StatusCode == HttpStatusCode.Redirect, "Bed: " + Errors(await r.Content.ReadAsStringAsync()));
+        await using var db2 = Factory.NewDb();
+        return await db2.IpdBeds.Where(b => b.Code == code).Select(b => b.Id).SingleAsync();
+    }
+
+    private async Task<long> AdmitAsync(Browser admin, long pid, int? bed, params (string, string)[] extra)
+    {
+        var f = new List<KeyValuePair<string, string>>
+        {
+            P("PatientId", pid.ToString()), P("Input.IdempotencyKey", Guid.NewGuid().ToString()), P("Input.Kind", "General"), P("Input.Source", "Direct"), P("Input.SourceEncounterId", ""),
+            P("Input.BedId", bed?.ToString() ?? ""), P("Input.AdmittingDoctorName", "Dr. Ward"), P("Input.AdmissionDiagnosis", "Pneumonia"), P("Input.AttendantName", "Brother"), P("Input.AttendantPhone", "03001234567"),
+        };
+        f.AddRange(extra.Select(e => P(e.Item1, e.Item2)));
+        var r = await admin.PostFormAsync($"/Ipd/Admit?patientId={pid}", f);
+        Assert.True(r.StatusCode == HttpStatusCode.Redirect, "Admit: " + Errors(await r.Content.ReadAsStringAsync()));
+        return long.Parse(AdmissionRegex().Match(r.Headers.Location!.OriginalString).Groups[1].Value);
+    }
+
+    private static readonly (string, string)[] DischargeFields =
+    {
+        ("Discharge.Type", "Routine"), ("Discharge.FinalDiagnosis", "Pneumonia, treated"), ("Discharge.ConditionAtDischarge", "Stable"),
+        ("Discharge.TreatmentSummary", "Antibiotics."), ("Discharge.FollowUp", "OPD after one week"), ("Discharge.DischargeDoctor", "Dr. Ward"),
+    };
+
+    private static Task<HttpResponseMessage> ActAsync(Browser b, long admissionId, string handler, params (string, string)[] fields) =>
+        b.PostFormAsync($"/Ipd/Admission/{admissionId}", fields.Select(f => P(f.Item1, f.Item2)), $"/Ipd/Admission/{admissionId}?handler={handler}");
+
+    private async Task<IpdLedgerTotals> TotalsAsync(long adm)
+    {
+        await using var db = Factory.NewDb();
+        var c = await db.Charges.Where(x => x.IpdAdmissionId == adm && x.Status != ChargeStatus.Cancelled).ToListAsync();
+        var advance = await db.PatientAdvances.Where(x => x.AdmissionId == adm).SumAsync(x => (decimal?)(x.Amount - x.AppliedAmount - x.RefundedAmount)) ?? 0;
+        return new IpdLedgerTotals(c.Sum(x => x.NetAmount), c.Sum(x => x.PaidAmount), advance);
+    }
+
+    private sealed record IpdLedgerTotals(decimal Net, decimal Paid, decimal Advance)
+    {
+        public decimal Due => Net - Paid - Advance;
+    }
+
+    [Fact]
+    public async Task Bed_days_follow_the_policy_and_never_overlap_after_a_transfer()
+    {
+        var zone = TimeZoneInfo.CreateCustomTimeZone("PKT", TimeSpan.FromHours(5), "PKT", "PKT");
+        DateTime L(int day, int hour) => new DateTime(2026, 11, day, hour, 0, 0, DateTimeKind.Utc).AddHours(-5); // local → UTC
+        // Ward 1 from 10 Nov 10:00 to 11 Nov 18:00, then ward 2 until 12 Nov 13:00 (discharge).
+        var periods = new List<(DateTime, DateTime?, int)> { (L(10, 10), L(11, 18), 1), (L(11, 18), L(12, 13), 2) };
+        var now = L(12, 13);
+        var cutoff = Infrastructure.Ipd.IpdService.BedDays(periods, BedChargePolicy.CutoffDay, new TimeOnly(12, 0), 6, now, true, zone);
+        // billing days start at 12:00: 9 Nov (10–12), 10 Nov, 11 Nov (ward 2 used 19 h vs ward 1 6 h), 12 Nov (12–13)
+        Assert.Equal(new[] { (new DateOnly(2026, 11, 9), 1, 1m), (new DateOnly(2026, 11, 10), 1, 1m), (new DateOnly(2026, 11, 11), 2, 1m), (new DateOnly(2026, 11, 12), 2, 1m) }, cutoff);
+        Assert.Equal(cutoff.Count, cutoff.Select(d => d.Day).Distinct().Count()); // one charge per day – no overlap
+        var half = Infrastructure.Ipd.IpdService.BedDays(periods, BedChargePolicy.HalfDay, new TimeOnly(12, 0), 6, now, true, zone);
+        Assert.Equal(new[] { 0.5m, 1m, 1m, 0.5m }, half.Select(d => d.Quantity));
+        var hourly = Infrastructure.Ipd.IpdService.BedDays(periods, BedChargePolicy.Hourly, new TimeOnly(12, 0), 6, now, true, zone);
+        Assert.Equal(51m, hourly.Sum(d => d.Quantity)); // 10 Nov 10:00 → 12 Nov 13:00 = 51 hours
+        // Before discharge only completed billing days are charged.
+        var running = Infrastructure.Ipd.IpdService.BedDays(periods, BedChargePolicy.CutoffDay, new TimeOnly(12, 0), 6, now, false, zone);
+        Assert.Equal(3, running.Count);
+        // Equipment quantities: per hour (started hours), per day (started days, at least one).
+        Assert.Equal(5m, Infrastructure.Ipd.IpdBillingService.UsageQuantity(ChargeUnit.PerHour, L(10, 10), L(10, 14).AddMinutes(30)));
+        Assert.Equal(1m, Infrastructure.Ipd.IpdBillingService.UsageQuantity(ChargeUnit.PerDay, L(10, 10), L(10, 11)));
+        Assert.Equal(2m, Infrastructure.Ipd.IpdBillingService.UsageQuantity(ChargeUnit.PerDay, L(10, 10), L(11, 11)));
+    }
+
+    [Fact]
+    public async Task Inpatient_account_collects_every_department_and_discharge_needs_financial_clearance()
+    {
+        await SetupAsync("Private");
+        var admin = await LoginAdminAsync();
+        var admFee = await SvcAsync(admin, "SVC-IPD-ADM", 1000);
+        var bedSvc = await SvcAsync(admin, "SVC-IPD-GEN", 500);
+        var incSvc = await SvcAsync(admin, "SVC-NICU-INC", 800);
+        await SetFeeAsync(admin, "LT-FBS", 300);
+        await using (var db = Factory.NewDb())
+        {
+            var s = await db.IpdSettings.SingleAsync();
+            Assert.True(s.RequireBillClearanceForDischarge); // update 10 default
+            s.AdmissionServiceItemId = admFee;
+            s.BedChargePolicy = BedChargePolicy.CutoffDay;
+            var w = await db.IpdWards.SingleAsync(x => x.Code == "MGW");
+            w.BedChargeServiceItemId = bedSvc;
+            // radiology starter service (inactive, fee 0) – activate it with a fee for this test
+            var rad = await db.RadiologyServices.Include(r => r.ServiceItem).OrderBy(r => r.Id).FirstAsync();
+            rad.IsActive = true; rad.ServiceItem!.IsActive = true;
+            db.ServiceFees.Add(new ServiceFee { ServiceItemId = rad.ServiceItemId, Fee = 700, EffectiveFrom = DateOnly.MinValue, CreatedUtc = DateTime.UtcNow, CreatedByUsername = "test" });
+            await db.SaveChangesAsync();
+        }
+        var bed1 = await BedAsync(admin, "MGW", "MGW-A1");
+        var bed2 = await BedAsync(admin, "MGW", "MGW-A2");
+        var pid = await RegisterPatientAsync(admin, PatientFields("Account Patient", "Father Account"));
+        var cash = (await CashAsync()).ToString();
+
+        // 18–19. The configured admission fee is shown and received with the admission.
+        Assert.Contains("data-admission-fee=\"1000\"", await admin.GetHtmlAsync($"/Ipd/Admit?patientId={pid}"));
+        var adm = await AdmitAsync(admin, pid, bed1, ("FeeAction", "pay"), ("FeeMethodId", cash));
+        await using (var db = Factory.NewDb())
+        {
+            var a = await db.IpdAdmissions.SingleAsync(x => x.Id == adm);
+            var fee = await db.Charges.SingleAsync(c => c.Id == a.AdmissionFeeChargeId);
+            Assert.Equal((1000m, 1000m, ChargeStatus.Paid), (fee.Fee, fee.PaidAmount, fee.Status));
+        }
+        // 20. Two copies of the admission form with the same admission number; reprinting creates nothing.
+        var form = await admin.GetHtmlAsync($"/Print/Ipd/admission/{adm}");
+        Assert.Contains("PATIENT / ATTENDANT COPY", form);
+        Assert.Contains("HOSPITAL / ADMISSION OFFICE COPY", form);
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(form, "data-fee-status><strong>PAID").Count);
+        int chargesBefore;
+        await using (var db = Factory.NewDb()) chargesBefore = await db.Charges.CountAsync();
+        await admin.GetHtmlAsync($"/Print/Ipd/admission/{adm}");
+        await using (var db = Factory.NewDb()) Assert.Equal(chargesBefore, await db.Charges.CountAsync());
+
+        // 21 / 43. Pharmacy issue to the admission → on the account, once (repeat issue does not bill twice).
+        int med;
+        await using (var db = Factory.NewDb())
+        {
+            var form2 = await db.PharmacyLookups.Where(l => l.Kind == PharmacyLookupKind.DosageForm && l.Name == "Tablet").Select(l => l.Id).SingleAsync();
+            _ = form2;
+        }
+        var medR = await admin.PostFormAsync("/Pharmacy/Medicines/Edit", new[]
+        {
+            P("Input.Name", "Amoxil Ten"), P("Input.GenericName", "Amoxicillin"), P("Input.Strength", "500 mg"),
+            P("Input.DosageFormId", (await DosageFormAsync()).ToString()), P("Input.Unit", "Capsule"), P("Input.UnitsPerPack", "10"), P("Input.MinimumStock", "0"),
+            P("Input.IsActive", "true"), P("Input.SalePrice", "20"), P("Input.PurchasePrice", "10"),
+        });
+        Assert.True(medR.StatusCode == HttpStatusCode.Redirect, "Medicine: " + Errors(await medR.Content.ReadAsStringAsync()));
+        await using (var db = Factory.NewDb()) med = await db.Medicines.Where(m => m.Name == "Amoxil Ten").Select(m => m.Id).SingleAsync();
+        var today = DateOnly.FromDateTime(Factory.Clock.GetUtcNow().UtcDateTime.AddHours(5));
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync("/Pharmacy/Receive", new[]
+        {
+            P("Input.IdempotencyKey", Guid.NewGuid().ToString()), P("Input.SourceName", "Opening stock"), P("Lines[0].MedicineId", med.ToString()), P("Lines[0].BatchNumber", "AMX-1"),
+            P("Lines[0].Expiry", today.AddMonths(18).ToString("yyyy-MM")), P("Lines[0].Quantity", "100"), P("Lines[0].UnitCost", "10"),
+        })).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Ipd/Medicines/{adm}", new[]
+            { P("Input.IdempotencyKey", Guid.NewGuid().ToString()), P("Input.Priority", "Routine"), P("Input.Lines[0].MedicineId", med.ToString()), P("Input.Lines[0].Quantity", "6") })).StatusCode);
+        long reqId, lineId;
+        await using (var db = Factory.NewDb()) { var rq = await db.MedicineRequests.Include(x => x.Lines).SingleAsync(); reqId = rq.Id; lineId = rq.Lines.Single().Id; }
+        var issue = new[] { P("IdempotencyKey", Guid.NewGuid().ToString()), P($"Issue[{lineId}]", "6") };
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Pharmacy/WardRequest/{reqId}", issue, $"/Pharmacy/WardRequest/{reqId}?handler=Issue")).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Pharmacy/WardRequest/{reqId}", issue, $"/Pharmacy/WardRequest/{reqId}?handler=Issue")).StatusCode);
+        await using (var db = Factory.NewDb())
+        {
+            var ph = await db.Charges.SingleAsync(c => c.IpdAdmissionId == adm && c.PharmacyIssueId != null);
+            Assert.Equal((6m, 20m, 120m), (ph.Quantity, ph.UnitPrice!.Value, ph.Fee));
+        }
+
+        // 22. Laboratory for the admitted patient: on the same account, no payment at the lab counter.
+        int fbs;
+        await using (var db = Factory.NewDb()) fbs = await db.LabTests.Where(t => t.Code == "FBS").Select(t => t.Id).SingleAsync();
+        Assert.DoesNotContain("data-lab-payment", await admin.GetHtmlAsync($"/Lab/Book?patientId={pid}&admissionId={adm}"));
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Lab/Book?patientId={pid}&admissionId={adm}", new[]
+            { P("Input.IdempotencyKey", Guid.NewGuid().ToString()), P("PatientId", pid.ToString()), P("AdmissionId", adm.ToString()), P("TestIds", fbs.ToString()), P("Input.ReferralType", "None") })).StatusCode);
+        // 23. Radiology for the admitted patient.
+        int radSvc;
+        await using (var db = Factory.NewDb()) radSvc = await db.RadiologyServices.Where(r => r.IsActive).Select(r => r.Id).FirstAsync();
+        var radR = await admin.PostFormAsync($"/Radiology/Book?patientId={pid}&admissionId={adm}", new[]
+        {
+            P("Input.IdempotencyKey", Guid.NewGuid().ToString()), P("PatientId", pid.ToString()), P("AdmissionId", adm.ToString()), P("VisitChoice", ""), P("Input.ReferralType", "External"),
+            P("Input.ExternalDoctorName", "Dr. Ward"), P("Input.ClinicalIndication", "Cough"), P("Input.Priority", "Routine"), P("ServiceIds", radSvc.ToString()),
+        });
+        Assert.True(radR.StatusCode == HttpStatusCode.Redirect, "Radiology: " + Errors(await radR.Content.ReadAsStringAsync()));
+
+        // 25 / 45. NICU equipment: started, a second period of the same equipment is refused while running, stopped once, charged by usage.
+        int inc;
+        await using (var db = Factory.NewDb()) inc = await db.NicuEquipment.Where(e => e.Code == "SVC-NICU-INC").Select(e => e.Id).SingleAsync();
+        var started = await admin.PostFormAsync($"/Ipd/Equipment/{adm}", new[]
+            { P("Start.IdempotencyKey", Guid.NewGuid().ToString()), P("Start.EquipmentId", inc.ToString()), P("Start.Identifier", "INC-01") }, $"/Ipd/Equipment/{adm}?handler=Start");
+        Assert.True(started.StatusCode == HttpStatusCode.Redirect, "Equipment start: " + Errors(await started.Content.ReadAsStringAsync()));
+        var twice = await admin.PostFormAsync($"/Ipd/Equipment/{adm}", new[]
+            { P("Start.IdempotencyKey", Guid.NewGuid().ToString()), P("Start.EquipmentId", inc.ToString()), P("Start.Identifier", "INC-02") }, $"/Ipd/Equipment/{adm}?handler=Start");
+        Assert.Contains("already running", Errors(await twice.Content.ReadAsStringAsync()));
+        long usage;
+        await using (var db = Factory.NewDb()) usage = await db.EquipmentUsages.Where(u => u.AdmissionId == adm).Select(u => u.Id).SingleAsync();
+        // 26. Replace: the first period ends, a new one starts – two separate periods, no overlap.
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Ipd/Equipment/{adm}", new[] { P("ReplaceKey", Guid.NewGuid().ToString()), P("NewIdentifier", "INC-03"), P("Reason", "Heater fault") },
+            $"/Ipd/Equipment/{adm}?handler=Replace&usageId={usage}")).StatusCode);
+        var stopAgain = await admin.PostFormAsync($"/Ipd/Equipment/{adm}", new[] { P("Reason", "again") }, $"/Ipd/Equipment/{adm}?handler=Stop&usageId={usage}");
+        Assert.Contains("not charged twice", Errors(await stopAgain.Content.ReadAsStringAsync()));
+        await using (var db = Factory.NewDb())
+        {
+            var periods = await db.EquipmentUsages.Where(u => u.AdmissionId == adm).OrderBy(u => u.Id).ToListAsync();
+            Assert.Equal(2, periods.Count);
+            Assert.Equal((EquipmentUsageStatus.Ended, 1m), (periods[0].Status, periods[0].Quantity!.Value)); // a started day
+            Assert.True(periods[1].StartUtc >= periods[0].EndUtc);
+            var c = await db.Charges.SingleAsync(x => x.Id == periods[0].ChargeId);
+            Assert.Equal((800m, 800m), (c.Fee, c.NetAmount));
+        }
+
+        // 27. Package including the incubator: the second incubator period is not billed again.
+        var pkgSvc = await SvcAsync(admin, "SVC-NICU-OTH", 2500);
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync("/Ipd/Packages", new[]
+            { P("Form.Code", "INC-PKG"), P("Form.Name", "Incubator package"), P("Form.ServiceItemId", pkgSvc.ToString()), P("Form.IncludedServiceIds", incSvc.ToString()), P("Form.IsActive", "true"), P("Form.Excluded", "Medicines, tests") })).StatusCode);
+        int pkg;
+        await using (var db = Factory.NewDb()) pkg = await db.ServicePackages.Select(x => x.Id).SingleAsync();
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Ipd/Account/{adm}", new[] { P("PackageId", pkg.ToString()) }, $"/Ipd/Account/{adm}?handler=Package")).StatusCode);
+        Assert.NotEqual(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Ipd/Account/{adm}", new[] { P("PackageId", pkg.ToString()) }, $"/Ipd/Account/{adm}?handler=Package")).StatusCode);
+
+        // 24 / 44. Daily ward charges two days later – posting again adds nothing.
+        Factory.Clock.Advance(TimeSpan.FromDays(2));
+        admin = await LoginAdminAsync();
+        Assert.Equal(HttpStatusCode.Redirect, (await ActAsync(admin, adm, "BedCharges")).StatusCode);
+        int bedDays;
+        await using (var db = Factory.NewDb()) bedDays = await db.IpdBedCharges.CountAsync(b => b.AdmissionId == adm);
+        Assert.True(bedDays >= 2, $"bed days {bedDays}");
+        Assert.Equal(HttpStatusCode.Redirect, (await ActAsync(admin, adm, "BedCharges")).StatusCode);
+        await using (var db = Factory.NewDb()) Assert.Equal(bedDays, await db.IpdBedCharges.CountAsync(b => b.AdmissionId == adm));
+        // Transfer to another bed: still one bed charge per billing day.
+        Assert.Equal(HttpStatusCode.Redirect, (await ActAsync(admin, adm, "Transfer", ("BedId", bed2.ToString()), ("Reason", "Closer to the nurses"), ("Receiving", "Nurse Ayesha"))).StatusCode);
+
+        // 28–30. Financial clearance: complete bill by department, outstanding shown.
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Ipd/Clearance/{adm}", Array.Empty<KeyValuePair<string, string>>(), $"/Ipd/Clearance/{adm}?handler=Finalise")).StatusCode);
+        var clearance = await admin.GetHtmlAsync($"/Ipd/Clearance/{adm}");
+        foreach (var g in new[] { "AdmissionFee", "WardBed", "Pharmacy", "Laboratory", "Radiology", "NicuEquipment", "Package" }) Assert.Contains($"data-row=\"{g}\"", clearance);
+        Assert.Contains("data-outstanding-warning", clearance);
+        await using (var db = Factory.NewDb())
+        {
+            var inc2 = await db.EquipmentUsages.Where(u => u.AdmissionId == adm).OrderBy(u => u.Id).Skip(1).SingleAsync();
+            Assert.Equal(EquipmentUsageStatus.Ended, inc2.Status); // final bill stopped the running incubator
+            var c2 = await db.Charges.SingleAsync(c => c.Id == inc2.ChargeId);
+            Assert.Equal(0m, c2.NetAmount);
+            Assert.Contains("Included in package", c2.DiscountReason);
+            Assert.Contains(await db.Charges.Where(c => c.IpdAdmissionId == adm).Select(c => c.RadiologyOrderId).ToListAsync(), x => x != null);
+            Assert.Contains(await db.Charges.Where(c => c.IpdAdmissionId == adm).Select(c => c.LabOrderId).ToListAsync(), x => x != null);
+        }
+        var t0 = await TotalsAsync(adm);
+        Assert.True(t0.Due > 1000, $"due {t0.Due}");
+
+        // Discharge is refused while a balance remains.
+        Assert.Equal(HttpStatusCode.Redirect, (await ActAsync(admin, adm, "RequestDischarge", DischargeFields)).StatusCode);
+        var blocked = await ActAsync(admin, adm, "Discharge", DischargeFields);
+        Assert.Contains("outstanding balance", Errors(await blocked.Content.ReadAsStringAsync()));
+
+        // Advance deposit 500, adjusted against the bill (not counted twice as cash).
+        var advKey = Guid.NewGuid().ToString();
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Ipd/Account/{adm}", new[] { P("IdempotencyKey", advKey), P("Amount", "500"), P("PaymentMethodId", cash) }, $"/Ipd/Account/{adm}?handler=Advance")).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Ipd/Account/{adm}", new[] { P("IdempotencyKey", advKey), P("Amount", "500"), P("PaymentMethodId", cash) }, $"/Ipd/Account/{adm}?handler=Advance")).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Ipd/Account/{adm}", new[] { P("IdempotencyKey", Guid.NewGuid().ToString()) }, $"/Ipd/Account/{adm}?handler=ApplyAdvance")).StatusCode);
+        await using (var db = Factory.NewDb())
+        {
+            var adv = await db.PatientAdvances.SingleAsync();
+            Assert.Equal((500m, 500m), (adv.Amount, adv.AppliedAmount));
+            var applyReceipt = await db.PatientAdvanceEntries.Where(x => x.AdvanceId == adv.Id && x.ReceiptId != null).Select(x => x.ReceiptId!.Value).SingleAsync();
+            Assert.Equal((500m, true), await db.CashierLedger.Where(e => e.AdvanceId == adv.Id).Select(e => ValueTuple.Create(e.Amount, e.AffectsCashInHand)).SingleAsync());
+            Assert.False(await db.CashierLedger.Where(e => e.ReceiptId == applyReceipt).Select(e => e.AffectsCashInHand).SingleAsync()); // the adjustment is not cash again
+        }
+        var t1 = await TotalsAsync(adm);
+        Assert.Equal(t0.Due - 500, t1.Due);
+
+        // 31 / 41. Partial payment (double submit = one receipt), then the rest: balance zero.
+        var payKey = Guid.NewGuid().ToString();
+        var receipts0 = 0;
+        await using (var db = Factory.NewDb()) receipts0 = await db.Receipts.CountAsync();
+        var part = new[] { P("IdempotencyKey", payKey), P("Amount", "300"), P("PaymentMethodId", cash) };
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Ipd/Clearance/{adm}", part, $"/Ipd/Clearance/{adm}?handler=Pay")).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Ipd/Clearance/{adm}", part, $"/Ipd/Clearance/{adm}?handler=Pay")).StatusCode);
+        await using (var db = Factory.NewDb()) Assert.Equal(receipts0 + 1, await db.Receipts.CountAsync());
+        var t2 = await TotalsAsync(adm);
+        Assert.Equal(t1.Due - 300, t2.Due);
+        var over = await admin.PostFormAsync($"/Ipd/Clearance/{adm}", new[] { P("IdempotencyKey", Guid.NewGuid().ToString()), P("Amount", (t2.Due + 1).ToString(CultureInfo.InvariantCulture)), P("PaymentMethodId", cash) }, $"/Ipd/Clearance/{adm}?handler=Pay");
+        Assert.NotEqual(HttpStatusCode.Redirect, over.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Ipd/Clearance/{adm}", new[] { P("IdempotencyKey", Guid.NewGuid().ToString()), P("Amount", t2.Due.ToString(CultureInfo.InvariantCulture)), P("PaymentMethodId", cash) }, $"/Ipd/Clearance/{adm}?handler=Pay")).StatusCode);
+        Assert.Equal(0m, (await TotalsAsync(adm)).Due);
+        Assert.Contains("data-cleared", await admin.GetHtmlAsync($"/Ipd/Clearance/{adm}"));
+
+        // 32–33. Discharge with zero balance; the discharge slip has no outstanding-payment warning.
+        Assert.Equal(HttpStatusCode.Redirect, (await ActAsync(admin, adm, "Discharge", DischargeFields)).StatusCode);
+        var slip = await admin.GetHtmlAsync($"/Print/Ipd/discharge/{adm}");
+        Assert.DoesNotContain("utstanding", slip);
+
+        // 34. Second admission: override needs the permission and a reason, and is audited.
+        var pid2 = await RegisterPatientAsync(admin, PatientFields("Override Patient", "Father Override"));
+        var adm2 = await AdmitAsync(admin, pid2, null);
+        Assert.Equal(HttpStatusCode.Redirect, (await ActAsync(admin, adm2, "RequestDischarge", DischargeFields)).StatusCode);
+        Assert.Contains("outstanding balance", Errors(await (await ActAsync(admin, adm2, "Discharge", DischargeFields)).Content.ReadAsStringAsync()));
+        var cashier = await UserWithAsync(admin, "ipdcashier", Perm.DashboardView, Perm.IpdViewPatients, Perm.IpdViewAllWards, Perm.FinanceViewClearance, Perm.FinanceReceiveInpatientPayments);
+        var noPerm = await cashier.PostFormAsync($"/Ipd/Clearance/{adm2}", new[] { P("Reason", "Poor family") }, $"/Ipd/Clearance/{adm2}?handler=Override");
+        Assert.True(noPerm.StatusCode is HttpStatusCode.Forbidden || noPerm.Headers.Location?.ToString().Contains("AccessDenied") == true, $"override without permission: {(int)noPerm.StatusCode}");
+        Assert.NotEqual(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Ipd/Clearance/{adm2}", new[] { P("Reason", "") }, $"/Ipd/Clearance/{adm2}?handler=Override")).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Ipd/Clearance/{adm2}", new[] { P("Reason", "Poor family – managing director approved") }, $"/Ipd/Clearance/{adm2}?handler=Override")).StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await ActAsync(admin, adm2, "Discharge", DischargeFields)).StatusCode);
+        var audit = await AuditAsync(AuditActions.IpdClearanceOverride);
+        Assert.Single(audit);
+        Assert.Contains("managing director", audit[0].Description);
+
+        // 46. Department-wise and cashier-wise collections come from the same receipts and agree.
+        var rev = await admin.GetHtmlAsync("/Finance/Revenue");
+        Assert.Contains("data-reconcile=\"ok\"", rev);
+        Assert.Contains("Admission fees", rev);
+        Assert.Contains("NICU equipment", rev);
+
+        // 47. Without the financial permissions the account, clearance and reports are refused.
+        var nurse = await UserWithAsync(admin, "ipdnurse10", Perm.DashboardView, Perm.IpdViewPatients, Perm.IpdViewAllWards);
+        foreach (var url in new[] { $"/Ipd/Account/{adm}", $"/Ipd/Clearance/{adm}", "/Finance/Revenue", $"/Finance/Statement/{pid}" })
+        {
+            var r = await nurse.Http.GetAsync(url);
+            Assert.True(r.StatusCode is HttpStatusCode.Forbidden || r.Headers.Location?.ToString().Contains("AccessDenied") == true, $"{url}: {(int)r.StatusCode}");
+        }
+        Assert.Contains("data-ledger", await admin.GetHtmlAsync($"/Ipd/Account/{adm}"));
+        Assert.Contains("Account Patient", await admin.GetHtmlAsync($"/Finance/Statement/{pid}"));
+    }
+
+    private async Task<int> DosageFormAsync()
+    {
+        await using var db = Factory.NewDb();
+        return await db.PharmacyLookups.Where(l => l.Kind == PharmacyLookupKind.DosageForm && l.Name == "Tablet").Select(l => l.Id).SingleAsync();
+    }
 }

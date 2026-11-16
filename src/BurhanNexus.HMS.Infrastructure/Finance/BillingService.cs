@@ -42,6 +42,8 @@ public sealed class CollectInput
     public string? Notes { get; set; }
     public List<NewChargeLine> Lines { get; set; } = new();
     public List<BalancePayment> Balances { get; set; } = new();
+    /// <summary>Update 10: the bill is settled from the patient's advance deposit (system payment method ADVANCE – not cash in hand). Internal: never bound from a form.</summary>
+    internal bool AdvanceAdjustment { get; set; }
 }
 
 public sealed record CollectResult(Receipt? Receipt, bool WasDuplicate, IReadOnlyList<Charge> FreeCharges);
@@ -96,6 +98,9 @@ public sealed class BillingService : IBillingService
     private readonly HospitalClock _clock;
     private readonly IFinanceSetupService _setup;
 
+    /// <summary>Update 10: system payment method for bills settled from an advance deposit.</summary>
+    public const string AdvanceMethodCode = "ADVANCE";
+
     public BillingService(HmsDbContext db, IAuditService audit, IRequestContext ctx, HospitalClock clock, IFinanceSetupService setup)
     {
         _db = db;
@@ -124,10 +129,11 @@ public sealed class BillingService : IBillingService
         var user = await _db.Users.AsNoTracking().FirstAsync(u => u.Id == userId, ct);
         var counter = await _db.Counters.AsNoTracking().FirstOrDefaultAsync(c => c.Id == input.CounterId, ct);
         if (counter is null || !counter.IsActive) errors.Add("Select an active counter.");
-        else if (!user.IsSystemAdministrator && !await _db.CounterAssignments.AnyAsync(a => a.CounterId == counter.Id && a.UserId == userId && a.EndedUtc == null, ct))
+        else if (!user.IsSystemAdministrator && !input.AdvanceAdjustment && !await _db.CounterAssignments.AnyAsync(a => a.CounterId == counter.Id && a.UserId == userId && a.EndedUtc == null, ct))
             errors.Add($"You are not assigned to {counter.Name}. Ask the administrator to assign you to this counter.");
         var method = await _db.PaymentMethods.AsNoTracking().FirstOrDefaultAsync(m => m.Id == input.PaymentMethodId, ct);
-        if (method is null || !method.IsActive) errors.Add("Select a payment method.");
+        if (method is null || (!method.IsActive && !(input.AdvanceAdjustment && method.Code == AdvanceMethodCode))) errors.Add("Select a payment method.");
+        else if (method.Code == AdvanceMethodCode && !input.AdvanceAdjustment) errors.Add("Advance deposits are adjusted from the patient's admission account.");
         Patient? patient = null;
         if (input.PatientId is long pid)
         {

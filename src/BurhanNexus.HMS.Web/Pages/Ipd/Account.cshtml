@@ -1,0 +1,149 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Ipd.AccountModel
+@using BurhanNexus.HMS.Infrastructure.Ipd
+@{
+    var L = Model.L;
+    var a = L.Admission;
+    ViewData["Title"] = "Account " + a.AdmissionNumber;
+}
+<partial name="_IpdNav" />
+<div class="page-header">
+    <div><h1>Inpatient account <span class="mono">@a.AdmissionNumber</span> <span class="pay-badge" data-pay-status>@L.PaymentStatus</span></h1>
+        <p class="muted">@a.Patient?.FullName · @a.Patient?.PatientNumber · @(a.CurrentWard?.Name ?? "—") @(a.CurrentBed?.Code) · admitted @Fmt.DateTimeText(a.AdmittedUtc)</p></div>
+    <div class="actions">
+        <a class="btn btn-light" href="/Ipd/Admission/@a.Id">Admission</a>
+        <a bn-permission="@Perm.FinanceViewClearance" class="btn btn-primary" href="/Ipd/Clearance/@a.Id" data-test="clearance">Financial clearance</a>
+        <a bn-permission="@Perm.IpdViewStatements" class="btn btn-light" href="/Finance/Statement/@a.PatientId">Patient statement</a>
+        <a bn-permission="@Perm.IpdPrintForms" class="btn btn-light" href="/Print/Ipd/bill/@a.Id" target="_blank">Final bill</a>
+    </div>
+</div>
+<partial name="_ValidationSummary" />
+<div class="kpis" data-account-kpis>
+    <div class="kpi"><small>Total bill</small><strong data-kpi="net">@Fmt.Money(L.Net)</strong></div>
+    <div class="kpi"><small>Paid</small><strong data-kpi="paid">@Fmt.Money(L.Paid)</strong></div>
+    <div class="kpi"><small>Advance unused</small><strong data-kpi="advance">@Fmt.Money(L.AdvanceAvailable)</strong></div>
+    <div class="kpi @(L.BalanceDue > 0 ? "kpi-warn" : "")"><small>Balance due</small><strong data-kpi="due">@Fmt.Money(Math.Max(0, L.BalanceDue))</strong></div>
+</div>
+@if (Model.CanLedger)
+{
+    <div class="card">
+        <div class="card-header"><h2>Charges by department</h2></div>
+        <table class="table table-compact" data-groups>
+            <tbody>
+            @foreach (var g in Enum.GetValues<LedgerGroup>())
+            {
+                var lines = L.Active.Where(l => l.Group == g).ToList();
+                if (lines.Count == 0) { continue; }
+                <tr data-group="@g"><td>@IpdLedger.Label(g)</td><td class="num">@lines.Count</td><td class="num">@Fmt.Money(lines.Sum(l => l.Charge.NetAmount))</td></tr>
+            }
+            </tbody>
+            <tfoot><tr><th>Total (gross @Fmt.Money(L.Gross), discounts / waivers @Fmt.Money(L.Discounts))</th><th></th><th class="num">@Fmt.Money(L.Net)</th></tr></tfoot>
+        </table>
+    </div>
+    <div class="card">
+        <div class="card-header"><h2>All charges</h2></div>
+        <div class="table-wrap">
+            <table class="table table-compact" data-ledger>
+                <thead><tr><th>Date / time</th><th>Charge</th><th>Department</th><th>Service</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Total</th><th class="num">Discount</th><th class="num">Net</th><th class="num">Paid</th><th>Status</th><th>By</th></tr></thead>
+                <tbody>
+                @foreach (var l in L.Lines)
+                {
+                    var c = l.Charge;
+                    <tr class="@(c.Status == ChargeStatus.Cancelled ? "row-muted" : "")" data-charge="@c.ChargeNumber" data-group="@l.Group">
+                        <td>@Fmt.DateTimeText(c.CreatedUtc)</td><td class="mono">@c.ChargeNumber</td><td>@(c.Department?.Name ?? IpdLedger.Label(l.Group))</td>
+                        <td>@c.ServiceName@if (c.DiscountReason is not null) { <small class="muted block">@c.DiscountReason</small> }</td>
+                        <td class="num">@c.Quantity.ToString("0.##")</td><td class="num">@Fmt.Money(c.UnitPrice ?? c.Fee)</td><td class="num">@Fmt.Money(c.Fee)</td>
+                        <td class="num">@(c.Discount > 0 ? Fmt.Money(c.Discount) : "")</td><td class="num">@Fmt.Money(c.NetAmount)</td><td class="num">@Fmt.Money(c.PaidAmount)</td>
+                        <td>@c.Status</td><td>@c.CreatedByUsername</td>
+                    </tr>
+                }
+                @if (L.Lines.Count == 0) { <tr><td colspan="12" class="empty">No charges yet.</td></tr> }
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="grid-2">
+        <div class="card">
+            <div class="card-header"><h3>Payments</h3></div>
+            <table class="table table-compact" data-payments>
+                <thead><tr><th>Receipt</th><th>Date</th><th>Method</th><th>Cashier</th><th class="num">Amount</th></tr></thead>
+                <tbody>@foreach (var p in L.Payments) { <tr class="@(p.Status == ReceiptStatus.Valid ? "" : "row-muted")"><td class="mono"><a href="/Print/Receipt/@p.ReceiptId" target="_blank">@p.ReceiptNumber</a></td><td>@Fmt.DateTimeText(p.CreatedUtc)</td><td>@p.Method</td><td>@p.Cashier</td><td class="num">@Fmt.Money(p.Amount)</td></tr> }
+                @if (L.Payments.Count == 0) { <tr><td colspan="5" class="empty">No payments.</td></tr> }</tbody>
+            </table>
+            @if (L.Refunds.Count > 0)
+            {
+                <h4>Refunds</h4>
+                <ul>@foreach (var r in L.Refunds) { <li>@r.RefundNumber · @Fmt.Money(r.Amount) · @r.Status · @r.Reason</li> }</ul>
+            }
+        </div>
+        <div class="card" data-advances>
+            <div class="card-header"><h3>Advance deposits</h3></div>
+            <table class="table table-compact">
+                <thead><tr><th>Advance</th><th>Date</th><th class="num">Amount</th><th class="num">Adjusted</th><th class="num">Returned</th><th class="num">Unused</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var adv in L.Advances)
+                {
+                    <tr data-advance="@adv.Number"><td class="mono">@adv.Number</td><td>@Fmt.DateTimeText(adv.CreatedUtc)</td><td class="num">@Fmt.Money(adv.Amount)</td><td class="num">@Fmt.Money(adv.AppliedAmount)</td>
+                        <td class="num">@Fmt.Money(adv.RefundedAmount)</td><td class="num">@Fmt.Money(adv.Available)</td>
+                        <td>@if (adv.Available > 0)
+                            {
+                                <details bn-permission="@Perm.FinanceApproveRefunds" class="inline-details"><summary class="btn btn-light btn-sm">Return</summary>
+                                    <form method="post" asp-page-handler="RefundAdvance" asp-route-advanceId="@adv.Id" class="inline-form" novalidate>
+                                        <input name="Amount" type="number" step="0.01" min="0.01" max="@adv.Available" value="@adv.Available" aria-label="Amount" />
+                                        <select name="PaymentMethodId" aria-label="Method">@foreach (var m in Model.Methods) { <option value="@m.Id">@m.Name</option> }</select>
+                                        <input name="Reason" maxlength="300" placeholder="Reason" required aria-label="Reason" />
+                                        <button class="btn btn-danger btn-sm">Return money</button></form></details>
+                            }</td></tr>
+                }
+                @if (L.Advances.Count == 0) { <tr><td colspan="7" class="empty">No advance deposits.</td></tr> }
+                </tbody>
+            </table>
+            <div class="card-body">
+                <form bn-permission="@Perm.FinanceReceiveAdvances" method="post" asp-page-handler="Advance" class="inline-form wrap" novalidate data-advance-form>
+                    <input type="hidden" name="IdempotencyKey" value="@Model.Key" />
+                    <input name="Amount" type="number" step="0.01" min="1" placeholder="Amount" required aria-label="Advance amount" />
+                    <select name="PaymentMethodId" aria-label="Method">@foreach (var m in Model.Methods) { <option value="@m.Id" selected="@(m.Code == "CASH")">@m.Name</option> }</select>
+                    <input name="Reference" maxlength="100" placeholder="Reference" aria-label="Reference" />
+                    <button class="btn btn-primary btn-sm" data-test="receive-advance">Receive advance</button>
+                </form>
+                @if (L.AdvanceAvailable > 0 && L.Outstanding > 0)
+                {
+                    <form bn-permission="@Perm.FinanceReceiveAdvances" method="post" asp-page-handler="ApplyAdvance" class="inline-form" novalidate>
+                        <input type="hidden" name="IdempotencyKey" value="@Model.Key" />
+                        <button class="btn btn-light btn-sm" data-test="apply-advance">Adjust advance against the bill</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+}
+<div class="grid-2">
+    <div class="card" data-bed-history>
+        <div class="card-header"><h3>Ward / bed charge history</h3></div>
+        <table class="table table-compact">
+            <thead><tr><th>Billing day</th><th class="num">Quantity</th><th>Charge</th></tr></thead>
+            <tbody>@foreach (var b in L.BedDays) { <tr><td>@Fmt.Day(b.Night)</td><td class="num">@b.Quantity.ToString("0.##")</td><td class="mono">@(L.Lines.FirstOrDefault(l => l.Charge.Id == b.ChargeId)?.Charge.ChargeNumber)</td></tr> }
+            @if (L.BedDays.Count == 0) { <tr><td colspan="3" class="empty">No bed charges posted yet.</td></tr> }</tbody>
+        </table>
+    </div>
+    <div class="card" data-equipment-history>
+        <div class="card-header"><h3>NICU equipment</h3><a bn-permission="@Perm.IpdRecordEquipment" class="btn btn-light btn-sm" href="/Ipd/Equipment/@a.Id">Manage equipment</a></div>
+        <table class="table table-compact">
+            <thead><tr><th>Equipment</th><th>From</th><th>To</th><th class="num">Qty</th><th>Status</th></tr></thead>
+            <tbody>@foreach (var e in L.Equipment) { <tr><td>@e.EquipmentName @e.Identifier</td><td>@Fmt.DateTimeText(e.StartUtc)</td><td>@(e.EndUtc is null ? "running" : Fmt.DateTimeText(e.EndUtc))</td><td class="num">@e.Quantity?.ToString("0.##")</td><td>@e.Status</td></tr> }
+            @if (L.Equipment.Count == 0) { <tr><td colspan="5" class="empty">No equipment used.</td></tr> }</tbody>
+        </table>
+    </div>
+</div>
+<div class="card" data-packages>
+    <div class="card-header"><h3>Packages</h3></div>
+    <ul>@foreach (var p in L.Packages) { <li>@p.Package?.Name · applied @Fmt.DateTimeText(p.AppliedUtc) by @p.AppliedBy @(p.IsActive ? "" : $"– removed: {p.RemovedReason}")
+        @if (p.IsActive) { <form bn-permission="@Perm.IpdManagePackages" method="post" asp-page-handler="RemovePackage" asp-route-admissionPackageId="@p.Id" class="inline-form" novalidate><input name="Reason" maxlength="300" placeholder="Reason" required aria-label="Reason" /><button class="btn btn-light btn-sm">Remove</button></form> }</li> }</ul>
+    @if (Model.Packages.Count > 0)
+    {
+        <form bn-permission="@Perm.IpdManagePackages" method="post" asp-page-handler="Package" class="inline-form card-body" novalidate>
+            <select name="PackageId" aria-label="Package">@foreach (var p in Model.Packages) { <option value="@p.Id">@p.Name</option> }</select>
+            <button class="btn btn-light btn-sm" data-test="apply-package">Apply package</button>
+        </form>
+    }
+</div>

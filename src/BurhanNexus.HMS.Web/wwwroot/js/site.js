@@ -465,3 +465,11 @@ document.querySelectorAll("select[data-autosubmit]").forEach(s => s.addEventList
   document.querySelectorAll("input[name='Input.DoctorId']").forEach(r => r.addEventListener("change", show));
   show();
 })();
+
+// Update 10: print buttons on normal pages (account statement)
+(function () {
+    document.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-print-now]');
+        if (b && !document.body.hasAttribute('data-lab-slip') && !document.body.hasAttribute('data-lab-receipt') && !document.querySelector('[data-form-page]')) window.print();
+    });
+})();

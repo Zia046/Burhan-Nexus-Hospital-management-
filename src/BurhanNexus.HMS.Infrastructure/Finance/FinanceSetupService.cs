@@ -133,6 +133,9 @@ public sealed class FinanceSetupService : IFinanceSetupService
             db.PaymentMethods.Add(new PaymentMethod { Code = "BANK", Name = "Bank Transfer", RequiresReference = true, SortOrder = 20, CreatedUtc = now, UpdatedUtc = now });
             db.PaymentMethods.Add(new PaymentMethod { Code = "CARD", Name = "Card", RequiresReference = true, SortOrder = 30, CreatedUtc = now, UpdatedUtc = now });
         }
+        // Update 10: bills settled from an advance deposit (inactive so that it is never chosen at the counter; not cash in hand).
+        if (!await db.PaymentMethods.AnyAsync(m => m.Code == BillingService.AdvanceMethodCode, ct))
+            db.PaymentMethods.Add(new PaymentMethod { Code = BillingService.AdvanceMethodCode, Name = "Advance deposit (adjusted)", CountsAsCashInHand = false, IsActive = false, SortOrder = 900, CreatedUtc = now, UpdatedUtc = now });
         if (!await db.Counters.AnyAsync(ct))
             db.Counters.Add(new Counter { Code = "MAIN", Name = "Main Reception Counter", CreatedUtc = now, UpdatedUtc = now });
 

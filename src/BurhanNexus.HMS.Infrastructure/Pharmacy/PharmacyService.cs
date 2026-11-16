@@ -517,6 +517,8 @@ public sealed class PharmacyService : IPharmacyService
                             i.Discount > 0 ? T(input.DiscountReason, 200) : null, today, now, ct);
                         charge.PharmacyIssueId = issue.Id;
                         charge.IpdAdmissionId = input.IpdAdmissionId;
+                        charge.Quantity = i.Quantity; // update 10: medicine quantity and unit price on the patient's account
+                        charge.UnitPrice = i.UnitPrice;
                         _db.Charges.Add(charge);
                         await _db.SaveChangesAsync(ct);
                         i.ChargeId = charge.Id;

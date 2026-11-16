@@ -153,6 +153,9 @@ public class Charge
     public Doctor? Doctor { get; set; }
     [MaxLength(150)] public string? DoctorName { get; set; }
     public decimal Fee { get; set; }
+    /// <summary>Update 10: quantity (days, hours, sessions, items …) and unit price; <see cref="Fee"/> stays the total charged.</summary>
+    public decimal Quantity { get; set; } = 1;
+    public decimal? UnitPrice { get; set; }
     public decimal Discount { get; set; }
     public decimal NetAmount { get; set; }
     /// <summary>Sum of valid (not cancelled) receipt lines.</summary>
@@ -305,7 +308,9 @@ public class CashDeposit
     public uint RowVersion { get; set; }
 }
 
-public enum CashierEntryType { Collection = 1, ReceiptCancellation = 2, Refund = 3, DepositConfirmed = 4, Adjustment = 5 }
+public enum CashierEntryType { Collection = 1, ReceiptCancellation = 2, Refund = 3, DepositConfirmed = 4, Adjustment = 5,
+    /// <summary>Update 10: patient advance deposit received / returned (cash in hand of the cashier).</summary>
+    AdvanceReceived = 6, AdvanceRefunded = 7 }
 
 /// <summary>
 /// Individual cashier ledger. Positive = the cashier holds more hospital money; negative = less.
@@ -325,6 +330,8 @@ public class CashierLedgerEntry
     public long? RefundId { get; set; }
     public long? DepositId { get; set; }
     public long? AdjustmentId { get; set; }
+    /// <summary>Update 10: patient advance deposit.</summary>
+    public long? AdvanceId { get; set; }
     [MaxLength(30)] public string Reference { get; set; } = string.Empty;
     [MaxLength(300)] public string? Description { get; set; }
     public DateOnly BusinessDate { get; set; }

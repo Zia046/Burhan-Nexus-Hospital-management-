@@ -1,0 +1,85 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Finance.RevenueModel
+@{ ViewData["Title"] = "Revenue & outstanding"; }
+<partial name="_FinanceNav" />
+<div class="page-header"><div><h1>Revenue, collections &amp; outstanding</h1><p class="muted">Hospital mode: <strong>@(Model.Government ? "Government" : "Private")</strong>. Charges are counted on their billing date, collections on the receipt date.</p></div></div>
+<form method="get" class="card filters" data-revenue-filters>
+    <div class="form-grid">
+        <div class="field"><label for="f">From</label><input id="f" name="from" type="date" value="@Model.From?.ToString("yyyy-MM-dd")" /></div>
+        <div class="field"><label for="t">To</label><input id="t" name="to" type="date" value="@Model.To?.ToString("yyyy-MM-dd")" /></div>
+        <div class="field"><label for="d">Department</label><select id="d" name="department"><option value="">All</option>@foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(Model.Department == d.Id)">@d.Name</option> }</select></div>
+        <div class="field"><label for="u">User / cashier</label><select id="u" name="cashier"><option value="">All</option>@foreach (var u in Model.Users) { <option value="@u.Id" selected="@(Model.Cashier == u.Id)">@u.Name</option> }</select></div>
+        <div class="field"><label for="s">Service</label><select id="s" name="service"><option value="">All</option>@foreach (var s in Model.Services) { <option value="@s.Id" selected="@(Model.Service == s.Id)">@s.Name</option> }</select></div>
+        <div class="field"><label for="st">Payment status</label><select id="st" name="status"><option value="">All</option><option value="paid" selected="@(Model.Status == "paid")">Paid</option><option value="partial" selected="@(Model.Status == "partial")">Partial</option><option value="unpaid" selected="@(Model.Status == "unpaid")">Unpaid</option></select></div>
+    </div>
+    <div class="form-actions"><button class="btn btn-primary">Show</button> <a class="btn btn-light" href="/Fees/Reports">Service-wise report</a></div>
+</form>
+<div class="kpis">
+    <div class="kpi"><small>Collected (receipts)</small><strong data-kpi="collected">@Fmt.Money(Model.CashierCollected)</strong></div>
+    <div class="kpi"><small>Advance deposits received</small><strong data-kpi="advances">@Fmt.Money(Model.AdvancesReceived)</strong></div>
+    <div class="kpi"><small>Refunds</small><strong data-kpi="refunds">@Fmt.Money(Model.Refunds)</strong></div>
+    <div class="kpi"><small>Discounts / waivers</small><strong data-kpi="discounts">@Fmt.Money(Model.Discounts)</strong></div>
+    <div class="kpi"><small>Unused advances (all)</small><strong>@Fmt.Money(Model.AdvancesUnused)</strong></div>
+</div>
+@if (Model.DepartmentCollected != Model.CashierCollected)
+{
+    <div class="alert alert-danger" data-reconcile="mismatch"><div>Department collections (@Fmt.Money(Model.DepartmentCollected)) and cashier collections (@Fmt.Money(Model.CashierCollected)) differ – please report this.</div></div>
+}
+else { <p class="small muted" data-reconcile="ok">Check: department-wise collections = cashier-wise collections = @Fmt.Money(Model.CashierCollected).</p> }
+
+@{
+    void Table(string title, string key, IReadOnlyList<BurhanNexus.HMS.Web.Pages.Finance.RevenueModel.Row> rows)
+    {
+        <div class="card" data-report="@key">
+            <div class="card-header"><h2>@title</h2></div>
+            <table class="table table-compact">
+                <thead><tr><th></th><th class="num">Charges</th><th class="num">Billed</th><th class="num">Discount</th><th class="num">Paid</th><th class="num">Outstanding</th></tr></thead>
+                <tbody>@foreach (var r in rows) { <tr data-row="@r.Label"><td>@r.Label</td><td class="num">@r.Count</td><td class="num">@Fmt.Money(r.Billed)</td><td class="num">@Fmt.Money(r.Discount)</td><td class="num" data-paid>@Fmt.Money(r.Paid)</td><td class="num">@Fmt.Money(r.Outstanding)</td></tr> }
+                @if (rows.Count == 0) { <tr><td colspan="6" class="empty">No charges.</td></tr> }</tbody>
+                <tfoot><tr><th>Total</th><th class="num">@rows.Sum(r => r.Count)</th><th class="num">@Fmt.Money(rows.Sum(r => r.Billed))</th><th class="num">@Fmt.Money(rows.Sum(r => r.Discount))</th><th class="num">@Fmt.Money(rows.Sum(r => r.Paid))</th><th class="num">@Fmt.Money(rows.Sum(r => r.Outstanding))</th></tr></tfoot>
+            </table>
+        </div>
+    }
+}
+@{ Table("Revenue by source (laboratory, radiology, OPD, emergency, admission fees, ward / bed, NICU equipment, pharmacy, OT …)", "source", Model.BySource); }
+@{ Table("Department-wise revenue", "department", Model.ByDepartment); }
+@{ Table("Government vs private services", "applicability", Model.ByApplicability); }
+<div class="grid-2">
+    <div class="card" data-report="daily">
+        <div class="card-header"><h2>Daily collections</h2></div>
+        <table class="table table-compact">
+            <thead><tr><th>Day</th><th class="num">Receipts</th><th class="num">Advances</th><th class="num">Refunds</th></tr></thead>
+            <tbody>@foreach (var d in Model.Days) { <tr><td>@Fmt.Day(d.Day)</td><td class="num">@Fmt.Money(d.Collections)</td><td class="num">@Fmt.Money(d.Advances)</td><td class="num">@Fmt.Money(d.Refunds)</td></tr> }</tbody>
+        </table>
+    </div>
+    <div class="card" data-report="cashier">
+        <div class="card-header"><h2>Cashier-wise collections</h2></div>
+        <table class="table table-compact">
+            <thead><tr><th>Cashier</th><th class="num">Receipts</th><th class="num">Amount</th><th class="num">of which advance adjusted</th></tr></thead>
+            <tbody>@foreach (var c in Model.Cashiers) { <tr data-cashier="@c.Cashier"><td>@c.Cashier</td><td class="num">@c.Receipts</td><td class="num">@Fmt.Money(c.Amount)</td><td class="num">@Fmt.Money(c.FromAdvance)</td></tr> }</tbody>
+        </table>
+    </div>
+</div>
+<div class="grid-2">
+    <div class="card" data-report="outstanding">
+        <div class="card-header"><h2>Patient-wise outstanding balances</h2></div>
+        <table class="table table-compact">
+            <tbody>@foreach (var p in Model.Outstanding) { <tr><td class="mono">@p.PatientNumber</td><td><a href="/Finance/Statement/@p.PatientId">@p.Name</a></td><td class="num">@Fmt.Money(p.Outstanding)</td></tr> }
+            @if (Model.Outstanding.Count == 0) { <tr><td class="empty">Nothing outstanding.</td></tr> }</tbody>
+        </table>
+    </div>
+    <div class="card" data-report="admissions">
+        <div class="card-header"><h2>Admission-wise final bills</h2></div>
+        <table class="table table-compact">
+            <thead><tr><th>Admission</th><th>Patient</th><th>Status</th><th class="num">Bill</th><th class="num">Paid</th><th class="num">Balance</th></tr></thead>
+            <tbody>@foreach (var a in Model.Admissions) { <tr><td class="mono"><a href="/Ipd/Account/@a.Id">@a.Number</a></td><td>@a.Patient</td><td>@a.Status</td><td class="num">@Fmt.Money(a.Net)</td><td class="num">@Fmt.Money(a.Paid)</td><td class="num">@Fmt.Money(a.Net - a.Paid)</td></tr> }</tbody>
+        </table>
+    </div>
+</div>
+<div class="card" data-report="waived">
+    <div class="card-header"><h2>Free services, discounts &amp; waived fees</h2><a class="btn btn-light btn-sm" href="/Appointments/Reports">Free by Doctor (appointments)</a></div>
+    <table class="table table-compact">
+        <thead><tr><th>Date</th><th>Charge</th><th>Service</th><th class="num">Fee</th><th class="num">Waived / discount</th><th>Reason</th><th>By</th></tr></thead>
+        <tbody>@foreach (var c in Model.Waived) { <tr><td>@Fmt.Day(c.BusinessDate)</td><td class="mono">@c.ChargeNumber</td><td>@c.ServiceName</td><td class="num">@Fmt.Money(c.Fee)</td><td class="num">@Fmt.Money(c.Discount)</td><td>@c.DiscountReason</td><td>@c.CreatedByUsername</td></tr> }</tbody>
+    </table>
+</div>

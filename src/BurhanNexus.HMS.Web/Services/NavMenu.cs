@@ -69,6 +69,7 @@ public static class NavMenu
             (Any(Perm.IpdManageNicu, Perm.IpdNicuObservations), new("ipd-nicu", "/Ipd/Nicu", "users-round", "NICU")),
             (Any(Perm.IpdManageNursing, Perm.IpdNursingNotes, Perm.IpdRecordMedication, Perm.IpdHandover), new("ipd-nursing", "/Ipd/Nursing", "check-circle", "Nursing")),
             (Any(Perm.IpdManageWards, Perm.IpdManageRooms, Perm.IpdManageBeds), new("ipd-wards", "/Ipd/Wards", "sliders", "Wards & Beds")),
+            (Has(Perm.IpdManagePackages), new("ipd-packages", "/Ipd/Packages", "database", "Packages", EmitDataNav: false)),
             (Has(Perm.IpdSettings), new("ipd-settings", "/Ipd/Settings", "settings", "IPD Settings")));
 
         Add("ot", "Operation Theatre", "scissors", Any(Perm.OtDashboard, Perm.OtCreateBooking, Perm.OtManageRecovery, Perm.OtManageCssd, Perm.OtViewStatistics,
@@ -114,6 +115,7 @@ public static class NavMenu
             (Has(Perm.FinanceViewOwnAccount), new("finance-account", "/Finance", "wallet", "My Financial Account")),
             (Has(Perm.FinanceViewOwnReceipts), new("finance-receipts", "/Finance/Receipts", "file", "Receipts")),
             (Has(Perm.FinanceDashboard), new("finance-dashboard", "/Finance/Dashboard", "chart", "Financial Dashboard")),
+            (Has(Perm.FinanceDashboard), new("finance-revenue", "/Finance/Revenue", "chart", "Revenue & Outstanding", EmitDataNav: false)),
             (Has(Perm.FinanceConfirmDeposits), new("finance-deposits", "/Finance/Deposits", "download", "Cash Deposits")),
             (Has(Perm.FinanceManageDoctorAccounts), new("finance-doctors", "/Finance/Doctors", "stethoscope", "Doctor Accounts")),
             (Has(Perm.FinanceManageServiceFees), new("finance-services", "/Finance/Services", "sliders", "Counters per Service")));

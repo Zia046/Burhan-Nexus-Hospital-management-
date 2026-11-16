@@ -104,5 +104,18 @@ public static class PermissionSeeder
         [Perm.LabReviewResults] = Perm.LabDeleteResults,
         [Perm.LabPrintReceipts] = Perm.LabBook,
         [Perm.LabCollectPayments] = Perm.FinanceCollect,
+        // update 10 IPD billing: split from the earlier IPD finance / billing / settings tasks (financial clearance override is never inherited)
+        [Perm.IpdViewLedger] = Perm.IpdViewFinancial,
+        [Perm.IpdViewStatements] = Perm.IpdViewFinancial,
+        [Perm.IpdViewBillingHistory] = Perm.IpdViewFinancial,
+        [Perm.IpdPostCharges] = Perm.IpdManageBilling,
+        [Perm.IpdManageAdmissionFee] = Perm.IpdSettings,
+        [Perm.IpdRecordAdmissionPayment] = Perm.FinanceCollect,
+        [Perm.IpdManageWardCharges] = Perm.IpdSettings,
+        [Perm.IpdRecordEquipment] = Perm.IpdManageNicu,
+        [Perm.IpdManagePackages] = Perm.IpdSettings,
+        [Perm.FinanceReceiveInpatientPayments] = Perm.FinanceCollect,
+        [Perm.FinanceReceiveAdvances] = Perm.FinanceCollect,
+        [Perm.FinanceViewClearance] = Perm.IpdViewFinancial,
     };
 }
