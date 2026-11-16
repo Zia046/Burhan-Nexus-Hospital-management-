@@ -61,7 +61,7 @@ public partial class IpdTests
         Assert.Equal(BedStatus.Occupied, await BedStatusAsync(b1));
 
         // An occupied bed is not offered and cannot be assigned.
-        Assert.DoesNotContain($"value=\"{b1}\"", await admin.GetHtmlAsync($"/Ipd/Admit?patientId={p2}"));
+        Assert.DoesNotContain($"<option value=\"{b1}\" data-ward", await admin.GetHtmlAsync($"/Ipd/Admit?patientId={p2}"));
         Assert.Contains("bed", (await Refused(await AdmitAtAsync(admin, p2, b1, D(LocalNow), T(LocalNow)), "Occupied bed")).ToLowerInvariant());
 
         // Admitted count on the admin dashboard and the IPD dashboard opens the list (name, ID, admission no., ward, room, bed, doctor, status).
@@ -80,7 +80,7 @@ public partial class IpdTests
         Assert.Equal(BedStatus.Available, await BedStatusAsync(b1));
         await using (var db = Factory.NewDb())
             Assert.Equal(BedStatus.Available, (await db.IpdBedStatusChanges.Where(c => c.BedId == b1).OrderByDescending(c => c.Id).FirstAsync()).To);
-        Assert.Contains($"value=\"{b1}\"", await admin.GetHtmlAsync($"/Ipd/Admit?patientId={p2}"));
+        Assert.Contains($"<option value=\"{b1}\" data-ward", await admin.GetHtmlAsync($"/Ipd/Admit?patientId={p2}"));
         await Ok(await AdmitAtAsync(admin, p2, b1, D(LocalNow), T(LocalNow)), "Bed reused after discharge");
         Assert.Equal(BedStatus.Available, await BedStatusAsync(b2));
     }

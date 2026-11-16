@@ -823,6 +823,24 @@ try {
   }
   await pdf(admUrl.replace("/Ipd/Admission/", "/Print/Ipd/admission/"), "sample-ipd-admission-form-2-copies-A4.pdf");
 
+  // ---- Update 11: frequent lab tests, Ward → Room → Bed, admitted list, ward request alert, supplier invoice, doctor account ----
+  for (const [url, name] of [[`/Lab/Book?patientId=${ahmadId}`, "p11-01-lab-frequent-tests"], ["/Ipd/Admit", "p11-02-admit-search"],
+                             ["/Ipd/Admissions?scope=active", "p11-03-admitted-list"], ["/Ipd", "p11-04-ipd-dashboard-admitted"],
+                             ["/Pharmacy/WardRequests", "p11-05-ward-requests-alert"], ["/Pharmacy/Receive", "p11-06-supplier-invoice"],
+                             ["/Finance/Doctors", "p11-07-doctor-accounts"], ["/", "p11-08-dashboard-admitted"]]) {
+    const r = await page.goto(base + url);
+    if (!r || r.status() >= 400) errors.push(`HTTP ${r && r.status()} on ${url}`);
+    await page.waitForTimeout(400);
+    await shot(page, name);
+  }
+  const docLink = await page.goto(base + "/Finance/Doctors").then(() => page.$eval("a[href^='/Finance/Doctors/Account/']", a => a.getAttribute("href"))).catch(() => null);
+  if (docLink) {
+    const r = await page.goto(base + docLink);
+    if (!r || r.status() >= 400) errors.push(`HTTP ${r && r.status()} on ${docLink}`);
+    await shot(page, "p11-09-doctor-account");
+    await pdf(docLink.replace("/Finance/Doctors/Account/", "/Print/Doctor/"), "sample-doctor-daily-opd-list-A4.pdf");
+  }
+
   // ---- Navigation: administrator sidebar (11 pages) + top taskbar categories ----
   await go("/");
   await shot(page, "nav-01-admin-sidebar-and-taskbar", false);

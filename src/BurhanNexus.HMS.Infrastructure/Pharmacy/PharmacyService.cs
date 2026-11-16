@@ -520,6 +520,7 @@ public sealed class PharmacyService : IPharmacyService
                             i.Discount > 0 ? T(input.DiscountReason, 200) : null, today, now, ct);
                         charge.PharmacyIssueId = issue.Id;
                         charge.IpdAdmissionId = input.IpdAdmissionId;
+                        if (input.IpdAdmissionId is not null) charge.AllowPartialPayment = true; // update 11: like every IPD charge (part payments on the admission account)
                         charge.Quantity = i.Quantity; // update 10: medicine quantity and unit price on the patient's account
                         charge.UnitPrice = i.UnitPrice;
                         _db.Charges.Add(charge);
@@ -536,6 +537,7 @@ public sealed class PharmacyService : IPharmacyService
                         var charge = await NewChargeAsync(svc, patient.Id, encounter?.Id, svc.Name, fee, 0, null, today, now, ct);
                         charge.PharmacyIssueId = issue.Id;
                         charge.IpdAdmissionId = input.IpdAdmissionId;
+                        if (input.IpdAdmissionId is not null) charge.AllowPartialPayment = true; // update 11: like every IPD charge (part payments on the admission account)
                         _db.Charges.Add(charge);
                     }
                 }
