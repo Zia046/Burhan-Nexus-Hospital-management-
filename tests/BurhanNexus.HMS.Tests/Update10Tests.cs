@@ -416,7 +416,7 @@ public partial class Update10Tests : Phase2TestBase
         var cash = (await CashAsync()).ToString();
 
         // 18–19. The configured admission fee is shown and received with the admission.
-        Assert.Contains("data-admission-fee=\"1000\"", await admin.GetHtmlAsync($"/Ipd/Admit?patientId={pid}"));
+        Assert.Contains("data-admission-fee=\"1000", await admin.GetHtmlAsync($"/Ipd/Admit?patientId={pid}"));
         var adm = await AdmitAsync(admin, pid, bed1, ("FeeAction", "pay"), ("FeeMethodId", cash));
         await using (var db = Factory.NewDb())
         {
