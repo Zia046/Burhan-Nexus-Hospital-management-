@@ -25,7 +25,16 @@ public sealed class AppointmentSlipFactory
         var d = a.Doctor!;
         var age = AgeCalculator.Of(p, a.AppointmentDate)?.Short ?? "-";
         var gender = p.Gender switch { Gender.Male => "M", Gender.Female => "F", Gender.Other => "O", _ => "-" };
-        var fee = s.ShowFeeOnAppointmentSlip && a.ConsultationFee is > 0 ? _fmt.Money(a.ConsultationFee.Value) : null;
+        // The fee and its payment status are always printed once the fee was settled at booking (the slip is the payment proof).
+        var settled = a.PaymentStatus != AppointmentPayment.NotRecorded;
+        var fee = (settled || s.ShowFeeOnAppointmentSlip) && a.ConsultationFee is > 0 ? _fmt.Money(a.ConsultationFee.Value) : null;
+        var payment = a.PaymentStatus switch
+        {
+            AppointmentPayment.Paid => "PAID " + _fmt.Money(a.AmountPaid ?? 0),
+            AppointmentPayment.Free => "FREE",
+            AppointmentPayment.FreeByDoctor => "FREE (by doctor)",
+            _ => null,
+        };
         var time = s.AppointmentTimeEnabled && a.AppointmentTime is { } t
             ? t.ToString(h.TimeFormat.Replace(":ss", ""), CultureInfo.InvariantCulture) : null;
         var date = a.AppointmentDate.ToString(h.DateFormat, CultureInfo.InvariantCulture);
@@ -34,6 +43,7 @@ public sealed class AppointmentSlipFactory
             h.ContactNumber is { Length: > 0 } c ? "Ph: " + c : null,
             d.Name, d.Qualification, d.Specialty, a.TokenNumber, p.FullName, p.PatientNumber, $"{age} / {gender}",
             date, time, fee, s.AppointmentSlipContact, s.AppointmentSlipMessage, a.Encounter!.EncounterNumber,
-            "Printed " + _fmt.DateTimeText(DateTime.UtcNow), isReprint, a.Status == AppointmentStatus.Cancelled);
+            "Printed " + _fmt.DateTimeText(DateTime.UtcNow), isReprint, a.Status == AppointmentStatus.Cancelled,
+            payment, a.PaymentStatus == AppointmentPayment.Paid ? a.PaymentMethodName : null, a.PaymentStatus == AppointmentPayment.Paid ? a.Receipt?.ReceiptNumber : null);
     }
 }

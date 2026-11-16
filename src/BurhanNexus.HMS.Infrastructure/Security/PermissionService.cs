@@ -50,11 +50,12 @@ public static class PermissionSeeder
     public static async Task SyncAsync(HmsDbContext db, CancellationToken ct = default)
     {
         var existing = await db.Permissions.ToDictionaryAsync(p => p.Key, ct);
+        var added = new List<Core.Domain.Permission>();
         foreach (var def in PermissionCatalog.All)
         {
             if (!existing.TryGetValue(def.Key, out var row))
             {
-                db.Permissions.Add(new Core.Domain.Permission
+                added.Add(new Core.Domain.Permission
                 {
                     Key = def.Key, Module = def.Module, Action = def.Action,
                     ModuleName = def.ModuleName, ActionName = def.ActionName,
@@ -69,6 +70,28 @@ public static class PermissionSeeder
                 row.SortOrder = def.SortOrder;
             }
         }
+        db.Permissions.AddRange(added);
+        await db.SaveChangesAsync(ct);
+
+        // A new permission that splits an existing task is given once, when it first appears, to whoever already had that task
+        // (so an update never stops staff from doing their work). Nothing else is granted automatically.
+        foreach (var p in added)
+        {
+            if (!Inherits.TryGetValue(p.Key, out var from) || !existing.TryGetValue(from, out var source)) continue;
+            var users = await db.UserPermissions.Where(u => u.PermissionId == source.Id && u.IsGranted).ToListAsync(ct);
+            foreach (var u in users)
+                db.UserPermissions.Add(new Core.Domain.UserPermission { UserId = u.UserId, PermissionId = p.Id, IsGranted = true, AssignedUtc = u.AssignedUtc, AssignedByUserId = u.AssignedByUserId });
+            var roles = await db.RolePermissions.Where(r => r.PermissionId == source.Id).ToListAsync(ct);
+            foreach (var r in roles) db.RolePermissions.Add(new Core.Domain.RolePermission { RoleId = r.RoleId, PermissionId = p.Id });
+        }
         await db.SaveChangesAsync(ct);
     }
+
+    /// <summary>New permission → existing permission whose holders receive it once (update 9).</summary>
+    private static readonly Dictionary<string, string> Inherits = new()
+    {
+        [Perm.AppointmentsCollectFee] = Perm.AppointmentsAdd,
+        [Perm.IpdRequestMedicines] = Perm.IpdRecordMedication,
+        [Perm.PharmProcessWardRequests] = Perm.PharmIssueToPatients,
+    };
 }

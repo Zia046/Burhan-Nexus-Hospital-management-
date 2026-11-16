@@ -202,7 +202,7 @@ public static class DatabaseHardening
                                        'IpdBedStatusChanges','IpdTransfers','IpdEvents','ClinicalRecords','IpdBedCharges','DeliveryRecords',
                                        'SurgeryEvents','OtDocuments','SurgeryChecklistEntries','SurgeryChecklistStages','OtDrugEntries','OtConsumptions','OtEquipmentLogs','SurgeryCharges','CssdBatchSets',
                                        'InventoryTransactions','SupplierLedger','SupplierPayments','MedicinePriceChanges','StockReceipts','StockReceiptItems',
-                                       'StockTransfers','StockTransferItems','MedicineReturns','MedicineReturnItems','SupplierReturns','SupplierReturnItems'] LOOP
+                                       'StockTransfers','StockTransferItems','MedicineReturns','MedicineReturnItems','SupplierReturns','SupplierReturnItems','MedicineRequestEvents'] LOOP
                 IF to_regclass(format('%I', t)) IS NOT NULL THEN
                     EXECUTE format('DROP TRIGGER IF EXISTS trg_%s_immutable ON %I', lower(t), t);
                     EXECUTE format('CREATE TRIGGER trg_%s_immutable BEFORE UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION bnhms_finance_immutable()', lower(t), t);
@@ -217,7 +217,7 @@ public static class DatabaseHardening
                                        'IpdWards','IpdRooms','IpdBeds','IpdAdmissions','IpdBedAllocations','Pregnancies','LabourRecords','NewbornRecords',
                                        'NicuDetails','NursingTasks','ShiftHandovers','MedicationOrders','MedicationDoses',
                                        'OtTheatres','OtProcedures','Surgeries','SurgeryTeamMembers','OtConsentTypes','SurgeryConsents','OtChecklistItems',
-                                       'OperativeNotes','SurgerySpecimens','OtEquipment','RecoveryEpisodes','CssdInstruments','CssdSets','CssdBatches','CssdIssues'] LOOP
+                                       'OperativeNotes','SurgerySpecimens','OtEquipment','RecoveryEpisodes','CssdInstruments','CssdSets','CssdBatches','CssdIssues','MedicineRequests','MedicineRequestLines'] LOOP
                 IF to_regclass(format('%I', t)) IS NOT NULL THEN
                     EXECUTE format('DROP TRIGGER IF EXISTS trg_%s_no_delete ON %I', lower(t), t);
                     EXECUTE format('CREATE TRIGGER trg_%s_no_delete BEFORE DELETE ON %I FOR EACH ROW EXECUTE FUNCTION bnhms_finance_immutable()', lower(t), t);

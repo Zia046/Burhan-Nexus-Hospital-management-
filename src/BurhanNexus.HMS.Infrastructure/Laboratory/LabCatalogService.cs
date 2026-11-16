@@ -11,6 +11,8 @@ namespace BurhanNexus.HMS.Infrastructure.Laboratory;
 
 public sealed class LabTestInput
 {
+    /// <summary>Update 9: the laboratory has checked the standard-catalogue ranges and price.</summary>
+    public bool MarkReviewed { get; set; }
     public string? Code { get; set; }
     public string? Name { get; set; }
     public int CategoryId { get; set; }
@@ -53,6 +55,8 @@ public sealed class LabRangeInput
     public decimal? CriticalLow { get; set; }
     public decimal? CriticalHigh { get; set; }
     public string? NormalText { get; set; }
+    /// <summary>Update 9: range used only for pregnant patients.</summary>
+    public bool IsPregnancy { get; set; }
 }
 
 public sealed class LabSettingsInput
@@ -229,6 +233,8 @@ public sealed class LabCatalogService : ILabCatalogService
         t.Code = code!; t.Name = name!; t.CategoryId = i.CategoryId; t.SampleTypeId = i.SampleTypeId;
         t.CollectionInstructions = T(i.CollectionInstructions, 500); t.Method = T(i.Method, 100); t.Interpretation = T(i.Interpretation, 1000);
         t.TurnaroundHours = i.TurnaroundHours; t.IsActive = i.IsActive; t.SortOrder = i.SortOrder; t.UpdatedUtc = now;
+        // Update 9: saving a standard-catalogue test after checking it clears the "review required" mark.
+        if (id is not null && t.RequiresReview && i.MarkReviewed) t.RequiresReview = false;
         await _db.SaveChangesAsync(ct);
         _audit.Add(AuditActions.LabTestSaved, "LabTest", t.Code, $"Laboratory test {t.Name} {(id is null ? "created" : "updated")} (definition v{t.DefinitionVersion})",
             old, new { t.Code, t.Name, t.CategoryId, t.SampleTypeId, t.Method, t.IsActive, t.DefinitionVersion });
@@ -285,12 +291,12 @@ public sealed class LabCatalogService : ILabCatalogService
         _db.LabReferenceRanges.Add(new LabReferenceRange
         {
             ParameterId = parameterId, Gender = i.Gender, MinAgeDays = min, MaxAgeDays = max, Low = i.Low, High = i.High,
-            CriticalLow = i.CriticalLow, CriticalHigh = i.CriticalHigh, NormalText = text
+            CriticalLow = i.CriticalLow, CriticalHigh = i.CriticalHigh, NormalText = text, IsPregnancy = i.IsPregnancy && i.Gender != Gender.Male
         });
         p.LabTest!.DefinitionVersion++;
         p.LabTest.UpdatedUtc = _clock.UtcNow;
         _audit.Add(AuditActions.LabTestSaved, "LabTest", p.LabTest.Code,
-            $"Reference range added to {p.LabTest.Name} / {p.Name}: {i.Gender?.ToString() ?? "all"}, {i.Low}–{i.High} {text} (definition v{p.LabTest.DefinitionVersion})");
+            $"Reference range added to {p.LabTest.Name} / {p.Name}: {i.Gender?.ToString() ?? "all"}{(i.IsPregnancy ? " (pregnancy)" : "")}, {i.Low}–{i.High} {text} (definition v{p.LabTest.DefinitionVersion})");
         await _db.SaveChangesAsync(ct);
         return ServiceResult.Ok();
     }
@@ -399,99 +405,84 @@ public sealed class LabCatalogService : ILabCatalogService
             foreach (var u in unlinked) u.DepartmentId = ld;
             await db.SaveChangesAsync(ct);
         }
-        if (await db.LabTests.AnyAsync(ct)) return;
+        await SeedStandardCatalogueAsync(db, now, ct);
+    }
 
-        var cat = await db.LabCategories.ToDictionaryAsync(c => c.Name, c => c.Id, ct);
-        var smp = await db.LabSampleTypes.ToDictionaryAsync(c => c.Code, c => c.Id, ct);
-        var dept = await db.Departments.Where(d => d.Name == "Laboratory").Select(d => (int?)d.Id).FirstOrDefaultAsync(ct);
-        var sort = 0;
-        foreach (var t in StarterCatalogue())
+    /// <summary>
+    /// Update 9: adds the standard catalogue once (version 1) – missing disciplines, sample types and tests. Tests are ACTIVE with price 0
+    /// (the hospital sets the prices in Services &amp; Fees) and marked "review required" for the method-dependent ranges. Existing tests,
+    /// matched by code, by their earlier starter code or by name, are never changed.
+    /// </summary>
+    public static async Task SeedStandardCatalogueAsync(HmsDbContext db, DateTime now, CancellationToken ct = default)
+    {
+        var settings = await db.LabSettings.FirstOrDefaultAsync(ct);
+        if (settings is null || settings.StandardCatalogueVersion >= 1) return;
+
+        var categories = await db.LabCategories.ToListAsync(ct);
+        var sort = categories.Count == 0 ? 0 : categories.Max(c => c.SortOrder);
+        var catId = new Dictionary<string, LabCategory>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, synonyms) in LabStandardCatalogue.Categories)
         {
+            var existing = categories.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase) || synonyms.Any(s => string.Equals(c.Name, s, StringComparison.OrdinalIgnoreCase)));
+            if (existing is null) { existing = new LabCategory { Name = name, SortOrder = sort += 10 }; db.LabCategories.Add(existing); }
+            catId[name] = existing;
+        }
+        var samples = await db.LabSampleTypes.ToListAsync(ct);
+        var ssort = samples.Count == 0 ? 0 : samples.Max(s => s.SortOrder);
+        var smp = new Dictionary<string, LabSampleType>();
+        foreach (var (code, name, container) in LabStandardCatalogue.SampleTypes)
+        {
+            var s = samples.FirstOrDefault(x => x.Code == code);
+            if (s is null) { s = new LabSampleType { Code = code, Name = name, Container = container, SortOrder = ssort += 10 }; db.LabSampleTypes.Add(s); }
+            smp[code] = s;
+        }
+        var codes = (await db.LabTests.Select(t => t.Code).ToListAsync(ct)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var names = (await db.LabTests.Select(t => t.Name).ToListAsync(ct)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var serviceCodes = (await db.ServiceItems.Select(s => s.Code).ToListAsync(ct)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var dept = await db.Departments.Where(d => d.Name == "Laboratory").Select(d => (int?)d.Id).FirstOrDefaultAsync(ct);
+        var tsort = await db.LabTests.MaxAsync(t => (int?)t.SortOrder, ct) ?? 0;
+        foreach (var t in LabStandardCatalogue.Tests())
+        {
+            if (codes.Contains(t.Code) || names.Contains(t.Name) || EarlierStarter.TryGetValue(t.Code, out var old) && codes.Contains(old)) continue;
+            var svcCode = "LT-" + t.Code;
+            if (serviceCodes.Contains(svcCode)) continue;
             var svc = new ServiceItem
             {
-                Code = "LT-" + t.Code, Name = t.Name, Category = EncounterType.ServiceOnly, Kind = ServiceKind.Laboratory, DepartmentId = dept,
-                DefaultFee = 0, IsActive = false, CreatedUtc = now, UpdatedUtc = now, Description = "Laboratory test (starter catalogue)"
+                Code = svcCode, Name = t.Name, Category = EncounterType.ServiceOnly, Kind = ServiceKind.Laboratory, DepartmentId = dept,
+                DefaultFee = 0, IsActive = true, CreatedUtc = now, UpdatedUtc = now, Description = "Laboratory test (standard catalogue) – set the price"
             };
-            if (await db.ServiceItems.AnyAsync(s => s.Code == svc.Code, ct)) continue;
             db.ServiceItems.Add(svc);
-            await db.SaveChangesAsync(ct);
-            db.ServiceFees.Add(new ServiceFee { ServiceItemId = svc.Id, Fee = 0, EffectiveFrom = DateOnly.MinValue, CreatedUtc = now, CreatedByUsername = "SYSTEM", Note = "Starter catalogue – set the price" });
+            db.ServiceFees.Add(new ServiceFee { ServiceItem = svc, Fee = 0, EffectiveFrom = DateOnly.MinValue, CreatedUtc = now, CreatedByUsername = "SYSTEM", Note = "Standard catalogue – set the price" });
             var test = new LabTest
             {
-                Code = t.Code, Name = t.Name, CategoryId = cat[t.Category], SampleTypeId = smp[t.Sample], ServiceItemId = svc.Id, IsActive = false,
-                SortOrder = ++sort * 10, CreatedUtc = now, UpdatedUtc = now, CollectionInstructions = t.Instructions,
-                Interpretation = t.Interpretation
+                Code = t.Code, Name = t.Name, Category = catId[t.Category], SampleType = smp[t.Sample], ServiceItem = svc, IsActive = true, RequiresReview = true,
+                SortOrder = tsort += 10, CreatedUtc = now, UpdatedUtc = now, CollectionInstructions = t.Instructions, Interpretation = t.Interpretation, Method = t.Method,
+                TurnaroundHours = t.Hours
             };
             var ps = 0;
             foreach (var p in t.Parameters)
             {
-                var param = new LabTestParameter { Name = p.Name, Unit = p.Unit, ResultType = p.Type, Options = p.Options, Decimals = p.Decimals, SortOrder = ++ps * 10 };
-                foreach (var r in p.Ranges) param.Ranges.Add(r);
+                var param = new LabTestParameter { Name = p.Name, Unit = p.Unit, ResultType = p.Type, Options = p.Options, Decimals = p.Decimals, IsOptional = p.Optional, SortOrder = ++ps * 10 };
+                foreach (var r in p.Ranges) param.Ranges.Add(new LabReferenceRange
+                {
+                    Gender = r.Gender, MinAgeDays = r.MinAgeDays, MaxAgeDays = r.MaxAgeDays, Low = r.Low, High = r.High, NormalText = r.NormalText, IsPregnancy = r.IsPregnancy
+                });
                 test.Parameters.Add(param);
             }
             db.LabTests.Add(test);
-            await db.SaveChangesAsync(ct);
+            codes.Add(t.Code);
+            names.Add(t.Name);
         }
+        settings.StandardCatalogueVersion = 1;
+        await db.SaveChangesAsync(ct);
     }
 
-    private sealed record StarterParam(string Name, string? Unit, LabResultType Type, int Decimals, LabReferenceRange[] Ranges, string? Options = null);
-    private sealed record StarterTest(string Code, string Name, string Category, string Sample, StarterParam[] Parameters, string? Instructions = null, string? Interpretation = null);
-
-    private static LabReferenceRange R(decimal? low, decimal? high, Gender? g = null, string? text = null) => new() { Low = low, High = high, Gender = g, NormalText = text };
-    private static LabReferenceRange Txt(string text) => new() { NormalText = text };
-    private static StarterParam N(string name, string? unit, int dec, params LabReferenceRange[] r) => new(name, unit, LabResultType.Numeric, dec, r);
-    private static StarterParam PN(string name, string normal = "Negative") => new(name, null, LabResultType.PositiveNegative, 0, new[] { Txt(normal) });
-    private static StarterParam Tx(string name, string? normal) => new(name, null, LabResultType.Text, 0, normal is null ? Array.Empty<LabReferenceRange>() : new[] { Txt(normal) });
-
-    /// <summary>
-    /// Commonly used adult reference intervals as a starting point only. Tests are created INACTIVE and FREE:
-    /// the laboratory must review every range against its own analyser / method, set the price and activate the test.
-    /// </summary>
-    private static IEnumerable<StarterTest> StarterCatalogue()
+    /// <summary>Codes of the earlier (Phase 4) starter tests that the standard catalogue would duplicate.</summary>
+    private static readonly Dictionary<string, string> EarlierStarter = new(StringComparer.OrdinalIgnoreCase)
     {
-        const Gender M = Gender.Male, F = Gender.Female;
-        yield return new("CBC", "Complete Blood Count (CBC)", "Haematology", "BLD", new[]
-        {
-            N("Haemoglobin", "g/dL", 1, R(13.0m, 17.0m, M), R(12.0m, 15.5m, F)),
-            N("Total WBC count", "×10³/µL", 1, R(4.0m, 11.0m)),
-            N("RBC count", "million/µL", 2, R(4.5m, 5.9m, M), R(4.0m, 5.2m, F)),
-            N("Haematocrit (HCT)", "%", 1, R(40m, 52m, M), R(36m, 46m, F)),
-            N("MCV", "fL", 1, R(80m, 100m)),
-            N("MCH", "pg", 1, R(27m, 33m)),
-            N("Platelet count", "×10³/µL", 0, R(150m, 400m)),
-        });
-        yield return new("HB", "Haemoglobin", "Haematology", "BLD", new[] { N("Haemoglobin", "g/dL", 1, R(13.0m, 17.0m, M), R(12.0m, 15.5m, F)) });
-        yield return new("BSR", "Blood Sugar (Random)", "Biochemistry", "PLS", new[] { N("Glucose (random)", "mg/dL", 0, R(70m, 140m)) });
-        yield return new("BSF", "Blood Sugar (Fasting)", "Biochemistry", "PLS", new[] { N("Glucose (fasting)", "mg/dL", 0, R(70m, 100m)) }, "8–10 hours fasting.");
-        yield return new("HBA1C", "HbA1c", "Biochemistry", "BLD", new[] { N("HbA1c", "%", 1, R(4.0m, 5.6m)) }, null,
-            "5.7–6.4 %: increased risk (pre-diabetes); ≥ 6.5 %: consistent with diabetes.");
-        yield return new("LFT", "Liver Function Tests (LFT)", "Biochemistry", "SER", new[]
-        {
-            N("Bilirubin (total)", "mg/dL", 2, R(0.1m, 1.2m)), N("ALT (SGPT)", "U/L", 0, R(7m, 56m)), N("AST (SGOT)", "U/L", 0, R(10m, 40m)),
-            N("Alkaline phosphatase", "U/L", 0, R(44m, 147m)), N("Albumin", "g/dL", 1, R(3.5m, 5.0m)),
-        });
-        yield return new("RFT", "Renal Function Tests (RFT)", "Biochemistry", "SER", new[]
-        {
-            N("Blood urea", "mg/dL", 0, R(15m, 45m)), N("Serum creatinine", "mg/dL", 2, R(0.7m, 1.3m, M), R(0.6m, 1.1m, F)),
-            N("Uric acid", "mg/dL", 1, R(3.4m, 7.0m, M), R(2.4m, 6.0m, F)),
-        });
-        yield return new("LIPID", "Lipid Profile", "Biochemistry", "SER", new[]
-        {
-            N("Total cholesterol", "mg/dL", 0, R(null, 200m)), N("Triglycerides", "mg/dL", 0, R(null, 150m)),
-            N("HDL cholesterol", "mg/dL", 0, R(40m, null, M), R(50m, null, F)), N("LDL cholesterol", "mg/dL", 0, R(null, 100m)),
-        }, "10–12 hours fasting.");
-        yield return new("URE", "Urine R/E", "Clinical Pathology", "URN", new[]
-        {
-            Tx("Colour", "Pale yellow"), Tx("Appearance", "Clear"), N("pH", null, 1, R(4.5m, 8.0m)), N("Specific gravity", null, 3, R(1.005m, 1.030m)),
-            PN("Protein"), PN("Glucose"), Tx("Pus cells", "0–5 /HPF"), Tx("Red blood cells", "0–2 /HPF"), Tx("Epithelial cells", "Few"),
-        }, "Early-morning midstream sample.");
-        yield return new("SRE", "Stool R/E", "Clinical Pathology", "STL", new[]
-        {
-            Tx("Consistency", "Formed"), PN("Occult blood"), Tx("Ova / cysts", "Not seen"), Tx("Pus cells", "Nil"),
-        });
-        yield return new("TFT", "Thyroid Profile", "Endocrinology", "SER", new[]
-        {
-            N("TSH", "µIU/mL", 2, R(0.4m, 4.0m)), N("Free T4", "ng/dL", 2, R(0.8m, 1.8m)), N("Free T3", "pg/mL", 2, R(2.3m, 4.2m)),
-        });
-    }
+        ["CBC-FULL"] = "CBC", ["RBS"] = "BSR", ["FBS"] = "BSF", ["HBA1C-H"] = "HBA1C", ["LFT-FULL"] = "LFT", ["RFT-FULL"] = "RFT", ["LIPID-FULL"] = "LIPID",
+        ["UCE"] = "URE", ["SCE"] = "SRE", ["TFT-FULL"] = "TFT",
+    };
+
+
 }

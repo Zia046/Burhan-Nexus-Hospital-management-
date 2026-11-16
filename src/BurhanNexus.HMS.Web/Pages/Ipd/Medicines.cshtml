@@ -1,0 +1,73 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Ipd.MedicinesModel
+@{
+    ViewData["Title"] = "Medicine request";
+    var a = Model.A;
+}
+<partial name="_IpdNav" />
+<div class="page-header">
+    <div><h1>Medicine request to pharmacy</h1>
+        <p class="muted">@a.Patient?.FullName · @a.Patient?.PatientNumber · @a.AdmissionNumber · @(a.CurrentWard?.Name ?? "—") @(a.CurrentBed?.Code)</p></div>
+    <a class="btn btn-light" href="/Ipd/Admission/@a.Id">Back to admission</a>
+</div>
+<partial name="_ValidationSummary" />
+
+@if (Model.Active)
+{
+    <form method="post" class="card" novalidate data-medicine-request>
+        <div class="card-header"><h2>New request</h2><span class="muted small">Nothing is taken from stock until the pharmacy issues.</span></div>
+        <input type="hidden" name="Input.IdempotencyKey" value="@Model.Input.IdempotencyKey" />
+        <div class="form-grid">
+            <div class="field"><label for="prio">Priority</label>
+                <select id="prio" name="Input.Priority"><option value="Routine">Routine</option><option value="Urgent" selected="@(Model.Input.Priority == MedicineRequestPriority.Urgent)">Urgent</option></select></div>
+            <div class="field span-2"><label for="notes">Notes</label><input id="notes" name="Input.Notes" value="@Model.Input.Notes" maxlength="500" /></div>
+        </div>
+        <table class="table table-compact" data-request-lines>
+            <thead><tr><th>Medicine</th><th>Quantity</th><th>Instructions</th></tr></thead>
+            <tbody>
+            @for (var i = 0; i < BurhanNexus.HMS.Web.Pages.Ipd.MedicinesModel.Rows; i++)
+            {
+                var line = i < Model.Input.Lines.Count ? Model.Input.Lines[i] : null;
+                <tr>
+                    <td><select name="Input.Lines[@i].MedicineId" aria-label="Medicine"><option value="0">—</option>
+                        @foreach (var m in Model.Medicines) { <option value="@m.Id" selected="@(line?.MedicineId == m.Id)">@m.Name</option> }</select></td>
+                    <td><input name="Input.Lines[@i].Quantity" type="number" min="1" max="10000" class="w-xs" value="@(line is { Quantity: > 0 } ? (int?)line.Quantity : null)" aria-label="Quantity" /></td>
+                    <td><input name="Input.Lines[@i].Instructions" maxlength="300" value="@(line?.Instructions)" aria-label="Instructions" /></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        <div class="form-actions"><button class="btn btn-primary" data-test="mrq-send">Send to pharmacy</button></div>
+    </form>
+}
+else
+{
+    <div class="alert alert-info">The patient is not admitted any more – new medicine requests cannot be made.</div>
+}
+
+<div class="card">
+    <div class="card-header"><h2>Requests for this admission</h2></div>
+    @if (Model.Requests.Count == 0) { <p class="muted">No medicine requests yet.</p> }
+    @foreach (var r in Model.Requests)
+    {
+        <div class="mrq" data-mrq="@r.Number">
+            <h3><span class="mono">@r.Number</span> <span class="status mrq-@r.Status.ToString().ToLowerInvariant()" data-mrq-status>@r.Status</span>
+                @if (r.Priority == MedicineRequestPriority.Urgent) { <span class="status status-warn">Urgent</span> }
+                <small class="muted">@Fmt.DateTimeText(r.RequestedUtc) · @r.RequestedBy</small></h3>
+            @if (Model.Details.TryGetValue(r.Id, out var d))
+            {
+                <table class="table table-compact">
+                    <thead><tr><th>Medicine</th><th class="num">Requested</th><th class="num">Issued</th><th>Status</th><th>Pharmacy note</th></tr></thead>
+                    <tbody>@foreach (var l in d.Lines) { <tr data-mrq-line="@l.MedicineName"><td>@l.MedicineName</td><td class="num">@l.Quantity</td><td class="num">@l.IssuedQuantity</td><td>@l.Status</td><td>@l.DecisionNote</td></tr> }</tbody>
+                </table>
+            }
+            @if (r.Status is MedicineRequestStatus.Pending or MedicineRequestStatus.Approved or MedicineRequestStatus.PartlyIssued)
+            {
+                <form method="post" asp-page-handler="Cancel" asp-route-requestId="@r.Id" class="inline-form" novalidate>
+                    <input name="Reason" maxlength="300" placeholder="Reason for cancelling" aria-label="Reason" />
+                    <button class="btn btn-light btn-sm" data-test="mrq-cancel">Cancel remaining</button>
+                </form>
+            }
+        </div>
+    }
+</div>

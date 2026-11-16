@@ -13,10 +13,15 @@
             @foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(Model.DoctorId == d.Id)">@d.Name</option> }</select>
         <select name="status" aria-label="Status">
             <option value="">All statuses</option>
-            <option value="active" selected="@(Model.Status == "active")">Active (booked + seen)</option>
-            <option value="booked" selected="@(Model.Status == "booked")">Waiting</option>
-            <option value="seen" selected="@(Model.Status == "seen")">Seen</option>
+            <option value="active" selected="@(Model.Status == "active")">Booked (not cancelled)</option>
             <option value="cancelled" selected="@(Model.Status == "cancelled")">Cancelled</option>
+        </select>
+        <select name="payment" aria-label="Fee">
+            <option value="">All fees</option>
+            <option value="paid" selected="@(Model.Payment == "paid")">Paid</option>
+            <option value="free" selected="@(Model.Payment == "free")">Free (incl. by doctor)</option>
+            <option value="freebydoctor" selected="@(Model.Payment == "freebydoctor")">Free by Doctor</option>
+            <option value="notrecorded" selected="@(Model.Payment == "notrecorded")">Fee not recorded</option>
         </select>
         <button class="btn btn-light" type="submit">Show</button>
         <a class="btn btn-light" href="/Appointments?date=@date.AddDays(-1).ToString("yyyy-MM-dd")" title="Previous day">&lsaquo;</a>
@@ -36,11 +41,11 @@
         <a class="appt-doc-card" href="#doc-@s.DoctorId" data-doctor-total="@s.DoctorId">
             <strong>@s.DoctorName</strong>
             <small>@s.Specialty</small>
-            <span class="appt-nums"><b>@s.Active</b> active · @s.Booked waiting · @s.Seen seen · @s.Cancelled cancelled</span>
+            <span class="appt-nums"><b>@s.Booked</b> booked · @s.Paid paid · @(s.Free + s.FreeByDoctor) free · @s.Cancelled cancelled</span>
         </a>
     }
     <div class="appt-doc-card total"><strong>@Fmt.Day(date)</strong><small>All doctors</small>
-        <span class="appt-nums"><b>@Model.Stats.Sum(s => s.Active)</b> active · @Model.Stats.Sum(s => s.Cancelled) cancelled</span></div>
+        <span class="appt-nums"><b>@Model.Stats.Sum(s => s.Booked)</b> booked · @Model.Stats.Sum(s => s.Cancelled) cancelled</span></div>
 </div>
 
 @foreach (var g in groups)
@@ -52,7 +57,7 @@
         </div>
         <div class="table-wrap">
             <table class="table table-compact">
-                <thead><tr><th>Token</th><th>Appt. no.</th><th>Patient ID</th><th>Patient</th><th>Age / Gender</th><th>Mobile</th>@if (Model.ShowFees) { <th class="num">Fee</th> }<th>Status</th><th>Slip</th><th></th></tr></thead>
+                <thead><tr><th>Token</th><th>Appt. no.</th><th>Patient ID</th><th>Patient</th><th>Age / Gender</th><th>Mobile</th>@if (Model.ShowFees) { <th class="num">Fee</th><th>Payment</th> }<th>Status</th><th>Slip</th><th></th></tr></thead>
                 <tbody>
                 @foreach (var a in g)
                 {
@@ -63,7 +68,7 @@
                         <td><strong>@a.PatientName</strong>@if (a.GuardianName is not null) { <small class="muted block">@a.GuardianName</small> }</td>
                         <td class="nowrap">@a.AgeText · @a.Gender</td>
                         <td>@a.MobileNumber</td>
-                        @if (Model.ShowFees) { <td class="num nowrap">@(a.ConsultationFee is decimal f ? Fmt.Money(f) : "—")</td> }
+                        @if (Model.ShowFees) { <td class="num nowrap">@(a.ConsultationFee is decimal f ? Fmt.Money(f) : "—")</td><td><partial name="_PayStatus" model="a.PaymentStatus" /></td> }
                         <td><partial name="_ApptStatus" model="a.Status" /></td>
                         <td>@if (a.PrintCount > 0) { <span class="status status-ok">@a.PrintCount×</span> } else { <span class="status status-warn">No</span> }</td>
                         <td class="actions nowrap">

@@ -92,6 +92,15 @@
                             <tr class="@(v.Flag != LabFlag.None ? "abn" : "")"><td>@v.Name</td><td class="val">@v.Value</td>
                                 <td class="flag">@(v.Flag switch { LabFlag.High => "H", LabFlag.Low => "L", LabFlag.CriticalHigh => "HH", LabFlag.CriticalLow => "LL", LabFlag.Abnormal => "*", _ => "" })</td>
                                 <td>@v.Unit</td><td>@v.ReferenceDisplay</td></tr>
+                            @if (v.ResultType == LabResultType.Culture && Model.CultureLines.TryGetValue(v.Id, out var sens) && sens.Count > 0)
+                            {
+                                <tr class="lr-sens-row"><td colspan="5">
+                                    <table class="lr-sens" data-sensitivity>
+                                        <thead><tr><th>Organism</th><th>Antibiotic</th><th>Result</th><th>MIC / zone</th></tr></thead>
+                                        <tbody>@foreach (var sl in sens.OrderBy(x => x.Organism).ThenBy(x => x.Interpretation).ThenBy(x => x.Antibiotic)) { <tr><td>@sl.Organism</td><td>@sl.Antibiotic</td><td class="sens-@sl.Interpretation.ToString().ToLowerInvariant()">@sl.Interpretation</td><td>@sl.Mic</td></tr> }</tbody>
+                                    </table>
+                                </td></tr>
+                            }
                         }
                         </tbody>
                     </table>

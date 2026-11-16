@@ -25,6 +25,9 @@
             <tr><td>Date</td><td data-field="date">@s.DateText</td></tr>
             @if (s.TimeText is not null) { <tr><td>Time</td><td>@s.TimeText</td></tr> }
             @if (s.FeeText is not null) { <tr class="fee"><td>Consultation fee</td><td>@s.FeeText</td></tr> }
+            @if (s.PaymentText is not null) { <tr class="fee" data-field="payment"><td>Payment</td><td><strong>@s.PaymentText</strong></td></tr> }
+            @if (s.PaymentMethod is not null) { <tr><td>Paid by</td><td data-field="method">@s.PaymentMethod</td></tr> }
+            @if (s.ReceiptNumber is not null) { <tr><td>Receipt no.</td><td data-field="receipt">@s.ReceiptNumber</td></tr> }
             <tr><td>Appt. no.</td><td>@s.AppointmentNumber</td></tr>
         </table>
         <div class="t-sep"></div>

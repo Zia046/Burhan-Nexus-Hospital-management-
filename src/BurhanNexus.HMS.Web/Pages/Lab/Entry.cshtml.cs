@@ -21,6 +21,28 @@ public class EntryModel : HmsPageModel
     [BindProperty] public string? Comment { get; set; }
     [BindProperty] public uint RowVersion { get; set; }
     [BindProperty] public string? Mode { get; set; }
+    /// <summary>Update 9: antibiotic sensitivity lines of culture parameters.</summary>
+    [BindProperty] public List<CultureRow> Culture { get; set; } = new();
+    public Dictionary<long, List<LabCultureResult>> CultureLines { get; private set; } = new();
+    /// <summary>Running index of the culture rows while the page renders.</summary>
+    public int CultureIndex { get; set; }
+
+    public sealed class CultureRow
+    {
+        public long ValueId { get; set; }
+        public string? Organism { get; set; }
+        public string? Antibiotic { get; set; }
+        public SensitivityResult? Result { get; set; }
+        public string? Mic { get; set; }
+    }
+
+    /// <summary>Common organisms and antibiotics offered as suggestions (free text is allowed).</summary>
+    public static readonly string[] Organisms = { "No growth", "Escherichia coli", "Klebsiella pneumoniae", "Pseudomonas aeruginosa", "Staphylococcus aureus", "MRSA",
+        "Coagulase-negative Staphylococcus", "Enterococcus faecalis", "Streptococcus pyogenes", "Streptococcus pneumoniae", "Proteus mirabilis", "Acinetobacter baumannii",
+        "Enterobacter spp.", "Salmonella Typhi", "Salmonella Paratyphi A", "Shigella spp.", "Candida albicans", "Candida spp.", "Mixed growth (contamination)" };
+    public static readonly string[] Antibiotics = { "Amikacin", "Amoxicillin-clavulanate", "Ampicillin", "Azithromycin", "Aztreonam", "Cefepime", "Cefixime", "Cefotaxime",
+        "Ceftazidime", "Ceftriaxone", "Cefuroxime", "Ciprofloxacin", "Clindamycin", "Colistin", "Co-trimoxazole", "Doxycycline", "Erythromycin", "Fosfomycin", "Gentamicin",
+        "Imipenem", "Levofloxacin", "Linezolid", "Meropenem", "Nitrofurantoin", "Oxacillin / Cefoxitin", "Penicillin", "Piperacillin-tazobactam", "Teicoplanin", "Tigecycline", "Vancomycin" };
 
     public LabOrder Order { get; private set; } = null!;
     public LabOrderItem? Current { get; private set; }
@@ -43,6 +65,16 @@ public class EntryModel : HmsPageModel
               ?? o.Items.FirstOrDefault(i => LabService.OpenStatuses.Contains(i.Status))
               ?? o.Items.FirstOrDefault(i => i.Status == LabOrderItemStatus.AwaitingVerification)
               ?? o.Items.FirstOrDefault();
+        if (Current is not null)
+        {
+            var ids = Current.Values.Where(v => v.ResultType == LabResultType.Culture).Select(v => v.Id).ToList();
+            if (ids.Count > 0)
+            {
+                var db = HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Persistence.HmsDbContext>();
+                CultureLines = (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(db.LabCultureResults.Where(c => ids.Contains(c.ResultValueId)).OrderBy(c => c.SortOrder)))
+                    .GroupBy(c => c.ResultValueId).ToDictionary(g => g.Key, g => g.ToList());
+            }
+        }
         if (Current is not null && !Values.Any())
         {
             Values = Current.Values.ToDictionary(v => v.Id, v => v.Value);
@@ -64,7 +96,8 @@ public class EntryModel : HmsPageModel
         if (item is null || item.LabOrderId != id) return NotFound();
         if (await DenyUnlessAsync(RequiredPermission(item)) is { } deny) return deny;
         var submit = Mode is "submit" or "next";
-        var r = await _lab.SaveResultAsync(item.Id, Values, Comment, submit, RowVersion);
+        var culture = Culture.Select(c => new CultureLineInput(c.ValueId, c.Organism, c.Antibiotic, c.Result, c.Mic)).ToList();
+        var r = await _lab.SaveResultAsync(item.Id, Values, culture, Comment, submit, RowVersion);
         if (!r.Succeeded)
         {
             await LoadAsync(id);

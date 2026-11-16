@@ -73,13 +73,14 @@ else
                     <div class="alert alert-danger"><svg class="icon"><use href="#i-alert" /></svg><div>This patient record is @p.Status.ToString().ToLowerInvariant(). An appointment cannot be booked.</div></div>
                 }
                 <input type="hidden" name="PatientId" value="@p.Id" />
+                <input type="hidden" name="Input.IdempotencyKey" value="@Model.Input.IdempotencyKey" />
                 <div class="field">
                     <label>Doctor <em>*</em></label>
                     <div class="doctor-picker" role="radiogroup">
                         @foreach (var d in Model.Doctors)
                         {
                             <label class="doctor-choice">
-                                <input type="radio" name="Input.DoctorId" value="@d.DoctorId" checked="@(Model.Input.DoctorId == d.DoctorId)" required />
+                                <input type="radio" name="Input.DoctorId" value="@d.DoctorId" checked="@(Model.Input.DoctorId == d.DoctorId)" required data-fee="@(d.Fee ?? 0)" />
                                 <span class="dc-body">
                                     <strong>@d.DoctorName</strong>
                                     <small>@(d.Specialty ?? "—")</small>
@@ -114,10 +115,40 @@ else
                     </div>
                 </div>
                 @if (date != Model.Today) { <p class="muted small">Next-token numbers above are for @Fmt.Day(date).</p> }
+                <fieldset class="fee-box" data-fee-box>
+                    <legend>Consultation fee</legend>
+                    <p class="fee-line">Fee of the selected doctor: <strong data-fee-amount data-currency="@(Fmt.Money(0).Split(' ')[0])">@(Model.Doctors.FirstOrDefault(d => d.DoctorId == Model.Input.DoctorId)?.Fee is decimal sf ? Fmt.Money(sf) : "—")</strong>
+                        <small class="muted">– collected now; the token slip is the patient's receipt (no separate fee receipt).</small></p>
+                    @if (Model.CanCollect)
+                    {
+                        <div class="grid-3">
+                            <div class="field"><label for="Input_PaymentMethodId">Payment method</label><select id="Input_PaymentMethodId" name="Input.PaymentMethodId">@foreach (var m in Model.Methods) { <option value="@m.Id" selected="@(Model.Input.PaymentMethodId == m.Id)">@m.Name</option> }</select></div>
+                            @if (Model.Counters.Count > 1)
+                            {
+                                <div class="field"><label for="Input_CounterId">Cash counter</label><select id="Input_CounterId" name="Input.CounterId">@foreach (var c in Model.Counters) { <option value="@c.Id" selected="@(Model.Input.CounterId == c.Id)">@c.Name</option> }</select></div>
+                            }
+                            else if (Model.Counters.Count == 1) { <input type="hidden" name="Input.CounterId" value="@Model.Counters[0].Id" /><div class="field"><label>Cash counter</label><p>@Model.Counters[0].Name</p></div> }
+                            else { <p class="text-warning small">You are not assigned to a cash counter – ask the administrator (Finance → Counters).</p> }
+                            <div class="field"><label for="Input_PaymentReference">Reference (bank / card)</label><input id="Input_PaymentReference" name="Input.PaymentReference" value="@Model.Input.PaymentReference" maxlength="100" /></div>
+                        </div>
+                    }
+                    else { <p class="text-warning small">You may book only free consultations – collecting the fee needs “Collect Consultation Fee”.</p> }
+                    @if (Model.CanMarkFree)
+                    {
+                        <details class="free-box" data-free-by-doctor open="@(Model.Input.Payment == "FreeByDoctor")">
+                            <summary>Free by Doctor (the doctor waived the fee)</summary>
+                            <div class="grid-2">
+                                <div class="field"><label for="Input_WaiverDoctorId">Waived by doctor</label><select id="Input_WaiverDoctorId" name="Input.WaiverDoctorId"><option value="">The selected doctor</option>@foreach (var d in Model.Doctors) { <option value="@d.DoctorId" selected="@(Model.Input.WaiverDoctorId == d.DoctorId)">@d.DoctorName</option> }</select></div>
+                                <div class="field"><label for="Input_WaiverReason">Reason *</label><input id="Input_WaiverReason" name="Input.WaiverReason" value="@Model.Input.WaiverReason" maxlength="300" placeholder="e.g. poor patient, staff family (doctor's instruction)" /></div>
+                            </div>
+                            <button class="btn btn-light" type="submit" name="Input.Payment" value="FreeByDoctor" data-test="appt-save-free" disabled="@(p.Status != PatientStatus.Active || !Model.IsPrivate)">Save as FREE by Doctor &amp; print token</button>
+                        </details>
+                    }
+                </fieldset>
             </div>
             <div class="card-footer form-actions">
                 <a class="btn btn-light" href="/Appointments/Book">Change patient</a>
-                <button class="btn btn-primary btn-lg" type="submit" data-test="appt-save" disabled="@(p.Status != PatientStatus.Active || !Model.IsPrivate)"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Save &amp; print token</button>
+                <button class="btn btn-primary btn-lg" type="submit" name="Input.Payment" value="Paid" data-test="appt-save" data-once disabled="@(p.Status != PatientStatus.Active || !Model.IsPrivate)"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Fee received – save &amp; print token</button>
             </div>
         </form>
         <div class="stack">
@@ -141,7 +172,7 @@ else
                     <ul class="activity">
                         @foreach (var v in Model.Recent)
                         {
-                            <li><span class="activity-dot"></span><div><strong>@Fmt.Day(v.AppointmentDate) · Token @v.TokenNumber</strong><small>@v.DoctorName · @v.Status</small></div></li>
+                            <li><span class="activity-dot"></span><div><strong>@Fmt.Day(v.AppointmentDate) · Token @v.TokenNumber</strong><small>@v.DoctorName · @(v.Status == AppointmentStatus.Cancelled ? "Cancelled" : "Booked")</small></div></li>
                         }
                     </ul>
                 </div>

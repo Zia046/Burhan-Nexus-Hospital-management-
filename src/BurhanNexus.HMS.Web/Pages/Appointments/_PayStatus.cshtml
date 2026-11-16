@@ -1,0 +1,8 @@
+@model AppointmentPayment
+@switch (Model)
+{
+    case AppointmentPayment.Paid: <span class="pay-badge pay-paid" data-pay="Paid">PAID</span> break;
+    case AppointmentPayment.Free: <span class="pay-badge pay-free" data-pay="Free">FREE</span> break;
+    case AppointmentPayment.FreeByDoctor: <span class="pay-badge pay-waived" data-pay="FreeByDoctor">FREE BY DOCTOR</span> break;
+    default: <span class="pay-badge pay-none" data-pay="NotRecorded">fee not recorded</span> break;
+}

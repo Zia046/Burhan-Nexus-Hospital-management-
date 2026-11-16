@@ -35,6 +35,8 @@ public class LabReportModel : HmsPageModel
     public HospitalProfile Hospital { get; private set; } = null!;
     public IReadOnlyList<LabOrderItem> Final { get; private set; } = Array.Empty<LabOrderItem>();
     public IReadOnlyList<LabOrderItem> Selected { get; private set; } = Array.Empty<LabOrderItem>();
+    /// <summary>Update 9: antibiotic sensitivity lines of culture results.</summary>
+    public Dictionary<long, List<LabCultureResult>> CultureLines { get; private set; } = new();
     public IReadOnlyList<LabOrderItem> NotReady { get; private set; } = Array.Empty<LabOrderItem>();
     public IReadOnlyList<LabReportPrint> Prints { get; private set; } = Array.Empty<LabReportPrint>();
     public bool IsReprint => Selected.Any(i => i.Status == LabOrderItemStatus.Released);
@@ -56,6 +58,13 @@ public class LabReportModel : HmsPageModel
         Prints = await _lab.PrintsAsync(id);
         Final = o.Items.Where(IsFinal).OrderBy(i => i.SortOrder).ToList();
         Selected = wanted.Count == 0 ? Final : Final.Where(i => wanted.Contains(i.Id)).ToList();
+        var cultureIds = Selected.SelectMany(i => i.Values).Where(v => v.ResultType == LabResultType.Culture).Select(v => v.Id).ToList();
+        if (cultureIds.Count > 0)
+        {
+            var db = HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Persistence.HmsDbContext>();
+            CultureLines = (await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(db.LabCultureResults.Where(c => cultureIds.Contains(c.ResultValueId)).OrderBy(c => c.SortOrder)))
+                .GroupBy(c => c.ResultValueId).ToDictionary(g => g.Key, g => g.ToList());
+        }
         NotReady = o.Items.Where(i => !IsFinal(i) && i.Status != LabOrderItemStatus.Cancelled).ToList();
         CanPrintNow = Selected.Count > 0 && await CanAsync(IsReprint ? Perm.LabReprintReports : Perm.LabPrintReports);
         if (Selected.Count > 0 && Lab.RequirePaymentBeforeRelease)

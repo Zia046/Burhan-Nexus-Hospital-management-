@@ -23,6 +23,10 @@ public class DetailsModel : HmsPageModel
     [BindProperty] public EditAppointmentInput Edit { get; set; } = new();
     [BindProperty] public uint RowVersion { get; set; }
     [BindProperty] public string? CancelReason { get; set; }
+    [BindProperty] public WaiverInput Waiver { get; set; } = new();
+    public IReadOnlyList<Doctor> Doctors { get; private set; } = Array.Empty<Doctor>();
+    public IReadOnlyList<PaymentMethod> Methods { get; private set; } = Array.Empty<PaymentMethod>();
+    public Refund? WaiverRefund { get; private set; }
 
     private async Task<bool> LoadAsync(long id)
     {
@@ -31,6 +35,10 @@ public class DetailsModel : HmsPageModel
         if (a is null) return false;
         Appointment = a;
         Settings = await _setup.GetSettingsAsync();
+        var db = HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Persistence.HmsDbContext>();
+        Doctors = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(db.Doctors.Where(d => d.IsActive).OrderBy(d => d.Name));
+        Methods = await HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Finance.IFinanceSetupService>().PaymentMethodsAsync(activeOnly: true);
+        if (a.WaiverRefundId is long rf) WaiverRefund = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(db.Refunds.Where(x => x.Id == rf));
         return true;
     }
 
@@ -64,11 +72,15 @@ public class DetailsModel : HmsPageModel
         return Page();
     }
 
-    public async Task<IActionResult> OnPostSeenAsync(long id)
+    public async Task<IActionResult> OnPostFreeAsync(long id)
     {
-        if (await DenyUnlessAsync(Perm.AppointmentsEdit) is { } deny) return deny;
-        var r = await _appointments.MarkSeenAsync(id);
-        if (r.Succeeded) FlashSuccess = "Marked as seen."; else FlashError = r.ErrorText;
-        return RedirectToPage(new { id });
+        if (await DenyUnlessAsync(Perm.AppointmentsFreeByDoctor) is { } deny) return deny;
+        var r = await _appointments.MarkFreeByDoctorAsync(id, Waiver);
+        if (r.Succeeded) { FlashSuccess = "Recorded as Free by Doctor."; return RedirectToPage(new { id }); }
+        if (!await LoadAsync(id)) return NotFound();
+        Edit = new EditAppointmentInput { AppointmentTime = Appointment.AppointmentTime, Complaint = Appointment.Complaint, Notes = Appointment.Notes };
+        RowVersion = Appointment.RowVersion;
+        AddErrors(r);
+        return Page();
     }
 }

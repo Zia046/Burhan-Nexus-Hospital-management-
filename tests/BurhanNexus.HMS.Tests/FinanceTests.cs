@@ -708,45 +708,142 @@ public partial class FinanceTests : Phase2TestBase
     }
 
     [Fact]
-    public async Task Appointment_and_opd_visits_can_be_billed_without_changing_tokens()
+    public async Task Appointment_fee_is_collected_at_booking_once_and_the_token_slip_is_the_receipt()
     {
         await SetupAsync("Private");
         var admin = await LoginAdminAsync();
         var counter = await CounterAsync(admin, "OPD", "OPD Counter");
         var doc = await DoctorAsync(admin, "Dr. Billing Link", "HospitalCommissionPercent", 20, 900);
         var pid = await RegisterPatientAsync(admin, PatientFields("Billing Link Patient", "Link Father"));
-        var book = await admin.PostFormAsync($"/Appointments/Book?patientId={pid}", new[] { P("Input.DoctorId", doc.ToString()) });
+        var cash = await MethodAsync("CASH");
+        // Booking without settling the fee is refused (nothing is recorded as paid unless it was received).
+        var refused = await admin.PostFormAsync($"/Appointments/Book?patientId={pid}", new[] { P("Input.DoctorId", doc.ToString()), P("Input.IdempotencyKey", Guid.NewGuid().ToString()) });
+        Assert.Contains("received", Errors(await refused.Content.ReadAsStringAsync()));
+        var key = Guid.NewGuid().ToString();
+        var fields = new[] { P("Input.DoctorId", doc.ToString()), P("Input.IdempotencyKey", key), P("Input.Payment", "Paid"), P("Input.CounterId", counter.ToString()), P("Input.PaymentMethodId", cash.ToString()) };
+        var book = await admin.PostFormAsync($"/Appointments/Book?patientId={pid}", fields);
         Assert.Equal(HttpStatusCode.Redirect, book.StatusCode);
+        // A double click returns the same appointment – no second token, no second payment.
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Appointments/Book?patientId={pid}", fields)).StatusCode);
         Appointment appt;
-        await using (var db = Factory.NewDb()) appt = await db.Appointments.SingleAsync();
-        Assert.Equal(1, appt.TokenNumber);
-        Assert.Contains("Collect fee", await admin.GetHtmlAsync($"/Appointments/Details/{appt.Id}"));
-
-        var form = await admin.GetHtmlAsync($"/Finance/Collect?encounterId={appt.EncounterId}");
-        Assert.Contains("Visit OPD-", form);
-        Assert.Contains("Billing Link Patient", form);
-        var token = await admin.TokenAsync($"/Finance/Collect?encounterId={appt.EncounterId}");
-        int consult;
-        await using (var db = Factory.NewDb()) consult = await db.ServiceItems.Where(s => s.DoctorId == doc).Select(s => s.Id).SingleAsync();
-        Assert.Contains($"value=\"{consult}\" data-fee=\"900.00\"", form);
-        var r = await admin.Http.PostAsync("/Finance/Collect", new FormUrlEncodedContent(new[]
-        {
-            P("__RequestVerificationToken", token), P("Input.IdempotencyKey", Guid.NewGuid().ToString()), P("Input.CounterId", counter.ToString()),
-            P("Input.PaymentMethodId", (await MethodAsync("CASH")).ToString()), P("PatientId", pid.ToString()), P("EncounterId", appt.EncounterId.ToString()),
-            P("Lines[0].ServiceItemId", consult.ToString()), P("Lines[0].DoctorId", doc.ToString()), P("Lines[0].EncounterId", appt.EncounterId.ToString()),
-        }));
-        var rid = await ReceiptIdAsync(r);
         await using (var db = Factory.NewDb())
         {
+            appt = await db.Appointments.SingleAsync();
+            Assert.Equal((1, AppointmentPayment.Paid, 900m, "Cash"), (appt.TokenNumber, appt.PaymentStatus, appt.AmountPaid!.Value, appt.PaymentMethodName));
             var charge = await db.Charges.SingleAsync();
-            Assert.Equal(appt.EncounterId, charge.EncounterId);
-            Assert.Equal(720m, charge.DoctorShareAmount);
-            Assert.Equal(1, (await db.Appointments.SingleAsync()).TokenNumber);
+            Assert.Equal((appt.EncounterId, appt.ChargeId!.Value, 720m, ChargeStatus.Paid), (charge.EncounterId!.Value, charge.Id, charge.DoctorShareAmount, charge.Status));
+            Assert.Equal(1, await db.Receipts.CountAsync());
         }
         Assert.Equal(720m, await DoctorPayableAsync(doc));
-        Assert.Contains("already billed", await admin.GetHtmlAsync($"/Finance/Collect?encounterId={appt.EncounterId}"));
-        Assert.Contains("Dr. Billing Link", await admin.GetHtmlAsync($"/Print/Receipt/{rid}"));
-        // The thermal appointment slip is unchanged.
-        Assert.Contains("TOKEN NO.", await admin.GetHtmlAsync($"/Print/Appointment/{appt.Id}"));
+        Assert.DoesNotContain("data-test=\"appt-collect\"", await admin.GetHtmlAsync($"/Appointments/Details/{appt.Id}"));
+
+        // The cashier cannot collect the same consultation fee again.
+        int consult;
+        await using (var db = Factory.NewDb()) consult = await db.ServiceItems.Where(s => s.DoctorId == doc).Select(s => s.Id).SingleAsync();
+        var token = await admin.TokenAsync($"/Finance/Collect?encounterId={appt.EncounterId}");
+        var again = await admin.Http.PostAsync("/Finance/Collect", new FormUrlEncodedContent(new[]
+        {
+            P("__RequestVerificationToken", token), P("Input.IdempotencyKey", Guid.NewGuid().ToString()), P("Input.CounterId", counter.ToString()),
+            P("Input.PaymentMethodId", cash.ToString()), P("PatientId", pid.ToString()), P("EncounterId", appt.EncounterId.ToString()),
+            P("Lines[0].ServiceItemId", consult.ToString()), P("Lines[0].DoctorId", doc.ToString()), P("Lines[0].EncounterId", appt.EncounterId.ToString()),
+        }));
+        Assert.Contains("already collected at booking", Errors(await again.Content.ReadAsStringAsync()));
+        Assert.Single(await AuditAsync(AuditActions.ConsultationFeeDuplicateBlocked));
+
+        // The token slip shows fee, PAID, method and receipt; printing / reprinting creates no financial record.
+        var slip = await admin.GetHtmlAsync($"/Print/Appointment/{appt.Id}");
+        Assert.Contains("TOKEN NO.", slip);
+        Assert.Contains("PAID", slip);
+        Assert.Contains("data-field=\"method\">Cash", slip);
+        Assert.Contains("RCP-", slip);
+        await admin.GetHtmlAsync($"/Print/Appointment/{appt.Id}");
+        await using (var db = Factory.NewDb())
+        {
+            Assert.Equal(1, await db.Receipts.CountAsync());
+            Assert.Equal(1, await db.Charges.CountAsync());
+            Assert.Equal(1, await db.CashierLedger.CountAsync());
+        }
+    }
+
+    [Fact]
+    public async Task Free_by_doctor_waives_the_fee_in_the_doctor_account_without_a_duplicate_refund()
+    {
+        await SetupAsync("Private");
+        var admin = await LoginAdminAsync();
+        var counter = await CounterAsync(admin, "OPD", "OPD Counter");
+        var doc = await DoctorAsync(admin, "Dr. Waiver", "HospitalCommissionPercent", 20, 900);
+        var cash = await MethodAsync("CASH");
+        var p1 = await RegisterPatientAsync(admin, PatientFields("Waiver Patient One", "Father One"));
+        var p2 = await RegisterPatientAsync(admin, PatientFields("Waiver Patient Two", "Father Two"));
+        var p3 = await RegisterPatientAsync(admin, PatientFields("Waiver Patient Three", "Father Three"));
+        KeyValuePair<string, string>[] Paid() => new[] { P("Input.DoctorId", doc.ToString()), P("Input.IdempotencyKey", Guid.NewGuid().ToString()), P("Input.Payment", "Paid"),
+            P("Input.CounterId", counter.ToString()), P("Input.PaymentMethodId", cash.ToString()) };
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Appointments/Book?patientId={p1}", Paid())).StatusCode);
+        Assert.Equal(720m, await DoctorPayableAsync(doc));
+
+        // Free by Doctor at booking: a reason and the authorising doctor are required; no money and no receipt.
+        var noReason = await admin.PostFormAsync($"/Appointments/Book?patientId={p2}", new[] { P("Input.DoctorId", doc.ToString()), P("Input.IdempotencyKey", Guid.NewGuid().ToString()),
+            P("Input.Payment", "FreeByDoctor"), P("Input.WaiverDoctorId", doc.ToString()) });
+        Assert.NotEqual(HttpStatusCode.Redirect, noReason.StatusCode);
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Appointments/Book?patientId={p2}", new[] { P("Input.DoctorId", doc.ToString()),
+            P("Input.IdempotencyKey", Guid.NewGuid().ToString()), P("Input.Payment", "FreeByDoctor"), P("Input.WaiverDoctorId", doc.ToString()), P("Input.WaiverReason", "Staff relative") })).StatusCode);
+        long a1, a2;
+        await using (var db = Factory.NewDb())
+        {
+            a1 = await db.Appointments.Where(a => a.PatientId == p1).Select(a => a.Id).SingleAsync();
+            var free = await db.Appointments.SingleAsync(a => a.PatientId == p2);
+            a2 = free.Id;
+            Assert.Equal((AppointmentPayment.FreeByDoctor, (long?)null, "Staff relative"), (free.PaymentStatus, free.ReceiptId, free.WaiverReason));
+            Assert.Equal(900m, free.WaivedAmount);
+            Assert.Equal(1, await db.Receipts.CountAsync());
+        }
+
+        // After payment: Free by Doctor without returning money → only a doctor-account adjustment (no cash refund).
+        var waive = new[] { P("Waiver.WaiverDoctorId", doc.ToString()), P("Waiver.Reason", "Poor patient – doctor's order") };
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Appointments/Details/{a1}", waive, $"/Appointments/Details/{a1}?handler=Free")).StatusCode);
+        Assert.Equal(0m, await DoctorPayableAsync(doc));
+        // A second waiver of the same appointment is refused (no double reduction).
+        var twice = await admin.PostFormAsync($"/Appointments/Details/{a1}", waive, $"/Appointments/Details/{a1}?handler=Free");
+        Assert.NotEqual(HttpStatusCode.Redirect, twice.StatusCode);
+        Assert.Equal(0m, await DoctorPayableAsync(doc));
+        await using (var db = Factory.NewDb())
+        {
+            var w = await db.Appointments.SingleAsync(a => a.Id == a1);
+            Assert.Equal((AppointmentPayment.FreeByDoctor, true, 900m), (w.PaymentStatus, w.WaivedAfterPayment, w.WaivedAmount!.Value));
+            Assert.Equal("admin", w.WaivedByUsername);
+            Assert.Equal(1, await db.DoctorLedger.CountAsync(e => e.EntryType == DoctorEntryType.FeeWaiver));
+            Assert.Equal(0, await db.Refunds.CountAsync());
+            Assert.Equal(1, await db.Receipts.CountAsync(r => r.Status == ReceiptStatus.Valid)); // history kept: the receipt is not cancelled
+        }
+
+        // After payment with the money returned: one pending refund linked to the waiver – never a second one.
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Appointments/Book?patientId={p3}", Paid())).StatusCode);
+        long a3;
+        await using (var db = Factory.NewDb()) a3 = await db.Appointments.Where(a => a.PatientId == p3).Select(a => a.Id).SingleAsync();
+        var back = new[] { P("Waiver.WaiverDoctorId", doc.ToString()), P("Waiver.Reason", "Doctor asked to return the fee"), P("Waiver.CashReturned", "true"), P("Waiver.RefundMethodId", cash.ToString()) };
+        Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Appointments/Details/{a3}", back, $"/Appointments/Details/{a3}?handler=Free")).StatusCode);
+        Assert.NotEqual(HttpStatusCode.Redirect, (await admin.PostFormAsync($"/Appointments/Details/{a3}", back, $"/Appointments/Details/{a3}?handler=Free")).StatusCode);
+        await using (var db = Factory.NewDb())
+        {
+            var refund = await db.Refunds.SingleAsync();
+            Assert.Equal(a3, refund.WaiverAppointmentId);
+            Assert.Equal(2, await db.DoctorLedger.CountAsync(e => e.EntryType == DoctorEntryType.FeeWaiver));
+        }
+        Assert.Equal(0m, await DoctorPayableAsync(doc));
+        Assert.Equal(3, (await AuditAsync(AuditActions.AppointmentFreeByDoctor)).Count);
+
+        // Reports show the waivers; the token slip of a free appointment says FREE (by doctor).
+        var report = await admin.GetHtmlAsync("/Appointments/Reports");
+        Assert.Contains("data-waiver-report", report);
+        Assert.Contains("Poor patient", report);
+        Assert.Contains("FREE (by doctor)", await admin.GetHtmlAsync($"/Print/Appointment/{a2}"));
+
+        // Without the permission a receptionist cannot mark an appointment free.
+        var rec = await UserWithAsync(admin, "recept9", Perm.AppointmentsView, Perm.AppointmentsAdd);
+        var p4 = await RegisterPatientAsync(admin, PatientFields("Waiver Patient Four", "Father Four"));
+        var denied = await rec.PostFormAsync($"/Appointments/Book?patientId={p4}", new[] { P("Input.DoctorId", doc.ToString()), P("Input.IdempotencyKey", Guid.NewGuid().ToString()),
+            P("Input.Payment", "FreeByDoctor"), P("Input.WaiverDoctorId", doc.ToString()), P("Input.WaiverReason", "Try") });
+        Assert.NotEqual(HttpStatusCode.Redirect, denied.StatusCode);
+        await using (var db = Factory.NewDb()) Assert.False(await db.Appointments.AnyAsync(a => a.PatientId == p4));
     }
 }

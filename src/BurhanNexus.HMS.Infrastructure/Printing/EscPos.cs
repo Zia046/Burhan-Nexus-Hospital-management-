@@ -92,7 +92,9 @@ public sealed class EscPosBuilder
 public sealed record AppointmentSlipData(
     string HospitalName, string? HospitalContact, string DoctorName, string? DoctorQualification, string? DoctorSpecialty,
     int TokenNumber, string PatientName, string PatientNumber, string AgeGender, string DateText, string? TimeText,
-    string? FeeText, string? ContactText, string? Message, string AppointmentNumber, string PrintedText, bool IsReprint, bool IsCancelled);
+    string? FeeText, string? ContactText, string? Message, string AppointmentNumber, string PrintedText, bool IsReprint, bool IsCancelled,
+    // Update 9: the token slip is the proof of the consultation-fee payment.
+    string? PaymentText = null, string? PaymentMethod = null, string? ReceiptNumber = null);
 
 public static class ThermalSlipComposer
 {
@@ -128,6 +130,9 @@ public static class ThermalSlipComposer
         b.Line(EscPosBuilder.Justify("Date:", d.DateText, w));
         if (!string.IsNullOrWhiteSpace(d.TimeText)) b.Line(EscPosBuilder.Justify("Time:", d.TimeText, w));
         if (!string.IsNullOrWhiteSpace(d.FeeText)) b.Bold(p.BoldText).Line(EscPosBuilder.Justify("Consultation fee:", d.FeeText, w)).Bold(false);
+        if (!string.IsNullOrWhiteSpace(d.PaymentText)) b.Bold(true).Line(EscPosBuilder.Justify("Payment:", d.PaymentText, w)).Bold(false);
+        if (!string.IsNullOrWhiteSpace(d.PaymentMethod)) b.Line(EscPosBuilder.Justify("Paid by:", d.PaymentMethod, w));
+        if (!string.IsNullOrWhiteSpace(d.ReceiptNumber)) b.Line(EscPosBuilder.Justify("Receipt no.:", d.ReceiptNumber, w));
         b.Line(EscPosBuilder.Justify("Appt. no.:", d.AppointmentNumber, w));
         b.Line(sep);
         b.AlignCenter();

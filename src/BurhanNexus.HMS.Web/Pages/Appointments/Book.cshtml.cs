@@ -1,5 +1,6 @@
 using BurhanNexus.HMS.Core.Domain;
 using BurhanNexus.HMS.Core.Security;
+using BurhanNexus.HMS.Infrastructure.Finance;
 using BurhanNexus.HMS.Infrastructure.Patients;
 using BurhanNexus.HMS.Infrastructure.Services;
 using BurhanNexus.HMS.Web.Security;
@@ -41,13 +42,25 @@ public class BookModel : HmsPageModel
     public bool IsPrivate { get; private set; }
     public bool ShowFees { get; private set; }
     public DateOnly Today { get; private set; }
+    public bool CanCollect { get; private set; }
+    public bool CanMarkFree { get; private set; }
+    public IReadOnlyList<PaymentMethod> Methods { get; private set; } = Array.Empty<PaymentMethod>();
+    public IReadOnlyList<Counter> Counters { get; private set; } = Array.Empty<Counter>();
+    public IReadOnlyList<DoctorDayLoad> AllDoctors => Doctors;
 
     private async Task LoadAsync()
     {
         ViewData["Nav"] = "appointment-book";
         Settings = await _setup.GetSettingsAsync();
         IsPrivate = (await _hospital.GetConfigurationAsync()).HospitalType == HospitalType.Private;
-        ShowFees = await CanAsync(Perm.AppointmentsFees);
+        CanCollect = await CanAsync(Perm.AppointmentsCollectFee);
+        CanMarkFree = await CanAsync(Perm.AppointmentsFreeByDoctor);
+        // The fee is shown to whoever collects or waives it (it is printed on the token slip).
+        ShowFees = CanCollect || CanMarkFree || await CanAsync(Perm.AppointmentsFees);
+        var finance = HttpContext.RequestServices.GetRequiredService<IFinanceSetupService>();
+        Methods = await finance.PaymentMethodsAsync(activeOnly: true);
+        if (User.IsSystemAdministrator()) Counters = (await finance.CountersAsync(activeOnly: true)).Select(c => c.Counter).ToList();
+        else if (CurrentUserId is int uid) Counters = await finance.CountersOfUserAsync(uid);
         Today = await _clock.TodayAsync();
         Doctors = await _appointments.DayLoadAsync(Input.AppointmentDate ?? Today);
         if (PatientId is long id)
@@ -71,6 +84,7 @@ public class BookModel : HmsPageModel
         await LoadAsync();
         Input.AppointmentDate = Today;
         Input.DoctorId = PreselectDoctor ?? 0;
+        Input.IdempotencyKey = Guid.NewGuid();
         return Page();
     }
 
@@ -78,10 +92,11 @@ public class BookModel : HmsPageModel
     {
         Input.PatientId = PatientId ?? 0;
         if (!(await _setup.GetSettingsAsync()).AppointmentTimeEnabled) Input.AppointmentTime = null;
-        var r = await _appointments.BookAsync(Input);
+        var r = await _appointments.BookAsync(Input, await CanAsync(Perm.AppointmentsCollectFee), await CanAsync(Perm.AppointmentsFreeByDoctor));
         if (!r.Succeeded)
         {
             await LoadAsync();
+            if (Input.IdempotencyKey == Guid.Empty) Input.IdempotencyKey = Guid.NewGuid();
             AddErrors(r);
             return Page();
         }

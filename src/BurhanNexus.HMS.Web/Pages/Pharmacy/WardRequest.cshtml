@@ -1,0 +1,68 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.WardRequestModel
+@{
+    ViewData["Title"] = "Ward request " + Model.R.Number;
+    var r = Model.R;
+    var open = r.Status is MedicineRequestStatus.Pending or MedicineRequestStatus.Approved or MedicineRequestStatus.PartlyIssued;
+}
+<partial name="_PharmNav" />
+<div class="page-header">
+    <div><h1>Ward request <span class="mono">@r.Number</span> <span class="status" data-mrq-status>@r.Status</span>
+            @if (r.Priority == MedicineRequestPriority.Urgent) { <span class="status status-warn">Urgent</span> }</h1>
+        <p class="muted">@r.Patient?.FullName · @r.Patient?.PatientNumber · @r.Admission?.AdmissionNumber · @r.WardName @r.BedCode · requested by @r.RequestedByName, @Fmt.DateTimeText(r.RequestedUtc)</p>
+        @if (r.Notes is not null) { <p><strong>Note:</strong> @r.Notes</p> }</div>
+    <a class="btn btn-light" href="/Pharmacy/WardRequests">Back to requests</a>
+</div>
+<partial name="_ValidationSummary" />
+
+<form method="post" asp-page-handler="Issue" asp-route-id="@r.Id" class="card" novalidate data-issue-form>
+    <input type="hidden" name="IdempotencyKey" value="@Model.IdempotencyKey" />
+    <div class="card-header"><h2>Medicines</h2></div>
+    <table class="table" data-request-lines>
+        <thead><tr><th>Medicine</th><th class="num">Requested</th><th class="num">Issued</th><th class="num">Remaining</th><th class="num">In stock (main)</th><th>Status</th><th>Issue now</th><th>Note</th></tr></thead>
+        <tbody>
+        @foreach (var l in r.Lines)
+        {
+            var canIssue = open && l.Remaining > 0;
+            <tr data-line="@l.MedicineName">
+                <td><strong>@l.MedicineName</strong>@if (l.Instructions is not null) { <small class="muted block">@l.Instructions</small> }</td>
+                <td class="num">@l.Quantity</td><td class="num" data-issued>@l.IssuedQuantity</td><td class="num">@l.Remaining</td>
+                <td class="num">@(Model.Stock.GetValueOrDefault(l.MedicineId))</td>
+                <td data-line-status>@l.Status</td>
+                <td>@if (canIssue) { <input name="Issue[@l.Id]" type="number" min="0" max="@l.Remaining" class="w-xs" value="@Math.Min(l.Remaining, Model.Stock.GetValueOrDefault(l.MedicineId))" aria-label="Quantity to issue" data-issue-qty /> }</td>
+                <td class="small">@l.DecisionNote</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    @if (open && r.Lines.Any(l => l.Remaining > 0))
+    {
+        <div class="form-actions"><button class="btn btn-primary" data-test="mrq-issue">Issue entered quantities</button>
+            <span class="muted small">A partial quantity leaves the rest open. Batches are chosen by first-expiry-first-out.</span></div>
+    }
+</form>
+
+@if (open)
+{
+    <div class="card" data-decisions>
+        <div class="card-header"><h2>Decisions per medicine</h2></div>
+        @foreach (var l in r.Lines.Where(l => l.Status is MedicineRequestLineStatus.Pending or MedicineRequestLineStatus.Approved or MedicineRequestLineStatus.PartlyIssued))
+        {
+            <form method="post" asp-page-handler="Decide" asp-route-id="@r.Id" asp-route-lineId="@l.Id" class="inline-form wrap" novalidate data-decide="@l.MedicineName">
+                <strong class="w-md">@l.MedicineName</strong>
+                <input name="Note" maxlength="300" placeholder="Reason / note" aria-label="Note" />
+                @if (l.Status == MedicineRequestLineStatus.Pending) { <button class="btn btn-light btn-sm" name="decision" value="Approve">Approve</button> }
+                <button class="btn btn-light btn-sm" name="decision" value="Unavailable">Not available</button>
+                <button class="btn btn-danger btn-sm" name="decision" value="Reject">Reject</button>
+            </form>
+        }
+    </div>
+}
+
+<div class="card">
+    <div class="card-header"><h2>History</h2></div>
+    <table class="table table-compact" data-history>
+        <thead><tr><th>When</th><th>Event</th><th class="num">Qty</th><th>Issue</th><th>Note</th><th>User</th></tr></thead>
+        <tbody>@foreach (var e in Model.Events) { <tr><td>@Fmt.DateTimeText(e.CreatedUtc)</td><td>@e.Event</td><td class="num">@e.Quantity</td><td class="mono">@if (e.PharmacyIssueId is long iid) { <a href="/Pharmacy/Doc/ISS/@iid">@e.PharmacyIssueNumber</a> }</td><td>@e.Note</td><td>@e.Username</td></tr> }</tbody>
+    </table>
+</div>

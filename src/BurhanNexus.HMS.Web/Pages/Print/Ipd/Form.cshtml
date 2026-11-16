@@ -24,6 +24,7 @@
         <strong>@Model.Title</strong>
         <button type="button" class="lr-btn" data-print-now data-test="print-form">Print</button>
         @if (a is not null) { <a class="lr-btn light" href="/Ipd/Admission/@a.Id">&larr; Admission</a> }
+        @if (Model.Form is "discharge" or "nicu-discharge") { <a class="lr-btn light" href="?name=@(Model.ShowDoctorName ? "0" : "1")" data-toggle-doctor-name>@(Model.ShowDoctorName ? "Hide doctor's name" : "Show doctor's name")</a> }
         @if (Model.Form == "daily-bill")
         {
             <form method="get" class="lr-row"><input type="date" name="date" value="@Model.Date?.ToString("yyyy-MM-dd")" /><button class="lr-btn light" type="submit">Show day</button></form>
@@ -71,9 +72,9 @@
                     <tr><th>Registered by</th><td>@a.CreatedByUsername</td><th></th><td></td></tr>
                 </table>
             </section>
-            <section class="rr-section"><h3>Consent of patient / attendant</h3>
+            <section class="rr-section"><h3>Consent</h3>
                 <p class="small">I agree to the admission and to the treatment considered necessary by the treating doctors, which has been explained to me.</p>
-                <div class="f-sign-row"><div>Patient / attendant signature &amp; thumb</div><div>Witness</div><div>Admitting doctor</div></div>
+                <div class="f-sign-row" data-sign-row><div>Admitting doctor</div></div>
             </section>
             break;
 
@@ -143,7 +144,7 @@
             }
             <section class="rr-section"><h3>Discharge medications (as prescribed)</h3><p class="rr-text">@V(a.DischargeMedications)</p></section>
             <section class="rr-section"><h3>Follow-up</h3><p class="rr-text">@V(a.FollowUp)</p></section>
-            <div class="f-sign-row"><div>@V(a.DischargeDoctor)<br /><small>Discharging doctor</small></div><div>Patient / attendant</div></div>
+            <div class="f-sign-row" data-sign-row><div data-doctor-signature>@if (Model.ShowDoctorName && !string.IsNullOrWhiteSpace(a.DischargeDoctor)) { <span data-doctor-name>@a.DischargeDoctor</span><br /> }Doctor's signature</div></div>
             break;
 
         case "bill":
@@ -165,7 +166,7 @@
                 </tfoot>
             </table>
             if (!Model.Private) { <p class="small">Government hospital – services recorded for the patient's record.</p> }
-            <div class="f-sign-row"><div>Accounts</div><div>Patient / attendant</div></div>
+            <div class="f-sign-row" data-sign-row><div>Accounts</div></div>
             break;
 
         case "investigations":
