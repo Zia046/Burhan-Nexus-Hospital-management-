@@ -74,6 +74,8 @@ public sealed class LabSettingsInput
     public bool ShowVerifiedBy { get; set; } = true;
     public bool AllowSelfVerification { get; set; }
     public bool RequirePaymentBeforeRelease { get; set; }
+    /// <summary>Update 10: simple workflow (no sample step, save = verified). Empty = keep the current setting.</summary>
+    public bool? SimpleWorkflow { get; set; }
 }
 
 public sealed record LabTestRow(LabTest Test, decimal Price, bool AllowPartial, int ParameterCount);
@@ -326,14 +328,15 @@ public sealed class LabCatalogService : ILabCatalogService
         if (T(i.Email, 150) is { } mail && !mail.Contains('@')) return ServiceResult.Fail("Email address is not valid.");
         var s = await _db.LabSettings.FirstAsync(ct);
         _db.Entry(s).Property(x => x.RowVersion).OriginalValue = rowVersion;
-        var old = new { s.LaboratoryName, s.HospitalName, s.SignatoryName, s.AllowSelfVerification, s.RequirePaymentBeforeRelease, s.Layout };
+        var old = new { s.LaboratoryName, s.HospitalName, s.SignatoryName, s.AllowSelfVerification, s.RequirePaymentBeforeRelease, s.Layout, s.SimpleWorkflow };
+        s.SimpleWorkflow = i.SimpleWorkflow ?? s.SimpleWorkflow;
         s.LaboratoryName = T(i.LaboratoryName, 150); s.HospitalName = T(i.HospitalName, 200); s.Address = T(i.Address, 300);
         s.ContactNumber = T(i.ContactNumber, 100); s.Email = T(i.Email, 150); s.ReportHeader = T(i.ReportHeader, 300); s.ReportFooter = T(i.ReportFooter, 500);
         s.Layout = Enum.IsDefined(i.Layout) ? i.Layout : LabReportLayout.Standard; s.SignatoryName = T(i.SignatoryName, 150); s.SignatoryDesignation = T(i.SignatoryDesignation, 150);
         s.ShowVerifiedBy = i.ShowVerifiedBy; s.AllowSelfVerification = i.AllowSelfVerification; s.RequirePaymentBeforeRelease = i.RequirePaymentBeforeRelease;
         s.UpdatedUtc = _clock.UtcNow;
         _audit.Add(AuditActions.LabSettingsChanged, "LabSettings", "1", "Laboratory settings changed", old,
-            new { s.LaboratoryName, s.HospitalName, s.SignatoryName, s.AllowSelfVerification, s.RequirePaymentBeforeRelease, s.Layout });
+            new { s.LaboratoryName, s.HospitalName, s.SignatoryName, s.AllowSelfVerification, s.RequirePaymentBeforeRelease, s.Layout, s.SimpleWorkflow });
         try { await _db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException) { return ServiceResult.Fail("Settings were changed by someone else. Please reload."); }
         return ServiceResult.Ok();

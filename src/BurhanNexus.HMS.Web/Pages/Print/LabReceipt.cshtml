@@ -1,0 +1,69 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Print.LabReceiptModel
+@{
+    Layout = null;
+    var o = Model.Order;
+    var p = o.Patient!;
+    var h = Model.Hospital;
+    var receiptNo = Model.Receipts.Count == 0 ? "—" : string.Join(", ", Model.Receipts.Select(r => r.ReceiptNumber));
+    var methods = string.Join(", ", Model.Receipts.Select(r => r.PaymentMethod?.Name).Where(n => n is not null).Distinct());
+    var discount = Model.Charges.Sum(c => c.Discount);
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Lab receipt @o.OrderNumber</title>
+    <link rel="stylesheet" href="~/css/thermal.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/lab-report.css" asp-append-version="true" />
+    <script src="~/js/lab-report.js" asp-append-version="true" defer></script>
+</head>
+<body class="thermal-body w@(Model.Width)" data-lab-receipt data-width="@Model.Width">
+<div class="t-toolbar no-print">
+    <div class="t-row">
+        <strong>Laboratory receipt @o.OrderNumber</strong>
+        <a class="t-btn light" href="/Lab/Order/@o.Id">&larr; Visit</a>
+        <a class="t-btn light @(Model.Width == 58 ? "on" : "")" href="?width=58">58 mm</a>
+        <a class="t-btn light @(Model.Width == 80 ? "on" : "")" href="?width=80">80 mm</a>
+        <button type="button" class="t-btn" data-print-now>Print 2 copies</button>
+    </div>
+    <div class="t-small">Prints two copies: the patient keeps one, the other is given at the laboratory. Reprinting creates no new payment or receipt number.</div>
+</div>
+<main class="slip-wrap">
+    @foreach (var copy in BurhanNexus.HMS.Web.Pages.Print.LabReceiptModel.Copies)
+    {
+        <article class="t-slip lab-receipt-copy" data-copy="@copy" data-receipt="@receiptNo" data-visit="@o.OrderNumber">
+            @if (h.HasLogo) { <img class="t-logo" src="/branding/logo?v=@h.LogoVersion" alt="" /> }
+            <div class="t-hosp">@h.HospitalName</div>
+            <div class="t-small">Laboratory</div>
+            <div class="t-sep"></div>
+            <div class="t-title">LABORATORY RECEIPT</div>
+            <div class="t-copy"><strong>@copy</strong></div>
+            <table class="t-kv">
+                <tr><td>Receipt no.</td><td data-field="receipt">@receiptNo</td></tr>
+                <tr><td>Lab visit no.</td><td data-field="visit">@o.OrderNumber</td></tr>
+                <tr><td>Date / time</td><td>@Fmt.DateTimeText(o.BookedUtc)</td></tr>
+                <tr><td>Patient</td><td>@p.FullName</td></tr>
+                <tr><td>Patient ID</td><td>@p.PatientNumber</td></tr>
+                @if (o.ReferredBy is { Length: > 0 } rb) { <tr><td>Referred by</td><td>@rb</td></tr> }
+            </table>
+            <div class="t-sep"></div>
+            <table class="t-lines" data-tests>
+                @foreach (var c in Model.Charges) { <tr><td>@c.ServiceName</td><td class="r">@Fmt.Money(c.Fee)</td></tr> }
+            </table>
+            <div class="t-sep"></div>
+            <table class="t-kv">
+                <tr><td>Total</td><td data-field="total">@Fmt.Money(Model.Charges.Sum(c => c.Fee))</td></tr>
+                @if (discount > 0) { <tr><td>Discount</td><td>@Fmt.Money(discount)</td></tr> }
+                <tr><td>Amount paid</td><td data-field="paid">@Fmt.Money(Model.Payment.Paid)</td></tr>
+                @if (Model.Payment.Balance > 0) { <tr><td><strong>Balance</strong></td><td><strong>@Fmt.Money(Model.Payment.Balance)</strong></td></tr> }
+                <tr><td>Payment</td><td data-field="status"><strong>@Model.StatusText</strong>@(methods.Length > 0 ? " · " + methods : "")</td></tr>
+                <tr><td>Booked by</td><td>@o.BookedByUsername</td></tr>
+            </table>
+            <div class="t-sep"></div>
+            <div class="t-tiny">@(copy == "PATIENT COPY" ? "Keep this copy to collect your report." : "Hand this copy to the laboratory for sample collection.")</div>
+        </article>
+    }
+</main>
+</body>
+</html>

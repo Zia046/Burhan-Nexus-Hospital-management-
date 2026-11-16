@@ -45,6 +45,10 @@ public class BookModel : HmsPageModel
     public bool ShowFees { get; private set; }
     public bool CanDiscount { get; private set; }
     public bool CanRegister { get; private set; }
+    /// <summary>Update 10: the payment is recorded at booking (Phase 3 receipt, two-copy laboratory receipt).</summary>
+    public bool CanCollect { get; private set; }
+    public IReadOnlyList<PaymentMethod> Methods { get; private set; } = Array.Empty<PaymentMethod>();
+    public IReadOnlyList<Counter> Counters { get; private set; } = Array.Empty<Counter>();
 
     private async Task LoadAsync()
     {
@@ -53,6 +57,15 @@ public class BookModel : HmsPageModel
         ShowFees = await CanAsync(Perm.LabViewFinancial);
         CanDiscount = ShowFees && await CanAsync(Perm.FinanceDiscount);
         CanRegister = await CanAsync(Perm.PatientsAdd) || await CanAsync(Perm.LabRegisterPatient);
+        CanCollect = await CanAsync(Perm.LabCollectPayments) && AdmissionId is null; // inpatient tests go on the IPD account
+        ShowFees |= CanCollect;
+        if (CanCollect)
+        {
+            var finance = HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Finance.IFinanceSetupService>();
+            Methods = await finance.PaymentMethodsAsync(activeOnly: true);
+            if (User.IsSystemAdministrator()) Counters = (await finance.CountersAsync(activeOnly: true)).Select(c => c.Counter).ToList();
+            else if (CurrentUserId is int uid) Counters = await finance.CountersOfUserAsync(uid);
+        }
         Tests = await _catalog.TestsAsync(activeOnly: true);
         Doctors = await _registration.DoctorsAsync(activeOnly: true);
         if (AdmissionId is long aid && PatientId is null)
@@ -88,7 +101,9 @@ public class BookModel : HmsPageModel
         Input.TestIds = TestIds;
         Input.Discounts = Discounts.Where(d => d.Value != 0).ToDictionary(d => d.Key, d => d.Value);
         var canDiscount = await CanAsync(Perm.LabViewFinancial) && await CanAsync(Perm.FinanceDiscount);
-        var r = await _lab.BookAsync(Input, canDiscount);
+        var canCollect = await CanAsync(Perm.LabCollectPayments) && AdmissionId is null;
+        if (AdmissionId is not null) Input.CollectPayment = false;
+        var r = await _lab.BookAsync(Input, canDiscount, canCollect);
         if (!r.Succeeded)
         {
             await LoadAsync();
@@ -96,7 +111,9 @@ public class BookModel : HmsPageModel
             return Page();
         }
         FlashSuccess = r.Value!.WasDuplicate
-            ? $"This booking was already saved as {r.Value.Order.OrderNumber}. No second order was created."
+            ? $"This booking was already saved as {r.Value.Order.OrderNumber}. No second order or payment was created."
+            : Input.CollectPayment ? $"Laboratory visit {r.Value.Order.OrderNumber} booked and the payment recorded. Print the receipt (two copies)."
+            : AdmissionId is not null ? $"Laboratory visit {r.Value.Order.OrderNumber} booked – the fees are on the patient's IPD account."
             : $"Laboratory visit {r.Value.Order.OrderNumber} booked. Fees are payable at the cash counter.";
         return Redirect($"/Lab/Order/{r.Value.Order.Id}");
     }

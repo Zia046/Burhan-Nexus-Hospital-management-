@@ -12,6 +12,17 @@ namespace BurhanNexus.HMS.Tests;
 /// <summary>Phase 4 – laboratory: catalogue, booking, samples, result entry, verification, reports, billing and security.</summary>
 public partial class LabTests : Phase2TestBase
 {
+    /// <summary>These tests cover the classic laboratory workflow (sample collection and separate verification); update 10 made the simple workflow the default.</summary>
+    private new async Task<Browser> SetupAsync(string hospitalType = "Private")
+    {
+        var b = await base.SetupAsync(hospitalType);
+        await using var db = Factory.NewDb();
+        var s = await db.LabSettings.SingleAsync();
+        s.SimpleWorkflow = false;
+        await db.SaveChangesAsync();
+        return b;
+    }
+
     [GeneratedRegex(@"/Lab/Order/(\d+)")] private static partial Regex OrderRegex();
 
     private static string N(decimal v) => v.ToString(CultureInfo.InvariantCulture);

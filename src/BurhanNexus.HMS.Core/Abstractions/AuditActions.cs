@@ -124,6 +124,7 @@ public static class AuditActions
     public const string LabResultVerified = "Lab.ResultVerified";
     public const string LabResultRejected = "Lab.ResultRejected";
     public const string LabResultWithdrawn = "Lab.ResultWithdrawn";
+    public const string LabResultReviewed = "Laboratory.ResultReviewed";
     public const string LabReportPrinted = "Lab.ReportPrinted";
     public const string LabReportReprinted = "Lab.ReportReprinted";
     public const string LabSettingsChanged = "Lab.SettingsChanged";

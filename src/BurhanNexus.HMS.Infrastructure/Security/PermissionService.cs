@@ -100,5 +100,9 @@ public static class PermissionSeeder
         [Perm.SvcManageServices] = Perm.FinanceManageServiceFees,
         [Perm.SvcManageFees] = Perm.FinanceManageServiceFees,
         [Perm.SvcReports] = Perm.FinanceDashboard,
+        // update 10 laboratory: correcting saved results was "withdraw result"; receipts go with booking; payments with the cashier task
+        [Perm.LabReviewResults] = Perm.LabDeleteResults,
+        [Perm.LabPrintReceipts] = Perm.LabBook,
+        [Perm.LabCollectPayments] = Perm.FinanceCollect,
     };
 }

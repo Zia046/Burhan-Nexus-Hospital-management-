@@ -19,6 +19,8 @@
         <div class="field"><label for="Input_SignatoryDesignation">Designation</label><input asp-for="Input.SignatoryDesignation" maxlength="150" placeholder="Consultant Pathologist" /></div>
     </div>
     <div class="card-body">
+        <label class="check" data-simple-workflow><input type="checkbox" name="Input.SimpleWorkflow" value="true" checked="@(Model.Input.SimpleWorkflow == true)" /> <strong>Simple workflow</strong> – no sample collection step and no separate verification: saving a complete report verifies it (corrections through “Review report”, with history)</label>
+        <input type="hidden" name="Input.SimpleWorkflow" value="false" />
         <label class="check"><input type="checkbox" asp-for="Input.ShowVerifiedBy" /> Show “verified by” on reports</label>
         <label class="check"><input type="checkbox" asp-for="Input.AllowSelfVerification" /> Allow a person to verify results they entered (only users with “Verify Own Results”)</label>
         <label class="check"><input type="checkbox" asp-for="Input.RequirePaymentBeforeRelease" /> Release (print) reports only for fully paid tests</label>

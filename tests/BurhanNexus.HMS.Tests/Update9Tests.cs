@@ -13,6 +13,17 @@ namespace BurhanNexus.HMS.Tests;
 /// <summary>Update 9 – laboratory standard catalogue (ranges, culture, pregnancy), nursing medicine demand, signatures.</summary>
 public partial class Update9Tests : Phase2TestBase
 {
+    /// <summary>These tests cover the classic laboratory workflow (sample collection and separate verification); update 10 made the simple workflow the default.</summary>
+    private new async Task<Browser> SetupAsync(string hospitalType = "Private")
+    {
+        var b = await base.SetupAsync(hospitalType);
+        await using var db = Factory.NewDb();
+        var s = await db.LabSettings.SingleAsync();
+        s.SimpleWorkflow = false;
+        await db.SaveChangesAsync();
+        return b;
+    }
+
     [GeneratedRegex(@"/Lab/Order/(\d+)")] private static partial Regex OrderRegex();
     [GeneratedRegex(@"/Ipd/Admission/(\d+)")] private static partial Regex AdmissionRegex();
 

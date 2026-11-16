@@ -23,7 +23,10 @@ public static class NavMenu
         "users", "departments", "audit", "settings", "backup",
     };
 
-    public static IReadOnlyList<NavSection> Build(IReadOnlySet<string> perms, bool isPrivate)
+    public static IReadOnlyList<NavSection> Build(IReadOnlySet<string> perms, bool isPrivate) => Build(perms, isPrivate, labSimple: false);
+
+    /// <param name="labSimple">Update 10: laboratory simple workflow – no sample collection or verification pages in the menu.</param>
+    public static IReadOnlyList<NavSection> Build(IReadOnlySet<string> perms, bool isPrivate, bool labSimple)
     {
         bool Has(string p) => perms.Contains(p);
         bool Any(params string[] keys) => keys.Any(perms.Contains);
@@ -47,9 +50,9 @@ public static class NavMenu
         Add("lab", "Laboratory", "flask", Any(Perm.LabDashboard, Perm.LabBook, Perm.LabCollectSamples, Perm.LabEnterResults, Perm.LabVerifyResults, Perm.LabApproveReports, Perm.LabViewResults, Perm.LabReports, Perm.LabManageCatalogue, Perm.LabSettings),
             (Has(Perm.LabDashboard), new("lab-dashboard", "/Lab", "flask", "Lab Dashboard")),
             (Has(Perm.LabBook), new("lab-book", "/Lab/Book", "plus", "New Lab Visit")),
-            (Has(Perm.LabCollectSamples), new("lab-samples", "/Lab/Samples", "scan", "Sample Collection")),
-            (Has(Perm.LabEnterResults), new("lab-pending", "/Lab/Pending", "edit", "Pending Tests")),
-            (Any(Perm.LabVerifyResults, Perm.LabApproveReports), new("lab-verify", "/Lab/Verify", "check-circle", "Verification")),
+            (Has(Perm.LabCollectSamples) && !labSimple, new("lab-samples", "/Lab/Samples", "scan", "Sample Collection")),
+            (Has(Perm.LabEnterResults), new("lab-pending", "/Lab/Pending", "edit", labSimple ? "Pending Lab Results" : "Pending Tests")),
+            (Any(Perm.LabVerifyResults, Perm.LabApproveReports) && !labSimple, new("lab-verify", "/Lab/Verify", "check-circle", "Verification")),
             (Has(Perm.LabViewResults), new("lab-results", "/Lab/Results", "file", "Lab Results")),
             (Has(Perm.LabReports), new("lab-reports", "/Lab/Reports", "chart", "Lab Reports")),
             (Has(Perm.LabManageCatalogue), new("lab-catalogue", "/Lab/Catalogue", "sliders", "Test Catalogue")),

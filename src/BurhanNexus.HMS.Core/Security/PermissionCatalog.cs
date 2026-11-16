@@ -151,6 +151,9 @@ public static class PermissionCatalog
                 new(LabActions.Settings, "Manage Laboratory Settings", "Laboratory branding, signatory and report settings"),
                 new(LabActions.ViewFinancial, "View Laboratory Financial Information", "Laboratory fees, payment status and collection"),
                 new(LabActions.ManageFees, "Manage Laboratory Fees", "Set test prices (fee history kept)"),
+                new(LabActions.CollectPayments, "Collect Laboratory Payments", "Record the payment when booking a laboratory visit (Phase 3 receipt)"),
+                new(LabActions.PrintReceipts, "Print Laboratory Receipts", "Print the two-copy laboratory receipt (patient and laboratory copy)"),
+                new(LabActions.ReviewResults, "Review / Edit Saved Results", "Correct a saved (verified) result with a reason – the previous result is kept in history"),
             }),
         new(Modules_.Radiology, "Radiology Management (X-Ray & Ultrasound)", "Radiology bookings, worklists, examinations, reporting, verification and A4 reports", "scan", true, "/Radiology",
             new PermissionAction[]
@@ -589,6 +592,9 @@ public static class PermissionCatalog
         public const string Settings = "Settings";
         public const string ViewFinancial = "ViewFinancial";
         public const string ManageFees = "ManageFees";
+        public const string CollectPayments = "CollectPayments";
+        public const string PrintReceipts = "PrintReceipts";
+        public const string ReviewResults = "ReviewResults";
     }
 
     public static class FinanceActions
@@ -896,6 +902,9 @@ public static class Perm
     public const string LabSettings = "Laboratory.Settings";
     public const string LabViewFinancial = "Laboratory.ViewFinancial";
     public const string LabManageFees = "Laboratory.ManageFees";
+    public const string LabCollectPayments = "Laboratory.CollectPayments";
+    public const string LabPrintReceipts = "Laboratory.PrintReceipts";
+    public const string LabReviewResults = "Laboratory.ReviewResults";
     public const string PharmDashboard = "Pharmacy.Dashboard";
     public const string PharmViewCatalogue = "Pharmacy.ViewCatalogue";
     public const string PharmAddMedicine = "Pharmacy.AddMedicine";

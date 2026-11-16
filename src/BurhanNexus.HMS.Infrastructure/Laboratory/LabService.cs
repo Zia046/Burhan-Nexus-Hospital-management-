@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System.Globalization;
 using System.Text.Json;
 using BurhanNexus.HMS.Core.Abstractions;
@@ -31,6 +32,13 @@ public sealed class LabBookingInput
     /// <summary>Optional discounts per test id (needs the Phase 3 "Give Discounts" permission).</summary>
     public Dictionary<int, decimal> Discounts { get; set; } = new();
     public string? DiscountReason { get; set; }
+    // ---- Update 10: payment recorded at booking (Phase 3 receipt) ----
+    public bool CollectPayment { get; set; }
+    public int? CounterId { get; set; }
+    public int? PaymentMethodId { get; set; }
+    public string? PaymentReference { get; set; }
+    /// <summary>Amount actually received (empty = the full amount). Less than the total is a partial payment (where the tests allow it).</summary>
+    public decimal? AmountReceived { get; set; }
 }
 
 public sealed record LabBookingResult(LabOrder Order, bool WasDuplicate);
@@ -75,6 +83,13 @@ public sealed record LabDashboard(
 public interface ILabService
 {
     Task<ServiceResult<LabBookingResult>> BookAsync(LabBookingInput input, bool canDiscount, CancellationToken ct = default);
+    /// <summary>Update 10: booking with the payment recorded in the same transaction (needs "Collect Laboratory Payments").</summary>
+    Task<ServiceResult<LabBookingResult>> BookAsync(LabBookingInput input, bool canDiscount, bool canCollect, CancellationToken ct = default);
+    /// <summary>
+    /// Update 10: corrects a saved (verified) result. The previous result is kept as a revision with the reason; the corrected
+    /// result is verified again by the person who saves it (no second verification step).
+    /// </summary>
+    Task<ServiceResult> ReviewResultAsync(long itemId, IReadOnlyDictionary<long, string?> values, IReadOnlyList<CultureLineInput> culture, string? comment, string? reason, CancellationToken ct = default);
     Task<ServiceResult> AddTestsAsync(long orderId, IReadOnlyList<int> testIds, CancellationToken ct = default);
     Task<ServiceResult> UpdateOrderAsync(long orderId, LabReferralType referral, int? doctorId, string? externalDoctor, string? notes, bool urgent, CancellationToken ct = default);
     Task<ServiceResult> CancelItemAsync(long itemId, string? reason, CancellationToken ct = default);
@@ -110,9 +125,11 @@ public sealed class LabService : ILabService
     private readonly HospitalClock _clock;
     private readonly IFinanceSetupService _finance;
     private readonly ILabCatalogService _catalog;
+    private readonly IServiceProvider _services;
 
-    public LabService(HmsDbContext db, IAuditService audit, IRequestContext ctx, HospitalClock clock, IFinanceSetupService finance, ILabCatalogService catalog)
+    public LabService(HmsDbContext db, IAuditService audit, IRequestContext ctx, HospitalClock clock, IFinanceSetupService finance, ILabCatalogService catalog, IServiceProvider services)
     {
+        _services = services;
         _db = db;
         _audit = audit;
         _ctx = ctx;
@@ -133,7 +150,9 @@ public sealed class LabService : ILabService
     // Booking
     // =====================================================================================
 
-    public async Task<ServiceResult<LabBookingResult>> BookAsync(LabBookingInput i, bool canDiscount, CancellationToken ct = default)
+    public Task<ServiceResult<LabBookingResult>> BookAsync(LabBookingInput i, bool canDiscount, CancellationToken ct = default) => BookAsync(i, canDiscount, false, ct);
+
+    public async Task<ServiceResult<LabBookingResult>> BookAsync(LabBookingInput i, bool canDiscount, bool canCollect, CancellationToken ct = default)
     {
         if (i.IdempotencyKey == Guid.Empty) return ServiceResult<LabBookingResult>.Fail("The booking form has expired. Please reload the page.");
         if (await _db.LabOrders.AsNoTracking().FirstOrDefaultAsync(o => o.IdempotencyKey == i.IdempotencyKey, ct) is { } dup)
@@ -156,6 +175,9 @@ public sealed class LabService : ILabService
             errors.Add("The admission does not belong to this patient.");
         if (i.Discounts.Any(d => d.Value != 0) && !canDiscount) errors.Add("You are not allowed to give discounts.");
         if (i.Discounts.Any(d => d.Value > 0) && T(i.DiscountReason, 200) is null) errors.Add("Enter the reason for the discount.");
+        if (i.CollectPayment && !canCollect) errors.Add("You are not allowed to collect laboratory payments.");
+        if (i.CollectPayment && i.PaymentMethodId is null) errors.Add("Select the payment method.");
+        if (i.AmountReceived is decimal ar0 && (ar0 < 0 || !FinanceMath.IsMoney(ar0))) errors.Add("Enter a valid amount received.");
         if (errors.Count > 0) return ServiceResult<LabBookingResult>.Fail(errors.ToArray());
 
         var today = await _clock.TodayAsync();
@@ -186,6 +208,17 @@ public sealed class LabService : ILabService
                 $"Laboratory order {order.OrderNumber} for {patient.PatientNumber}: {string.Join(", ", order.Items.Select(x => x.TestCode))}" +
                 (order.ReferredBy is { Length: > 0 } r ? $", referred by {r}" : ""));
             await _db.SaveChangesAsync(ct);
+            if (i.CollectPayment)
+            {
+                // The payment is recorded in the same transaction: a failed payment books nothing.
+                var paid = await CollectForOrderAsync(order, i, ct);
+                if (!paid.Succeeded)
+                {
+                    await tx.RollbackAsync(CancellationToken.None);
+                    _db.ChangeTracker.Clear();
+                    return ServiceResult<LabBookingResult>.Fail(paid.Errors.Select(e => "The visit was not booked – the payment could not be recorded: " + e).ToArray());
+                }
+            }
             await tx.CommitAsync(ct);
             return ServiceResult<LabBookingResult>.Ok(new LabBookingResult(order, false));
         }
@@ -196,6 +229,53 @@ public sealed class LabService : ILabService
             var existing = await _db.LabOrders.AsNoTracking().FirstAsync(o => o.IdempotencyKey == i.IdempotencyKey, ct);
             return ServiceResult<LabBookingResult>.Ok(new LabBookingResult(existing, true));
         }
+    }
+
+    /// <summary>Pays the order's charges through the Phase 3 cashier (one receipt; the amount received is applied test by test).</summary>
+    private async Task<ServiceResult> CollectForOrderAsync(LabOrder order, LabBookingInput i, CancellationToken ct)
+    {
+        var charges = await _db.Charges.Where(c => c.LabOrderId == order.Id && c.Status != ChargeStatus.Cancelled && c.NetAmount > c.PaidAmount).OrderBy(c => c.Id).ToListAsync(ct);
+        var due = charges.Sum(c => c.NetAmount - c.PaidAmount);
+        if (due == 0) return ServiceResult.Ok(); // free tests: nothing to collect
+        var received = i.AmountReceived ?? due;
+        if (received <= 0) return ServiceResult.Fail("Enter the amount received, or book without payment.");
+        if (received > due) return ServiceResult.Fail($"The amount received ({received:N2}) is more than the total due ({due:N2}).");
+        var counter = i.CounterId ?? await DefaultCounterAsync(ct);
+        if (counter is null) return ServiceResult.Fail("You are not assigned to a cash counter. Ask the administrator to assign you (Finance → Counters).");
+        var input = new CollectInput
+        {
+            IdempotencyKey = i.IdempotencyKey, PatientId = order.PatientId, CounterId = counter.Value, PaymentMethodId = i.PaymentMethodId!.Value,
+            PaymentReference = T(i.PaymentReference, 100), Notes = $"Laboratory visit {order.OrderNumber}"
+        };
+        var left = received;
+        foreach (var c in charges)
+        {
+            if (left <= 0) break;
+            var pay = Math.Min(left, c.NetAmount - c.PaidAmount);
+            input.Balances.Add(new BalancePayment { ChargeId = c.Id, PayNow = pay });
+            left -= pay;
+        }
+        var billing = _services.GetRequiredService<IBillingService>();
+        var r = await billing.CollectAsync(input, canDiscount: false, ct);
+        if (!r.Succeeded) return ServiceResult.Fail(r.Errors.ToArray());
+        if (r.Value?.Receipt is { } rec)
+        {
+            var o = await _db.LabOrders.FirstAsync(x => x.Id == order.Id, ct);
+            o.BookingReceiptId = rec.Id;
+            order.BookingReceiptId = rec.Id;
+            await _db.SaveChangesAsync(ct);
+        }
+        return ServiceResult.Ok();
+    }
+
+    private async Task<int?> DefaultCounterAsync(CancellationToken ct)
+    {
+        if (_ctx.UserId is not int uid) return null;
+        var mine = await _db.CounterAssignments.Where(a => a.UserId == uid && a.EndedUtc == null && a.Counter!.IsActive).Select(a => (int?)a.CounterId).ToListAsync(ct);
+        if (mine.Count > 0) return mine[0];
+        // The system administrator may collect at any counter: use the first active one.
+        var isAdmin = await _db.Users.AnyAsync(u => u.Id == uid && u.IsSystemAdministrator, ct);
+        return isAdmin ? await _db.Counters.Where(c => c.IsActive).OrderBy(c => c.Id).Select(c => (int?)c.Id).FirstOrDefaultAsync(ct) : null;
     }
 
     private async Task<List<string>> ValidateReferralAsync(LabReferralType type, int? doctorId, string? external, CancellationToken ct)
@@ -231,6 +311,7 @@ public sealed class LabService : ILabService
             : patient.AgeAtRegistration is int ar && patient.AgeUnitAtRegistration is AgeUnit au
                 ? today.DayNumber - AgeCalculator.EstimateDateOfBirth(ar, au, DateOnly.FromDateTime(patient.RegisteredUtc)).DayNumber : (int?)null;
         var samples = await _db.LabSamples.Where(s => s.LabOrderId == order.Id && s.Status != LabSampleStatus.Rejected).ToListAsync(ct);
+        var simple = (await _catalog.SettingsAsync(ct)).SimpleWorkflow;
         var sort = await _db.LabOrderItems.Where(x => x.LabOrderId == order.Id).MaxAsync(x => (int?)x.SortOrder, ct) ?? 0;
         var newItems = new List<(LabOrderItem Item, LabTest Test)>();
         foreach (var t in testIds.Select(id => tests.First(x => x.Id == id)).OrderBy(x => x.Category!.SortOrder).ThenBy(x => x.SortOrder))
@@ -245,6 +326,11 @@ public sealed class LabService : ILabService
                     SampleNumber = await FinanceDb.NextNumberAsync(_db, HmsDbContext.LabSampleNumberSequence, "SMP", today, ct),
                     LabOrderId = order.Id, SampleTypeName = t.SampleType!.Name, CreatedUtc = now, BusinessDate = today
                 };
+                if (simple)
+                {
+                    // Update 10 simple workflow: the specimen is taken physically against the laboratory receipt – nothing to record.
+                    sample.Status = LabSampleStatus.Received;
+                }
                 _db.LabSamples.Add(sample);
                 samples.Add(sample);
             }
@@ -513,9 +599,10 @@ public sealed class LabService : ILabService
     {
         var item = await _db.LabOrderItems.Include(x => x.Values).Include(x => x.Order).FirstOrDefaultAsync(x => x.Id == itemId, ct);
         if (item is null) return ServiceResult.Fail("Test not found.");
+        var simple = (await _catalog.SettingsAsync(ct)).SimpleWorkflow;
         switch (item.Status)
         {
-            case LabOrderItemStatus.SamplePending: return ServiceResult.Fail("The sample has not been collected yet. Collect the sample first.");
+            case LabOrderItemStatus.SamplePending when !simple: return ServiceResult.Fail("The sample has not been collected yet. Collect the sample first.");
             case LabOrderItemStatus.Cancelled: return ServiceResult.Fail("This test was cancelled.");
             case LabOrderItemStatus.Verified or LabOrderItemStatus.Released: return ServiceResult.Fail("This result is verified and cannot be changed. Withdraw it with a reason if it is wrong.");
         }
@@ -559,6 +646,7 @@ public sealed class LabService : ILabService
         var today = await _clock.TodayAsync();
         var wasSubmitted = item.Status == LabOrderItemStatus.AwaitingVerification;
         item.Comment = T(comment, 1000);
+        var autoVerified = false;
         if (submit)
         {
             item.Status = LabOrderItemStatus.AwaitingVerification;
@@ -566,14 +654,30 @@ public sealed class LabService : ILabService
             item.ResultEnteredByUserId = _ctx.UserId;
             item.ResultEnteredByUsername = _ctx.Username;
             item.CorrectionReason = null;
+            autoVerified = simple;
         }
         else if (!wasSubmitted) item.Status = LabOrderItemStatus.InProgress;
         var summary = string.Join("; ", item.Values.Where(v => v.Value is not null).Select(v => $"{v.Name} {v.Value}{(v.Flag == LabFlag.None ? "" : " " + v.Flag)}"));
         _db.LabItemEvents.Add(Event(item.Id, wasSubmitted ? LabEventType.ResultEdited : submit ? LabEventType.ResultSubmitted : LabEventType.ResultSaved, summary, today));
-        _audit.Add(AuditActions.LabResultSaved, "LabOrder", item.Order!.OrderNumber,
-            $"{item.TestName} of {item.Order.OrderNumber}: result {(wasSubmitted ? "edited" : submit ? "entered (awaiting verification)" : "saved as draft")}");
+        _audit.Add(autoVerified ? AuditActions.LabResultVerified : AuditActions.LabResultSaved, "LabOrder", item.Order!.OrderNumber,
+            $"{item.TestName} of {item.Order.OrderNumber}: result {(autoVerified ? "saved and verified (simple workflow)" : wasSubmitted ? "edited" : submit ? "entered (awaiting verification)" : "saved as draft")}");
+        await using var tx = await TxScope.BeginAsync(_db, ct);
         try { await _db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException) { return ServiceResult.Fail("The result was changed by someone else. Please reload."); }
+        if (autoVerified)
+        {
+            // Update 10: saving the complete report verifies it – the saving user is the responsible result-entry person.
+            // (Values are saved first, then the status: the database refuses value changes of a verified result.)
+            var me = _ctx.UserId is int uid0 ? await _db.Users.AsNoTracking().Where(u => u.Id == uid0).Select(u => u.FullName).FirstOrDefaultAsync(ct) : null;
+            item.Status = LabOrderItemStatus.Verified;
+            item.VerifiedUtc = item.ResultEnteredUtc;
+            item.VerifiedByUserId = _ctx.UserId;
+            item.VerifiedByUsername = _ctx.Username;
+            item.VerifiedByName = me ?? _ctx.Username;
+            _db.LabItemEvents.Add(Event(item.Id, LabEventType.Verified, "Report saved – verified automatically", today));
+            await _db.SaveChangesAsync(ct);
+        }
+        if (tx.Owned) await tx.CommitAsync(ct);
         return ServiceResult.Ok();
     }
 
@@ -631,7 +735,7 @@ public sealed class LabService : ILabService
     {
         reason = T(reason, 300);
         if (reason is null) return ServiceResult.Fail("Enter the reason for withdrawing the result.");
-        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        await using var tx = await TxScope.BeginAsync(_db, ct);
         var item = await _db.LabOrderItems.Include(x => x.Values).Include(x => x.Order).FirstOrDefaultAsync(x => x.Id == itemId, ct);
         if (item is null) return ServiceResult.Fail("Test not found.");
         if (item.Status is not (LabOrderItemStatus.AwaitingVerification or LabOrderItemStatus.Verified or LabOrderItemStatus.Released))
@@ -657,6 +761,43 @@ public sealed class LabService : ILabService
         _db.LabItemEvents.Add(Event(item.Id, LabEventType.ResultWithdrawn, $"Revision {item.RevisionNo}: {reason}", await _clock.TodayAsync()));
         _audit.Add(AuditActions.LabResultWithdrawn, "LabOrder", item.Order!.OrderNumber,
             $"{item.TestName} of {item.Order.OrderNumber} ({previous}) withdrawn – revision {item.RevisionNo} kept: {reason}");
+        await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return ServiceResult.Ok();
+    }
+
+    public async Task<ServiceResult> ReviewResultAsync(long itemId, IReadOnlyDictionary<long, string?> values, IReadOnlyList<CultureLineInput> culture, string? comment, string? reason, CancellationToken ct = default)
+    {
+        reason = T(reason, 300);
+        if (reason is null) return ServiceResult.Fail("Enter the reason for the correction.");
+        await using var tx = await TxScope.BeginAsync(_db, ct);
+        await FinanceDb.LockAsync(_db, $"LABREVIEW|{itemId}", ct);
+        var item = await _db.LabOrderItems.AsNoTracking().Include(x => x.Values).FirstOrDefaultAsync(x => x.Id == itemId, ct);
+        if (item is null) return ServiceResult.Fail("Test not found.");
+        if (item.Status is not (LabOrderItemStatus.Verified or LabOrderItemStatus.Released)) return ServiceResult.Fail("Only a saved (verified) report can be reviewed. Enter the result normally.");
+        var before = item.Values.ToDictionary(v => v.Id, v => v.Value);
+        var changed = item.Values.Where(v => values.TryGetValue(v.Id, out var nv) && !string.Equals(T(nv, 200), v.Value, StringComparison.Ordinal)).Select(v => v.Name).ToList();
+        // 1) keep the previous report as a revision (with the reason) and reopen only this test
+        var w = await WithdrawResultAsync(itemId, "Review: " + reason, ct);
+        if (!w.Succeeded) { await tx.RollbackAsync(CancellationToken.None); _db.ChangeTracker.Clear(); return w; }
+        // 2) save the corrected values – the simple workflow verifies them again with the reviewer as the responsible user
+        var current = await _db.LabOrderItems.Where(x => x.Id == itemId).Select(x => x.RowVersion).FirstAsync(ct);
+        var merged = item.Values.ToDictionary(v => v.Id, v => values.TryGetValue(v.Id, out var nv) ? nv : v.Value);
+        var s = await SaveResultAsync(itemId, merged, culture, comment, submit: true, current, ct);
+        if (!s.Succeeded) { await tx.RollbackAsync(CancellationToken.None); _db.ChangeTracker.Clear(); return s; }
+        var saved = await _db.LabOrderItems.Include(x => x.Order).FirstAsync(x => x.Id == itemId, ct);
+        if (saved.Status != LabOrderItemStatus.Verified)
+        {
+            // classic workflow: the corrected result is verified by the reviewer (no second verification queue for a reviewed report)
+            saved.Status = LabOrderItemStatus.Verified;
+            saved.VerifiedUtc = _clock.UtcNow; saved.VerifiedByUserId = _ctx.UserId; saved.VerifiedByUsername = _ctx.Username;
+            saved.VerifiedByName = _ctx.UserId is int u ? await _db.Users.Where(x => x.Id == u).Select(x => x.FullName).FirstOrDefaultAsync(ct) : _ctx.Username;
+        }
+        var after = await _db.LabResultValues.AsNoTracking().Where(v => v.OrderItemId == itemId).ToDictionaryAsync(v => v.Id, v => v.Value, ct);
+        _audit.Add(AuditActions.LabResultReviewed, "LabOrder", saved.Order!.OrderNumber,
+            $"{saved.TestName} of {saved.Order.OrderNumber} corrected (revision {saved.RevisionNo}): {reason}" + (changed.Count > 0 ? $" – changed {string.Join(", ", changed)}" : ""),
+            item.Values.Where(v => before[v.Id] != after.GetValueOrDefault(v.Id)).ToDictionary(v => v.Name, v => before[v.Id]),
+            item.Values.Where(v => before[v.Id] != after.GetValueOrDefault(v.Id)).ToDictionary(v => v.Name, v => after.GetValueOrDefault(v.Id)));
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return ServiceResult.Ok();

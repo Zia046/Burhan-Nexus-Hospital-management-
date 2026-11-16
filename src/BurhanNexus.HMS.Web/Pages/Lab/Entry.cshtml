@@ -6,8 +6,11 @@
     var c = Model.Current;
     ViewData["Title"] = $"Result entry – {p.FullName}";
     var age = AgeCalculator.Of(p, o.BusinessDate)?.Short ?? "—";
-    var editable = c is not null && (LabService.OpenStatuses.Contains(c.Status) || c.Status == LabOrderItemStatus.AwaitingVerification);
-    var allowed = c is not null && (BurhanNexus.HMS.Web.Pages.Lab.EntryModel.RequiredPermission(c) == Perm.LabEditResults ? Model.CanEdit : Model.CanEnter);
+    var saved = c is not null && c.Status is LabOrderItemStatus.Verified or LabOrderItemStatus.Released;
+    var reviewing = saved && Model.Review && Model.CanReview;
+    var editable = c is not null && (LabService.OpenStatuses.Contains(c.Status) || c.Status == LabOrderItemStatus.AwaitingVerification || reviewing);
+    var allowed = c is not null && (reviewing || (BurhanNexus.HMS.Web.Pages.Lab.EntryModel.RequiredPermission(c) == Perm.LabEditResults ? Model.CanEdit : Model.CanEnter));
+    var samplePending = c?.Status == LabOrderItemStatus.SamplePending && !Model.Simple;
 }
 <partial name="_LabNav" />
 <div class="lab-entry-head card">
@@ -44,7 +47,7 @@ else
         {
             <div class="alert alert-danger"><svg class="icon"><use href="#i-alert" /></svg><div><strong>Correction requested:</strong> @c.CorrectionReason</div></div>
         }
-        @if (c.Status == LabOrderItemStatus.SamplePending)
+        @if (samplePending)
         {
             <div class="alert alert-warning"><svg class="icon"><use href="#i-info" /></svg><div>The @c.SampleTypeName sample (@c.Sample?.SampleNumber) has not been collected yet.
                 @if (c.SampleId is long sid) { <button bn-permission="@Perm.LabCollectSamples" class="btn btn-primary btn-sm" type="submit" asp-page-handler="Collect" asp-route-sampleId="@sid" formnovalidate data-test="entry-collect">Collect &amp; receive sample now</button> }</div></div>
@@ -57,7 +60,7 @@ else
                 @foreach (var v in c.Values)
                 {
                     Model.Values.TryGetValue(v.Id, out var val);
-                    var dis = !editable || !allowed || c.Status == LabOrderItemStatus.SamplePending;
+                    var dis = !editable || !allowed || samplePending;
                     <tr data-param="@v.Name">
                         <td><label for="v@(v.Id)"><strong>@v.Name</strong>@if (v.IsOptional) { <small class="muted"> (optional)</small> }</label></td>
                         <td>
@@ -120,15 +123,32 @@ else
             <div class="field"><label for="Comment">Comment / interpretation</label><textarea id="Comment" name="Comment" rows="2" maxlength="1000" disabled="@(!editable || !allowed)">@Model.Comment</textarea></div>
             @if (c.ResultEnteredByUsername is not null) { <small class="muted">Entered by @c.ResultEnteredByUsername · @Fmt.DateTimeText(c.ResultEnteredUtc)</small> }
             @if (!allowed && editable) { <div class="alert alert-warning"><svg class="icon"><use href="#i-info" /></svg><div>You need the “Edit Unverified Results” permission to change this result.</div></div> }
-            @if (!editable) { <div class="muted">This result is @LabService.Label(c.Status).ToLowerInvariant() and can no longer be edited here.</div> }
+            @if (c.RevisionNo > 0) { <div class="small" data-amended>Amended report – revision @c.RevisionNo (previous results kept in the history).</div> }
+            @if (!editable)
+            {
+                <div class="muted" data-saved>This report is @LabService.Label(c.Status).ToLowerInvariant()@(c.VerifiedByName is null ? "" : " (" + c.VerifiedByName + ", " + Fmt.DateTimeText(c.VerifiedUtc) + ")").</div>
+                <div class="form-actions">
+                    @if (saved && Model.CanReview) { <a class="btn btn-light" href="/Lab/Entry/@o.Id?item=@c.Id&review=true" data-test="review-report">Review report (correct a result)</a> }
+                    @if (saved) { <a bn-permission="@Perm.LabPrintReports" class="btn btn-primary" href="/Print/LabReport/@o.Id" target="_blank" data-test="print-report">Print report</a> }
+                </div>
+            }
         </div>
-        @if (editable && allowed && c.Status != LabOrderItemStatus.SamplePending)
+        @if (reviewing)
+        {
+            <div class="card-footer form-actions" data-review-form>
+                <div class="field grow"><label for="Reason">Reason for the correction <em>*</em></label><input id="Reason" name="Reason" maxlength="300" required value="@Model.Reason" /></div>
+                <button class="btn btn-primary" type="submit" asp-page-handler="Review" data-test="review-save">Save corrected report</button>
+                <a class="btn btn-light" href="/Lab/Entry/@o.Id?item=@c.Id">Cancel</a>
+            </div>
+        }
+        else if (editable && allowed && !samplePending)
         {
             <div class="card-footer form-actions">
                 <button class="btn btn-light" type="submit" name="Mode" value="draft">Save draft</button>
-                <button class="btn btn-light" type="submit" name="Mode" value="submit" data-test="entry-save">Save result</button>
-                <button class="btn btn-primary btn-lg" type="submit" name="Mode" value="next" data-test="entry-next">Save &amp; next test →</button>
+                <button class="btn btn-light" type="submit" name="Mode" value="submit" data-test="entry-save">@(Model.Simple ? "Save report" : "Save result")</button>
+                <button class="btn btn-primary btn-lg" type="submit" name="Mode" value="next" data-test="entry-next">@(Model.Simple ? "Save report & next test →" : "Save & next test →")</button>
             </div>
+            @if (Model.Simple) { <div class="card-body small muted">Saving a complete report verifies it automatically – you are recorded as the responsible person.</div> }
         }
     </form>
 }
