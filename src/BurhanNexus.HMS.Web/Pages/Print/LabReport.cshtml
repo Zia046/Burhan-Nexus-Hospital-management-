@@ -72,8 +72,16 @@
         <tr><th>Patient</th><td data-field="patient"><strong>@p.FullName</strong></td><th>Patient ID</th><td class="mono" data-field="patient-id">@p.PatientNumber</td></tr>
         <tr><th>Age / Gender</th><td>@age / @p.Gender</td><th>Lab no.</th><td class="mono" data-field="order">@o.OrderNumber</td></tr>
         <tr><th>Referred by</th><td>@(o.ReferredBy is { Length: > 0 } rb ? rb : "Self")</td><th>Booked</th><td>@Fmt.DateTimeText(o.BookedUtc)</td></tr>
+        @if (Model.Lab.SimpleWorkflow)
+        {
+            @* update 10: no sample step – the specimen type only *@
+            <tr><th>Specimen</th><td colspan="3">@string.Join(", ", Model.Selected.Select(i => i.SampleTypeName).Distinct())</td></tr>
+        }
+        else
+        {
         <tr><th>Sample(s)</th><td>@string.Join(", ", Model.Selected.Select(i => i.Sample).Where(x => x != null).DistinctBy(x => x!.Id).Select(x => $"{x!.SampleTypeName} {x.SampleNumber}"))</td>
             <th>Collected</th><td>@Fmt.DateTimeText(Model.Selected.Select(i => i.Sample?.CollectedUtc).Where(x => x != null).Min())</td></tr>
+        }
         <tr><th>Reported</th><td>@Fmt.DateTimeText(lastVerified?.VerifiedUtc)</td><th>Printed</th><td>@Fmt.DateTimeText(DateTime.UtcNow)@(Model.Prints.Count > 1 ? $" (copy {Model.Prints.Count})" : "")</td></tr>
     </table>
     @foreach (var g in groups)

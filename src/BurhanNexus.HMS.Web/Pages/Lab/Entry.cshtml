@@ -137,7 +137,7 @@ else
         {
             <div class="card-footer form-actions" data-review-form>
                 <div class="field grow"><label for="Reason">Reason for the correction <em>*</em></label><input id="Reason" name="Reason" maxlength="300" required value="@Model.Reason" /></div>
-                <button class="btn btn-primary" type="submit" asp-page-handler="Review" data-test="review-save">Save corrected report</button>
+                <button class="btn btn-primary" type="submit" asp-page-handler="Review" asp-route-id="@o.Id" asp-route-item="@c.Id" data-test="review-save">Save corrected report</button>
                 <a class="btn btn-light" href="/Lab/Entry/@o.Id?item=@c.Id">Cancel</a>
             </div>
         }
