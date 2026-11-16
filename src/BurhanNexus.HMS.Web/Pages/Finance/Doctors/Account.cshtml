@@ -8,7 +8,10 @@
 <partial name="_FinanceNav" />
 <div class="toolbar">
     <form method="get" class="filters wrap"><partial name="_PeriodFilter" model="(Model.PresetKey, Model.From!.Value, Model.To!.Value)" /><button class="btn btn-light" type="submit">Show</button></form>
-    <div class="toolbar-actions"><a class="btn btn-light" href="/Finance/Doctors">&larr; Doctor accounts</a></div>
+    <div class="toolbar-actions">
+        @if (Model.CanPrint) { <a class="btn btn-light" href="/Print/Doctor/@a.DoctorId?from=@Model.From!.Value.ToString("yyyy-MM-dd")&amp;to=@Model.To!.Value.ToString("yyyy-MM-dd")" data-test="print-settlement"><svg class="icon icon-sm"><use href="#i-file" /></svg> Settlement report</a> }
+        @if (Model.IsManager) { <a class="btn btn-light" href="/Finance/Doctors">&larr; Doctor accounts</a> }
+    </div>
 </div>
 <partial name="_ValidationSummary" />
 <div class="card">
@@ -19,10 +22,41 @@
             <div class="kpi"><div class="kpi-icon navy"><svg class="icon"><use href="#i-wallet" /></svg></div><div><span class="kpi-label">Fees collected</span><strong class="kpi-value" data-kpi="collected">@Fmt.Money(a.FeesCollected)</strong></div></div>
             <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-hospital" /></svg></div><div><span class="kpi-label">Hospital share</span><strong class="kpi-value" data-kpi="hospital">@Fmt.Money(a.HospitalShare)</strong></div></div>
             <div class="kpi"><div class="kpi-icon amber"><svg class="icon"><use href="#i-refresh" /></svg></div><div><span class="kpi-label">Fee waivers (Free by Doctor)</span><strong class="kpi-value" data-kpi="waivers">@Fmt.Money(a.FeeWaivers)</strong><small class="muted block">@Fmt.Money(a.FeesWaived) of fees · not a cash refund</small></div></div>
-            <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-check-circle" /></svg></div><div><span class="kpi-label">Paid to doctor</span><strong class="kpi-value" data-kpi="paid">@Fmt.Money(a.PaidToDoctor)</strong></div></div>
+            <div class="kpi"><div class="kpi-icon green"><svg class="icon"><use href="#i-check-circle" /></svg></div><div><span class="kpi-label">Handed to doctor</span><strong class="kpi-value" data-kpi="paid">@Fmt.Money(a.PaidToDoctor)</strong></div></div>
+            <div class="kpi"><div class="kpi-icon grey"><svg class="icon"><use href="#i-key" /></svg></div><div><span class="kpi-label">Handed to Admin</span><strong class="kpi-value" data-kpi="to-admin">@Fmt.Money(a.HandedToAdmin)</strong></div></div>
             <div class="kpi"><div class="kpi-icon red"><svg class="icon"><use href="#i-alert" /></svg></div><div><span class="kpi-label">Remaining payable</span><strong class="kpi-value" data-kpi="payable">@Fmt.Money(a.Payable)</strong></div></div>
         </div>
         <p class="muted small">@BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(Model.From!.Value, Model.To!.Value): @p.Consultations consultations, @Fmt.Money(p.FeesCollected) collected, doctor's share @Fmt.Money(p.DoctorEarned), fee waivers @Fmt.Money(p.FeeWaivers), earnings after waivers @Fmt.Money(p.EarnedAfterWaivers), paid @Fmt.Money(p.PaidToDoctor).</p>
+    </div>
+</div>
+@{ var t = Model.Today; }
+<div class="card" data-doctor-day>
+    <div class="card-header"><h3><svg class="icon"><use href="#i-calendar" /></svg> OPD of @Fmt.Day(t.Date)</h3>
+        <form method="get" class="inline-form"><input type="date" name="day" value="@t.Date.ToString("yyyy-MM-dd")" aria-label="Day" /><button class="btn btn-light btn-sm" type="submit">Show</button></form>
+        @if (Model.CanPrint) { <a class="btn btn-light btn-sm" href="/Print/Doctor/@a.DoctorId?day=@t.Date.ToString("yyyy-MM-dd")" data-test="print-opd-list"><svg class="icon icon-sm"><use href="#i-file" /></svg> Print OPD list</a> }</div>
+    <div class="card-body">
+        <div class="kpi-grid">
+            <div class="kpi"><div><span class="kpi-label">OPD patients</span><strong class="kpi-value" data-day="count">@t.Count</strong></div></div>
+            <div class="kpi"><div><span class="kpi-label">Total booked (fees)</span><strong class="kpi-value" data-day="booked">@Fmt.Money(t.Booked)</strong></div></div>
+            <div class="kpi"><div><span class="kpi-label">Collected</span><strong class="kpi-value" data-day="collected">@Fmt.Money(t.Collected)</strong></div></div>
+            <div class="kpi"><div><span class="kpi-label">Outstanding from patients</span><strong class="kpi-value" data-day="outstanding">@Fmt.Money(t.Outstanding)</strong></div></div>
+            <div class="kpi"><div><span class="kpi-label">Doctor's share of the day</span><strong class="kpi-value" data-day="share">@Fmt.Money(t.DoctorShare)</strong></div></div>
+            <div class="kpi"><div><span class="kpi-label">Handed to doctor · to Admin (day)</span><strong class="kpi-value" data-day="handed">@Fmt.Money(t.HandedToDoctor) · @Fmt.Money(t.HandedToAdmin)</strong></div></div>
+            <div class="kpi"><div><span class="kpi-label">Payable remaining (carried forward)</span><strong class="kpi-value" data-day="payable">@Fmt.Money(a.Payable)</strong></div></div>
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table class="table table-compact" data-doctor-opd>
+            <thead><tr><th>Token</th><th>Patient ID</th><th>Patient</th><th>Booked</th><th class="num">Fee</th><th class="num">Paid</th><th>Payment</th><th>Status</th></tr></thead>
+            <tbody>
+            @foreach (var r in t.Rows)
+            {
+                <tr class="@(r.Status == AppointmentStatus.Cancelled ? "row-muted" : "")" data-opd-row="@r.PatientNumber"><td class="mono">@r.Token</td><td class="mono">@r.PatientNumber</td><td>@r.PatientName</td><td class="nowrap">@Fmt.DateTimeText(r.BookedUtc)</td>
+                    <td class="num">@Fmt.Money(r.Fee)</td><td class="num">@Fmt.Money(r.Paid)</td><td>@r.PaymentStatus</td><td>@r.Status</td></tr>
+            }
+            @if (t.Rows.Count == 0) { <tr><td colspan="8" class="empty">No OPD patients on this day.</td></tr> }
+            </tbody>
+        </table>
     </div>
 </div>
 <div class="grid-side">
@@ -45,25 +79,34 @@
             </div>
         </div>
         <div class="card">
-            <div class="card-header"><h3>Payments to doctor</h3></div>
+            <div class="card-header"><h3>Handover history</h3></div>
             <div class="table-wrap">
                 <table class="table table-compact" data-settlements>
-                    <thead><tr><th>Payment</th><th>Date</th><th class="num">Amount</th><th>Method</th><th>Reference</th><th>Notes</th><th>Recorded by</th></tr></thead>
+                    <thead><tr><th>Voucher</th><th>Date</th><th>Handed to</th><th class="num">Amount</th><th>Method</th><th>Reference</th><th>Notes</th><th>Recorded by</th><th></th></tr></thead>
                     <tbody>
                     @foreach (var s in Model.Settlements)
                     {
-                        <tr><td class="mono">@s.SettlementNumber</td><td>@Fmt.Day(s.BusinessDate)</td><td class="num">@Fmt.Money(s.Amount)</td><td>@s.PaymentMethod?.Name</td><td>@s.PaymentReference</td><td>@s.Notes</td><td>@s.RecordedByUsername · @Fmt.DateTimeText(s.PaidUtc)</td></tr>
+                        <tr data-settlement-kind="@s.Kind"><td class="mono">@s.SettlementNumber</td><td>@Fmt.Day(s.BusinessDate)</td><td>@(s.Kind == DoctorSettlementKind.ToAdmin ? "Admin" + (s.ReceivedBy is null or "Admin" ? "" : " (" + s.ReceivedBy + ")") : "Doctor")</td>
+                            <td class="num">@Fmt.Money(s.Amount)</td><td>@s.PaymentMethod?.Name</td><td>@s.PaymentReference</td><td>@s.Notes</td><td>@s.RecordedByUsername · @Fmt.DateTimeText(s.PaidUtc)</td>
+                            <td>@if (Model.CanPrint) { <a class="btn btn-light btn-sm" href="/Print/Doctor/@a.DoctorId?voucher=@s.Id" data-test="print-voucher">Voucher</a> }</td></tr>
                     }
-                    @if (Model.Settlements.Count == 0) { <tr><td colspan="7" class="empty">No payments yet.</td></tr> }
+                    @if (Model.Settlements.Count == 0) { <tr><td colspan="9" class="empty">No handovers yet.</td></tr> }
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
     <div class="stack">
-        <form bn-permission="@Perm.FinanceRecordDoctorPayments" method="post" asp-page-handler="Pay" class="card" novalidate>
-            <div class="card-header"><h3>Pay doctor</h3></div>
+        @if (Model.CanPay || Model.CanHandToAdmin)
+        {
+        <form method="post" asp-page-handler="Pay" asp-route-id="@a.DoctorId" class="card" novalidate data-doctor-handover>
+            <div class="card-header"><h3>Pay / hand over</h3></div>
             <div class="card-body">
+                <div class="checks">
+                    @if (Model.CanPay) { <label class="check"><input type="radio" name="Pay.ToAdmin" value="false" checked /> Hand to doctor</label> }
+                    @if (Model.CanHandToAdmin) { <label class="check"><input type="radio" name="Pay.ToAdmin" value="true" checked="@(!Model.CanPay)" data-test="hand-to-admin" /> Hand to Admin (recorded separately)</label> }
+                </div>
+                <div class="field"><label for="Pay_ReceivedBy">Received by (for Admin)</label><input id="Pay_ReceivedBy" name="Pay.ReceivedBy" maxlength="150" placeholder="Admin" /></div>
                 <div class="field"><label for="Pay_Amount">Amount (payable @Fmt.Money(a.Payable)) <em>*</em></label>
                     <input id="Pay_Amount" name="Pay.Amount" type="number" step="0.01" min="0.01" max="@Math.Max(0, a.Payable)" value="@(a.Payable > 0 ? a.Payable.ToString(System.Globalization.CultureInfo.InvariantCulture) : "")" required /></div>
                 <div class="field"><label for="Pay_PaymentMethodId">Method</label><select id="Pay_PaymentMethodId" name="Pay.PaymentMethodId">@foreach (var m in Model.Methods) { <option value="@m.Id">@m.Name</option> }</select></div>
@@ -71,9 +114,13 @@
                 <div class="field"><label for="Pay_PaidOn">Date</label><input id="Pay_PaidOn" name="Pay.PaidOn" type="date" /></div>
                 <div class="field"><label for="Pay_Notes">Notes</label><input id="Pay_Notes" name="Pay.Notes" maxlength="300" /></div>
             </div>
-            <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="doctor-pay" data-once>Record payment</button></div>
+            <div class="card-footer"><button class="btn btn-primary" type="submit" data-test="doctor-pay" data-once>Record handover</button>
+                <small class="muted block">Each handover gets its own voucher number. Whatever is not handed over stays payable for the next day.</small></div>
         </form>
-        <form method="post" asp-page-handler="Share" class="card" novalidate>
+        }
+        @if (Model.IsManager)
+        {
+        <form method="post" asp-page-handler="Share" asp-route-id="@a.DoctorId" class="card" novalidate>
             <div class="card-header"><h3>Fee-sharing arrangement</h3></div>
             <div class="card-body">
                 <div class="field"><label for="ShareType">Arrangement</label>
@@ -90,5 +137,6 @@
             </div>
             <div class="card-footer"><button class="btn btn-light" type="submit" data-test="doctor-share">Save arrangement</button></div>
         </form>
+        }
     </div>
 </div>

@@ -12,9 +12,11 @@ public sealed record DoctorAccount(
     int DoctorId, string Name, string? Specialty, bool IsActive, DoctorShareType ShareType, decimal ShareValue, decimal? ConsultationFee,
     int Consultations, decimal FeesCollected, decimal HospitalShare, decimal DoctorEarned, decimal Adjustments, decimal PaidToDoctor,
     /// <summary>Update 9: "Free by Doctor" waivers of fees already collected (negative = reduces the doctor's earnings; not a cash refund).</summary>
-    decimal FeeWaivers = 0, decimal FeesWaived = 0)
+    decimal FeeWaivers = 0, decimal FeesWaived = 0,
+    /// <summary>Update 11: handed to the Admin on the doctor's behalf (positive) – recorded separately from money handed to the doctor.</summary>
+    decimal HandedToAdmin = 0)
 {
-    public decimal Payable => DoctorEarned + Adjustments + FeeWaivers - PaidToDoctor;
+    public decimal Payable => DoctorEarned + Adjustments + FeeWaivers - PaidToDoctor - HandedToAdmin;
     /// <summary>Consultation-fee earnings after waivers.</summary>
     public decimal EarnedAfterWaivers => DoctorEarned + FeeWaivers;
     public string Arrangement => FinanceMath.Describe(ShareType, ShareValue);
@@ -27,6 +29,24 @@ public sealed class SettlementInput
     public string? PaymentReference { get; set; }
     public string? Notes { get; set; }
     public DateOnly? PaidOn { get; set; }
+    /// <summary>Update 11: hand the money to the Admin instead of the doctor.</summary>
+    public bool ToAdmin { get; set; }
+    public string? ReceivedBy { get; set; }
+}
+
+/// <summary>Update 11: one OPD patient of a doctor's daily list.</summary>
+public sealed record DoctorOpdRow(long AppointmentId, int Token, string PatientNumber, string PatientName, AppointmentStatus Status, DateTime BookedUtc,
+    decimal Fee, decimal Paid, bool Waived)
+{
+    public decimal Outstanding => Waived ? 0 : Math.Max(0, Fee - Paid);
+    public string PaymentStatus => Waived ? "Free by doctor" : Fee <= 0 ? "No fee" : Paid >= Fee ? "Paid" : Paid > 0 ? "Partly paid" : "Unpaid";
+}
+
+/// <summary>Update 11: a doctor's day – OPD list and the money of that day (no double counting: built from the ledger and the charges).</summary>
+public sealed record DoctorDay(DateOnly Date, IReadOnlyList<DoctorOpdRow> Rows, decimal Booked, decimal Collected, decimal Outstanding,
+    decimal DoctorShare, decimal HandedToDoctor, decimal HandedToAdmin)
+{
+    public int Count => Rows.Count(r => r.Status != AppointmentStatus.Cancelled);
 }
 
 public interface IDoctorAccountService
@@ -37,6 +57,10 @@ public interface IDoctorAccountService
     Task<IReadOnlyList<DoctorSettlement>> SettlementsAsync(int? doctorId, DateOnly? from, DateOnly? to, CancellationToken ct = default);
     Task<decimal> PayableAsync(int doctorId, CancellationToken ct = default);
     Task<ServiceResult<DoctorSettlement>> PayAsync(int doctorId, SettlementInput input, CancellationToken ct = default);
+    /// <summary>Update 11: the doctor's OPD list and money of one day.</summary>
+    Task<DoctorDay> DayAsync(int doctorId, DateOnly date, CancellationToken ct = default);
+    /// <summary>Update 11: the doctor linked to a user (a doctor sees only his own account).</summary>
+    Task<int?> DoctorOfUserAsync(int userId, CancellationToken ct = default);
 }
 
 public sealed class DoctorAccountService : IDoctorAccountService
@@ -81,7 +105,8 @@ public sealed class DoctorAccountService : IDoctorAccountService
                 mine.Where(s => s.EntryType == DoctorEntryType.Adjustment).Sum(s => s.Amount),
                 -mine.Where(s => s.EntryType == DoctorEntryType.Settlement).Sum(s => s.Amount),
                 mine.Where(s => s.EntryType == DoctorEntryType.FeeWaiver).Sum(s => s.Amount),
-                -mine.Where(s => s.EntryType == DoctorEntryType.FeeWaiver).Sum(s => s.Gross));
+                -mine.Where(s => s.EntryType == DoctorEntryType.FeeWaiver).Sum(s => s.Gross),
+                -mine.Where(s => s.EntryType == DoctorEntryType.HandedToAdmin).Sum(s => s.Amount));
         }).ToList();
     }
 
@@ -119,6 +144,10 @@ public sealed class DoctorAccountService : IDoctorAccountService
         var paidOn = i.PaidOn ?? today;
         if (paidOn > today) return ServiceResult<DoctorSettlement>.Fail("Payment date cannot be in the future.");
 
+        var receivedBy = string.IsNullOrWhiteSpace(i.ReceivedBy) ? null : i.ReceivedBy.Trim();
+        if ((receivedBy?.Length ?? 0) > 150) return ServiceResult<DoctorSettlement>.Fail("Received by: max 150 characters.");
+        if (i.ToAdmin) receivedBy ??= "Admin";
+
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         await FinanceDb.LockAsync(_db, $"DOCTOR|{doctorId}", ct);
         var payable = await PayableAsync(doctorId, ct);
@@ -127,7 +156,8 @@ public sealed class DoctorAccountService : IDoctorAccountService
         var now = _clock.UtcNow;
         var s = new DoctorSettlement
         {
-            SettlementNumber = await FinanceDb.NextNumberAsync(_db, HmsDbContext.SettlementNumberSequence, "DPY", paidOn, ct),
+            SettlementNumber = await FinanceDb.NextNumberAsync(_db, HmsDbContext.SettlementNumberSequence, i.ToAdmin ? "DHA" : "DPY", paidOn, ct),
+            Kind = i.ToAdmin ? DoctorSettlementKind.ToAdmin : DoctorSettlementKind.ToDoctor, ReceivedBy = receivedBy,
             DoctorId = doctorId, Amount = i.Amount, PaymentMethodId = method.Id, PaymentReference = reference,
             Notes = string.IsNullOrWhiteSpace(i.Notes) ? null : i.Notes.Trim(), PaidUtc = now, BusinessDate = paidOn,
             RecordedByUserId = _ctx.UserId, RecordedByUsername = _ctx.Username
@@ -136,14 +166,39 @@ public sealed class DoctorAccountService : IDoctorAccountService
         await _db.SaveChangesAsync(ct);
         _db.DoctorLedger.Add(new DoctorLedgerEntry
         {
-            DoctorId = doctorId, EntryType = DoctorEntryType.Settlement, Amount = -i.Amount, SettlementId = s.Id, Reference = s.SettlementNumber,
-            Description = $"Paid to doctor ({method.Name}{(reference is null ? "" : " " + reference)})", BusinessDate = paidOn, CreatedUtc = now,
-            CreatedByUserId = _ctx.UserId, CreatedByUsername = _ctx.Username
+            DoctorId = doctorId, EntryType = i.ToAdmin ? DoctorEntryType.HandedToAdmin : DoctorEntryType.Settlement, Amount = -i.Amount, SettlementId = s.Id, Reference = s.SettlementNumber,
+            Description = (i.ToAdmin ? $"Handed to Admin ({receivedBy}, {method.Name}" : $"Paid to doctor ({method.Name}") + $"{(reference is null ? "" : " " + reference)})",
+            BusinessDate = paidOn, CreatedUtc = now, CreatedByUserId = _ctx.UserId, CreatedByUsername = _ctx.Username
         });
-        _audit.Add(AuditActions.DoctorPaid, "DoctorSettlement", s.SettlementNumber,
-            $"{i.Amount:N2} paid to {doctor.Name} ({method.Name}); payable before {payable:N2}, after {payable - i.Amount:N2}");
+        _audit.Add(i.ToAdmin ? AuditActions.DoctorHandedToAdmin : AuditActions.DoctorPaid, "DoctorSettlement", s.SettlementNumber,
+            (i.ToAdmin ? $"{i.Amount:N2} of {doctor.Name}'s account handed to Admin ({receivedBy}, {method.Name})" : $"{i.Amount:N2} paid to {doctor.Name} ({method.Name})")
+            + $"; payable before {payable:N2}, after {payable - i.Amount:N2}");
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return ServiceResult<DoctorSettlement>.Ok(s);
+    }
+
+    public async Task<int?> DoctorOfUserAsync(int userId, CancellationToken ct = default) =>
+        await _db.Doctors.AsNoTracking().Where(d => d.UserId == userId).Select(d => (int?)d.Id).FirstOrDefaultAsync(ct);
+
+    public async Task<DoctorDay> DayAsync(int doctorId, DateOnly date, CancellationToken ct = default)
+    {
+        var appts = await _db.Appointments.AsNoTracking().Where(a => a.DoctorId == doctorId && a.AppointmentDate == date)
+            .OrderBy(a => a.TokenNumber).Select(a => new
+            {
+                a.Id, a.TokenNumber, a.Patient!.PatientNumber, a.Patient.FullName, a.Status, a.BookedUtc, a.EncounterId, a.ConsultationFee,
+                Fee = _db.Charges.Where(c => c.EncounterId == a.EncounterId && c.DoctorId == doctorId && c.Status != ChargeStatus.Cancelled).Sum(c => (decimal?)c.NetAmount),
+                Paid = _db.Charges.Where(c => c.EncounterId == a.EncounterId && c.DoctorId == doctorId && c.Status != ChargeStatus.Cancelled).Sum(c => (decimal?)c.PaidAmount),
+                Waived = _db.DoctorLedger.Any(e => e.AppointmentId == a.Id && e.EntryType == DoctorEntryType.FeeWaiver)
+            }).ToListAsync(ct);
+        var rows = appts.Select(a => new DoctorOpdRow(a.Id, a.TokenNumber, a.PatientNumber, a.FullName, a.Status, a.BookedUtc,
+            a.Fee ?? a.ConsultationFee ?? 0, a.Paid ?? 0, a.Waived)).ToList();
+        var live = rows.Where(r => r.Status != AppointmentStatus.Cancelled).ToList();
+        var ledger = await _db.DoctorLedger.AsNoTracking().Where(e => e.DoctorId == doctorId && e.BusinessDate == date)
+            .GroupBy(e => e.EntryType).Select(g => new { g.Key, Amount = g.Sum(e => e.Amount), Gross = g.Sum(e => e.GrossAmount) }).ToListAsync(ct);
+        var share = ledger.Where(l => l.Key is DoctorEntryType.ConsultationShare or DoctorEntryType.ShareReversal).ToList();
+        return new DoctorDay(date, rows, live.Sum(r => r.Fee), share.Sum(l => l.Gross), live.Sum(r => r.Outstanding),
+            share.Sum(l => l.Amount) + ledger.Where(l => l.Key == DoctorEntryType.FeeWaiver).Sum(l => l.Amount),
+            -ledger.Where(l => l.Key == DoctorEntryType.Settlement).Sum(l => l.Amount), -ledger.Where(l => l.Key == DoctorEntryType.HandedToAdmin).Sum(l => l.Amount));
     }
 }

@@ -259,4 +259,11 @@ public static class AuditActions
     public const string IpdAdmissionFeePaid = "Ipd.AdmissionFeePaid";
     public const string IpdAdmissionFeeWaived = "Ipd.AdmissionFeeWaived";
     public const string IpdDuplicateChargeBlocked = "Ipd.DuplicateChargeBlocked";
+
+    // ---- Update 11 ----
+    public const string IpdMedicinePaid = "Ipd.MedicineIssuePaid";
+    public const string IpdMedicineLeftOutstanding = "Ipd.MedicineIssueOutstanding";
+    public const string DoctorHandover = "Finance.DoctorHandover";
+    public const string DoctorHandedToAdmin = "Finance.DoctorHandedToAdmin";
+    public const string StockInvoiceDuplicateBlocked = "Pharmacy.DuplicateInvoiceBlocked";
 }

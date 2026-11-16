@@ -16,7 +16,6 @@ public class WardRequestModel : PharmacyPageModel
     [BindProperty(SupportsGet = true)] public long Id { get; set; }
     [BindProperty] public Guid IdempotencyKey { get; set; }
     [BindProperty] public string? Note { get; set; }
-
     public MedicineRequest R { get; private set; } = null!;
     public IReadOnlyList<MedicineRequestEvent> Events { get; private set; } = Array.Empty<MedicineRequestEvent>();
     public Dictionary<int, int> Stock { get; } = new();
@@ -32,6 +31,7 @@ public class WardRequestModel : PharmacyPageModel
         var ids = r.Lines.Select(l => l.MedicineId).ToHashSet();
         foreach (var s in rows.Where(s => ids.Contains(s.MedicineId))) Stock[s.MedicineId] = s.MainStock;
         if (IdempotencyKey == Guid.Empty) IdempotencyKey = Guid.NewGuid();
+        await LoadIpdPaymentAsync();
         return true;
     }
 
@@ -51,6 +51,7 @@ public class WardRequestModel : PharmacyPageModel
             return Page();
         }
         FlashSuccess = r.Value!.WasDuplicate ? $"Already issued as {r.Value.Number} – nothing was deducted again." : $"Issued as {r.Value.Number}. Stock deducted against the admission.";
+        if ((R?.AdmissionId ?? (await _req.GetAsync(Id))?.AdmissionId) is long aid) await SettleIpdIssueAsync(aid, r.Value.Id, r.Value.Number, IdempotencyKey);
         return Redirect($"/Pharmacy/WardRequest/{Id}");
     }
 

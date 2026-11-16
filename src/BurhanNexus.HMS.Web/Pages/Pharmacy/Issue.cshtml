@@ -66,8 +66,9 @@ else
             @if (Model.CanDiscount) { <div class="field span-2"><label for="Input_DiscountReason">Discount reason</label><input asp-for="Input.DiscountReason" maxlength="200" /></div> }
             <div class="field span-2"><label for="Input_Notes">Notes</label><input asp-for="Input.Notes" maxlength="500" placeholder="e.g. as per handwritten prescription of Dr. …" /></div>
         </div>
+        @if (Model.Admission is not null) { <div class="card-body"><partial name="_IpdPayOption" model="Model" /></div> }
         <div class="card-footer form-actions">
-            @if (Model.IsPrivate) { <span class="muted">Charges go to the cash counter (Phase 3) for payment.</span> }
+            @if (Model.IsPrivate && Model.Admission is null) { <span class="muted">Charges go to the cash counter (Phase 3) for payment.</span> }
             <button class="btn btn-primary btn-lg" type="submit" data-test="save-issue">Issue medicines</button>
         </div>
     </form>

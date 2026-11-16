@@ -141,3 +141,36 @@ public sealed class BackupApiController : ControllerBase
     public async Task<IActionResult> List(CancellationToken ct) =>
         Ok((await _backups.ListAsync(ct)).Select(b => new { b.Id, b.FileName, b.SizeBytes, status = b.Status.ToString(), kind = b.Kind.ToString(), b.StartedUtc, b.CompletedUtc }));
 }
+
+/// <summary>Update 11: live alert counts for the navigation (polled by site.js – no full page refresh).
+/// Ward medicine requests stay "pending" until every request is issued or cancelled; viewing does not clear the alert.</summary>
+[ApiController]
+[Route("api/alerts")]
+[Authorize]
+public sealed class AlertsApiController : ControllerBase
+{
+    private readonly UserPermissionContext _permissions;
+    private readonly BurhanNexus.HMS.Infrastructure.Persistence.HmsDbContext _db;
+    public AlertsApiController(UserPermissionContext permissions, BurhanNexus.HMS.Infrastructure.Persistence.HmsDbContext db)
+    {
+        _permissions = permissions;
+        _db = db;
+    }
+
+    public static readonly BurhanNexus.HMS.Core.Domain.MedicineRequestStatus[] PendingWardRequest =
+    {
+        BurhanNexus.HMS.Core.Domain.MedicineRequestStatus.Pending, BurhanNexus.HMS.Core.Domain.MedicineRequestStatus.Approved,
+        BurhanNexus.HMS.Core.Domain.MedicineRequestStatus.PartlyIssued
+    };
+
+    [HttpGet]
+    public async Task<IActionResult> Get(CancellationToken ct)
+    {
+        var perms = await _permissions.GetAsync();
+        int? ward = null;
+        if (perms.Contains(Perm.PharmProcessWardRequests))
+            ward = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.CountAsync(_db.MedicineRequests, r => PendingWardRequest.Contains(r.Status), ct);
+        Response.Headers.CacheControl = "no-store";
+        return Ok(new { wardRequests = ward });
+    }
+}

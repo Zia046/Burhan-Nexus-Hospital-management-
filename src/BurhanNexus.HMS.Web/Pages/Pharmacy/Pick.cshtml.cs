@@ -18,7 +18,7 @@ public class PickModel : PharmacyPageModel
         var list = await Query.PickAsync(q, loc, prices, idList, idList.Count > 0 ? idList.Count : 20);
         return new JsonResult(list.Select(m => new
         {
-            id = m.Id, code = m.Code, name = m.Name, generic = m.GenericName, unit = m.Unit, available = m.Available, price = m.SalePrice,
+            id = m.Id, code = m.Code, name = m.Name, generic = m.GenericName, unit = m.Unit, available = m.Available, price = m.SalePrice, cost = m.PurchasePrice,
             discount = m.AllowDiscount, maxDiscount = m.MaxDiscountPercent,
             batches = m.Batches.Select(b => new { id = b.Id, number = b.BatchNumber, expiry = b.Expiry.ToString("yyyy-MM-dd"), available = b.Available, price = b.SalePrice, near = b.NearExpiry })
         }));

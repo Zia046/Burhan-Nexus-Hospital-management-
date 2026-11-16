@@ -10,7 +10,7 @@ namespace BurhanNexus.HMS.Infrastructure.Ipd;
 public sealed record AdmissionRow(
     long Id, string AdmissionNumber, AdmissionKind Kind, AdmissionStatus Status, DateTime AdmittedUtc, DateTime? DischargedUtc,
     long PatientId, string PatientNumber, string PatientName, string AgeGender, string? Ward, string? Room, string? Bed, string? Department,
-    string? Diagnosis, bool NeedsAttention, string? AttentionNote, string? Allergies, LabourStatus? LabourStatus, long? MotherAdmissionId);
+    string? Diagnosis, bool NeedsAttention, string? AttentionNote, string? Allergies, LabourStatus? LabourStatus, long? MotherAdmissionId, string? Doctor = null);
 
 public sealed record WardOccupancy(int WardId, string Ward, WardType Type, int Beds, int Occupied, int Available, int Reserved, int Cleaning, int Unavailable, int Patients);
 
@@ -144,6 +144,7 @@ public sealed class IpdQueryService : IIpdQueryService
             a.Id, a.AdmissionNumber, a.Kind, a.Status, a.AdmittedUtc, a.DischargedUtc, a.PatientId, a.Patient!.PatientNumber, a.Patient.FullName, a.Patient.Gender, a.Patient.DateOfBirth,
             Ward = a.CurrentWard != null ? a.CurrentWard.Name : null, Room = a.CurrentBed != null ? a.CurrentBed.Room!.Name : null, Bed = a.CurrentBed != null ? a.CurrentBed.Code : null,
             Department = a.Department != null ? a.Department.Name : null, a.AdmissionDiagnosis, a.NeedsAttention, a.AttentionNote, a.Allergies, a.MotherAdmissionId,
+            Doctor = a.AdmittingDoctor != null ? a.AdmittingDoctor.Name : a.AdmittingDoctorName,
             Labour = _db.LabourRecords.Where(l => l.AdmissionId == a.Id).Select(l => (LabourStatus?)l.Status).FirstOrDefault()
         }).ToListAsync(ct);
         var today = await _clock.TodayAsync();
@@ -152,7 +153,7 @@ public sealed class IpdQueryService : IIpdQueryService
             var age = r.DateOfBirth is { } dob ? AgeCalculator.FromDateOfBirth(dob, today).Short : "-";
             var g = r.Gender switch { Gender.Male => "M", Gender.Female => "F", Gender.Other => "O", _ => "-" };
             return new AdmissionRow(r.Id, r.AdmissionNumber, r.Kind, r.Status, r.AdmittedUtc, r.DischargedUtc, r.PatientId, r.PatientNumber, r.FullName, $"{age} / {g}",
-                r.Ward, r.Room, r.Bed, r.Department, r.AdmissionDiagnosis, r.NeedsAttention, r.AttentionNote, r.Allergies, r.Labour, r.MotherAdmissionId);
+                r.Ward, r.Room, r.Bed, r.Department, r.AdmissionDiagnosis, r.NeedsAttention, r.AttentionNote, r.Allergies, r.Labour, r.MotherAdmissionId, r.Doctor);
         }).ToList();
     }
 

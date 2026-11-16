@@ -1,0 +1,82 @@
+@page "{id:int}"
+@model BurhanNexus.HMS.Web.Pages.Print.DoctorModel
+@{
+    Layout = null;
+    var h = Model.Hospital; var a = Model.Account;
+    var title = Model.Mode switch { "voucher" => "Doctor handover voucher", "settlement" => "Doctor settlement report", _ => "Doctor daily OPD list" };
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>@title – @a.Name</title>
+    <link rel="stylesheet" href="~/css/lab-report.css" asp-append-version="true" />
+    <script src="~/js/lab-report.js" asp-append-version="true" defer></script>
+</head>
+<body class="lab-report-body" data-doctor-print="@Model.Mode">
+<div class="lr-toolbar no-print">
+    <div class="lr-row">
+        <strong>@title</strong>
+        <button type="button" class="lr-btn" data-print-now data-test="print-doctor">Print</button>
+        <a class="lr-btn light" href="/Finance/Doctors/Account/@a.DoctorId">&larr; Doctor account</a>
+    </div>
+    <div class="lr-status">For a PDF choose “Save as PDF” in the print dialog. Printing only reads the stored records – nothing is created.</div>
+</div>
+<main class="lr-page">
+    <header class="lr-head">
+        @if (h.HasLogo) { <img class="lr-logo" src="/branding/logo?v=@h.LogoVersion" alt="" /> }
+        <div class="lr-brand"><div class="lr-hosp">@h.HospitalName</div><div class="lr-small">@h.Address, @h.City · @h.ContactNumber</div></div>
+    </header>
+    <h1 class="lr-title">@title.ToUpperInvariant()</h1>
+    <table class="lr-info">
+        <tr><th>Doctor</th><td><strong>@a.Name</strong> @a.Specialty</td><th>Arrangement</th><td>@a.Arrangement</td></tr>
+        <tr><th>Payable now</th><td><strong>@Fmt.Money(a.Payable)</strong></td><th>Printed</th><td>@Fmt.DateTimeText(DateTime.UtcNow)</td></tr>
+    </table>
+    @if (Model.Mode == "voucher" && Model.Settlement is { } s)
+    {
+        <table class="lr-results" data-voucher="@s.SettlementNumber">
+            <tr><th>Voucher no.</th><td class="mono"><strong>@s.SettlementNumber</strong></td></tr>
+            <tr><th>Date</th><td>@Fmt.Day(s.BusinessDate) (@Fmt.DateTimeText(s.PaidUtc))</td></tr>
+            <tr><th>Handed to</th><td>@(s.Kind == DoctorSettlementKind.ToAdmin ? "Admin – " + (s.ReceivedBy ?? "Admin") : "Doctor – " + a.Name)</td></tr>
+            <tr><th>Amount</th><td><strong>@Fmt.Money(s.Amount)</strong></td></tr>
+            <tr><th>Method</th><td>@s.PaymentMethod?.Name @s.PaymentReference</td></tr>
+            <tr><th>Note</th><td>@s.Notes</td></tr>
+            <tr><th>Recorded by</th><td>@s.RecordedByUsername</td></tr>
+        </table>
+        <div class="lr-sign"><span>Received by ____________________</span><span>Handed over by ____________________</span></div>
+    }
+    else if (Model.Mode == "settlement" && Model.Period is { } p)
+    {
+        <p class="lr-small">Period: @Fmt.Day(Model.From!.Value) – @Fmt.Day(Model.To!.Value)</p>
+        <table class="lr-results" data-settlement-summary>
+            <tr><th>Consultations</th><td>@p.Consultations</td></tr>
+            <tr><th>Fees collected</th><td>@Fmt.Money(p.FeesCollected)</td></tr>
+            <tr><th>Hospital share</th><td>@Fmt.Money(p.HospitalShare)</td></tr>
+            <tr><th>Doctor's share (after waivers)</th><td>@Fmt.Money(p.EarnedAfterWaivers)</td></tr>
+            <tr><th>Adjustments</th><td>@Fmt.Money(p.Adjustments)</td></tr>
+            <tr><th>Handed to doctor</th><td>@Fmt.Money(p.PaidToDoctor)</td></tr>
+            <tr><th>Handed to Admin</th><td>@Fmt.Money(p.HandedToAdmin)</td></tr>
+            <tr><th>Net for the period</th><td><strong>@Fmt.Money(p.Payable)</strong></td></tr>
+        </table>
+        <h3>Handovers</h3>
+        <table class="lr-results"><thead><tr><th>Voucher</th><th>Date</th><th>To</th><th>Amount</th><th>Method</th><th>By</th></tr></thead><tbody>
+            @foreach (var x in Model.Settlements) { <tr><td class="mono">@x.SettlementNumber</td><td>@Fmt.Day(x.BusinessDate)</td><td>@(x.Kind == DoctorSettlementKind.ToAdmin ? "Admin" : "Doctor")</td><td>@Fmt.Money(x.Amount)</td><td>@x.PaymentMethod?.Name</td><td>@x.RecordedByUsername</td></tr> }
+            @if (Model.Settlements.Count == 0) { <tr><td colspan="6">No handovers in this period.</td></tr> }
+        </tbody></table>
+        <h3>Account entries</h3>
+        <table class="lr-results"><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Collected</th><th>Doctor</th></tr></thead><tbody>
+            @foreach (var e in Model.Ledger.OrderBy(e => e.Id)) { <tr><td>@Fmt.Day(e.BusinessDate)</td><td>@e.EntryType</td><td class="mono">@e.Reference</td><td>@(e.GrossAmount == 0 ? "" : Fmt.Money(e.GrossAmount))</td><td>@Fmt.Money(e.Amount)</td></tr> }
+        </tbody></table>
+    }
+    else if (Model.DayData is { } d)
+    {
+        <p class="lr-small">Date: <strong>@Fmt.Day(d.Date)</strong> · OPD patients: <strong>@d.Count</strong> · Booked @Fmt.Money(d.Booked) · Collected @Fmt.Money(d.Collected) · Outstanding @Fmt.Money(d.Outstanding)</p>
+        <table class="lr-results" data-opd-list><thead><tr><th>Token</th><th>Patient ID</th><th>Patient</th><th>Fee</th><th>Paid</th><th>Payment</th><th>Status</th></tr></thead><tbody>
+            @foreach (var r in d.Rows) { <tr><td>@r.Token</td><td class="mono">@r.PatientNumber</td><td>@r.PatientName</td><td>@Fmt.Money(r.Fee)</td><td>@Fmt.Money(r.Paid)</td><td>@r.PaymentStatus</td><td>@r.Status</td></tr> }
+            @if (d.Rows.Count == 0) { <tr><td colspan="7">No OPD patients.</td></tr> }
+        </tbody></table>
+        <p class="lr-small">Doctor's share of the day @Fmt.Money(d.DoctorShare) · handed to doctor @Fmt.Money(d.HandedToDoctor) · handed to Admin @Fmt.Money(d.HandedToAdmin) · payable remaining @Fmt.Money(a.Payable)</p>
+    }
+</main>
+</body>
+</html>

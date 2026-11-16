@@ -98,6 +98,11 @@ public interface IIpdBillingService
     Task<ServiceResult<Receipt?>> ReceivePaymentAsync(long admissionId, Guid idempotencyKey, decimal amount, int paymentMethodId, int? counterId, string? reference, CancellationToken ct = default);
     Task<ServiceResult> PayAdmissionFeeAsync(long admissionId, Guid idempotencyKey, int paymentMethodId, int? counterId, string? reference, CancellationToken ct = default);
     Task<ServiceResult> WaiveAdmissionFeeAsync(long admissionId, string? reason, CancellationToken ct = default);
+    /// <summary>Update 11: outstanding amount of one medicine issuance on the admission's account (0 = settled / nothing billed).</summary>
+    Task<decimal> MedicineIssueDueAsync(long admissionId, long issueId, CancellationToken ct = default);
+    /// <summary>Update 11: "pay now" for an IPD medicine issuance – a Phase 3 receipt against exactly that issuance's charges (partial allowed).
+    /// Without it the amount simply stays outstanding on the IPD account and the discharge statement.</summary>
+    Task<ServiceResult<string>> PayMedicineIssueAsync(long admissionId, long issueId, Guid idempotencyKey, int paymentMethodId, int? counterId, decimal amount, string? reference, CancellationToken ct = default);
 
     Task<IReadOnlyList<NicuEquipment>> EquipmentCatalogueAsync(bool activeOnly, CancellationToken ct = default);
     Task<ServiceResult<EquipmentUsage>> StartEquipmentAsync(EquipmentStartInput input, CancellationToken ct = default);
@@ -419,6 +424,47 @@ public sealed class IpdBillingService : IIpdBillingService
         if (!r.Value!.WasDuplicate)
             await _audit.LogAsync(AuditActions.IpdAdmissionFeePaid, "IpdAdmission", a.AdmissionNumber, $"Admission fee {c.NetAmount:N2} of {a.AdmissionNumber} paid (receipt {r.Value.Receipt?.ReceiptNumber})", ct: ct);
         return ServiceResult.Ok();
+    }
+
+    public async Task<decimal> MedicineIssueDueAsync(long admissionId, long issueId, CancellationToken ct = default) =>
+        await _db.Charges.AsNoTracking().Where(c => c.PharmacyIssueId == issueId && c.IpdAdmissionId == admissionId && c.Status != ChargeStatus.Cancelled)
+            .SumAsync(c => (decimal?)(c.NetAmount - c.PaidAmount), ct) ?? 0m;
+
+    public async Task<ServiceResult<string>> PayMedicineIssueAsync(long admissionId, long issueId, Guid key, int paymentMethodId, int? counterId, decimal amount, string? reference, CancellationToken ct = default)
+    {
+        var a = await _db.IpdAdmissions.AsNoTracking().FirstOrDefaultAsync(x => x.Id == admissionId, ct);
+        if (a is null) return ServiceResult<string>.Fail("Admission not found.");
+        var issue = await _db.PatientMedicineIssues.AsNoTracking().FirstOrDefaultAsync(i => i.Id == issueId && i.IpdAdmissionId == admissionId, ct);
+        if (issue is null) return ServiceResult<string>.Fail("The medicine issuance does not belong to this admission.");
+        var charges = await _db.Charges.AsNoTracking().Where(c => c.PharmacyIssueId == issueId && c.IpdAdmissionId == admissionId && c.Status != ChargeStatus.Cancelled)
+            .OrderBy(c => c.Id).ToListAsync(ct);
+        var due = charges.Sum(c => c.NetAmount - c.PaidAmount);
+        if (due <= 0) return ServiceResult<string>.Fail($"Nothing is outstanding on {issue.Number}.");
+        amount = Math.Round(amount, 2, MidpointRounding.AwayFromZero);
+        if (amount <= 0) return ServiceResult<string>.Fail("Enter the amount received.");
+        if (amount > due) return ServiceResult<string>.Fail($"The amount is more than the outstanding {due:N2} of {issue.Number}.");
+        var counter = await CounterAsync(counterId, ct);
+        if (counter is null) return ServiceResult<string>.Fail("You are not assigned to a cash counter. Ask the administrator to assign you (Finance → Counters).");
+        var input = new CollectInput
+        {
+            IdempotencyKey = key, PatientId = a.PatientId, CounterId = counter.Value, PaymentMethodId = paymentMethodId, PaymentReference = T(reference, 100),
+            Notes = $"Medicines {issue.Number} – {a.AdmissionNumber}"
+        };
+        var left = amount;
+        foreach (var c in charges)
+        {
+            var open = c.NetAmount - c.PaidAmount;
+            if (open <= 0 || left <= 0) continue;
+            var pay = Math.Min(open, left);
+            input.Balances.Add(new BalancePayment { ChargeId = c.Id, PayNow = pay });
+            left -= pay;
+        }
+        var r = await _billing.CollectAsync(input, canDiscount: false, ct);
+        if (!r.Succeeded) return ServiceResult<string>.Fail(r.Errors.ToArray());
+        if (!r.Value!.WasDuplicate)
+            await _audit.LogAsync(AuditActions.IpdMedicinePaid, "PatientMedicineIssue", issue.Number,
+                $"{amount:N2} of {due:N2} received for medicines {issue.Number} ({a.AdmissionNumber}), receipt {r.Value.Receipt?.ReceiptNumber}", ct: ct);
+        return ServiceResult<string>.Ok(r.Value.Receipt?.ReceiptNumber ?? "");
     }
 
     public async Task<ServiceResult> WaiveAdmissionFeeAsync(long admissionId, string? reason, CancellationToken ct = default)

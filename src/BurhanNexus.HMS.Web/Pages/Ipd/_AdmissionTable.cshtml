@@ -1,7 +1,7 @@
 @model (IReadOnlyList<BurhanNexus.HMS.Infrastructure.Ipd.AdmissionRow> Rows, string Empty)
 <div class="table-wrap">
     <table class="table" data-admissions>
-        <thead><tr><th>Admission</th><th>Patient</th><th>Ward / bed</th><th>Diagnosis</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Admission</th><th>Patient</th><th>Ward / room / bed</th><th>Doctor</th><th>Diagnosis</th><th>Status</th><th></th></tr></thead>
         <tbody>
         @foreach (var a in Model.Rows)
         {
@@ -10,12 +10,13 @@
                 <td><strong>@a.PatientName</strong><small class="muted block">@a.PatientNumber · @a.AgeGender</small>
                     @if (a.Allergies is not null) { <small class="text-danger block">Allergies: @a.Allergies</small> }</td>
                 <td>@(a.Ward ?? "— no bed —")@if (a.Bed is not null) { <small class="muted block">@a.Room · bed @a.Bed</small> }</td>
+                <td class="small">@(a.Doctor ?? "—")</td>
                 <td class="small">@a.Diagnosis @if (a.NeedsAttention) { <span class="status status-bad">Attention</span><small class="block">@a.AttentionNote</small> }</td>
                 <td><partial name="/Pages/Ipd/_AdmStatus.cshtml" model="a.Status" />@if (a.LabourStatus is { } ls) { <small class="block">@BurhanNexus.HMS.Infrastructure.Ipd.MaternityService.Label(ls)</small> }</td>
                 <td class="actions"><a class="btn btn-light btn-sm" href="/Ipd/Admission/@a.Id">Open</a></td>
             </tr>
         }
-        @if (Model.Rows.Count == 0) { <tr><td colspan="6" class="empty">@Model.Empty</td></tr> }
+        @if (Model.Rows.Count == 0) { <tr><td colspan="7" class="empty">@Model.Empty</td></tr> }
         </tbody>
     </table>
 </div>

@@ -10,7 +10,7 @@ public sealed record BatchPick(long Id, string BatchNumber, DateOnly Expiry, int
 
 /// <summary>A medicine for the picker: issuable batches at a location, earliest expiry (FEFO) first.</summary>
 public sealed record MedicinePick(int Id, string Code, string Name, string? GenericName, string Unit, int Available, decimal? SalePrice,
-    bool AllowDiscount, decimal MaxDiscountPercent, IReadOnlyList<BatchPick> Batches);
+    bool AllowDiscount, decimal MaxDiscountPercent, IReadOnlyList<BatchPick> Batches, decimal? PurchasePrice = null);
 
 public enum ExpiryState { Ok, NearExpiry, Expired }
 
@@ -142,7 +142,7 @@ public sealed class PharmacyQueryService : IPharmacyQueryService
                 .Select(s => new BatchPick(s.BatchId, s.Batch!.BatchNumber, s.Batch.ExpiryDate, s.Quantity, includePrices ? s.Batch.SalePrice ?? m.SalePrice : null,
                     State(s.Batch.ExpiryDate, today, near) == ExpiryState.NearExpiry)).ToList();
             return new MedicinePick(m.Id, m.Code, m.DisplayName, m.GenericName, m.Unit, batches.Sum(b => b.Available), includePrices ? m.SalePrice : null,
-                includePrices && m.AllowDiscount, includePrices ? m.MaxDiscountPercent : 0, batches);
+                includePrices && m.AllowDiscount, includePrices ? m.MaxDiscountPercent : 0, batches, includePrices ? m.PurchasePrice : null);
         }).ToList();
     }
 

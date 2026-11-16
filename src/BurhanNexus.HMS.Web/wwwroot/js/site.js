@@ -417,7 +417,9 @@
       let shown = 0;
       choices.forEach(c => {
         const on = c.querySelector("input[type=checkbox]").checked;
-        const vis = q ? (c.dataset.testName || "").includes(q) && shown < 40 : (c.dataset.frequent === "1" || on);
+        // Frequent-test mode only on the laboratory booking (it has the "Frequently used" title); radiology keeps the full list.
+        const vis = !freqTitle ? (!q || (c.dataset.testName || "").includes(q))
+          : q ? (c.dataset.testName || "").includes(q) && shown < 40 : (c.dataset.frequent === "1" || on);
         c.style.display = vis ? "" : "none";
         if (vis) shown++;
       });
@@ -495,4 +497,31 @@ document.querySelectorAll("select[data-autosubmit]").forEach(s => s.addEventList
         var b = e.target.closest && e.target.closest('[data-print-now]');
         if (b && !document.body.hasAttribute('data-lab-slip') && !document.body.hasAttribute('data-lab-receipt') && !document.querySelector('[data-form-page]')) window.print();
     });
+})();
+
+/* Update 11: live navigation alerts – the Ward Requests links turn red with the pending count while any ward medicine
+   request is waiting (Pending / Approved / Partly issued). Polled every 20 s; viewing the list does not clear it. */
+(function () {
+  "use strict";
+  const links = () => document.querySelectorAll('a[href="/Pharmacy/WardRequests"]');
+  if (links().length === 0) return;
+  const paint = (n) => {
+    links().forEach(a => {
+      let b = a.querySelector(".nav-badge");
+      if (n > 0) {
+        a.classList.add("nav-alert");
+        if (!b) { b = document.createElement("span"); b.className = "nav-badge"; b.setAttribute("data-ward-request-count", ""); a.appendChild(b); }
+        b.textContent = String(n);
+        a.title = n + " ward medicine request(s) pending";
+      } else {
+        a.classList.remove("nav-alert");
+        if (b) b.remove();
+        a.removeAttribute("title");
+      }
+    });
+  };
+  const poll = () => fetch("/api/alerts", { headers: { "Accept": "application/json" }, credentials: "same-origin" })
+    .then(r => r.ok ? r.json() : null).then(d => { if (d && typeof d.wardRequests === "number") paint(d.wardRequests); }).catch(() => { });
+  poll();
+  setInterval(poll, 20000);
 })();

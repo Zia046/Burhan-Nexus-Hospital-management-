@@ -45,6 +45,8 @@ public class IndexModel : HmsPageModel
     public bool IsAdminView { get; private set; }
     public bool ShowDashboard { get; private set; }
     public ClinicalCounts? Clinical { get; private set; }
+    /// <summary>Update 11: patients admitted now (ward-permission filtered; null when the user cannot see IPD patients).</summary>
+    public int? AdmittedNow { get; private set; }
     /// <summary>Private hospitals: today's doctor-wise appointments (null when not applicable).</summary>
     public IReadOnlyList<DoctorAppointmentStats>? DoctorsToday { get; private set; }
     public IReadOnlyList<ModuleDefinition> AvailableModules { get; private set; } = Array.Empty<ModuleDefinition>();
@@ -68,6 +70,13 @@ public class IndexModel : HmsPageModel
 
         if (Perms.Contains(Perm.OpdView) || Perms.Contains(Perm.EmergencyView) || Perms.Contains(Perm.PatientsSearch))
             Clinical = await _encounters.CountsAsync();
+        if (Perms.Contains(Perm.IpdViewPatients))
+        {
+            var ipdQuery = HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Ipd.IIpdQueryService>();
+            var wards = await ipdQuery.VisibleWardIdsAsync(CurrentUserId, Perms.Contains(Perm.IpdViewAllWards));
+            AdmittedNow = (await ipdQuery.AdmissionsAsync("active", null, null, null, wards, take: 100000)).Count;
+            Clinical ??= await _encounters.CountsAsync();
+        }
         if (Perms.Contains(Perm.AppointmentsView) && (await _hospital.GetConfigurationAsync()).HospitalType == HospitalType.Private)
         {
             var today = await _clock.TodayAsync();

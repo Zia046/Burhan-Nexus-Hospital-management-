@@ -127,10 +127,13 @@
     const prices = table.dataset.prices === "1", salePrice = table.dataset.saleprice === "1";
     const box = table.closest("form").querySelector("[data-med-search-box]");
     const totalEl = table.querySelector("[data-receive-total]");
+    const form = table.closest("form");
+    const summary = form.querySelector("[data-receive-summary]");
     const reindex = () => {
-      let total = 0;
+      let total = 0, qtyTotal = 0;
       [...tbody.rows].forEach((tr, i) => {
         tr.querySelectorAll("[data-name]").forEach(inp => { inp.name = `Lines[${i}].${inp.dataset.name}`; });
+        qtyTotal += parseInt(tr.querySelector("[data-name=Quantity]").value || "0", 10) || 0;
         if (prices) {
           const q = parseInt(tr.querySelector("[data-name=Quantity]").value || "0", 10) || 0;
           const c = parseFloat(tr.querySelector("[data-name=UnitCost]").value || "0") || 0;
@@ -141,12 +144,20 @@
         }
       });
       if (totalEl) totalEl.textContent = money(total);
+      // Update 11: item count, total quantity and purchase total of the invoice.
+      if (summary) {
+        summary.querySelector("[data-receive-count]").textContent = String(tbody.rows.length);
+        summary.querySelector("[data-receive-qty]").textContent = String(qtyTotal);
+        const pt = summary.querySelector("[data-receive-purchase]"); if (pt) pt.textContent = money(total);
+      }
     };
     const addLine = (m, init) => {
-      const v = k => (init && init[k] !== null && init[k] !== undefined ? init[k] : "");
+      // Update 11: purchase and sale price are filled from the medicine (editable); a new line starts with them.
+      const auto = init ? {} : { cost: m.cost, sale: m.price };
+      const v = k => (init && init[k] !== null && init[k] !== undefined ? init[k] : (auto[k] !== null && auto[k] !== undefined ? auto[k] : ""));
       const cells = [
         el("td", {}, [el("strong", { text: m.name || init.name }), el("input", { type: "hidden", "data-name": "MedicineId", value: m.id }), el("input", { type: "hidden", "data-name": "MedicineName", value: m.name || init.name })]),
-        el("td", {}, [el("input", { "data-name": "BatchNumber", maxlength: "50", className: "w-sm", value: v("batch"), required: true })]),
+        el("td", {}, [el("input", { "data-name": "BatchNumber", maxlength: "50", className: "w-sm", value: v("batch"), placeholder: "optional" })]),
         el("td", {}, [el("input", { type: "month", "data-name": "Expiry", value: v("expiry"), required: true })]),
         el("td", {}, [el("input", { type: "month", "data-name": "Manufactured", value: v("mfg") })]),
         el("td", { className: "num" }, [el("input", { type: "number", min: "1", "data-name": "Quantity", className: "w-xs", value: v("qty"), required: true })])
@@ -164,9 +175,10 @@
       tbody.appendChild(tr);
       tr.querySelectorAll("input").forEach(i => i.addEventListener("input", reindex));
       reindex();
-      if (!init) tr.querySelector("[data-name=BatchNumber]").focus();
+      if (!init) tr.querySelector("[data-name=Quantity]").focus();
     };
     if (box) attachSearch(box, "", m => addLine(m));
+    form.querySelectorAll("[data-add-item]").forEach(b => b.addEventListener("click", () => { const s = form.querySelector("[data-med-search]"); if (s) s.focus(); }));
     let initial = [];
     try { initial = JSON.parse(table.dataset.initial || "[]"); } catch { initial = []; }
     initial.forEach(i => addLine({ id: i.id, name: i.name, code: i.id }, i));

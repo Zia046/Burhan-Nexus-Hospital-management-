@@ -53,7 +53,7 @@ public class IssueModel : PharmacyPageModel
         if (AdmissionId is long aid)
         {
             Admission = await _db.IpdAdmissions.AsNoTracking().FirstOrDefaultAsync(a => a.Id == aid);
-            if (Admission is not null) PatientId ??= Admission.PatientId;
+            if (Admission is not null) { PatientId ??= Admission.PatientId; await LoadIpdPaymentAsync(); }
         }
         if (EncounterId is long eid && PatientId is null)
             PatientId = await _db.PatientEncounters.Where(e => e.Id == eid).Select(e => (long?)e.PatientId).FirstOrDefaultAsync();
@@ -88,6 +88,7 @@ public class IssueModel : PharmacyPageModel
         var r = await Pharmacy.IssueAsync(Input, await RightsAsync());
         if (!r.Succeeded) { AddErrors(r); return Page(); }
         FlashSuccess = r.Value!.WasDuplicate ? $"{r.Value.Number} was already saved – stock was not deducted twice." : $"Medicines issued: {r.Value.Number}.";
+        if (Input.IpdAdmissionId is long aid) await SettleIpdIssueAsync(aid, r.Value.Id, r.Value.Number, Input.IdempotencyKey);
         return Redirect($"/Pharmacy/Doc/ISS/{r.Value.Id}");
     }
 }

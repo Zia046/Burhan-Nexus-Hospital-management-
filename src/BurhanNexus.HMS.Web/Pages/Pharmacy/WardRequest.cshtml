@@ -37,6 +37,7 @@
     </table>
     @if (open && r.Lines.Any(l => l.Remaining > 0))
     {
+        <partial name="_IpdPayOption" model="Model" />
         <div class="form-actions"><button class="btn btn-primary" data-test="mrq-issue">Issue entered quantities</button>
             <span class="muted small">A partial quantity leaves the rest open. Batches are chosen by first-expiry-first-out.</span></div>
     }

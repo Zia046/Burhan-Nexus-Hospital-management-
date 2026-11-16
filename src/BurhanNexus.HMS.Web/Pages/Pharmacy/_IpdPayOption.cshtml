@@ -1,0 +1,17 @@
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.PharmacyPageModel
+@* Update 11: IPD medicine issuance – pay now (Phase 3 receipt linked to the issuance, partial allowed) or no payment (outstanding on the IPD account). *@
+@if (Model.CanReceivePayment)
+{
+    <fieldset class="fee-box" data-ipd-medicine-payment>
+        <legend>Payment for this issuance</legend>
+        <div class="checks">
+            <label class="check"><input type="radio" name="PayAction" value="later" checked="@(Model.PayAction is null or "later")" /> No payment now – stays outstanding on the IPD account and the discharge statement</label>
+            <label class="check"><input type="radio" name="PayAction" value="pay" checked="@(Model.PayAction == "pay")" data-test="mrq-pay-now" /> Pay now (receipt linked to this issuance)</label>
+        </div>
+        <div class="grid-3">
+            <div class="field"><label for="PayAmount">Amount received (blank = full amount)</label><input id="PayAmount" name="PayAmount" type="number" min="0" step="0.01" value="@Model.PayAmount" data-test="mrq-pay-amount" /></div>
+            <div class="field"><label for="PayMethodId">Payment method</label><select id="PayMethodId" name="PayMethodId">@foreach (var pm in Model.PayMethods) { <option value="@pm.Id" selected="@(Model.PayMethodId == pm.Id || (Model.PayMethodId is null && pm.Code == "CASH"))">@pm.Name</option> }</select></div>
+            <div class="field"><label for="PayReference">Reference</label><input id="PayReference" name="PayReference" maxlength="100" value="@Model.PayReference" /></div>
+        </div>
+    </fieldset>
+}
