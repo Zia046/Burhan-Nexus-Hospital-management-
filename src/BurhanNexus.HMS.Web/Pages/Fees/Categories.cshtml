@@ -1,0 +1,36 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Fees.CategoriesModel
+@{ ViewData["Title"] = "Service categories"; var f = Model.Form; }
+<div class="page-header"><div><h1>Service categories</h1></div></div>
+<partial name="_FeesNav" />
+<partial name="_ValidationSummary" />
+<div class="grid-side">
+    <div class="card">
+        <table class="table" data-categories>
+            <thead><tr><th>Code</th><th>Category</th><th class="num">Services</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr class="@(r.Category.IsActive ? "" : "row-muted")" data-category="@r.Category.Code">
+                    <td class="mono">@r.Category.Code</td><td><strong>@r.Category.Name</strong> <small class="muted block">@r.Category.Description</small></td>
+                    <td class="num"><a href="/Fees?category=@r.Category.Id&status=all">@r.ActiveServices / @r.Services</a></td>
+                    <td>@(r.Category.IsActive ? "Active" : "Inactive")</td>
+                    <td class="actions"><a class="btn btn-light btn-sm" href="/Fees/Categories?id=@r.Category.Id">Edit</a> <a bn-permission="@Perm.SvcManageServices" class="btn btn-light btn-sm" href="/Fees/Service?category=@r.Category.Id">Add service</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <form method="post" asp-route-id="@Model.Id" class="card" novalidate data-category-form>
+        <div class="card-header"><h3>@(Model.Id is null ? "New category" : "Edit category")</h3>@if (Model.Id is not null) { <a href="/Fees/Categories" class="btn btn-light btn-sm">New</a> }</div>
+        <div class="card-body">
+            <div class="field"><label for="c_code">Code <em>*</em></label><input id="c_code" name="Form.Code" value="@f.Code" maxlength="20" required /></div>
+            <div class="field"><label for="c_name">Name <em>*</em></label><input id="c_name" name="Form.Name" value="@f.Name" maxlength="100" required /></div>
+            <div class="field"><label for="c_desc">Description</label><input id="c_desc" name="Form.Description" value="@f.Description" maxlength="300" /></div>
+            @if (Model.Id is not null) { <div class="field"><label for="c_sort">Display order</label><input id="c_sort" name="Form.SortOrder" type="number" min="0" value="@f.SortOrder" /></div> }
+            <label class="check"><input type="checkbox" name="Form.IsActive" value="true" checked="@f.IsActive" /> Active</label>
+            <input type="hidden" name="Form.IsActive" value="false" />
+        </div>
+        <div class="card-footer"><button class="btn btn-primary" data-test="save-category">Save category</button></div>
+    </form>
+</div>

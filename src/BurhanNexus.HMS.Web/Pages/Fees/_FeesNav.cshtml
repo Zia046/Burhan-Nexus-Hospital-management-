@@ -1,0 +1,10 @@
+@{
+    var tab = ViewData["FeesTab"] as string;
+    string Cls(string t) => tab == t ? "tab active" : "tab";
+}
+<nav class="tabs" aria-label="Fees & Services" data-fees-nav>
+    <a class="@Cls("catalogue")" href="/Fees">Service catalogue</a>
+    <a bn-permission="@Perm.SvcManageServices" class="@Cls("new")" href="/Fees/Service">New service</a>
+    <a bn-permission="@Perm.SvcManageCategories" class="@Cls("categories")" href="/Fees/Categories">Categories</a>
+    <a bn-permission="@Perm.SvcReports" class="@Cls("reports")" href="/Fees/Reports">Service-wise report</a>
+</nav>

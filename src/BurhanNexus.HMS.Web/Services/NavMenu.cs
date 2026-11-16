@@ -113,7 +113,12 @@ public static class NavMenu
             (Has(Perm.FinanceDashboard), new("finance-dashboard", "/Finance/Dashboard", "chart", "Financial Dashboard")),
             (Has(Perm.FinanceConfirmDeposits), new("finance-deposits", "/Finance/Deposits", "download", "Cash Deposits")),
             (Has(Perm.FinanceManageDoctorAccounts), new("finance-doctors", "/Finance/Doctors", "stethoscope", "Doctor Accounts")),
-            (Has(Perm.FinanceManageServiceFees), new("finance-services", "/Finance/Services", "sliders", "Services & Fees")));
+            (Has(Perm.FinanceManageServiceFees), new("finance-services", "/Finance/Services", "sliders", "Counters per Service")));
+
+        Add("fees", "Fees & Services", "sliders", Any(Perm.SvcViewFees, Perm.SvcManageCatalogue, Perm.SvcManageServices, Perm.SvcManageFees, Perm.SvcManageCategories, Perm.SvcReports),
+            (Any(Perm.SvcViewFees, Perm.SvcManageCatalogue, Perm.SvcManageServices, Perm.SvcManageFees), new("fees-catalogue", "/Fees", "sliders", "Service Catalogue")),
+            (Has(Perm.SvcManageCategories), new("fees-categories", "/Fees/Categories", "database", "Categories")),
+            (Has(Perm.SvcReports), new("fees-reports", "/Fees/Reports", "chart", "Service-wise Report")));
 
         Add("admin", "Administration", "building", Any(Perm.UsersView, Perm.DepartmentsManage, Perm.RolesManage, Perm.LoginHistoryView, Perm.AuditView),
             (Has(Perm.UsersView), new("users", "/Users", "users", "Users", EmitDataNav: false)),

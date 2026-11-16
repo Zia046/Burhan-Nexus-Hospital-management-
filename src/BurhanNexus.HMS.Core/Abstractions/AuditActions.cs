@@ -90,6 +90,7 @@ public static class AuditActions
     public const string CounterUnassigned = "Finance.CounterUnassigned";
     public const string PaymentMethodSaved = "Finance.PaymentMethodSaved";
     public const string ServiceSaved = "Finance.ServiceSaved";
+    public const string ServiceCategorySaved = "Finance.ServiceCategorySaved";
     public const string ServiceFeeChanged = "Finance.ServiceFeeChanged";
     public const string DoctorShareChanged = "Finance.DoctorShareChanged";
     public const string PaymentCollected = "Finance.PaymentCollected";

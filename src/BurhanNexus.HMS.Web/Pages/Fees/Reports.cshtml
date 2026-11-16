@@ -1,0 +1,29 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Fees.ReportsModel
+@{ ViewData["Title"] = "Service-wise report"; }
+<div class="page-header"><div><h1>Service-wise usage &amp; revenue</h1><p class="muted">From the patient bills (charges). Cancelled charges are excluded.</p></div></div>
+<partial name="_FeesNav" />
+<form method="get" class="card filters">
+    <div class="form-grid">
+        <div class="field"><label for="from">From</label><input id="from" name="from" type="date" value="@Model.From?.ToString("yyyy-MM-dd")" /></div>
+        <div class="field"><label for="to">To</label><input id="to" name="to" type="date" value="@Model.To?.ToString("yyyy-MM-dd")" /></div>
+        <div class="field"><label for="cat">Category</label><select id="cat" name="category"><option value="">All</option>@foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(Model.Category == c.Id)">@c.Name</option> }</select></div>
+        <div class="field"><label for="dep">Department</label><select id="dep" name="department"><option value="">All</option>@foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(Model.Department == d.Id)">@d.Name</option> }</select></div>
+    </div>
+    <div class="form-actions"><button class="btn btn-primary">Show</button></div>
+</form>
+<div class="card">
+    <table class="table table-compact" data-service-report>
+        <thead><tr><th>Category</th><th>Service</th><th class="num">Times</th><th class="num">Free</th><th class="num">Gross</th><th class="num">Discount</th><th class="num">Net billed</th><th class="num">Paid</th><th class="num">Refunded</th><th class="num">Outstanding</th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            <tr data-row="@r.Code"><td>@r.Category</td><td><span class="mono">@r.Code</span> @r.Name</td><td class="num">@r.Count</td><td class="num">@r.Free</td><td class="num">@Fmt.Money(r.Gross)</td><td class="num">@Fmt.Money(r.Discount)</td>
+                <td class="num" data-net>@Fmt.Money(r.Net)</td><td class="num">@Fmt.Money(r.Paid)</td><td class="num">@Fmt.Money(r.Refunded)</td><td class="num">@Fmt.Money(r.Net - r.Paid)</td></tr>
+        }
+        @if (Model.Rows.Count == 0) { <tr><td colspan="10" class="empty">No charges in this period.</td></tr> }
+        </tbody>
+        <tfoot><tr><th colspan="2">Total</th><th class="num">@Model.Rows.Sum(r => r.Count)</th><th class="num">@Model.Rows.Sum(r => r.Free)</th><th class="num">@Fmt.Money(Model.Rows.Sum(r => r.Gross))</th><th class="num">@Fmt.Money(Model.Rows.Sum(r => r.Discount))</th>
+            <th class="num" data-total-net>@Fmt.Money(Model.Rows.Sum(r => r.Net))</th><th class="num">@Fmt.Money(Model.Rows.Sum(r => r.Paid))</th><th class="num">@Fmt.Money(Model.Rows.Sum(r => r.Refunded))</th><th class="num">@Fmt.Money(Model.Rows.Sum(r => r.Net - r.Paid))</th></tr></tfoot>
+    </table>
+</div>

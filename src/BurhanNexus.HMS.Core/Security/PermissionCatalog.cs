@@ -336,6 +336,16 @@ public static class PermissionCatalog
                 new(FinanceActions.Export, "Export Financial Reports", "Excel / CSV export of financial reports"),
                 new(FinanceActions.Settings, "Manage Financial Settings", "Payment methods and receipt settings"),
             }, IsFinancialModule: true),
+        new(Modules_.Services, "Fees & Services", "Central catalogue of service categories, services and fees used by every department", "sliders", true, "/Fees",
+            new PermissionAction[]
+            {
+                new(ServicesActions.ViewFees, "View Service Fees", "See the service catalogue and current fees"),
+                new(ServicesActions.ManageCatalogue, "Manage Service Catalogue", "Search and organise the catalogue (categories, charging methods)"),
+                new(ServicesActions.ManageCategories, "Add Service Categories", "Add, rename and deactivate service categories"),
+                new(ServicesActions.ManageServices, "Add / Edit / Deactivate Services", "Create services and change their details (never deleted)"),
+                new(ServicesActions.ManageFees, "Manage Service Fees", "Change fees and government rates (history kept, old bills unchanged)"),
+                new(ServicesActions.Reports, "View Service-wise Reports", "Usage and revenue of each service"),
+            }, IsFinancialModule: true),
         Future("Reports", "Reports", "Operational and financial reports", "chart"),
 
         new(Modules_.UserManagement, "User Management", "Users, departments and responsibilities", "user-cog", true, "/Users",
@@ -406,6 +416,17 @@ public static class PermissionCatalog
         public const string Radiology = "Radiology";
         public const string Ipd = "Ipd";
         public const string Ot = "Ot";
+        public const string Services = "Services";
+    }
+
+    public static class ServicesActions
+    {
+        public const string ViewFees = "ViewFees";
+        public const string ManageCatalogue = "ManageCatalogue";
+        public const string ManageCategories = "ManageCategories";
+        public const string ManageServices = "ManageServices";
+        public const string ManageFees = "ManageFees";
+        public const string Reports = "Reports";
     }
 
     public static class OtActions
@@ -751,6 +772,13 @@ public static class Perm
     public const string FinanceAdjustments = "Finance.Adjustments";
     public const string FinanceExport = "Finance.Export";
     public const string FinanceSettings = "Finance.Settings";
+    // ---- Update 10: Fees & Services ----
+    public const string SvcViewFees = "Services.ViewFees";
+    public const string SvcManageCatalogue = "Services.ManageCatalogue";
+    public const string SvcManageCategories = "Services.ManageCategories";
+    public const string SvcManageServices = "Services.ManageServices";
+    public const string SvcManageFees = "Services.ManageFees";
+    public const string SvcReports = "Services.Reports";
     public const string IpdDashboard = "Ipd.Dashboard";
     public const string IpdViewPatients = "Ipd.ViewPatients";
     public const string IpdViewAllWards = "Ipd.ViewAllWards";

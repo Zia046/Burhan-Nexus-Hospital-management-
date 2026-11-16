@@ -93,5 +93,12 @@ public static class PermissionSeeder
         [Perm.AppointmentsCollectFee] = Perm.AppointmentsAdd,
         [Perm.IpdRequestMedicines] = Perm.IpdRecordMedication,
         [Perm.PharmProcessWardRequests] = Perm.PharmIssueToPatients,
+        // update 10: whoever managed service fees in Finance manages the central Fees & Services catalogue
+        [Perm.SvcViewFees] = Perm.FinanceManageServiceFees,
+        [Perm.SvcManageCatalogue] = Perm.FinanceManageServiceFees,
+        [Perm.SvcManageCategories] = Perm.FinanceManageServiceFees,
+        [Perm.SvcManageServices] = Perm.FinanceManageServiceFees,
+        [Perm.SvcManageFees] = Perm.FinanceManageServiceFees,
+        [Perm.SvcReports] = Perm.FinanceDashboard,
     };
 }

@@ -35,6 +35,7 @@ public class HmsDbContext : DbContext
     public DbSet<EmergencyCategory> EmergencyCategories => Set<EmergencyCategory>();
     public DbSet<Doctor> Doctors => Set<Doctor>();
     public DbSet<ServiceItem> ServiceItems => Set<ServiceItem>();
+    public DbSet<ServiceCategory> ServiceCategories => Set<ServiceCategory>();
     public DbSet<PrintedDocument> PrintedDocuments => Set<PrintedDocument>();
     public DbSet<RegistrationSettings> RegistrationSettings => Set<RegistrationSettings>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
@@ -418,6 +419,16 @@ public class HmsDbContext : DbContext
             e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(30);
             e.HasOne(x => x.Doctor).WithMany().HasForeignKey(x => x.DoctorId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Department).WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ServiceCategory).WithMany().HasForeignKey(x => x.ServiceCategoryId).OnDelete(DeleteBehavior.Restrict);
+            e.Property(x => x.ChargeUnit).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Applicability).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => x.ServiceCategoryId);
+        });
+        b.Entity<ServiceCategory>(e =>
+        {
+            e.ToTable("ServiceCategories");
+            e.HasIndex(x => x.Code).IsUnique();
+            e.HasIndex(x => x.Name).IsUnique();
         });
 
         b.Entity<PrintedDocument>(e =>

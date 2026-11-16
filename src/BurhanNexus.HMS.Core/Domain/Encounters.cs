@@ -173,6 +173,11 @@ public class ServiceItem
     [MaxLength(300)] public string? Description { get; set; }
     public List<ServiceFee> Fees { get; set; } = new();
     public List<ServiceCounter> Counters { get; set; } = new();
+    // ---- Update 10: central Fees & Services ----
+    public int? ServiceCategoryId { get; set; }
+    public ServiceCategory? ServiceCategory { get; set; }
+    public ChargeUnit ChargeUnit { get; set; } = ChargeUnit.Fixed;
+    public ServiceApplicability Applicability { get; set; } = ServiceApplicability.Both;
 }
 
 public class PrintedDocument
