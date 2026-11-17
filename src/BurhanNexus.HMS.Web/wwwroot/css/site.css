@@ -737,3 +737,11 @@ a.kpi-link:hover { outline: 2px solid var(--primary, #1565c0); outline-offset: -
 .invoice-summary strong { font-size: 1.35em; }
 dialog.modal { border: none; padding: 0; border-radius: 10px; max-width: 640px; width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
 dialog.modal::backdrop { background: rgba(15,42,74,.45); }
+.invoice-header { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 900px) { .invoice-header { grid-template-columns: 1fr; } }
+.invoice-table { width: 100%; }
+.invoice-table .w-med { min-width: 15em; }
+.invoice-table th, .invoice-table td { padding-left: .35rem; padding-right: .35rem; }
+.invoice-table input.w-xs { width: 5.2em; }
+.invoice-table input.w-sm { width: 7.5em; }
+.invoice-table input[type=month] { width: 9.5em; }
