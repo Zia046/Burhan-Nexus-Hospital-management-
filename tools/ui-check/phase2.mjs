@@ -899,7 +899,8 @@ try {
     if (await page.$("#NM_Cost")) await page.fill("#NM_Cost", "40");
     if (await page.$("#NM_Sale")) await page.fill("#NM_Sale", "55");
     await page.click("[data-new-medicine-save]");
-    await page.waitForFunction(() => { const r = document.querySelector("[data-invoice-lines] tbody tr:last-child [data-name=MedicineId]"); return r && r.value !== "0"; }, null, { timeout: 5000 });
+    await page.waitForFunction(() => !document.querySelector("[data-new-medicine]").open, null, { timeout: 8000 })
+      .catch(async () => { errors.push("New medicine from the invoice failed: " + await page.textContent("[data-new-medicine-error]")); await page.click("[data-new-medicine-cancel]"); });
     await page.fill("[data-invoice-lines] tbody tr:last-child [data-name=Quantity]", String(qtys[22]));
     await page.fill("[data-invoice-lines] tbody tr:last-child [data-name=Expiry]", ym(20));
     const count = await page.textContent("[data-receive-count]"), total = await page.textContent("[data-receive-qty]");

@@ -298,9 +298,14 @@
       dlg.querySelector("[data-new-medicine-cancel]").addEventListener("click", () => dlg.close());
       dlg.querySelector("[data-new-medicine-save]").addEventListener("click", async () => {
         err.textContent = "";
-        const fd = new FormData(dform);
-        fd.append("__RequestVerificationToken", form.querySelector("input[name=__RequestVerificationToken]").value);
-        const r = await fetch("/Pharmacy/Receive?handler=NewMedicine", { method: "POST", body: fd, credentials: "same-origin" });
+        const token = form.querySelector("input[name=__RequestVerificationToken]").value;
+        const body = new URLSearchParams();
+        new FormData(dform).forEach((v, k) => body.append(k, String(v)));
+        body.append("__RequestVerificationToken", token);
+        const r = await fetch("/Pharmacy/Receive?handler=NewMedicine", {
+          method: "POST", body, credentials: "same-origin",
+          headers: { "Content-Type": "application/x-www-form-urlencoded", "X-CSRF-TOKEN": token, "Accept": "application/json" }
+        });
         const d = r.ok ? await r.json().catch(() => null) : null;
         if (!d) { err.textContent = "Could not create the medicine (permission or connection)."; return; }
         if (d.duplicate) { dup.hidden = false; dlg.querySelector("[data-new-medicine-dup-text]").textContent = "Similar: " + d.duplicate.join("; "); return; }
