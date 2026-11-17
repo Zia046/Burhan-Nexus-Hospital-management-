@@ -337,7 +337,7 @@ public sealed class PharmacyService : IPharmacyService
                 if (input.Lines.Any(l => l.SalePrice is not null) && !rights.ManagePrices) errors.Add("Setting a sale price needs the “Manage Medicine Prices” permission.");
                 var lines = input.Lines.Where(l => l.MedicineId > 0).ToList();
                 if (lines.Count == 0) errors.Add("Add at least one medicine.");
-                if (lines.Count > 100) errors.Add("At most 100 lines per receiving.");
+                if (lines.Count > 500) errors.Add("At most 500 rows per invoice.");
                 // Update 11: the batch number is optional on a supplier invoice – without one, the line is kept as the batch of its expiry date.
                 foreach (var l in lines)
                     if (T(l.BatchNumber, 50) is null && l.ExpiryDate is DateOnly autoExp) l.BatchNumber = $"AUTO-{autoExp:yyyyMMdd}";

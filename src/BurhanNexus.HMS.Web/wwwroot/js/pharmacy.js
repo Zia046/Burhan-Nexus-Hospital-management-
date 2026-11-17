@@ -122,65 +122,194 @@
   });
 
   // ---------------- Receiving lines ----------------
-  document.querySelectorAll("[data-receive-lines]").forEach(table => {
+  // ---------------- Supplier invoice (Update 12): one table, a medicine search inside every row ----------------
+  document.querySelectorAll("[data-invoice-lines]").forEach(table => {
+    const form = table.closest("form");
     const tbody = table.querySelector("tbody");
     const prices = table.dataset.prices === "1", salePrice = table.dataset.saleprice === "1";
-    const box = table.closest("form").querySelector("[data-med-search-box]");
-    const totalEl = table.querySelector("[data-receive-total]");
-    const form = table.closest("form");
     const summary = form.querySelector("[data-receive-summary]");
+    const num = (inp, int) => { if (!inp) return 0; const v = int ? parseInt(inp.value || "0", 10) : parseFloat(inp.value || "0"); return isNaN(v) ? 0 : v; };
+
     const reindex = () => {
-      let total = 0, qtyTotal = 0;
+      let total = 0, qty = 0, items = 0;
       [...tbody.rows].forEach((tr, i) => {
+        tr.querySelector("[data-row-no]").textContent = String(i + 1);
         tr.querySelectorAll("[data-name]").forEach(inp => { inp.name = `Lines[${i}].${inp.dataset.name}`; });
-        qtyTotal += parseInt(tr.querySelector("[data-name=Quantity]").value || "0", 10) || 0;
+        const chosen = num(tr.querySelector("[data-name=MedicineId]"), true) > 0;
+        const q = num(tr.querySelector("[data-name=Quantity]"), true);
+        if (chosen) { items++; qty += q; }
         if (prices) {
-          const q = parseInt(tr.querySelector("[data-name=Quantity]").value || "0", 10) || 0;
-          const c = parseFloat(tr.querySelector("[data-name=UnitCost]").value || "0") || 0;
-          const d = parseFloat(tr.querySelector("[data-name=Discount]").value || "0") || 0;
-          const line = Math.max(0, q * c - d);
-          tr.querySelector("[data-line-total]").textContent = money(line);
-          total += line;
+          const line = Math.max(0, q * num(tr.querySelector("[data-name=UnitCost]")) - num(tr.querySelector("[data-name=Discount]")));
+          tr.querySelector("[data-line-total]").textContent = chosen ? money(line) : "";
+          if (chosen) total += line;
         }
       });
-      if (totalEl) totalEl.textContent = money(total);
-      // Update 11: item count, total quantity and purchase total of the invoice.
-      if (summary) {
-        summary.querySelector("[data-receive-count]").textContent = String(tbody.rows.length);
-        summary.querySelector("[data-receive-qty]").textContent = String(qtyTotal);
-        const pt = summary.querySelector("[data-receive-purchase]"); if (pt) pt.textContent = money(total);
+      summary.querySelector("[data-receive-count]").textContent = String(items);
+      summary.querySelector("[data-receive-qty]").textContent = String(qty);
+      if (prices) {
+        summary.querySelector("[data-receive-purchase]").textContent = money(total);
+        const net = total - num(form.querySelector("[data-invoice-discount]")) + num(form.querySelector("[data-invoice-charges]"));
+        summary.querySelector("[data-receive-net]").textContent = money(net);
       }
     };
-    const addLine = (m, init) => {
-      // Update 11: purchase and sale price are filled from the medicine (editable); a new line starts with them.
-      const auto = init ? {} : { cost: m.cost, sale: m.price };
-      const v = k => (init && init[k] !== null && init[k] !== undefined ? init[k] : (auto[k] !== null && auto[k] !== undefined ? auto[k] : ""));
+
+    // Moves the focus to the next box of the row; from the last box to the next row (a new row is opened at the end).
+    const nextBox = (tr, from) => {
+      const boxes = [...tr.querySelectorAll("input:not([type=hidden]):not([readonly])")];
+      const i = boxes.indexOf(from);
+      if (i >= 0 && i < boxes.length - 1) { boxes[i + 1].focus(); boxes[i + 1].select && boxes[i + 1].select(); return; }
+      const next = tr.nextElementSibling || addRow();
+      next.querySelector("[data-row-med]").focus();
+    };
+
+    const setMedicine = (tr, m) => {
+      tr.querySelector("[data-name=MedicineId]").value = m.id;
+      tr.querySelector("[data-name=MedicineName]").value = m.name;
+      const box = tr.querySelector("[data-row-med]");
+      box.value = m.name; box.classList.add("chosen"); box.classList.remove("input-error");
+      tr.querySelector("[data-row-info]").textContent = [m.generic, m.code, m.available !== undefined ? `in stock ${m.available} ${m.unit || ""}` : null].filter(Boolean).join(" · ");
+      tr.dataset.medicine = m.code || m.id;
+      if (prices) {
+        const cost = tr.querySelector("[data-name=UnitCost]");
+        if (cost && (cost.value === "" || cost.dataset.auto === "1")) { cost.value = m.cost ?? ""; cost.dataset.auto = "1"; }
+        const sale = tr.querySelector("[data-sale]");
+        if (sale) {
+          if (sale.tagName === "INPUT") { if (sale.value === "" || sale.dataset.auto === "1") { sale.value = m.price ?? ""; sale.dataset.auto = "1"; } }
+          else sale.textContent = m.price === null || m.price === undefined ? "—" : money(m.price);
+        }
+      }
+      reindex();
+    };
+
+    const clearMedicine = tr => {
+      tr.querySelector("[data-name=MedicineId]").value = "0";
+      tr.querySelector("[data-name=MedicineName]").value = "";
+      tr.querySelector("[data-row-med]").classList.remove("chosen");
+      tr.querySelector("[data-row-info]").textContent = "";
+      delete tr.dataset.medicine;
+      reindex();
+    };
+
+    const attachRowSearch = tr => {
+      const input = tr.querySelector("[data-row-med]");
+      const list = tr.querySelector("[data-med-results]");
+      let timer = null, items = [], active = -1, seq = 0;
+      const render = () => {
+        list.innerHTML = "";
+        items.forEach((m, i) => {
+          const row = el("button", { type: "button", className: "med-result" + (i === active ? " on" : ""), "data-med-result": m.code, tabindex: "-1" }, [
+            el("strong", { text: m.name }), " ",
+            el("small", { className: "muted", text: [m.generic, m.code].filter(Boolean).join(" · ") }),
+            el("span", { className: "med-avail", text: (m.available ?? 0) + " in stock" + (prices && m.cost != null ? " · cost " + money(m.cost) : "") })
+          ]);
+          row.addEventListener("mousedown", e => { e.preventDefault(); choose(i); });
+          list.appendChild(row);
+        });
+        list.hidden = items.length === 0;
+      };
+      const choose = i => {
+        const m = items[i]; if (!m) return;
+        items = []; render();
+        setMedicine(tr, m);
+        const q = tr.querySelector("[data-name=Quantity]"); q.focus(); q.select();
+      };
+      input.addEventListener("input", () => {
+        if (tr.querySelector("[data-name=MedicineId]").value !== "0") clearMedicine(tr);
+        clearTimeout(timer);
+        const q = input.value.trim();
+        if (q.length < 2) { items = []; render(); return; }
+        const my = ++seq;
+        timer = setTimeout(async () => { const r = await pick({ q, location: "" }); if (my !== seq) return; items = r; active = items.length ? 0 : -1; render(); }, 150);
+      });
+      input.addEventListener("keydown", e => {
+        if (e.key === "ArrowDown" && items.length) { active = Math.min(items.length - 1, active + 1); render(); e.preventDefault(); }
+        else if (e.key === "ArrowUp" && items.length) { active = Math.max(0, active - 1); render(); e.preventDefault(); }
+        else if (e.key === "Enter") {
+          e.preventDefault();
+          if (items.length && active >= 0) choose(active);
+          else if (tr.querySelector("[data-name=MedicineId]").value !== "0") { const q = tr.querySelector("[data-name=Quantity]"); q.focus(); q.select(); }
+        }
+        else if (e.key === "Escape") { items = []; render(); }
+      });
+      input.addEventListener("blur", () => setTimeout(() => { items = []; render(); }, 150));
+    };
+
+    const addRow = init => {
+      const v = k => (init && init[k] !== null && init[k] !== undefined ? init[k] : "");
       const cells = [
-        el("td", {}, [el("strong", { text: m.name || init.name }), el("input", { type: "hidden", "data-name": "MedicineId", value: m.id }), el("input", { type: "hidden", "data-name": "MedicineName", value: m.name || init.name })]),
-        el("td", {}, [el("input", { "data-name": "BatchNumber", maxlength: "50", className: "w-sm", value: v("batch"), placeholder: "optional" })]),
-        el("td", {}, [el("input", { type: "month", "data-name": "Expiry", value: v("expiry"), required: true })]),
-        el("td", {}, [el("input", { type: "month", "data-name": "Manufactured", value: v("mfg") })]),
-        el("td", { className: "num" }, [el("input", { type: "number", min: "1", "data-name": "Quantity", className: "w-xs", value: v("qty"), required: true })])
+        el("td", { className: "muted", "data-row-no": "" }),
+        el("td", { className: "med-cell" }, [
+          el("div", { className: "med-search" }, [
+            el("input", { "data-row-med": "", autocomplete: "off", placeholder: "Search medicine…", value: v("name"), "aria-label": "Medicine" }),
+            el("div", { className: "med-results", "data-med-results": "", hidden: true })
+          ]),
+          el("small", { className: "muted block", "data-row-info": "" }),
+          el("input", { type: "hidden", "data-name": "MedicineId", value: v("id") || "0" }),
+          el("input", { type: "hidden", "data-name": "MedicineName", value: v("name") })
+        ]),
+        el("td", { className: "num" }, [el("input", { type: "number", min: "1", step: "1", "data-name": "Quantity", className: "w-xs", value: v("qty"), "aria-label": "Quantity" })]),
+        el("td", {}, [el("input", { type: "month", "data-name": "Expiry", value: v("expiry"), "aria-label": "Expiry" })]),
+        el("td", {}, [el("input", { "data-name": "BatchNumber", maxlength: "50", className: "w-sm", value: v("batch"), placeholder: "optional", "aria-label": "Batch" })])
       ];
       if (prices) {
-        cells.push(el("td", { className: "num" }, [el("input", { type: "number", min: "0", step: "0.0001", "data-name": "UnitCost", className: "w-xs", value: v("cost") })]));
-        if (salePrice) cells.push(el("td", { className: "num" }, [el("input", { type: "number", min: "0", step: "0.01", "data-name": "SalePrice", className: "w-xs", value: v("sale"), placeholder: m.price ?? "" })]));
-        cells.push(el("td", { className: "num" }, [el("input", { type: "number", min: "0", step: "0.01", "data-name": "Discount", className: "w-xs", value: v("discount") })]));
+        cells.push(el("td", { className: "num" }, [el("input", { type: "number", min: "0", step: "0.0001", "data-name": "UnitCost", className: "w-xs", value: v("cost"), "aria-label": "Purchase price" })]));
+        cells.push(el("td", { className: "num" }, [salePrice
+          ? el("input", { type: "number", min: "0", step: "0.01", "data-name": "SalePrice", "data-sale": "", className: "w-xs", value: v("sale"), "aria-label": "Sale price" })
+          : el("span", { "data-sale": "", className: "muted", title: "Changing the sale price needs “Manage Medicine Prices”", text: v("sale") === "" ? "" : money(v("sale")) })]));
+        cells.push(el("td", { className: "num" }, [el("input", { type: "number", min: "0", step: "0.01", "data-name": "Discount", className: "w-xs", value: v("discount"), "aria-label": "Adjustment" })]));
         cells.push(el("td", { className: "num", "data-line-total": "" }));
       }
-      const remove = el("button", { type: "button", className: "btn btn-light btn-sm", title: "Remove", text: "✕" });
-      remove.addEventListener("click", () => { tr.remove(); reindex(); });
+      const remove = el("button", { type: "button", className: "btn btn-light btn-sm", title: "Remove row", tabindex: "-1", text: "✕", "data-remove-row": "" });
       cells.push(el("td", {}, [remove]));
-      const tr = el("tr", { "data-receive-line": m.code || m.id }, cells);
+      const tr = el("tr", { "data-invoice-row": "" }, cells);
       tbody.appendChild(tr);
-      tr.querySelectorAll("input").forEach(i => i.addEventListener("input", reindex));
+      remove.addEventListener("click", () => { tr.remove(); if (tbody.rows.length === 0) addRow(); reindex(); });
+      tr.querySelectorAll("input[data-name]:not([type=hidden])").forEach(i => {
+        i.addEventListener("input", () => { if (i.dataset.auto) i.dataset.auto = "0"; reindex(); });
+        i.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); nextBox(tr, i); } });
+      });
+      attachRowSearch(tr);
+      if (init && init.id > 0) { tr.querySelector("[data-row-med]").classList.add("chosen"); tr.dataset.medicine = init.id; }
       reindex();
-      if (!init) tr.querySelector("[data-name=Quantity]").focus();
+      return tr;
     };
-    if (box) attachSearch(box, "", m => addLine(m));
-    form.querySelectorAll("[data-add-item]").forEach(b => b.addEventListener("click", () => { const s = form.querySelector("[data-med-search]"); if (s) s.focus(); }));
+
+    form.querySelectorAll("[data-add-row]").forEach(b => b.addEventListener("click", () => addRow().querySelector("[data-row-med]").focus()));
+    document.addEventListener("keydown", e => { if (e.altKey && (e.key === "n" || e.key === "N")) { e.preventDefault(); addRow().querySelector("[data-row-med]").focus(); } });
+    form.querySelectorAll("[data-invoice-discount],[data-invoice-charges]").forEach(i => i.addEventListener("input", reindex));
+    // Enter in the header never submits the invoice by accident.
+    form.querySelectorAll("[data-invoice-header] input").forEach(i => i.addEventListener("keydown", e => { if (e.key === "Enter") e.preventDefault(); }));
+    const sup = form.querySelector("[data-supplier-select]"), supInfo = form.querySelector("[data-supplier-details]");
+    if (sup && supInfo) { const show = () => { supInfo.textContent = sup.selectedOptions[0]?.dataset.details || ""; }; sup.addEventListener("change", show); show(); }
+
     let initial = [];
     try { initial = JSON.parse(table.dataset.initial || "[]"); } catch { initial = []; }
-    initial.forEach(i => addLine({ id: i.id, name: i.name, code: i.id }, i));
+    initial.forEach(i => addRow(i));
+    while (tbody.rows.length < 3) addRow();
+
+    // New medicine from inside the invoice – the invoice on screen stays as it is.
+    const dlg = document.querySelector("[data-new-medicine]");
+    const openBtn = form.querySelector("[data-new-medicine-open]");
+    if (dlg && openBtn) {
+      const dform = dlg.querySelector("[data-new-medicine-form]");
+      const err = dlg.querySelector("[data-new-medicine-error]");
+      const dup = dlg.querySelector("[data-new-medicine-dup]");
+      openBtn.addEventListener("click", () => { dform.reset(); dup.hidden = true; err.textContent = ""; dlg.showModal(); dlg.querySelector("[name=Name]").focus(); });
+      dlg.querySelector("[data-new-medicine-cancel]").addEventListener("click", () => dlg.close());
+      dlg.querySelector("[data-new-medicine-save]").addEventListener("click", async () => {
+        err.textContent = "";
+        const fd = new FormData(dform);
+        fd.append("__RequestVerificationToken", form.querySelector("input[name=__RequestVerificationToken]").value);
+        const r = await fetch("/Pharmacy/Receive?handler=NewMedicine", { method: "POST", body: fd, credentials: "same-origin" });
+        const d = r.ok ? await r.json().catch(() => null) : null;
+        if (!d) { err.textContent = "Could not create the medicine (permission or connection)."; return; }
+        if (d.duplicate) { dup.hidden = false; dlg.querySelector("[data-new-medicine-dup-text]").textContent = "Similar: " + d.duplicate.join("; "); return; }
+        if (!d.ok) { err.textContent = (d.errors || []).join(" "); return; }
+        dlg.close();
+        const empty = [...tbody.rows].find(tr => tr.querySelector("[data-name=MedicineId]").value === "0" && !tr.querySelector("[data-row-med]").value) || addRow();
+        setMedicine(empty, { id: d.id, name: d.name, code: d.code, cost: d.cost, price: d.price, available: 0, unit: "" });
+        const q = empty.querySelector("[data-name=Quantity]"); q.focus();
+      });
+    }
   });
 })();

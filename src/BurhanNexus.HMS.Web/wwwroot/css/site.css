@@ -719,3 +719,21 @@ a.nav-alert svg { color: #fff; }
 .date-time-pair input[type=time] { min-width: 7em; }
 a.kpi-link { text-decoration: none; color: inherit; cursor: pointer; }
 a.kpi-link:hover { outline: 2px solid var(--primary, #1565c0); outline-offset: -2px; }
+
+/* Update 12: supplier invoice entry – one continuous table */
+.invoice-table-wrap { overflow: visible; }
+.invoice-table td { vertical-align: top; }
+.invoice-table .w-no { width: 2.5em; }
+.invoice-table .w-med { min-width: 22em; }
+.invoice-table .med-cell .med-search { max-width: none; }
+.invoice-table .med-cell input[data-row-med] { width: 100%; }
+.invoice-table input.chosen { border-color: #2e7d32; background: #f1f8f2; font-weight: 600; }
+.invoice-table .med-results { min-width: 28em; }
+.invoice-toolbar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+.invoice-toolbar kbd { font-size: .7em; padding: 0 .3em; border: 1px solid var(--line); border-radius: 4px; margin-left: .3em; }
+.invoice-summary { display: flex; flex-wrap: wrap; gap: 1rem; padding: .8rem 1.2rem; background: #f4f7fb; border-top: 1px solid var(--line); }
+.invoice-summary > div { display: flex; flex-direction: column; min-width: 9em; }
+.invoice-summary span { font-size: .78em; text-transform: uppercase; letter-spacing: .04em; color: var(--muted, #5b6b7f); }
+.invoice-summary strong { font-size: 1.35em; }
+dialog.modal { border: none; padding: 0; border-radius: 10px; max-width: 640px; width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+dialog.modal::backdrop { background: rgba(15,42,74,.45); }

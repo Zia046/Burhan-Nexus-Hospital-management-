@@ -9,6 +9,7 @@
 <partial name="_PharmNav" />
 <div class="toolbar no-print">
     <div class="toolbar-actions">
+        @if (Model.Receipt is not null) { <a class="btn btn-light" href="/Print/SupplierInvoice/@Model.Receipt.Id" data-test="print-invoice-a4"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print invoice (A4)</a> }
         <a class="btn btn-light" href="/Print/Pharmacy/@Model.Type/@ViewContext.RouteData.Values["id"]" data-test="print-doc"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print</a>
         @if (Model.Sale is not null) { <a bn-permission="@Perm.PharmProcessReturns" class="btn btn-light" href="/Pharmacy/Returns/Sale/@Model.Sale.Id">Return medicines</a> }
         @if (Model.Issue is not null) { <a bn-permission="@Perm.PharmProcessReturns" class="btn btn-light" href="/Pharmacy/Returns/Issue/@Model.Issue.Id">Patient return</a> }
@@ -19,17 +20,18 @@
 @if (Model.Receipt is { } g)
 {
     <div class="card" data-doc-grn="@g.Number">
-        <div class="card-header"><h2><svg class="icon"><use href="#i-download" /></svg> Stock receiving @g.Number</h2><span class="pill">@g.Location!.Name</span></div>
+        <div class="card-header"><h2><svg class="icon"><use href="#i-download" /></svg> Supplier invoice @(g.ReferenceNumber ?? "—") <small class="muted">GRN @g.Number</small></h2><span class="pill">@g.Location!.Name</span></div>
         <div class="card-body"><dl class="details-grid">
-            <dt>Supplier / source</dt><dd>@(g.Supplier?.Name ?? g.SourceName)</dd><dt>Reference</dt><dd>@(g.ReferenceNumber ?? "—")@(g.InvoiceDate is { } idt ? " · " + Fmt.Day(idt) : "")</dd>
+            <dt>Supplier / source</dt><dd>@(g.Supplier?.Name ?? g.SourceName)</dd><dt>Invoice no. / date</dt><dd data-grn-invoice>@(g.ReferenceNumber ?? "—")@(g.InvoiceDate is { } idt ? " · " + Fmt.Day(idt) : "")</dd>
+            <dt>Items / total quantity</dt><dd><strong data-grn-items>@g.Items.Count</strong> medicine row(s) · <strong data-grn-qty>@g.Items.Sum(x => x.Quantity)</strong> unit(s)</dd><dt>Corrections</dt><dd class="muted">Only by an authorised stock adjustment with a reason</dd>
             <dt>Received</dt><dd>@Fmt.Day(g.ReceivedDate) · @g.CreatedByUsername · @Fmt.DateTimeText(g.CreatedUtc)</dd><dt>Notes</dt><dd>@(g.Notes ?? "—")</dd>
         </dl></div>
         <div class="table-wrap"><table class="table table-compact">
-            <thead><tr><th>Medicine</th><th>Batch</th><th>Expiry</th><th class="num">Qty</th>@if (showPrices && g.Mode == HospitalType.Private) { <th class="num">Cost</th><th class="num">Sale</th><th class="num">Discount</th><th class="num">Total</th> }</tr></thead>
-            <tbody>@foreach (var i in g.Items) { <tr><td>@i.MedicineName</td><td class="mono">@i.BatchNumber</td><td>@Fmt.Day(i.ExpiryDate)</td><td class="num">@i.Quantity</td>
+            <thead><tr><th>#</th><th>Medicine</th><th>Batch</th><th>Expiry</th><th class="num">Qty</th>@if (showPrices && g.Mode == HospitalType.Private) { <th class="num">Cost</th><th class="num">Sale</th><th class="num">Discount</th><th class="num">Total</th> }</tr></thead>
+            <tbody>@{ var rowNo = 0; }@foreach (var i in g.Items.OrderBy(x => x.Id)) { rowNo++; <tr data-grn-item="@i.MedicineName"><td class="muted">@rowNo</td><td>@i.MedicineName</td><td class="mono">@i.BatchNumber</td><td>@Fmt.Day(i.ExpiryDate)</td><td class="num">@i.Quantity</td>
                 @if (showPrices && g.Mode == HospitalType.Private) { <td class="num">@i.UnitCost?.ToString("N2")</td><td class="num">@i.SalePrice?.ToString("N2")</td><td class="num">@i.Discount?.ToString("N2")</td><td class="num">@i.LineTotal?.ToString("N2")</td> }</tr> }</tbody>
             @if (showPrices && g.NetAmount is decimal net)
-            { <tfoot><tr><td colspan="7" class="num">Lines @g.GrossAmount?.ToString("N2") − discount @g.DiscountAmount?.ToString("N2") + charges @g.AdditionalCharges?.ToString("N2") =</td><td class="num"><strong data-grn-net>@net.ToString("N2")</strong></td></tr></tfoot> }
+            { <tfoot><tr><td colspan="8" class="num">Lines @g.GrossAmount?.ToString("N2") − discount @g.DiscountAmount?.ToString("N2") + charges @g.AdditionalCharges?.ToString("N2") =</td><td class="num"><strong data-grn-net>@net.ToString("N2")</strong></td></tr></tfoot> }
         </table></div>
     </div>
 }

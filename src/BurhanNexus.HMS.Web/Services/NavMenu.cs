@@ -104,7 +104,7 @@ public static class NavMenu
             (Has(Perm.PharmIssueToPatients), new("pharm-issue", "/Pharmacy/Issue", "users-round", "Patient Issue")),
             (Has(Perm.PharmProcessWardRequests), new("pharm-ward", "/Pharmacy/WardRequests", "file", "Ward Requests")),
             (Has(Perm.PharmRetailSales) && isPrivate, new("pharm-sale", "/Pharmacy/Sale", "wallet", "Retail Sale", PrivateOnly: true)),
-            (Has(Perm.PharmReceiveStock), new("pharm-receive", "/Pharmacy/Receive", "download", "Receive Stock")),
+            (Has(Perm.PharmReceiveStock), new("pharm-receive", "/Pharmacy/Receive", "download", "Supplier Invoice")),
             (Has(Perm.PharmTransferStock), new("pharm-transfer", "/Pharmacy/Transfer", "refresh", "Stock Transfer")),
             (Any(Perm.PharmViewStockReports, Perm.PharmViewDepartmentStock), new("pharm-stock", "/Pharmacy/Stock", "database", "Stock & Batches")),
             (Has(Perm.PharmViewCatalogue), new("pharm-medicines", "/Pharmacy/Medicines", "sliders", "Medicines")));

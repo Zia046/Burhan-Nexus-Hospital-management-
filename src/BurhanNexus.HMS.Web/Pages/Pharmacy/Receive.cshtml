@@ -2,54 +2,93 @@
 @model BurhanNexus.HMS.Web.Pages.Pharmacy.ReceiveModel
 @using System.Text.Json
 @{
-    ViewData["Title"] = Model.WithPrices ? "Purchase / receive stock" : "Receive stock";
-    var initial = JsonSerializer.Serialize(Model.Lines.Where(l => l.MedicineId > 0).Select(l => new { id = l.MedicineId, name = l.MedicineName, batch = l.BatchNumber, expiry = l.Expiry, mfg = l.Manufactured, qty = l.Quantity, cost = l.UnitCost, sale = l.SalePrice, discount = l.Discount }));
+    ViewData["Title"] = "Supplier invoice – receive stock";
+    var initial = JsonSerializer.Serialize(Model.Lines.Select(l => new { id = l.MedicineId, name = l.MedicineName, batch = l.BatchNumber, expiry = l.Expiry, qty = l.Quantity, cost = l.UnitCost, sale = l.SalePrice, discount = l.Discount }));
 }
 <partial name="_PharmNav" />
 <partial name="_ValidationSummary" />
-<form method="post" class="card" data-receive-form novalidate>
+<form method="post" class="card invoice-entry" data-invoice-form novalidate>
     <input type="hidden" asp-for="Input.IdempotencyKey" />
-    <div class="card-header"><h2><svg class="icon"><use href="#i-download" /></svg> @ViewData["Title"] <small class="muted">into Main Pharmacy</small></h2></div>
-    <div class="card-body form-grid">
-        <div class="field"><label for="Input_SupplierId">Supplier</label><select asp-for="Input.SupplierId"><option value="">— no supplier record —</option>@foreach (var s in Model.Suppliers) { <option value="@s.Id">@s.Name</option> }</select></div>
-        <div class="field"><label for="Input_SourceName">or stock source</label><input asp-for="Input.SourceName" maxlength="150" placeholder="e.g. District Health Office, donation" /></div>
-        <div class="field"><label for="Input_ReferenceNumber">@(Model.WithPrices ? "Supplier invoice no." : "Reference / document no.")</label><input asp-for="Input.ReferenceNumber" maxlength="60" /></div>
-        @if (Model.WithPrices) { <div class="field"><label for="Input_InvoiceDate">Invoice date</label><input asp-for="Input.InvoiceDate" type="date" /></div> }
+    <div class="card-header">
+        <h2><svg class="icon"><use href="#i-download" /></svg> Supplier invoice <small class="muted">receive stock into Main Pharmacy</small></h2>
+        <a class="btn btn-light btn-sm" href="/Pharmacy/Invoices" data-test="invoice-history"><svg class="icon icon-sm"><use href="#i-file" /></svg> Invoice history</a>
+    </div>
+
+    <div class="card-body form-grid invoice-header" data-invoice-header>
+        <div class="field"><label for="Input_SupplierId">Supplier *</label>
+            <select asp-for="Input.SupplierId" data-supplier-select data-test="invoice-supplier">
+                <option value="">— select supplier —</option>
+                @foreach (var s in Model.Suppliers) { <option value="@s.Id" data-details="@string.Join(" · ", new[] { s.ContactPerson, s.Phone, s.City }.Where(x => !string.IsNullOrWhiteSpace(x)))">@s.Name</option> }
+            </select>
+            <small class="muted" data-supplier-details></small>
+            <small><a href="/Pharmacy/Suppliers/Edit" target="_blank" rel="noopener">+ New supplier</a></small></div>
+        <div class="field"><label for="Input_ReferenceNumber">Invoice number *</label><input asp-for="Input.ReferenceNumber" maxlength="60" data-test="invoice-number" autocomplete="off" /></div>
+        <div class="field"><label for="Input_InvoiceDate">Invoice date</label><input asp-for="Input.InvoiceDate" type="date" data-test="invoice-date" /></div>
         <div class="field"><label for="Input_ReceivedDate">Received on</label><input asp-for="Input.ReceivedDate" type="date" /></div>
-        <div class="field span-2"><label for="Input_Notes">Notes</label><input asp-for="Input.Notes" maxlength="500" /></div>
+        <div class="field"><label for="Input_SourceName">No supplier record? Source</label><input asp-for="Input.SourceName" maxlength="150" placeholder="e.g. District Health Office, donation" /></div>
+        <div class="field"><label for="Input_Notes">Notes</label><input asp-for="Input.Notes" maxlength="500" /></div>
     </div>
-    <div class="card-body">
-        <div class="med-search" data-med-search-box>
-            <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input data-med-search placeholder="Type medicine name, generic name or code to add a line…" autocomplete="off" /></div>
-            <div class="med-results" data-med-results hidden></div>
-        </div>
-    </div>
-    <div class="table-wrap">
-        <table class="table lines-table" data-receive-lines data-prices="@(Model.WithPrices ? "1" : "0")" data-saleprice="@(Model.CanSalePrice ? "1" : "0")" data-initial="@initial">
-            <thead><tr><th>Medicine</th><th>Batch no.</th><th>Expiry *</th><th>Mfg</th><th class="num">Quantity *</th>
-                @if (Model.WithPrices) { <th class="num">Cost / unit</th>@if (Model.CanSalePrice) { <th class="num">Sale price</th> }<th class="num">Discount</th><th class="num">Line total</th> }<th></th></tr></thead>
+
+    <div class="table-wrap invoice-table-wrap">
+        <table class="table invoice-table" data-invoice-lines data-prices="@(Model.WithPrices ? "1" : "0")" data-saleprice="@(Model.CanSalePrice ? "1" : "0")" data-initial="@initial">
+            <thead><tr>
+                <th class="w-no">#</th><th class="w-med">Medicine *</th><th class="num">Quantity *</th><th>Expiry *</th><th>Batch no.</th>
+                @if (Model.WithPrices) { <th class="num">Purchase price</th><th class="num">Sale price</th><th class="num">Adjustment (−)</th><th class="num">Line total</th> }
+                <th></th>
+            </tr></thead>
             <tbody></tbody>
-            @if (Model.WithPrices)
-            {
-                <tfoot><tr><td colspan="@(Model.CanSalePrice ? 8 : 7)" class="num">Lines total</td><td class="num" data-receive-total>0.00</td><td></td></tr></tfoot>
-            }
         </table>
     </div>
+
+    <div class="card-body invoice-toolbar">
+        <button type="button" class="btn btn-light" data-add-row data-test="add-item"><svg class="icon icon-sm"><use href="#i-plus" /></svg> Add item <kbd>Alt+N</kbd></button>
+        @if (Model.CanAddMedicine) { <button type="button" class="btn btn-light" data-new-medicine-open data-test="new-medicine-open"><svg class="icon icon-sm"><use href="#i-pill" /></svg> New medicine (not in catalogue)</button> }
+        <span class="muted small">Type 2+ letters in the Medicine box, ↑/↓ to choose, Enter to pick. Enter moves to the next box; Enter in the last box opens a new row.</span>
+    </div>
+
     @if (Model.WithPrices)
     {
         <div class="card-body form-grid">
-            <div class="field"><label for="Input_DiscountAmount">Invoice discount</label><input asp-for="Input.DiscountAmount" type="number" min="0" step="0.01" /></div>
-            <div class="field"><label for="Input_AdditionalCharges">Additional charges (freight etc.)</label><input asp-for="Input.AdditionalCharges" type="number" min="0" step="0.01" /></div>
+            <div class="field"><label for="Input_DiscountAmount">Invoice discount</label><input asp-for="Input.DiscountAmount" type="number" min="0" step="0.01" data-invoice-discount /></div>
+            <div class="field"><label for="Input_AdditionalCharges">Additional charges (freight etc.)</label><input asp-for="Input.AdditionalCharges" type="number" min="0" step="0.01" data-invoice-charges /></div>
         </div>
     }
-    <div class="card-body inline-form wrap" data-receive-summary>
-        <button type="button" class="btn btn-light btn-sm" data-add-item><svg class="icon icon-sm"><use href="#i-plus" /></svg> Add another item</button>
-        <span>Items: <strong data-receive-count>0</strong></span>
-        <span>Total quantity: <strong data-receive-qty>0</strong></span>
-        @if (Model.WithPrices) { <span>Purchase total: <strong data-receive-purchase>0.00</strong></span> }
+
+    <div class="invoice-summary" data-receive-summary>
+        <div><span>Medicines / items</span><strong data-receive-count>0</strong></div>
+        <div><span>Total quantity</span><strong data-receive-qty>0</strong></div>
+        @if (Model.WithPrices) { <div><span>Purchase total</span><strong data-receive-purchase>0.00</strong></div><div><span>Invoice net</span><strong data-receive-net>0.00</strong></div> }
     </div>
-    <div class="card-footer form-actions"><span class="muted">The whole invoice is saved in one step – all lines or none. Each line creates a permanent stock entry; corrections only through an authorised stock adjustment with a reason. Expired stock cannot be received. Without a batch number the line is kept as the batch of its expiry date.</span>
-        <a class="btn btn-light" href="/Pharmacy/Documents?type=receipts" data-test="invoice-history">Invoice history</a>
-        <button class="btn btn-primary" type="submit" data-test="save-receipt" data-once>Save invoice</button></div>
+    <div class="card-footer form-actions">
+        <span class="muted">All rows are saved together in one step – every medicine or none. Saving twice never adds stock twice; the same supplier invoice number is refused. Sale prices stay as they are unless you change them (permission needed). Corrections later only through an authorised stock adjustment with a reason.</span>
+        <button class="btn btn-primary btn-lg" type="submit" data-test="save-receipt" data-once>Save &amp; receive complete invoice</button>
+    </div>
 </form>
+
+@if (Model.CanAddMedicine)
+{
+    <dialog class="modal" data-new-medicine>
+        <form method="dialog" class="card" data-new-medicine-form>
+            <div class="card-header"><h3>New medicine</h3></div>
+            <div class="card-body form-grid">
+                <div class="field span-2"><label for="NM_Name">Name *</label><input id="NM_Name" name="Name" maxlength="150" required /></div>
+                <div class="field"><label for="NM_Generic">Generic name</label><input id="NM_Generic" name="GenericName" maxlength="150" /></div>
+                <div class="field"><label for="NM_Strength">Strength</label><input id="NM_Strength" name="Strength" maxlength="50" placeholder="500mg" /></div>
+                <div class="field"><label for="NM_Form">Dosage form</label><select id="NM_Form" name="DosageFormId"><option value="">—</option>@foreach (var f in Model.DosageForms) { <option value="@f.Id">@f.Name</option> }</select></div>
+                <div class="field"><label for="NM_Unit">Unit</label><input id="NM_Unit" name="Unit" maxlength="30" placeholder="Tablet / Vial / Bottle" /></div>
+                @if (Model.IsPrivate)
+                {
+                    <div class="field"><label for="NM_Cost">Purchase price</label><input id="NM_Cost" name="PurchasePrice" type="number" min="0" step="0.0001" /></div>
+                    @if (Model.CanSalePrice) { <div class="field"><label for="NM_Sale">Sale price</label><input id="NM_Sale" name="SalePrice" type="number" min="0" step="0.01" /></div> }
+                }
+                <div class="field span-2" data-new-medicine-dup hidden><label class="check"><input type="checkbox" name="ConfirmDuplicate" value="true" /> <span data-new-medicine-dup-text></span> – create anyway</label></div>
+                <div class="field span-2 text-danger" data-new-medicine-error></div>
+            </div>
+            <div class="card-footer form-actions">
+                <button type="button" class="btn btn-light" data-new-medicine-cancel>Cancel</button>
+                <button type="button" class="btn btn-primary" data-new-medicine-save data-test="new-medicine-save">Create and add to invoice</button>
+            </div>
+        </form>
+    </dialog>
+}
 @section Scripts { <script src="~/js/pharmacy.js" asp-append-version="true"></script> }

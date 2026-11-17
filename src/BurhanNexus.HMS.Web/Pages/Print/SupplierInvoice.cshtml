@@ -1,0 +1,57 @@
+@page "{id:long}/{handler=Print}"
+@model BurhanNexus.HMS.Web.Pages.Print.SupplierInvoiceModel
+@{
+    Layout = null;
+    var h = Model.Hospital; var g = Model.Receipt!;
+    var priced = Model.ShowPrices && g.Mode == HospitalType.Private;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Supplier invoice @g.ReferenceNumber – @g.Number</title>
+    <link rel="stylesheet" href="~/css/lab-report.css" asp-append-version="true" />
+    <script src="~/js/lab-report.js" asp-append-version="true" defer></script>
+</head>
+<body class="lab-report-body" data-supplier-invoice-print="@g.Number">
+<div class="lr-toolbar no-print">
+    <div class="lr-row">
+        <strong>Supplier invoice @g.ReferenceNumber</strong>
+        <button type="button" class="lr-btn" data-print-now>Print</button>
+        <a class="lr-btn light" href="/Pharmacy/Doc/GRN/@g.Id">&larr; Invoice</a>
+    </div>
+    <div class="lr-status">For a PDF choose “Save as PDF” in the print dialog.</div>
+</div>
+<main class="lr-page">
+    <header class="lr-head">
+        @if (h.HasLogo) { <img class="lr-logo" src="/branding/logo?v=@h.LogoVersion" alt="" /> }
+        <div class="lr-brand"><div class="lr-hosp">@h.HospitalName</div><div class="lr-small">@h.Address, @h.City · @h.ContactNumber</div></div>
+    </header>
+    <h1 class="lr-title">STOCK RECEIVING – SUPPLIER INVOICE</h1>
+    <table class="lr-info">
+        <tr><th>Supplier</th><td><strong>@(g.Supplier?.Name ?? g.SourceName)</strong></td><th>Invoice no.</th><td><strong>@(g.ReferenceNumber ?? "—")</strong></td></tr>
+        <tr><th>Invoice date</th><td>@(g.InvoiceDate is DateOnly d ? Fmt.Day(d) : "—")</td><th>GRN / received</th><td>@g.Number · @Fmt.Day(g.ReceivedDate)</td></tr>
+        <tr><th>Items</th><td>@g.Items.Count</td><th>Total quantity</th><td>@g.Items.Sum(i => i.Quantity)</td></tr>
+        <tr><th>Received by</th><td>@g.CreatedByUsername · @Fmt.DateTimeText(g.CreatedUtc)</td><th>Store</th><td>@g.Location?.Name</td></tr>
+    </table>
+    <table class="lr-results">
+        <thead><tr><th>#</th><th>Medicine</th><th>Batch</th><th>Expiry</th><th>Qty</th>@if (priced) { <th>Purchase</th><th>Sale</th><th>Adj.</th><th>Total</th> }</tr></thead>
+        <tbody>
+        @{ var n = 0; }
+        @foreach (var i in g.Items.OrderBy(x => x.Id))
+        {
+            n++;
+            <tr><td>@n</td><td>@i.MedicineName</td><td>@i.BatchNumber</td><td>@i.ExpiryDate.ToString("MM/yyyy")</td><td>@i.Quantity</td>
+                @if (priced) { <td>@i.UnitCost?.ToString("N2")</td><td>@i.SalePrice?.ToString("N2")</td><td>@i.Discount?.ToString("N2")</td><td>@i.LineTotal?.ToString("N2")</td> }</tr>
+        }
+        </tbody>
+        @if (priced && g.NetAmount is decimal net)
+        {
+            <tfoot><tr><td colspan="8">Lines @g.GrossAmount?.ToString("N2") − discount @g.DiscountAmount?.ToString("N2") + charges @g.AdditionalCharges?.ToString("N2")</td><td><strong>@net.ToString("N2")</strong></td></tr></tfoot>
+        }
+    </table>
+    @if (g.Notes is not null) { <p class="lr-small">Notes: @g.Notes</p> }
+    <div class="lr-sign"><span>Received by ____________________</span><span>Checked by ____________________</span></div>
+</main>
+</body>
+</html>
