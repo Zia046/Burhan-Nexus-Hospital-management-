@@ -39,6 +39,9 @@ public sealed class DisplayFormatter
     public string Time(DateTime? utc) => utc is null ? "—" : ToLocal(utc.Value).ToString(TimeFormat, CultureInfo.InvariantCulture);
     public string Day(DateOnly date) => date.ToString(DateFormat, CultureInfo.InvariantCulture);
     public string DateTimeText(DateTime? utc) => utc is null ? "—" : $"{Date(utc)} {Time(utc)}";
+    /// <summary>Update 13: a service fee – the amount, "FREE" (explicitly marked) or "Fee not set".</summary>
+    public string Fee(decimal amount, bool isFree) => amount > 0 ? Money(amount) : isFree ? "FREE" : "Fee not set";
+
     public string Money(decimal amount) => $"{_profile?.CurrencySymbol ?? "Rs."} {amount.ToString("N2", CultureInfo.InvariantCulture)}";
 
     public static string Bytes(long bytes) => bytes switch

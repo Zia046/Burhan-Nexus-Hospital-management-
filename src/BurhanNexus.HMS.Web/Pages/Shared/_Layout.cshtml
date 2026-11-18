@@ -62,7 +62,7 @@
             foreach (var item in items) { @NavLink(item, "nav-link") }
         }
     </nav>
-    <div class="sidebar-footer">Burhan Nexus · v2.1 · Update 11</div>
+    <div class="sidebar-footer">Burhan Nexus · v2.2 · Update 13</div>
 </aside>
 <div class="sidebar-backdrop" data-sidebar-close></div>
 
@@ -74,6 +74,10 @@
             @if (!license.AllowsWrite && license.State != BurhanNexus.HMS.Core.Licensing.LicenseState.NotInitialized)
             {
                 <span class="pill pill-danger" title="@license.Message"><svg class="icon icon-sm"><use href="#i-lock" /></svg> Read-only</span>
+            }
+            else if (license.ExpiresSoon)
+            {
+                <a class="pill pill-warning" href="/Settings/License" title="@license.Message" data-license-expiring>Licence expires in @license.DaysRemaining day(s)</a>
             }
             else if (license.State == BurhanNexus.HMS.Core.Licensing.LicenseState.TrialActive && perms.Contains(Perm.LicenseView))
             {

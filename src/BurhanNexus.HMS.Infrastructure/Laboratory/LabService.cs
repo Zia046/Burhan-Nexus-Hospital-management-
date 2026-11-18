@@ -300,6 +300,7 @@ public sealed class LabService : ILabService
             var t = tests.FirstOrDefault(x => x.Id == id);
             if (t is null || !t.IsActive) errors.Add("A selected test is not available.");
             else if (t.Parameters.Count == 0) errors.Add($"{t.Name} has no result parameters yet – complete its definition first.");
+            else if (await ServiceCatalogue.FeeNotSetErrorAsync(_db, t.ServiceItemId, today, ct) is { } feeMissing) errors.Add(feeMissing); // Update 13
         }
         if (await _db.LabOrderItems.AnyAsync(x => x.LabOrderId == order.Id && testIds.Contains(x.LabTestId) && x.Status != LabOrderItemStatus.Cancelled, ct))
             errors.Add("A selected test is already booked in this visit.");

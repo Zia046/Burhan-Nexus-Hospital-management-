@@ -288,7 +288,10 @@ public sealed class RadiologyWorkflowService : IRadiologyService
         var services = await _db.RadiologyServices.AsNoTracking().Include(s => s.ServiceItem).Where(s => serviceIds.Contains(s.Id)).ToListAsync(ct);
         var errors = new List<string>();
         foreach (var id in serviceIds)
+        {
             if (services.FirstOrDefault(x => x.Id == id) is not { IsActive: true } s || !s.ServiceItem!.IsActive) errors.Add("A selected examination is not available.");
+            else if (await ServiceCatalogue.FeeNotSetErrorAsync(_db, s.ServiceItemId, today, ct) is { } feeMissing) errors.Add(feeMissing); // Update 13
+        }
         if (await _db.RadiologyExams.AnyAsync(x => x.OrderId == order.Id && serviceIds.Contains(x.ServiceId) && x.Status != RadiologyExamStatus.Cancelled, ct))
             errors.Add("A selected examination is already booked in this order.");
         if (errors.Count > 0) return ServiceResult.Fail(errors.Distinct().ToArray());

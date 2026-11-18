@@ -16,8 +16,12 @@ public sealed class LicenseKeyPayload
     public DateTime IssuedUtc { get; set; }
     /// <summary>Required for Annual licences, null for Lifetime.</summary>
     public DateTime? ExpiresUtc { get; set; }
-    /// <summary>Unique key serial for tracking.</summary>
+    /// <summary>Unique key serial (licence ID) for tracking.</summary>
     public string Serial { get; set; } = string.Empty;
+    /// <summary>Update 13: "Yearly", "Custom" or "Lifetime" – how the expiry was chosen (display only; older keys have none).</summary>
+    public string? Term { get; set; }
+    /// <summary>Update 13: optional machine binding – when present the key works only on the computer with this Machine ID.</summary>
+    public string? MachineId { get; set; }
 }
 
 public enum LicenseState
@@ -39,8 +43,17 @@ public sealed record LicenseStatus(
     DateTime? ActivatedUtc,
     DateTime? ExpiresUtc,
     int? DaysRemaining,
-    string Message)
+    string Message,
+    string? LicenseId = null,
+    string? Term = null,
+    bool Deactivated = false)
 {
+    /// <summary>Update 13: days before expiry when every page starts warning.</summary>
+    public const int WarnDays = 30;
+
+    /// <summary>An active time-limited licence close to its expiry date.</summary>
+    public bool ExpiresSoon => State == LicenseState.Active && ExpiresUtc is not null && DaysRemaining is int d && d <= WarnDays;
+
     /// <summary>Data can be added/changed only while this is true. Data is never deleted either way.</summary>
     public bool AllowsWrite => State is LicenseState.TrialActive or LicenseState.Active;
 
@@ -48,9 +61,9 @@ public sealed record LicenseStatus(
     {
         LicenseState.TrialActive => "Trial (active)",
         LicenseState.TrialExpired => "Trial expired",
-        LicenseState.Active => Type == LicenseType.Lifetime ? "Lifetime licence" : "Annual licence",
+        LicenseState.Active => Type == LicenseType.Lifetime ? "Lifetime licence" : Term == "Custom" ? "Licence (custom period)" : "Yearly licence",
         LicenseState.Expired => "Licence expired",
-        LicenseState.Invalid => "Licence verification required",
+        LicenseState.Invalid => Deactivated ? "Licence deactivated" : "Licence verification required",
         _ => "Not initialised"
     };
 }

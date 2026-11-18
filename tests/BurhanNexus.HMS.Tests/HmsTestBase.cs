@@ -37,12 +37,22 @@ public abstract partial class HmsTestBase : IAsyncLifetime
         P("DefaultLanguage", "en"), P("ReceiptPaperSize", "80mm"), P("ReportPaperSize", "A4")
     };
 
-    protected async Task<Browser> SetupAsync(string hospitalType = "Private")
+    /// <param name="freeUnpricedServices">
+    /// Update 13: services are no longer free by default ("fee not set" blocks billing in Private mode). Tests written before
+    /// Update 13 book the unpriced standard catalogue as free, so by default the seeded zero-fee services are marked FREE
+    /// explicitly here – exactly what an administrator does in Fees &amp; Services. Update 13 tests pass false.
+    /// </param>
+    protected async Task<Browser> SetupAsync(string hospitalType = "Private", bool freeUnpricedServices = true)
     {
         var b = Factory.NewBrowser();
         var r = await b.PostMultipartAsync("/Setup", SetupFields(hospitalType), ("Logo", "logo.png", TinyPng, "image/png"));
         Assert.True(r.StatusCode == HttpStatusCode.Redirect, "Setup failed: " + Errors(await r.Content.ReadAsStringAsync()));
         Assert.Equal("/Account/Login", r.Headers.Location?.OriginalString);
+        if (freeUnpricedServices)
+        {
+            await using var db = Factory.NewDb();
+            await db.Database.ExecuteSqlRawAsync("UPDATE \"ServiceItems\" SET \"IsFree\" = TRUE WHERE \"DefaultFee\" = 0");
+        }
         return b;
     }
 

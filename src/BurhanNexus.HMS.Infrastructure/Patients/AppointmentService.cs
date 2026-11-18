@@ -87,7 +87,7 @@ public sealed record WaiverRow(long AppointmentId, string AppointmentNumber, Dat
 
 public sealed record AppointmentDayCount(DateOnly Date, int DoctorId, AppointmentStatus Status, int Count);
 
-public sealed record DoctorDayLoad(int DoctorId, string DoctorName, string? Specialty, int Issued, int LastToken, decimal? Fee);
+public sealed record DoctorDayLoad(int DoctorId, string DoctorName, string? Specialty, int Issued, int LastToken, decimal? Fee, bool FeeIsFree = false);
 
 public interface IAppointmentService
 {
@@ -170,7 +170,12 @@ public sealed class AppointmentService : IAppointmentService
         if (errors.Count > 0) return ServiceResult<Appointment>.Fail(errors.ToArray());
 
         var service = await DoctorServiceAsync(doctor!.Id, ct);
-        var fee = service is null ? 0m : await Finance.ServiceCatalogue.FeeOnAsync(_db, service.Id, today, ct);
+        // Update 13: no doctor is free by default – the consultation fee must be set (or the doctor marked FREE) in OPD Setup.
+        if (service is null)
+            return ServiceResult<Appointment>.Fail($"The consultation fee of {doctor.Name} is not set. Enter it in OPD Setup (or mark the doctor's consultation FREE).");
+        if (await Finance.ServiceCatalogue.FeeNotSetErrorAsync(_db, service.Id, today, ct) is not null)
+            return ServiceResult<Appointment>.Fail($"The consultation fee of {doctor.Name} is not set. Enter it in OPD Setup (or mark the doctor's consultation FREE).");
+        var fee = await Finance.ServiceCatalogue.FeeOnAsync(_db, service.Id, today, ct);
 
         // ---- how the consultation fee is settled ----
         var payment = fee <= 0 ? AppointmentPayment.Free
@@ -570,11 +575,12 @@ public sealed class AppointmentService : IAppointmentService
             .GroupBy(a => a.DoctorId).Select(g => new { DoctorId = g.Key, Issued = g.Count(), Last = g.Max(a => a.TokenNumber) }).ToListAsync(ct);
         var doctors = await _db.Doctors.AsNoTracking().Where(d => d.IsActive).OrderBy(d => d.Name).ToListAsync(ct);
         var fees = await _db.ServiceItems.AsNoTracking().Where(s => s.DoctorId != null && s.IsActive && s.Category == EncounterType.Opd)
-            .GroupBy(s => s.DoctorId!.Value).Select(g => new { DoctorId = g.Key, Fee = g.OrderBy(s => s.Id).First().DefaultFee }).ToListAsync(ct);
+            .GroupBy(s => s.DoctorId!.Value).Select(g => new { DoctorId = g.Key, Fee = g.OrderBy(s => s.Id).First().DefaultFee, IsFree = g.OrderBy(s => s.Id).First().IsFree }).ToListAsync(ct);
         return doctors.Select(d =>
         {
             var c = counts.FirstOrDefault(x => x.DoctorId == d.Id);
-            return new DoctorDayLoad(d.Id, d.Name, d.Specialty, c?.Issued ?? 0, c?.Last ?? 0, fees.FirstOrDefault(f => f.DoctorId == d.Id)?.Fee);
+            var f = fees.FirstOrDefault(x => x.DoctorId == d.Id);
+            return new DoctorDayLoad(d.Id, d.Name, d.Specialty, c?.Issued ?? 0, c?.Last ?? 0, f?.Fee, f?.IsFree ?? false);
         }).ToList();
     }
 

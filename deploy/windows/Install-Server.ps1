@@ -122,7 +122,27 @@ if (-not (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)) {
         -Description "Burhan Nexus Hospital Management server (web application on port $Port)" -StartupType Automatic | Out-Null
     sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/10000/restart/30000 | Out-Null
 }
-Start-Service $ServiceName
+# Update 13: prepare / upgrade the database BEFORE starting the service. The first migration can take longer than
+# Windows allows a service to start (30 s), which made the first start fail although a manual run worked.
+Write-Step "Preparing the database (first time can take a few minutes)"
+Push-Location $InstallDir
+try {
+    $prevEap = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    & $exe --migrate-only 2>&1 | ForEach-Object { "$_" } | Select-Object -Last 5 | ForEach-Object { Write-Host "  $_" }
+    $migrateExit = $LASTEXITCODE
+    $ErrorActionPreference = $prevEap
+} finally { Pop-Location }
+if ($migrateExit -ne 0) { Write-Warning "Database preparation reported exit code $migrateExit - the service will still be started and will retry." }
+try { Start-Service $ServiceName -ErrorAction Stop }
+catch {
+    # A slow start is not a failure: wait up to 2 minutes for the service (it restarts itself on failure).
+    Write-Host "  Service is still starting - waiting..."
+    for ($w = 0; $w -lt 24 -and (Get-Service $ServiceName).Status -ne "Running"; $w++) {
+        Start-Sleep -Seconds 5
+        if ((Get-Service $ServiceName).Status -eq "Stopped") { Start-Service $ServiceName -ErrorAction SilentlyContinue }
+    }
+    if ((Get-Service $ServiceName).Status -ne "Running") { throw "The Windows service '$ServiceName' did not start. Check the Windows Event Viewer (Application log)." }
+}
 
 # ---- Firewall ----
 Write-Step "Allowing TCP port $Port on the local network"

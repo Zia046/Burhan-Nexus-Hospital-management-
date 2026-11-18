@@ -745,3 +745,18 @@ dialog.modal::backdrop { background: rgba(15,42,74,.45); }
 .invoice-table input.w-xs { width: 5.2em; }
 .invoice-table input.w-sm { width: 7.5em; }
 .invoice-table input[type=month] { width: 11.5em; }
+
+/* Update 13: patient suggestions (two lines) */
+.patient-suggest { position: relative; }
+.suggest-list { position: absolute; z-index: 30; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid var(--line, #d5dde7); border-radius: 8px; box-shadow: 0 10px 30px rgba(15,42,74,.15); max-height: 420px; overflow-y: auto; }
+.suggest-item { display: flex; flex-direction: column; padding: .45rem .8rem; border-bottom: 1px solid #eef2f6; color: inherit; text-decoration: none; line-height: 1.25; }
+.suggest-item:hover, .suggest-item.on { background: #eaf2fd; }
+.suggest-item small, .today-patient small { color: var(--muted, #5b6b7f); font-size: .8em; }
+.today-patients { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: .4rem; }
+.today-patient { display: flex; flex-direction: column; padding: .45rem .7rem; border: 1px solid var(--line, #d5dde7); border-radius: 8px; color: inherit; text-decoration: none; line-height: 1.25; background: #fff; }
+.today-patient:hover { border-color: var(--primary, #1565c0); background: #f4f8fe; }
+
+/* Update 13: licence screen */
+.input-group { display: flex; gap: 6px; }
+.input-group input { flex: 1; min-width: 0; }
+progress.progress-bar { width: 100%; height: 8px; accent-color: var(--amber-600); }

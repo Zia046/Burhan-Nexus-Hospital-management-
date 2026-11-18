@@ -194,7 +194,7 @@ public sealed class LabCatalogService : ILabCatalogService
         if (!await _db.LabSampleTypes.AnyAsync(c => c.Id == i.SampleTypeId, ct)) errors.Add("Select the sample type.");
         if (code is not null && await _db.LabTests.AnyAsync(t => t.Id != id && t.Code == code, ct)) errors.Add("Another test already uses this code.");
         if (i.TurnaroundHours is < 0 or > 2000) errors.Add("Turnaround time is not valid.");
-        if (id is null && !canManageFees) { i.IsFree = true; i.Price = 0; } // price is set later by a user with "Manage Laboratory Fees"
+        if (id is null && !canManageFees) { i.IsFree = false; i.Price = 0; } // Update 13: "price not set" – set later by a user with "Manage Laboratory Fees"
         if (canManageFees && !i.IsFree && i.Price <= 0) errors.Add("Enter the test price, or mark the test as free.");
         if (errors.Count > 0) return ServiceResult<int>.Fail(errors.ToArray());
 
@@ -207,7 +207,7 @@ public sealed class LabCatalogService : ILabCatalogService
             var dept = await _db.Departments.Where(d => d.Name == "Laboratory").Select(d => (int?)d.Id).FirstOrDefaultAsync(ct);
             var svc = await _finance.SaveServiceAsync(null, new ServiceInput
             {
-                Code = "LT-" + code, Name = name, Kind = ServiceKind.Laboratory, DepartmentId = dept, IsFree = i.IsFree, Fee = i.IsFree ? 0 : i.Price,
+                Code = "LT-" + code, Name = name, Kind = ServiceKind.Laboratory, DepartmentId = dept, IsFree = i.IsFree, Fee = i.IsFree ? 0 : i.Price, FeePending = !canManageFees,
                 AllowPartialPayment = i.AllowPartialPayment, IsActive = i.IsActive, Description = "Laboratory test"
             }, ct);
             if (!svc.Succeeded) return ServiceResult<int>.Fail(svc.Errors.ToArray());
@@ -223,7 +223,7 @@ public sealed class LabCatalogService : ILabCatalogService
             var svc = await _finance.SaveServiceAsync(s.Id, new ServiceInput
             {
                 Code = s.Code, Name = name, Kind = ServiceKind.Laboratory, DepartmentId = s.DepartmentId,
-                IsFree = canManageFees ? i.IsFree : currentFee == 0, Fee = canManageFees ? (i.IsFree ? 0 : i.Price) : currentFee,
+                IsFree = canManageFees ? i.IsFree : s.IsFree, Fee = canManageFees ? (i.IsFree ? 0 : i.Price) : currentFee, FeePending = !canManageFees,
                 FeeEffectiveFrom = canManageFees ? i.PriceEffectiveFrom : null, FeeNote = "Laboratory test price",
                 AllowPartialPayment = canManageFees ? i.AllowPartialPayment : s.AllowPartialPayment, IsActive = i.IsActive,
                 Description = s.Description, CounterIds = await _db.ServiceCounters.Where(c => c.ServiceItemId == s.Id).Select(c => c.CounterId).ToListAsync(ct)

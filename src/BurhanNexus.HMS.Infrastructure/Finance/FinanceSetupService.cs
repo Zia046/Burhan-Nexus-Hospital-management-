@@ -33,6 +33,8 @@ public sealed class ServiceInput
     public int? DepartmentId { get; set; }
     public int? DoctorId { get; set; }
     public bool IsFree { get; set; }
+    /// <summary>Update 13: saved without a fee for now (a user without the fee permission) – "fee not set", NOT free.</summary>
+    public bool FeePending { get; set; }
     public decimal Fee { get; set; }
     /// <summary>When the (changed) fee applies. Empty = today. Only today or a future date.</summary>
     public DateOnly? FeeEffectiveFrom { get; set; }
@@ -357,7 +359,7 @@ public sealed class FinanceSetupService : IFinanceSetupService
         if (!Enum.IsDefined(i.Kind)) errors.Add("Select the service type.");
         var fee = i.IsFree ? 0 : i.Fee;
         if (fee < 0 || fee > 10_000_000 || !FinanceMath.IsMoney(fee)) errors.Add("Fee must be a valid amount (0 or more, 2 decimals).");
-        if (!i.IsFree && fee == 0) errors.Add("Enter the fee, or mark the service as free.");
+        if (!i.IsFree && fee == 0 && !i.FeePending) errors.Add("Enter the fee, or mark the service as FREE.");
         if (i.DepartmentId is int d && !await _db.Departments.AnyAsync(x => x.Id == d, ct)) errors.Add("Unknown department.");
         if (i.DoctorId is int doc && !await _db.Doctors.AnyAsync(x => x.Id == doc, ct)) errors.Add("Unknown doctor.");
         if (i.Kind == ServiceKind.Consultation && i.DoctorId is null) errors.Add("A consultation service must be linked to a doctor.");
@@ -399,6 +401,7 @@ public sealed class FinanceSetupService : IFinanceSetupService
         }
         s.Code = code!; s.Name = name!; s.Kind = i.Kind; s.DepartmentId = i.DepartmentId; s.DoctorId = i.DoctorId;
         s.AllowPartialPayment = i.AllowPartialPayment; s.IsActive = i.IsActive; s.Description = T(i.Description); s.UpdatedUtc = now;
+        s.IsFree = i.IsFree; // Update 13: free only when explicitly marked
         s.ServiceCategoryId = i.ServiceCategoryId ?? s.ServiceCategoryId ?? await ServiceCatalogue.CategoryIdAsync(_db, i.Kind, ct);
         s.ChargeUnit = i.ChargeUnit ?? s.ChargeUnit; s.Applicability = i.Applicability ?? s.Applicability;
         // Registration services keep their OPD/ER category; everything else is billed at the counter only.

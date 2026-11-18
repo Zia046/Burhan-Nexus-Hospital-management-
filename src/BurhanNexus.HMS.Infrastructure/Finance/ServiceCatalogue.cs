@@ -210,6 +210,23 @@ public static class ServiceCatalogue
         return row.Fee;
     }
 
+    /// <summary>Update 13: the fee of a service and whether it is explicitly FREE or still without a fee.</summary>
+    public sealed record FeeQuote(decimal Fee, bool IsFree, bool NotSet, string Name);
+
+    public static async Task<FeeQuote> QuoteAsync(HmsDbContext db, int serviceId, DateOnly date, CancellationToken ct = default)
+    {
+        var item = await db.ServiceItems.AsNoTracking().Where(s => s.Id == serviceId).Select(s => new { s.Name, s.IsFree }).FirstAsync(ct);
+        var fee = await FeeOnAsync(db, serviceId, date, ct);
+        return new FeeQuote(fee, item.IsFree, fee <= 0 && !item.IsFree && !await IsGovernmentAsync(db, ct), item.Name);
+    }
+
+    /// <summary>Update 13: the refusal for a service that has no fee yet (Private mode) – null when it can be billed.</summary>
+    public static async Task<string?> FeeNotSetErrorAsync(HmsDbContext db, int serviceId, DateOnly date, CancellationToken ct = default)
+    {
+        var q = await QuoteAsync(db, serviceId, date, ct);
+        return q.NotSet ? $"The fee of “{q.Name}” is not set yet. Ask the administrator to enter it (Fees & Services) – or to mark it FREE." : null;
+    }
+
     public static async Task<bool> IsGovernmentAsync(HmsDbContext db, CancellationToken ct = default) =>
         await db.HospitalConfigurations.AsNoTracking().Select(c => (HospitalType?)c.HospitalType).FirstOrDefaultAsync(ct) == HospitalType.Government;
 }

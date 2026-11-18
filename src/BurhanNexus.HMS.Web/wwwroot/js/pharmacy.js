@@ -169,6 +169,7 @@
       box.value = m.name; box.classList.add("chosen"); box.classList.remove("input-error");
       tr.querySelector("[data-row-info]").textContent = [m.generic, m.code, m.available !== undefined ? `in stock ${m.available} ${m.unit || ""}` : null].filter(Boolean).join(" · ");
       tr.dataset.medicine = m.code || m.id;
+      tr.dataset.currentCost = m.cost === null || m.cost === undefined ? "" : String(m.cost);
       if (prices) {
         const cost = tr.querySelector("[data-name=UnitCost]");
         if (cost && (cost.value === "" || cost.dataset.auto === "1")) { cost.value = m.cost ?? ""; cost.dataset.auto = "1"; }
@@ -178,7 +179,23 @@
           else sale.textContent = m.price === null || m.price === undefined ? "—" : money(m.price);
         }
       }
+      checkRate(tr);
       reindex();
+    };
+
+    // Update 13: a purchase rate different from the medicine's current rate needs its own batch number (rates are never mixed).
+    const checkRate = tr => {
+      const cost = tr.querySelector("[data-name=UnitCost]"), batch = tr.querySelector("[data-name=BatchNumber]");
+      if (!cost || !batch) return;
+      const cur = tr.dataset.currentCost, val = cost.value.trim();
+      const differs = cur !== undefined && cur !== "" && val !== "" && Number(val) !== Number(cur);
+      const need = differs && batch.value.trim() === "";
+      batch.required = differs;
+      batch.placeholder = differs ? "required – new rate" : "optional";
+      batch.classList.toggle("input-error", need);
+      batch.setCustomValidity(need ? `Purchase rate ${money(Number(val))} differs from the current rate ${money(Number(cur))}. Enter a separate batch number.` : "");
+      batch.title = need ? batch.validationMessage : "";
+      tr.toggleAttribute("data-rate-differs", differs);
     };
 
     const clearMedicine = tr => {
@@ -265,7 +282,7 @@
       tbody.appendChild(tr);
       remove.addEventListener("click", () => { tr.remove(); if (tbody.rows.length === 0) addRow(); reindex(); });
       tr.querySelectorAll("input[data-name]:not([type=hidden])").forEach(i => {
-        i.addEventListener("input", () => { if (i.dataset.auto) i.dataset.auto = "0"; reindex(); });
+        i.addEventListener("input", () => { if (i.dataset.auto) i.dataset.auto = "0"; checkRate(tr); reindex(); });
         i.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); nextBox(tr, i); } });
       });
       attachRowSearch(tr);

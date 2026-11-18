@@ -43,7 +43,7 @@
     <div class="card-body invoice-toolbar">
         <button type="button" class="btn btn-light" data-add-row data-test="add-item"><svg class="icon icon-sm"><use href="#i-plus" /></svg> Add item <kbd>Alt+N</kbd></button>
         @if (Model.CanAddMedicine) { <button type="button" class="btn btn-light" data-new-medicine-open data-test="new-medicine-open"><svg class="icon icon-sm"><use href="#i-pill" /></svg> New medicine (not in catalogue)</button> }
-        <span class="muted small">Type 2+ letters in the Medicine box, ↑/↓ to choose, Enter to pick. Enter moves to the next box; Enter in the last box opens a new row.</span>
+        <span class="muted small">Type 2+ letters in the Medicine box, ↑/↓ to choose, Enter to pick. Enter moves to the next box; Enter in the last box opens a new row.@if (Model.WithPrices) {<text> Batch number is optional – but a purchase rate different from the medicine&#39;s current rate needs its own batch number (rates are never mixed).</text>}</span>
     </div>
 
     @if (Model.WithPrices)

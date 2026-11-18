@@ -8,9 +8,12 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 
+// Update 13: "--migrate-only" applies database migrations and exits. The installer runs it before starting the Windows
+// service, so a long first-time (or upgrade) migration never hits the service-start timeout.
+var migrateOnly = args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase);
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
-    Args = args,
+    Args = args.Where(a => !a.Equals("--migrate-only", StringComparison.OrdinalIgnoreCase)).ToArray(),
     // A Windows Service starts in System32, so use the application folder as content root there.
     ContentRootPath = Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceHelpers.IsWindowsService() ? AppContext.BaseDirectory : null
 });
@@ -91,7 +94,12 @@ var app = builder.Build();
 
 // ---- Database: migrate + seed permissions (never deletes data) ----
 var autoMigrate = app.Configuration.GetValue("Hms:AutoMigrate", true);
-await app.Services.InitializeHmsDatabaseAsync(autoMigrate);
+await app.Services.InitializeHmsDatabaseAsync(autoMigrate || migrateOnly);
+if (migrateOnly)
+{
+    Console.WriteLine("Burhan Nexus HMS: database is up to date.");
+    return;
+}
 
 if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
 {

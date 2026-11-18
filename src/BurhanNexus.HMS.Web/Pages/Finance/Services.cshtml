@@ -18,7 +18,7 @@
                     <tr class="@(s.Item.IsActive ? "" : "row-muted")" data-service="@s.Item.Code">
                         <td class="mono"><a href="/Finance/Services?id=@s.Item.Id">@s.Item.Code</a></td><td><strong>@s.Item.Name</strong></td><td>@s.Item.Kind</td>
                         <td>@s.Item.Department?.Name @s.Item.Doctor?.Name</td>
-                        <td class="num" data-fee>@(s.CurrentFee == 0 ? "Free" : Fmt.Money(s.CurrentFee))</td>
+                        <td class="num" data-fee>@Fmt.Fee(s.CurrentFee, s.Item.IsFree)</td>
                         <td>@(s.NextChange is { } n ? $"{Fmt.Money(n.Fee)} from {Fmt.Day(n.EffectiveFrom)}" : "")</td>
                         <td>@(s.Item.AllowPartialPayment ? "Yes" : "No")</td>
                         <td>@(s.CounterNames.Count == 0 ? "Any" : string.Join(", ", s.CounterNames))</td>

@@ -144,7 +144,7 @@ public sealed class RadiologyCatalogService : IRadiologyCatalogService
         if (i.DurationMinutes is < 0 or > 600) errors.Add("Estimated duration must be between 0 and 600 minutes.");
         if (i.DefaultTemplateId is int tid && !await _db.RadiologyTemplates.AnyAsync(t => t.Id == tid && t.Modality == i.Modality, ct))
             errors.Add("The selected template does not belong to this modality.");
-        if (id is null && !canManageFees) { i.IsFree = true; i.Fee = 0; } // the fee is set later by a user with "Manage Radiology Fees"
+        if (id is null && !canManageFees) { i.IsFree = false; i.Fee = 0; } // Update 13: "fee not set" – set later by a user with "Manage Radiology Fees"
         if (canManageFees && !i.IsFree && i.Fee <= 0) errors.Add("Enter the fee, or mark the service as free.");
         if (canManageFees && !FinanceMath.IsMoney(i.Fee)) errors.Add("The fee may have at most 2 decimals.");
         if (errors.Count > 0) return ServiceResult<int>.Fail(errors.ToArray());
@@ -158,7 +158,7 @@ public sealed class RadiologyCatalogService : IRadiologyCatalogService
         {
             var svc = await _finance.SaveServiceAsync(null, new ServiceInput
             {
-                Code = "RAD-" + code, Name = name, Kind = kind, DepartmentId = await DepartmentAsync(i.Modality, ct), IsFree = i.IsFree, Fee = i.IsFree ? 0 : i.Fee,
+                Code = "RAD-" + code, Name = name, Kind = kind, DepartmentId = await DepartmentAsync(i.Modality, ct), IsFree = i.IsFree, Fee = i.IsFree ? 0 : i.Fee, FeePending = !canManageFees,
                 AllowPartialPayment = i.AllowPartialPayment, IsActive = i.IsActive, Description = $"{Label(i.Modality)} examination"
             }, ct);
             if (!svc.Succeeded) return ServiceResult<int>.Fail(svc.Errors.ToArray());
@@ -176,7 +176,7 @@ public sealed class RadiologyCatalogService : IRadiologyCatalogService
             var svc = await _finance.SaveServiceAsync(item.Id, new ServiceInput
             {
                 Code = item.Code, Name = name, Kind = kind, DepartmentId = item.DepartmentId ?? await DepartmentAsync(i.Modality, ct),
-                IsFree = canManageFees ? i.IsFree : currentFee == 0, Fee = canManageFees ? (i.IsFree ? 0 : i.Fee) : currentFee,
+                IsFree = canManageFees ? i.IsFree : item.IsFree, Fee = canManageFees ? (i.IsFree ? 0 : i.Fee) : currentFee, FeePending = !canManageFees,
                 FeeEffectiveFrom = canManageFees ? i.FeeEffectiveFrom : null, FeeNote = "Radiology examination fee",
                 AllowPartialPayment = canManageFees ? i.AllowPartialPayment : item.AllowPartialPayment, IsActive = i.IsActive,
                 Description = item.Description, CounterIds = await _db.ServiceCounters.Where(c => c.ServiceItemId == item.Id).Select(c => c.CounterId).ToListAsync(ct)

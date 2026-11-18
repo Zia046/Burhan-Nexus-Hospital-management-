@@ -80,7 +80,7 @@ else
                         @foreach (var d in Model.Doctors)
                         {
                             <label class="doctor-choice">
-                                <input type="radio" name="Input.DoctorId" value="@d.DoctorId" checked="@(Model.Input.DoctorId == d.DoctorId)" required data-fee="@(d.Fee ?? 0)" />
+                                <input type="radio" name="Input.DoctorId" value="@d.DoctorId" checked="@(Model.Input.DoctorId == d.DoctorId)" required data-fee="@(d.Fee ?? 0)" data-free="@(d.FeeIsFree ? "1" : "0")" />
                                 <span class="dc-body">
                                     <strong>@d.DoctorName</strong>
                                     <small>@(d.Specialty ?? "—")</small>

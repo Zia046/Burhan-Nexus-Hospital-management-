@@ -90,7 +90,7 @@ public class LicenseTests : HmsTestBase
         Assert.Contains("already expired", await Try(Key(installation, LicenseType.Annual, DateTime.UtcNow.AddDays(-1))));
 
         var ok = await Try(good);
-        Assert.Contains("Annual licence", ok);
+        Assert.Contains("Yearly licence", ok); // Update 13: "Annual" is shown as "Yearly"
         Assert.Contains("Licence activated", ok);
         Assert.Single(await AuditAsync(AuditActions.LicenseActivated));
         Assert.Equal(4, (await AuditAsync(AuditActions.LicenseActivationFailed)).Count);

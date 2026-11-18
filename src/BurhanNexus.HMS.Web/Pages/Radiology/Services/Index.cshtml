@@ -22,7 +22,7 @@
                     <tr class="@(s.Service.IsActive ? "" : "row-muted")" data-service="@s.Service.Code">
                         <td class="mono">@s.Service.Code</td><td><strong>@s.Service.Name</strong>@if (s.Service.PreparationInstructions is not null) { <small class="muted block">@s.Service.PreparationInstructions</small> }</td>
                         <td>@s.Service.BodyPart</td><td>@(s.Service.DurationMinutes is int m ? $"{m} min" : "—")</td>
-                        @if (Model.ShowFees) { <td class="num">@(s.Fee == 0 ? "Free" : Fmt.Money(s.Fee))</td> }
+                        @if (Model.ShowFees) { <td class="num">@Fmt.Fee(s.Fee, s.Service.ServiceItem?.IsFree ?? false)</td> }
                         <td>@(s.Service.DefaultTemplate?.Name ?? "—")</td>
                         <td>@(s.Service.IsActive ? "Active" : "Inactive")</td>
                         <td class="actions"><a bn-permission="@Perm.RadManageServices" class="btn btn-light btn-sm" href="/Radiology/Services/Edit/@s.Service.Id" data-test="edit-@s.Service.Code">Edit</a></td>

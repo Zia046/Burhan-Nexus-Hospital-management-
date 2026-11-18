@@ -25,6 +25,7 @@ public partial class AppointmentTests : Phase2TestBase
         var fields = new List<KeyValuePair<string, string>> { P("DoctorForm.Name", name), P("DoctorForm.IsActive", "true") };
         if (specialty is not null) fields.Add(P("DoctorForm.Specialty", specialty));
         if (qualification is not null) fields.Add(P("DoctorForm.Qualification", qualification));
+        if (fee is null) fields.Add(P("ConsultationFree", "true")); // Update 13: a doctor without a fee is FREE only when marked so
         Assert.Equal(HttpStatusCode.Redirect, (await admin.PostFormAsync("/Opd/Setup", fields, "/Opd/Setup?handler=Doctor")).StatusCode);
         int id;
         await using (var db = Factory.NewDb()) id = await db.Doctors.Where(d => d.Name == name).Select(d => d.Id).SingleAsync();

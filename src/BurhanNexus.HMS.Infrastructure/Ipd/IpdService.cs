@@ -779,6 +779,7 @@ public sealed class IpdService : IIpdService
             return ServiceResult.Fail("Investigations are billed when they are booked in the Laboratory / Radiology module for this admission.");
         if (quantity is < 1 or > 100) return ServiceResult.Fail("Quantity must be between 1 and 100.");
         if (discount != 0 && !canDiscount) return ServiceResult.Fail("You are not allowed to give discounts.");
+        if (await ServiceCatalogue.FeeNotSetErrorAsync(_db, svc.Id, await _clock.TodayAsync(), ct) is { } feeMissing) return ServiceResult.Fail(feeMissing); // Update 13
         var fee = await _finance.FeeOnAsync(svc.Id, await _clock.TodayAsync(), ct) * quantity;
         if (discount < 0 || discount > fee || !FinanceMath.IsMoney(discount)) return ServiceResult.Fail($"The discount must be between 0 and {fee:N2}.");
         if (discount > 0 && T(reason, 200) is null) return ServiceResult.Fail("Enter the reason for the discount.");

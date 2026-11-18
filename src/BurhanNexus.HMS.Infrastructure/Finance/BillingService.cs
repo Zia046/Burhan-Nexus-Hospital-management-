@@ -176,6 +176,7 @@ public sealed class BillingService : IBillingService
                 if (s.DoctorId is int fixedDoc && fixedDoc != did) { errors.Add($"{s.Name} belongs to {s.Doctor!.Name}."); continue; }
             }
             if (s.Kind == ServiceKind.Consultation && doctor is null) { errors.Add($"Select the doctor for {s.Name}."); continue; }
+            if (l.PresetFee is null && await ServiceCatalogue.FeeNotSetErrorAsync(_db, s.Id, today, ct) is { } feeMissing) { errors.Add(feeMissing); continue; }
             var fee = l.PresetFee ?? await _setup.FeeOnAsync(s.Id, today, ct);
             var discount = l.Discount;
             if (discount != 0 && !canDiscount) { errors.Add("You are not allowed to give discounts."); continue; }

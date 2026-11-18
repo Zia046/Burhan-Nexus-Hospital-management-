@@ -49,11 +49,17 @@ try {
   await page.fill("#dn", "Dr. Sana Khan");
   await page.fill("#dq", "MBBS, FCPS (Gynae)");
   await page.fill("#dsp", "Gynaecology & Obstetrics");
+  await page.fill("#dfee", "1500");   // Update 13: consultation fee entered with the doctor
   await submit("button:has-text('Add doctor')");
   await page.fill("#dn", "Dr. Imran Ali");
   await page.fill("#dq", "MBBS, FCPS (Medicine)");
   await page.fill("#dsp", "General Medicine");
+  await page.fill("#dfee", "1000");
   await submit("button:has-text('Add doctor')");
+  for (const [doc, fee] of [["Dr. Sana Khan", "1,500.00"], ["Dr. Imran Ali", "1,000.00"]]) {
+    const shown = await page.textContent(`tr:has-text('${doc}') [data-doctor-fee]`).catch(() => null);
+    if (!shown || !shown.includes(fee)) errors.push(`OPD setup: consultation fee of ${doc} shows "${shown}" (expected ${fee})`);
+  }
   await shot(page, "p2-01-opd-setup");
 
   // ---- Register patient ----
@@ -919,6 +925,56 @@ try {
     await pdf(grnUrl.replace("/Pharmacy/Doc/GRN/", "/Print/SupplierInvoice/"), "sample-supplier-invoice-12322-A4.pdf");
     await go("/Pharmacy/Stock");
     await shot(page, "p12-04-stock-after-invoice");
+  }
+
+  // ---- Update 13: OPD setup + settings, fees (no default free), lab visit (top 6, today's OPD, live search), batch rule, licence ----
+  {
+    await go("/Opd/Setup");
+    if (await page.$("[data-test='doctor-fee']") === null) errors.push("OPD setup: consultation fee field missing");
+    if ((await page.content()).includes("Fee reference")) errors.push("OPD setup still shows the fee reference table");
+    await shot(page, "p13-01-opd-setup-doctor-fee");
+    await go("/Settings/Opd");
+    await shot(page, "p13-02-settings-opd");
+    await go("/Fees");
+    await shot(page, "p13-03-fees-not-set-vs-free");
+    // Lab New Visit without a patient: today's OPD patients (2 lines each) + live suggestions while typing
+    await go("/Lab/Book");
+    const todays = await page.$$("[data-today-patient]");
+    if (todays.length < 1) errors.push("Lab New Visit: today's OPD patients list is empty");
+    await shot(page, "p13-04-lab-today-opd-patients");
+    const sInput = await page.$("input[data-patient-suggest]");
+    if (!sInput) errors.push("Lab New Visit: live patient search box missing");
+    else {
+      await sInput.click();
+      await page.keyboard.type("Rukh", { delay: 80 });
+      await page.waitForSelector("[data-suggest-list] [data-suggest-item]", { timeout: 5000 }).catch(() => errors.push("Lab New Visit: no live suggestions for 'Rukh'"));
+      await shot(page, "p13-05-lab-live-suggestions");
+      if (await page.$("[data-suggest-list] [data-suggest-item]")) {
+        await page.keyboard.press("Enter");
+        await page.waitForURL(/patientId=/, { timeout: 8000 }).catch(() => errors.push("Lab New Visit: choosing a suggestion did not load the patient"));
+      }
+    }
+    await go(`/Lab/Book?patientId=${pid}`);
+    const frequent = await page.$$("[data-frequent] label.test-choice:not([hidden]), label.test-choice[data-frequent]:not([hidden])");
+    step(`lab new visit: ${frequent.length} suggested tests shown`);
+    const pay = await page.$("[data-lab-payment]");
+    if (!pay) errors.push("Lab New Visit: payment section missing");
+    await shot(page, "p13-06-lab-top6-and-payment");
+    // Pharmacy: a different purchase rate needs its own batch number (rates are never mixed)
+    await go("/Pharmacy/Receive");
+    const row = "[data-invoice-lines] tbody tr:nth-child(1)";
+    await page.type(`${row} [data-row-med]`, "Tab. Panadol Acc", { delay: 10 });
+    await page.waitForSelector(`${row} [data-med-result]`, { timeout: 5000 }).catch(() => {});
+    await page.keyboard.press("Enter");
+    if (await page.$(`${row} [data-name=UnitCost]`)) {
+      await page.fill(`${row} [data-name=UnitCost]`, "1.5");
+      const flagged = await page.$eval(`${row} [data-name=BatchNumber]`, b => b.required && b.classList.contains("input-error")).catch(() => false);
+      if (!flagged) errors.push("Supplier invoice: a different purchase rate did not ask for a batch number");
+      await shot(page, "p13-07-invoice-new-rate-needs-batch");
+    }
+    await go("/Settings/License");
+    if (!(await page.$("[data-machine-id]"))) errors.push("Licence screen: Machine ID missing");
+    await shot(page, "p13-08-licence-activation");
   }
 
   // ---- Navigation: administrator sidebar (11 pages) + top taskbar categories ----

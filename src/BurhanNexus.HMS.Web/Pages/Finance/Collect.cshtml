@@ -103,7 +103,7 @@ else
                                                     @foreach (var s in g)
                                                     {
                                                         <option value="@s.Item.Id" data-fee="@s.CurrentFee.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-partial="@(s.Item.AllowPartialPayment ? "1" : "0")"
-                                                                data-doctor="@s.Item.DoctorId" data-consult="@(s.Item.Kind == ServiceKind.Consultation ? "1" : "0")" selected="@(l.ServiceItemId == s.Item.Id)">@s.Item.Name (@(s.CurrentFee == 0 ? "Free" : Fmt.Money(s.CurrentFee)))</option>
+                                                                data-doctor="@s.Item.DoctorId" data-consult="@(s.Item.Kind == ServiceKind.Consultation ? "1" : "0")" selected="@(l.ServiceItemId == s.Item.Id)">@s.Item.Name (@Fmt.Fee(s.CurrentFee, s.Item.IsFree))</option>
                                                     }
                                                 </optgroup>
                                             }

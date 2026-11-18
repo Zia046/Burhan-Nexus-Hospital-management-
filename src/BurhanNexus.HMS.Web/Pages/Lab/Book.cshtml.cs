@@ -40,7 +40,11 @@ public class BookModel : HmsPageModel
     public string AgeText { get; private set; } = "—";
     public IReadOnlyList<PatientListItem> Matches { get; private set; } = Array.Empty<PatientListItem>();
     public IReadOnlyList<LabTestRow> Tests { get; private set; } = Array.Empty<LabTestRow>();
-    /// <summary>Update 11: most frequently booked tests (last 90 days), shown below the search bar instead of categories.</summary>
+    /// <summary>Update 13: the Top 6 most frequently booked tests (last 90 days, most frequent first), shown below the search bar.</summary>
+    public const int TopTests = 6;
+    /// <summary>Update 13: today's OPD patients (name + registration number) offered before anything is typed.</summary>
+    public sealed record Suggestion(long Id, string Name, string Number);
+    public IReadOnlyList<Suggestion> TodayOpd { get; private set; } = Array.Empty<Suggestion>();
     public IReadOnlyList<int> Frequent { get; private set; } = Array.Empty<int>();
 
     private static readonly string[] CommonCodes = { "CBC-FULL", "RBS", "FBS", "UCE", "LFT-FULL", "RFT-FULL", "HBSAG", "AHCV", "MP", "WIDAL", "ESR", "LIPID-FULL" };
@@ -55,11 +59,11 @@ public class BookModel : HmsPageModel
             .Where(x => active.Contains(x.Key)).Select(x => x.Key).ToList();
         foreach (var code in CommonCodes)
         {
-            if (used.Count >= 8) break;
+            if (used.Count >= TopTests) break;
             if (Tests.FirstOrDefault(t => t.Test.Code == code) is { } t && !used.Contains(t.Test.Id)) used.Add(t.Test.Id);
         }
-        foreach (var t in Tests) { if (used.Count >= 8) break; if (!used.Contains(t.Test.Id)) used.Add(t.Test.Id); }
-        return used.Take(Math.Max(8, used.Count > 12 ? 12 : used.Count)).ToList();
+        foreach (var t in Tests) { if (used.Count >= TopTests) break; if (!used.Contains(t.Test.Id)) used.Add(t.Test.Id); }
+        return used.Take(TopTests).ToList();
     }
     public IReadOnlyList<Doctor> Doctors { get; private set; } = Array.Empty<Doctor>();
     public IReadOnlyList<LabOrderSummary> Previous { get; private set; } = Array.Empty<LabOrderSummary>();
@@ -106,6 +110,38 @@ public class BookModel : HmsPageModel
         }
         else if (!string.IsNullOrWhiteSpace(Q))
             Matches = (await _patients.SearchAsync(new PatientSearchQuery { Q = Q, PageSize = 15, Routine = true })).Items;
+        else
+            TodayOpd = await TodayOpdAsync(30);
+    }
+
+    /// <summary>Patients with an OPD visit today (hospital date), latest first – name and registration number only.</summary>
+    private async Task<IReadOnlyList<Suggestion>> TodayOpdAsync(int take)
+    {
+        var db = HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Persistence.HmsDbContext>();
+        var start = await _clock.LocalToUtcAsync((await _clock.TodayAsync()).ToDateTime(TimeOnly.MinValue));
+        var visits = await db.PatientEncounters.AsNoTracking()
+            .Where(e => e.Type == EncounterType.Opd && e.EncounterUtc >= start && e.Patient!.Status == PatientStatus.Active)
+            .OrderByDescending(e => e.EncounterUtc).Take(take * 3)
+            .Select(e => new { e.PatientId, e.Patient!.FullName, e.Patient.PatientNumber, At = e.EncounterUtc }).ToListAsync();
+        // Patients registered today at the OPD counter are listed too (before their first visit is recorded).
+        var registered = await db.Patients.AsNoTracking()
+            .Where(p => p.RegisteredUtc >= start && p.Status == PatientStatus.Active)
+            .OrderByDescending(p => p.RegisteredUtc).Take(take)
+            .Select(p => new { PatientId = p.Id, p.FullName, p.PatientNumber, At = p.RegisteredUtc }).ToListAsync();
+        return visits.Concat(registered).OrderByDescending(r => r.At).DistinctBy(r => r.PatientId).Take(take)
+            .Select(r => new Suggestion(r.PatientId, r.FullName, r.PatientNumber)).ToList();
+    }
+
+    /// <summary>Update 13: live patient suggestions while typing (today's / admitted patients, same rule as the search box).</summary>
+    public async Task<IActionResult> OnGetSuggestAsync(string? q)
+    {
+        q = q?.Trim();
+        IReadOnlyList<Suggestion> list = string.IsNullOrEmpty(q)
+            ? await TodayOpdAsync(30)
+            : (await _patients.SearchAsync(new PatientSearchQuery { Q = q.Length > 100 ? q[..100] : q, PageSize = 20, Routine = true })).Items
+                .Select(m => new Suggestion(m.Id, m.FullName, m.PatientNumber)).ToList();
+        Response.Headers.CacheControl = "no-store";
+        return new JsonResult(list.Select(x => new { id = x.Id, name = x.Name, number = x.Number }));
     }
 
     public async Task<IActionResult> OnGetAsync()
