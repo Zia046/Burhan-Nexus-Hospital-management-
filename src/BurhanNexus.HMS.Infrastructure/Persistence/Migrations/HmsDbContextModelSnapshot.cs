@@ -8691,6 +8691,9 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsFree")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(30)
