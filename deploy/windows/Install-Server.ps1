@@ -53,6 +53,15 @@ if (-not $pgBin) { throw "PostgreSQL was not found under C:\Program Files\Postgr
 $psql = Join-Path $pgBin "psql.exe"
 Write-Host "Found PostgreSQL tools in $pgBin"
 
+# Re-running the installer: keep the database password of the existing configuration, otherwise the login would be
+# changed below while the kept configuration still holds the old password (the server could no longer connect).
+$existingConfig = Join-Path $InstallDir "appsettings.Production.json"
+if ([string]::IsNullOrWhiteSpace($DbPassword) -and (Test-Path $existingConfig)) {
+    try {
+        $cs = (Get-Content $existingConfig -Raw | ConvertFrom-Json).ConnectionStrings.HmsDatabase
+        if ($cs -match "Password=([^;]*)") { $DbPassword = $Matches[1]; Write-Host "Using the database password of the existing configuration." }
+    } catch { Write-Warning "Could not read $existingConfig - a new configuration will be written." ; Remove-Item $existingConfig -Force -ErrorAction SilentlyContinue }
+}
 if ([string]::IsNullOrWhiteSpace($DbPassword)) {
     $bytes = New-Object byte[] 24
     [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
