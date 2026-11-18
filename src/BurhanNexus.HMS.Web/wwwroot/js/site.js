@@ -485,7 +485,9 @@ document.querySelectorAll("select[data-autosubmit]").forEach(s => s.addEventList
     const r = document.querySelector("input[name='Input.DoctorId']:checked");
     if (!r) { out.textContent = "—"; return; }
     const fee = parseFloat(r.dataset.fee || "0");
-    out.textContent = fee > 0 ? prefix + fee.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "FREE (no fee)";
+    // Update 13: nothing is free by default – FREE only when the doctor's consultation is marked free.
+    out.textContent = fee > 0 ? prefix + fee.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : r.dataset.free === "1" ? "FREE" : "Fee not set – enter it in OPD Setup";
   };
   document.querySelectorAll("input[name='Input.DoctorId']").forEach(r => r.addEventListener("change", show));
   show();
@@ -525,3 +527,54 @@ document.querySelectorAll("select[data-autosubmit]").forEach(s => s.addEventList
   poll();
   setInterval(poll, 20000);
 })();
+
+/* Update 13: live patient suggestions while typing (today's / admitted patients) – two lines: name, registration number. */
+(function () {
+  "use strict";
+  document.querySelectorAll("input[data-patient-suggest]").forEach(input => {
+    const box = input.parentElement.querySelector("[data-suggest-list]");
+    if (!box) return;
+    const url = input.dataset.patientSuggest, pick = input.dataset.pickUrl;
+    let timer = null, seq = 0, items = [], active = -1;
+    const render = () => {
+      box.innerHTML = "";
+      items.forEach((p, i) => {
+        const a = document.createElement("a");
+        a.href = pick + p.id;
+        a.className = "suggest-item" + (i === active ? " on" : "");
+        a.setAttribute("data-suggest-item", p.number);
+        const n = document.createElement("strong"); n.textContent = p.name;
+        const r = document.createElement("small"); r.textContent = p.number; r.className = "mono";
+        a.appendChild(n); a.appendChild(r);
+        box.appendChild(a);
+      });
+      box.hidden = items.length === 0;
+    };
+    const load = () => {
+      const q = input.value.trim(), my = ++seq;
+      fetch(url + "&q=" + encodeURIComponent(q), { credentials: "same-origin", headers: { "Accept": "application/json" } })
+        .then(r => r.ok ? r.json() : []).then(d => { if (my !== seq) return; items = q ? d : []; active = items.length ? 0 : -1; render(); }).catch(() => { });
+    };
+    input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(load, 120); });
+    input.addEventListener("keydown", e => {
+      if (e.key === "ArrowDown" && items.length) { active = Math.min(items.length - 1, active + 1); render(); e.preventDefault(); }
+      else if (e.key === "ArrowUp" && items.length) { active = Math.max(0, active - 1); render(); e.preventDefault(); }
+      else if (e.key === "Enter" && items.length && active >= 0 && !box.hidden) { e.preventDefault(); window.location.href = pick + items[active].id; }
+      else if (e.key === "Escape") { items = []; render(); }
+    });
+    input.addEventListener("blur", () => setTimeout(() => { box.hidden = true; }, 200));
+    if (input.value.trim()) load();
+  });
+})();
+
+/* Update 13: copy buttons (licence request code). */
+document.querySelectorAll("[data-copy-button]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const src = document.querySelector(btn.dataset.copyButton);
+    if (!src) return;
+    const text = src.value ?? src.textContent;
+    const done = () => { const t = btn.textContent; btn.textContent = "Copied ✓"; setTimeout(() => { btn.textContent = t; }, 1500); };
+    if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done).catch(() => { src.select && src.select(); document.execCommand("copy"); done(); });
+    else { src.select && src.select(); document.execCommand("copy"); done(); }
+  });
+});

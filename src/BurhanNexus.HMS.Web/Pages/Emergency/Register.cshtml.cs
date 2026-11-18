@@ -25,7 +25,7 @@ public class RegisterModel : HmsPageModel
 
     [BindProperty(SupportsGet = true)] public long? PatientId { get; set; }
     [BindProperty(SupportsGet = true, Name = "q")] public string? Q { get; set; }
-    [BindProperty] public PatientInput Patient { get; set; } = new() { AgeUnit = AgeUnit.Years, GuardianRelation = GuardianRelation.SonOf };
+    [BindProperty] public PatientInput Patient { get; set; } = new() { AgeUnit = AgeUnit.Years, GuardianRelation = GuardianRelation.SonOf, Address = PatientInput.DefaultAddress };
     [BindProperty] public EmergencyDetailsInput Visit { get; set; } = new();
     [BindProperty] public DateTime? ArrivalLocal { get; set; }
 

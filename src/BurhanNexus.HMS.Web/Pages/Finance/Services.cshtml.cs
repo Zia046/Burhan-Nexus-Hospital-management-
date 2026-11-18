@@ -52,7 +52,7 @@ public class ServicesModel : HmsPageModel
             Form = new ServiceInput
             {
                 Code = e.Item.Code, Name = e.Item.Name, Kind = e.Item.Kind, DepartmentId = e.Item.DepartmentId, DoctorId = e.Item.DoctorId,
-                IsFree = e.CurrentFee == 0, Fee = e.CurrentFee, AllowPartialPayment = e.Item.AllowPartialPayment, IsActive = e.Item.IsActive,
+                IsFree = e.Item.IsFree, Fee = e.CurrentFee, AllowPartialPayment = e.Item.AllowPartialPayment, IsActive = e.Item.IsActive,
                 Description = e.Item.Description, CounterIds = e.Item.Counters.Select(c => c.CounterId).ToList()
             };
         return Page();

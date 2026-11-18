@@ -337,11 +337,28 @@ public sealed class PharmacyService : IPharmacyService
                 if (input.Lines.Any(l => l.SalePrice is not null) && !rights.ManagePrices) errors.Add("Setting a sale price needs the “Manage Medicine Prices” permission.");
                 var lines = input.Lines.Where(l => l.MedicineId > 0).ToList();
                 if (lines.Count == 0) errors.Add("Add at least one medicine.");
-                if (lines.Count > 100) errors.Add("At most 100 lines per receiving.");
+                if (lines.Count > 500) errors.Add("At most 500 rows per invoice.");
+                var meds = await MedicinesAsync(lines.Select(l => l.MedicineId), ct);
+                // Update 13: purchase rates are never mixed. The batch number stays optional while the purchase rate equals the
+                // medicine's current purchase rate; stock bought at a different rate must be received under its own batch number.
+                if (withPrices)
+                {
+                    var ids = lines.Select(l => l.MedicineId).Distinct().ToList();
+                    var lastCost = (await _db.MedicineBatches.AsNoTracking().Where(b => ids.Contains(b.MedicineId) && b.UnitCost != null)
+                            .Select(b => new { b.MedicineId, b.Id, b.UnitCost }).ToListAsync(ct))
+                        .GroupBy(b => b.MedicineId).ToDictionary(g => g.Key, g => g.OrderByDescending(b => b.Id).First().UnitCost!.Value);
+                    foreach (var l in lines)
+                    {
+                        if (T(l.BatchNumber, 50) is not null || l.UnitCost is not decimal cost || !meds.TryGetValue(l.MedicineId, out var m)) continue;
+                        decimal? current = m.PurchasePrice is > 0 ? m.PurchasePrice : lastCost.TryGetValue(m.Id, out var lc) ? lc : null;
+                        if (current is decimal cur && cur != cost)
+                            errors.Add($"{m.Name}: the purchase rate Rs. {cost:N2} differs from the current purchase rate Rs. {cur:N2}. " +
+                                       "Enter a separate batch number for this stock – stock at different purchase rates is never mixed in one batch.");
+                    }
+                }
                 // Update 11: the batch number is optional on a supplier invoice – without one, the line is kept as the batch of its expiry date.
                 foreach (var l in lines)
                     if (T(l.BatchNumber, 50) is null && l.ExpiryDate is DateOnly autoExp) l.BatchNumber = $"AUTO-{autoExp:yyyyMMdd}";
-                var meds = await MedicinesAsync(lines.Select(l => l.MedicineId), ct);
                 foreach (var l in lines)
                 {
                     if (!meds.TryGetValue(l.MedicineId, out var m)) { errors.Add("Medicine not found."); continue; }
@@ -393,11 +410,14 @@ public sealed class PharmacyService : IPharmacyService
                     else
                     {
                         if (batch.ExpiryDate != l.ExpiryDate) return Fail($"{m.Name} batch {bn} is already recorded with expiry {batch.ExpiryDate:dd MMM yyyy}. Check the expiry date.");
-                        if (withPrices && l.UnitCost is not null && batch.UnitCost != l.UnitCost)
+                        if (withPrices && l.UnitCost is not null && batch.UnitCost is decimal had && had != l.UnitCost)
                         {
-                            // Weighted cost is not used: the batch keeps the latest purchase price (history in the receiving lines).
-                            batch.UnitCost = l.UnitCost;
+                            // Update 13: one batch = one purchase rate, so valuation and profit stay exact.
+                            var auto = bn.StartsWith("AUTO-", StringComparison.OrdinalIgnoreCase);
+                            return Fail($"{m.Name} batch {(auto ? "(without number)" : bn)} was received at Rs. {had:N2} per {m.Unit.ToLowerInvariant()}; this line says Rs. {l.UnitCost:N2}. " +
+                                        "Stock at a different purchase rate needs a separate batch number.");
                         }
+                        if (withPrices && l.UnitCost is not null && batch.UnitCost is null) batch.UnitCost = l.UnitCost;
                         if (withPrices && l.SalePrice is not null && batch.SalePrice != l.SalePrice) batch.SalePrice = l.SalePrice;
                     }
                     var gross = withPrices ? R(l.UnitCost!.Value * l.Quantity) : (decimal?)null;

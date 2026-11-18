@@ -85,6 +85,7 @@ jobs:
           dotnet publish tools/BurhanNexus.PrintAgent -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish/win-x64/tools/print-agent 2>&1 | tail -n 5 | tee -a ci-output/publish.log
           rm -f publish/win-x64/tools/print-agent/*.pdb publish/win-x64/tools/print-agent/appsettings.Development.json
           cp -r deploy/windows publish/win-x64/deploy/
+          cp deploy/windows/INSTALL.cmd publish/win-x64/INSTALL.cmd
           cp README.md publish/win-x64/
           cp docs/*.md publish/win-x64/docs/ 2>/dev/null || true
           rm -f publish/win-x64/appsettings.Development.json
@@ -115,18 +116,27 @@ jobs:
         with:
           name: BurhanNexus-HMS-Server-win-x64
           path: package
-      - name: Start PostgreSQL
+      - name: Simulate a fresh computer (hide the runner's PostgreSQL)
         shell: pwsh
         run: |
-          $svc = Get-Service -Name "postgresql*" | Select-Object -First 1
-          Set-Service $svc.Name -StartupType Manual
-          Start-Service $svc.Name
-          Get-ChildItem "C:\Program Files\PostgreSQL"
-      - name: Run server installer
+          Get-Service -Name "postgresql*" | ForEach-Object { Stop-Service $_.Name -Force -ErrorAction SilentlyContinue; Set-Service $_.Name -StartupType Disabled }
+          if (Test-Path "C:\Program Files\PostgreSQL") { Rename-Item "C:\Program Files\PostgreSQL" "PostgreSQL-runner" }
+          $ok = $false
+          foreach ($v in "16.16-1", "16.15-1", "16.14-1", "16.13-1", "16.12-1", "16.11-1", "16.10-1", "16.9-1") {
+            try { Invoke-WebRequest -UseBasicParsing "https://get.enterprisedb.com/postgresql/postgresql-$v-windows-x64-binaries.zip" -OutFile "package\postgresql-$v-windows-x64-binaries.zip"; "downloaded $v"; $ok = $true; break } catch { "no $v" }
+          }
+          if (-not $ok) { throw "could not download the PostgreSQL binaries zip" }
+      - name: One-click installer (INSTALL.cmd path, fresh machine)
         shell: pwsh
         run: |
-          powershell -ExecutionPolicy Bypass -File .\package\deploy\windows\Install-Server.ps1 -PostgresPassword root -Port 5000 *> install.log
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\package\deploy\windows\Easy-Install.ps1 -PostgresPassword BCGH -NoBrowser *> install.log
+          $code = $LASTEXITCODE
           Get-Content install.log
+          if (Test-Path package\install-log.txt) { "---- install-log.txt ----"; Get-Content package\install-log.txt -Tail 60 }
+          if ($code -ne 0) { throw "Easy-Install failed ($code)" }
+          if (-not (Test-Path "C:\Program Files\PostgreSQL\16\bin\psql.exe")) { throw "PostgreSQL 16 was not installed from the zip" }
+          Get-Service postgresql-x64-16 | Format-List Name, Status, StartType
+          if (-not (Test-Path package\INSTALL.cmd)) { throw "INSTALL.cmd missing from the package" }
       - name: Verify installation
         shell: pwsh
         run: |
@@ -200,5 +210,6 @@ jobs:
           name: windows-install-logs
           path: |
             install.log
+            package/install-log.txt
             verify.log
             agent.log

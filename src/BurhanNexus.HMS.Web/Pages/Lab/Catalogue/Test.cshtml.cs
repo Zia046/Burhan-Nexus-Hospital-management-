@@ -52,11 +52,11 @@ public class TestModel : HmsPageModel
                 {
                     Code = t.Code, Name = t.Name, CategoryId = t.CategoryId, SampleTypeId = t.SampleTypeId, CollectionInstructions = t.CollectionInstructions,
                     Method = t.Method, Interpretation = t.Interpretation, TurnaroundHours = t.TurnaroundHours, IsActive = t.IsActive, SortOrder = t.SortOrder,
-                    IsFree = row.Price == 0, Price = row.Price, AllowPartialPayment = row.AllowPartial
+                    IsFree = t.ServiceItem?.IsFree ?? false, Price = row.Price, AllowPartialPayment = row.AllowPartial
                 };
             }
         }
-        else if (fillInput) Input = new LabTestInput { IsFree = !CanFees };
+        else if (fillInput) Input = new LabTestInput { IsFree = false }; // Update 13: nothing is free by default
         return true;
     }
 

@@ -11,7 +11,7 @@ public class RegisterModel : HmsPageModel
     private readonly IPatientService _patients;
     public RegisterModel(IPatientService patients) => _patients = patients;
 
-    [BindProperty] public PatientInput Patient { get; set; } = new() { AgeUnit = Core.Domain.AgeUnit.Years, GuardianRelation = Core.Domain.GuardianRelation.SonOf };
+    [BindProperty] public PatientInput Patient { get; set; } = new() { AgeUnit = Core.Domain.AgeUnit.Years, GuardianRelation = Core.Domain.GuardianRelation.SonOf, Address = PatientInput.DefaultAddress };
     [BindProperty] public bool ConfirmNotDuplicate { get; set; }
     /// <summary>What to do after registering: "opd", "emergency" or "profile".</summary>
     [BindProperty(SupportsGet = true)] public string? Next { get; set; }

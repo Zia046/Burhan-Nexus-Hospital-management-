@@ -96,6 +96,13 @@ public sealed class EcdsaLicenseKeyVerifier : ILicenseKeyVerifier
         return true;
     }
 
+    /// <summary>Creates a new vendor key pair (P-256). The private key must stay with Burhan Nexus – never ship or commit it.</summary>
+    public static (string PrivatePem, string PublicPem) CreateKeyPair()
+    {
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        return (ecdsa.ExportPkcs8PrivateKeyPem(), ecdsa.ExportSubjectPublicKeyInfoPem());
+    }
+
     /// <summary>Creates a key. Used by the vendor generator tool and by automated tests only.</summary>
     public static string CreateKey(LicenseKeyPayload payload, string privateKeyPem)
     {

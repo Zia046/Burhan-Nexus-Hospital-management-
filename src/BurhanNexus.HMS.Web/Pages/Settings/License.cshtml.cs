@@ -15,6 +15,9 @@ public class LicenseModel : HmsPageModel
     public LicenseStatus Status { get; private set; } = null!;
     public bool ReadOnlyRedirect { get; private set; }
     [BindProperty] public string? ActivationKey { get; set; }
+    [BindProperty] public string? Reason { get; set; }
+    [BindProperty] public bool Confirm { get; set; }
+    public string MachineId => MachineIdentity.Current;
 
     public async Task OnGetAsync(int? @readonly)
     {
@@ -39,6 +42,20 @@ public class LicenseModel : HmsPageModel
         }
         var r = await _license.ActivateAsync(ActivationKey);
         if (r.Succeeded) FlashSuccess = $"Licence activated: {r.Value!.DisplayName}.";
+        else FlashError = r.ErrorText;
+        return RedirectToPage();
+    }
+
+    public async Task<IActionResult> OnPostDeactivateAsync()
+    {
+        if (await DenyUnlessAsync(Perm.LicenseActivate) is { } deny) return deny;
+        if (!Confirm)
+        {
+            FlashError = "Tick the confirmation to deactivate the licence.";
+            return RedirectToPage();
+        }
+        var r = await _license.DeactivateAsync(Reason ?? string.Empty);
+        if (r.Succeeded) FlashSuccess = "The licence was deactivated. The system is read-only until a licence key is activated.";
         else FlashError = r.ErrorText;
         return RedirectToPage();
     }

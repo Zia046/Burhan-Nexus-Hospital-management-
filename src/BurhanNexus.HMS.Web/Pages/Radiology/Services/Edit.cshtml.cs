@@ -37,7 +37,7 @@ public class EditModel : RadiologyPageModel
             {
                 Code = s.Code, Name = s.Name, Modality = s.Modality, BodyPart = s.BodyPart, Description = s.Description, PreparationInstructions = s.PreparationInstructions,
                 DurationMinutes = s.DurationMinutes, ReportTitle = s.ReportTitle, DefaultTemplateId = s.DefaultTemplateId, IsActive = s.IsActive, SortOrder = s.SortOrder,
-                IsFree = row.Fee == 0, Fee = row.Fee, AllowPartialPayment = row.AllowPartial
+                IsFree = s.ServiceItem?.IsFree ?? false, Fee = row.Fee, AllowPartialPayment = row.AllowPartial
             };
         }
         return Page();

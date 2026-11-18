@@ -70,7 +70,7 @@ else
                     <div class="field">
                         <label for="Visit_ServiceItemId">Service / fee reference</label>
                         <select id="Visit_ServiceItemId" name="Visit.ServiceItemId">
-                            @foreach (var s in Model.Services) { <option value="@s.Id" selected="@(Model.Visit.ServiceItemId == s.Id)">@s.Name (@(s.DefaultFee == 0 ? "Free" : Fmt.Money(s.DefaultFee)))</option> }
+                            @foreach (var s in Model.Services) { <option value="@s.Id" selected="@(Model.Visit.ServiceItemId == s.Id)">@s.Name (@Fmt.Fee(s.DefaultFee, s.IsFree))</option> }
                         </select>
                         <small class="muted">Reference only – fee collection and receipts come with the billing module.</small>
                     </div>

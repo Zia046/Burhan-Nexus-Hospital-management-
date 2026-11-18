@@ -1,0 +1,30 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Settings.OpdModel
+@{ ViewData["Title"] = "OPD settings"; var s = Model.Settings; }
+<partial name="_SettingsNav" />
+<form method="post" class="card card-medium" data-opd-settings>
+    <div class="card-header"><h3><svg class="icon"><use href="#i-sliders" /></svg> OPD settings</h3><a class="btn btn-light btn-sm" href="/Opd/Setup">Doctors &amp; consultation fees →</a></div>
+    <div class="card-body">
+        <input type="hidden" name="RowVersion" value="@s.RowVersion" />
+        <label class="toggle"><input type="checkbox" name="OpdForm.OpdTokenEnabled" value="true" checked="@s.OpdTokenEnabled" /><span><strong>Issue token numbers</strong><small>Daily queue number printed on the slip, restarting at 1 every day.</small></span></label>
+        <input type="hidden" name="OpdForm.OpdTokenEnabled" value="false" />
+        <div class="field"><label for="scope">Token counting</label>
+            <select id="scope" name="OpdForm.OpdTokenScope">
+                <option value="Hospital" selected="@(s.OpdTokenScope == TokenScopeMode.Hospital)">One queue for the whole OPD</option>
+                <option value="Department" selected="@(s.OpdTokenScope == TokenScopeMode.Department)">Separate queue per department</option>
+                <option value="Doctor" selected="@(s.OpdTokenScope == TokenScopeMode.Doctor)">Separate queue per doctor</option>
+            </select></div>
+        <div class="field"><label for="ddep">Default OPD department</label>
+            <select id="ddep" name="OpdForm.DefaultOpdDepartmentId"><option value="">None</option>
+                @foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(s.DefaultOpdDepartmentId == d.Id)">@d.Name</option> }</select></div>
+        <div class="field"><label for="dsvc">Default OPD fee reference</label>
+            <select id="dsvc" name="OpdForm.DefaultOpdServiceItemId"><option value="">None</option>
+                @foreach (var x in Model.Services.Where(x => x.Category == EncounterType.Opd)) { <option value="@x.Id" selected="@(s.DefaultOpdServiceItemId == x.Id)">@x.Name (@Fmt.Fee(x.DefaultFee, x.IsFree))</option> }</select></div>
+        <div class="field"><label for="esvc">Default emergency fee reference</label>
+            <select id="esvc" name="OpdForm.DefaultEmergencyServiceItemId"><option value="">None</option>
+                @foreach (var x in Model.Services.Where(x => x.Category == EncounterType.Emergency)) { <option value="@x.Id" selected="@(s.DefaultEmergencyServiceItemId == x.Id)">@x.Name (@Fmt.Fee(x.DefaultFee, x.IsFree))</option> }</select></div>
+        <label class="toggle"><input type="checkbox" name="OpdForm.RequireDoctorForPrivateOpd" value="true" checked="@s.RequireDoctorForPrivateOpd" /><span><strong>Private mode: doctor is required</strong><small>Each private OPD visit is recorded against a doctor (doctor-wise history and billing).</small></span></label>
+        <input type="hidden" name="OpdForm.RequireDoctorForPrivateOpd" value="false" />
+    </div>
+    <div class="card-footer form-actions"><button class="btn btn-primary" type="submit" data-test="opd-settings-save">Save OPD settings</button></div>
+</form>

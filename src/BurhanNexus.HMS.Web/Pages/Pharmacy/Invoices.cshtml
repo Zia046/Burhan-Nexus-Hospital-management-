@@ -1,0 +1,33 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.InvoicesModel
+@{ ViewData["Title"] = "Supplier invoice history"; }
+<partial name="_PharmNav" />
+<div class="toolbar">
+    <h2>Supplier invoice history</h2>
+    <a bn-permission="@Perm.PharmReceiveStock" class="btn btn-primary" href="/Pharmacy/Receive"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New supplier invoice</a>
+</div>
+<form method="get" class="card card-body filter-bar" data-invoice-search>
+    <div class="field"><label for="Q">Invoice no.</label><input id="Q" name="q" value="@Model.Q" placeholder="e.g. 12322" /></div>
+    <div class="field"><label for="SupplierId">Supplier</label><select id="SupplierId" name="supplierId"><option value="">All suppliers</option>@foreach (var s in Model.Suppliers) { <option value="@s.Id" selected="@(Model.SupplierId == s.Id)">@s.Name</option> }</select></div>
+    <div class="field"><label for="From">Invoice date from</label><input id="From" name="from" type="date" value="@Model.From?.ToString("yyyy-MM-dd")" /></div>
+    <div class="field"><label for="To">to</label><input id="To" name="to" type="date" value="@Model.To?.ToString("yyyy-MM-dd")" /></div>
+    <div class="field"><label>&nbsp;</label><button class="btn btn-light" type="submit">Search</button></div>
+</form>
+<div class="card">
+    <div class="table-wrap">
+        <table class="table" data-invoice-history>
+            <thead><tr><th>Invoice no.</th><th>Invoice date</th><th>Supplier</th><th class="num">Items</th><th class="num">Quantity</th>@if (Model.ShowPrices) { <th class="num">Invoice total</th> }<th>GRN</th><th>Received</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr data-invoice="@r.Invoice"><td class="mono"><strong>@(r.Invoice ?? "—")</strong></td><td>@(r.InvoiceDate is DateOnly d ? Fmt.Day(d) : "—")</td><td>@r.Supplier</td>
+                    <td class="num" data-items>@r.Items</td><td class="num" data-qty>@r.Quantity</td>@if (Model.ShowPrices) { <td class="num">@(r.Net is decimal n ? Fmt.Money(n) : "—")</td> }
+                    <td class="mono">@r.Number</td><td>@Fmt.Day(r.ReceivedDate) · @r.By</td>
+                    <td class="nowrap"><a class="btn btn-light btn-sm" href="/Pharmacy/Doc/GRN/@r.Id" data-test="open-invoice">Open</a> <a class="btn btn-light btn-sm" href="/Print/SupplierInvoice/@r.Id">Print</a></td></tr>
+            }
+            @if (Model.Rows.Count == 0) { <tr><td colspan="9" class="empty">No supplier invoice found.</td></tr> }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer muted small">Saved invoices are never edited. A correction is made with an authorised stock adjustment (Pharmacy → Adjustments) with a reason – it is audited.</div>
+</div>

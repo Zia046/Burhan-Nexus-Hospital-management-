@@ -59,7 +59,7 @@ public class ServiceModel : HmsPageModel
             Form = new ServiceInput
             {
                 Code = e.Item.Code, Name = e.Item.Name, Kind = e.Item.Kind, DepartmentId = e.Item.DepartmentId, DoctorId = e.Item.DoctorId,
-                IsFree = e.CurrentFee == 0 && e.CurrentGovernmentFee is null or 0, Fee = e.CurrentFee, GovernmentFee = e.CurrentGovernmentFee,
+                IsFree = e.Item.IsFree, Fee = e.CurrentFee, GovernmentFee = e.CurrentGovernmentFee,
                 AllowPartialPayment = e.Item.AllowPartialPayment, IsActive = e.Item.IsActive, Description = e.Item.Description,
                 CounterIds = e.Item.Counters.Select(c => c.CounterId).ToList(), ServiceCategoryId = e.Item.ServiceCategoryId,
                 ChargeUnit = e.Item.ChargeUnit, Applicability = e.Item.Applicability
@@ -76,8 +76,8 @@ public class ServiceModel : HmsPageModel
         if (!CanFees)
         {
             // Detail-only users: the fee stays as it is (the fee fields are not posted).
-            if (Editing is { } cur) { Form.Fee = cur.CurrentFee; Form.GovernmentFee = cur.CurrentGovernmentFee; Form.IsFree = cur.CurrentFee == 0 && cur.CurrentGovernmentFee is null or 0; }
-            else { Form.Fee = 0; Form.GovernmentFee = null; Form.IsFree = true; }
+            if (Editing is { } cur) { Form.Fee = cur.CurrentFee; Form.GovernmentFee = cur.CurrentGovernmentFee; Form.IsFree = cur.Item.IsFree; Form.FeePending = !cur.Item.IsFree && cur.CurrentFee == 0; }
+            else { Form.Fee = 0; Form.GovernmentFee = null; Form.IsFree = false; Form.FeePending = true; } // Update 13: "fee not set", not free
             Form.FeeEffectiveFrom = null;
         }
         if (Form.IsFree) { Form.Fee = 0; Form.GovernmentFee = null; }

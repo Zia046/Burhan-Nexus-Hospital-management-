@@ -35,6 +35,7 @@ public static class AuditActions
     public const string LicenseTrialStarted = "License.TrialStarted";
     public const string LicenseActivated = "License.Activated";
     public const string LicenseActivationFailed = "License.ActivationFailed";
+    public const string LicenseDeactivated = "License.Deactivated";
     public const string BackupCreated = "Backup.Created";
     public const string BackupFailed = "Backup.Failed";
     public const string BackupDownloaded = "Backup.Downloaded";

@@ -104,7 +104,7 @@ public partial class Update9Tests
         await using (var db = Factory.NewDb()) supplier = await db.Suppliers.Where(s => s.Name == "City Distributors").Select(s => s.Id).SingleAsync();
         var page = await admin.GetHtmlAsync("/Pharmacy/Receive");
         Assert.Contains("data-receive-summary", page);
-        Assert.Contains("data-add-item", page);
+        Assert.Contains("data-add-row", page);
         // The medicine picker carries the purchase and sale price for auto-fill.
         Assert.Contains("\"cost\":5", await admin.GetHtmlAsync("/Pharmacy/Pick?q=Amoxil"));
 

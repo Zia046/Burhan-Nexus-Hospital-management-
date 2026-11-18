@@ -49,11 +49,17 @@ try {
   await page.fill("#dn", "Dr. Sana Khan");
   await page.fill("#dq", "MBBS, FCPS (Gynae)");
   await page.fill("#dsp", "Gynaecology & Obstetrics");
+  await page.fill("#dfee", "1500");   // Update 13: consultation fee entered with the doctor
   await submit("button:has-text('Add doctor')");
   await page.fill("#dn", "Dr. Imran Ali");
   await page.fill("#dq", "MBBS, FCPS (Medicine)");
   await page.fill("#dsp", "General Medicine");
+  await page.fill("#dfee", "1000");
   await submit("button:has-text('Add doctor')");
+  for (const [doc, fee] of [["Dr. Sana Khan", "1,500.00"], ["Dr. Imran Ali", "1,000.00"]]) {
+    const shown = await page.textContent(`tr:has-text('${doc}') [data-doctor-fee]`).catch(() => null);
+    if (!shown || !shown.includes(fee)) errors.push(`OPD setup: consultation fee of ${doc} shows "${shown}" (expected ${fee})`);
+  }
   await shot(page, "p2-01-opd-setup");
 
   // ---- Register patient ----
@@ -343,6 +349,15 @@ try {
     await page.click("[data-med-result]");
     await page.waitForTimeout(200);
   };
+  // Update 12: supplier invoice row – a new row, medicine searched inside the row, Enter picks it.
+  const invoiceItem = async q => {
+    await page.click("[data-add-row]");
+    const row = "[data-invoice-lines] tbody tr:last-child";
+    await page.type(`${row} [data-row-med]`, q, { delay: 30 });
+    await page.waitForSelector(`${row} [data-med-result]`, { timeout: 5000 });
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(150);
+  };
   const newMedicine = async (name, generic, strength, form, unit, min) => {
     await go("/Pharmacy/Medicines/Edit");
     await page.fill("#Input_Name", name);
@@ -367,8 +382,8 @@ try {
   await page.fill("#Input_SourceName", "District Health Office");
   await page.fill("#Input_ReferenceNumber", "DHO/2026/114");
   for (const [q, batch, exp, qty] of [["Parac", "PCM-2401", ym(4), 500], ["Parac", "PCM-2409", ym(14), 1000], ["Amoxil", "AMX-118", ym(10), 300], ["Tetanus", "TT-77", ym(8), 60]]) {
-    await addMed(q);
-    const row = "[data-receive-lines] tbody tr:last-child";
+    await invoiceItem(q);
+    const row = "[data-invoice-lines] tbody tr:last-child";
     await page.fill(`${row} [data-name=BatchNumber]`, batch);
     await page.fill(`${row} [data-name=Expiry]`, exp);
     await page.fill(`${row} [data-name=Quantity]`, String(qty));
@@ -432,8 +447,8 @@ try {
   await go("/Pharmacy/Receive");
   await page.selectOption("#Input_SupplierId", { label: "Peshawar Medical Distributors" });
   await page.fill("#Input_ReferenceNumber", "PMD-88231");
-  await addMed("Amoxil");
-  const prow = "[data-receive-lines] tbody tr:last-child";
+  await invoiceItem("Amoxil");
+  const prow = "[data-invoice-lines] tbody tr:last-child";
   await page.fill(`${prow} [data-name=BatchNumber]`, "AMX-131");
   await page.fill(`${prow} [data-name=Expiry]`, ym(16));
   await page.fill(`${prow} [data-name=Quantity]`, "200");
@@ -839,6 +854,127 @@ try {
     if (!r || r.status() >= 400) errors.push(`HTTP ${r && r.status()} on ${docLink}`);
     await shot(page, "p11-09-doctor-account");
     await pdf(docLink.replace("/Finance/Doctors/Account/", "/Print/Doctor/"), "sample-doctor-daily-opd-list-A4.pdf");
+  }
+
+  // ---- Update 12: ACCEPTANCE TEST – one supplier invoice 12322 with 23 medicines, entered in one screen and saved once ----
+  {
+    const meds = [
+      ["Inj. Diclofenac Acc", 18, 30], ["Tab. Panadol Acc", 1.2, 2], ["Cap. Amoxicillin Acc", 6, 9], ["Syrup Brufen Acc", 95, 130], ["Tab. Flagyl Acc", 2.5, 4],
+      ["Inj. Ceftriaxone Acc", 120, 160], ["Tab. Augmentin Acc", 28, 38], ["Syrup Calpol Acc", 80, 110], ["Tab. Ponstan Acc", 3, 5], ["Inj. Dexamethasone Acc", 15, 25],
+      ["Tab. Loprin Acc", 1.5, 2.5], ["Cap. Omeprazole Acc", 8, 12], ["Tab. Glucophage Acc", 4, 6], ["Inj. Ranitidine Acc", 20, 30], ["Syrup Ventolin Acc", 70, 95],
+      ["Tab. Disprin Acc", 0.8, 1.5], ["Tab. Arinac Acc", 6, 9], ["Inj. Voltral Acc", 25, 35], ["Tab. Ciproxin Acc", 12, 18], ["Cap. Doxycycline Acc", 5, 8],
+      ["Tab. Lasix Acc", 2, 3.5], ["Inj. Gravinate Acc", 18, 26]
+    ];
+    for (const [name, cost, sale] of meds) {
+      await go("/Pharmacy/Medicines/Edit");
+      await page.fill("#Input_Name", name);
+      if (await page.$("#Input_PurchasePrice")) await page.fill("#Input_PurchasePrice", String(cost));
+      if (await page.$("#Input_SalePrice")) await page.fill("#Input_SalePrice", String(sale));
+      await submit("button[data-test='save-medicine']");
+      if (page.url().includes("/Edit")) { await page.check("[name='Input.ConfirmDuplicate']"); await submit("button[data-test='save-medicine']"); }
+    }
+    await go("/Pharmacy/Suppliers/Edit");
+    await page.fill("#Input_Name", "ABC Medical Supplier");
+    await page.fill("#Input_Phone", "091-5550123");
+    await submit("button[data-test='save-supplier']");
+
+    await go("/Pharmacy/Receive");
+    await page.selectOption("[data-test='invoice-supplier']", { label: "ABC Medical Supplier" });
+    await page.fill("[data-test='invoice-number']", "12322");
+    await page.fill("[data-test='invoice-date']", new Date().toISOString().slice(0, 10));
+    const qtys = meds.map(() => 13).concat([14]); // 22 × 13 + 14 = 300 units
+    for (let i = 0; i < meds.length; i++) {
+      if (i >= 3) await page.click("[data-add-row]");
+      const row = i < 3 ? `[data-invoice-lines] tbody tr:nth-child(${i + 1})` : "[data-invoice-lines] tbody tr:last-child";
+      const [name, cost, sale] = meds[i];
+      await page.type(`${row} [data-row-med]`, name, { delay: 10 });
+      await page.waitForSelector(`${row} [data-med-result]`, { timeout: 5000 });
+      await page.keyboard.press("Enter");
+      const costEl = await page.$(`${row} [data-name=UnitCost]`);
+      const gotCost = costEl ? parseFloat(await costEl.inputValue()) : cost;
+      const saleEl = await page.$(`${row} input[data-name=SalePrice]`);
+      const gotSale = saleEl ? parseFloat(await saleEl.inputValue()) : sale;
+      if (gotCost !== cost || gotSale !== sale) errors.push(`Invoice 12322: prices not auto-loaded for ${name} (cost ${gotCost}, sale ${gotSale})`);
+      await page.fill(`${row} [data-name=Quantity]`, String(qtys[i]));
+      await page.fill(`${row} [data-name=Expiry]`, ym(12 + (i % 12)));
+      if (i % 2 === 0) await page.fill(`${row} [data-name=BatchNumber]`, `B12322-${i + 1}`);
+    }
+    // Item 23 is a medicine that is not in the catalogue yet – created from inside the invoice (the invoice stays on screen).
+    await page.click("[data-new-medicine-open]");
+    await page.fill("#NM_Name", "Inj. Newmed Acceptance");
+    if (await page.$("#NM_Cost")) await page.fill("#NM_Cost", "40");
+    if (await page.$("#NM_Sale")) await page.fill("#NM_Sale", "55");
+    await page.click("[data-new-medicine-save]");
+    await page.waitForFunction(() => !document.querySelector("[data-new-medicine]").open, null, { timeout: 8000 })
+      .catch(async () => { errors.push("New medicine from the invoice failed: " + await page.textContent("[data-new-medicine-error]")); await page.click("[data-new-medicine-cancel]"); });
+    await page.fill("[data-invoice-lines] tbody tr:last-child [data-name=Quantity]", String(qtys[22]));
+    await page.fill("[data-invoice-lines] tbody tr:last-child [data-name=Expiry]", ym(20));
+    const count = await page.textContent("[data-receive-count]"), total = await page.textContent("[data-receive-qty]");
+    if (count !== "23" || total !== "300") errors.push(`Invoice 12322 summary shows ${count} items / ${total} units (expected 23 / 300)`);
+    await shot(page, "p12-01-supplier-invoice-23-items");
+    await submit("button[data-test='save-receipt']");   // ONE save for the whole invoice
+    const grnUrl = new URL(page.url()).pathname;
+    const items = await page.textContent("[data-grn-items]").catch(() => null), units = await page.textContent("[data-grn-qty]").catch(() => null);
+    if (!grnUrl.startsWith("/Pharmacy/Doc/GRN/") || items !== "23" || units !== "300") errors.push(`Invoice 12322 saved as ${grnUrl} with ${items} items / ${units} units (expected 23 / 300)`);
+    step(`ACCEPTANCE invoice 12322: ${items} items, ${units} units, saved once at ${grnUrl}`);
+    await shot(page, "p12-02-invoice-12322-received");
+    await go("/Pharmacy/Invoices?q=12322");
+    const histItems = await page.textContent("[data-invoice='12322'] [data-items]").catch(() => null);
+    if (histItems !== "23") errors.push(`Invoice history shows ${histItems} items for 12322`);
+    await shot(page, "p12-03-invoice-history");
+    await pdf(grnUrl.replace("/Pharmacy/Doc/GRN/", "/Print/SupplierInvoice/"), "sample-supplier-invoice-12322-A4.pdf");
+    await go("/Pharmacy/Stock");
+    await shot(page, "p12-04-stock-after-invoice");
+  }
+
+  // ---- Update 13: OPD setup + settings, fees (no default free), lab visit (top 6, today's OPD, live search), batch rule, licence ----
+  {
+    await go("/Opd/Setup");
+    if (await page.$("[data-test='doctor-fee']") === null) errors.push("OPD setup: consultation fee field missing");
+    if ((await page.content()).includes("Fee reference")) errors.push("OPD setup still shows the fee reference table");
+    await shot(page, "p13-01-opd-setup-doctor-fee");
+    await go("/Settings/Opd");
+    await shot(page, "p13-02-settings-opd");
+    await go("/Fees");
+    await shot(page, "p13-03-fees-not-set-vs-free");
+    // Lab New Visit without a patient: today's OPD patients (2 lines each) + live suggestions while typing
+    await go("/Lab/Book");
+    const todays = await page.$$("[data-today-patient]");
+    if (todays.length < 1) errors.push("Lab New Visit: today's OPD patients list is empty");
+    await shot(page, "p13-04-lab-today-opd-patients");
+    const sInput = await page.$("input[data-patient-suggest]");
+    if (!sInput) errors.push("Lab New Visit: live patient search box missing");
+    else {
+      await sInput.click();
+      await page.keyboard.type("Rukh", { delay: 80 });
+      await page.waitForSelector("[data-suggest-list] [data-suggest-item]", { timeout: 5000 }).catch(() => errors.push("Lab New Visit: no live suggestions for 'Rukh'"));
+      await shot(page, "p13-05-lab-live-suggestions");
+      if (await page.$("[data-suggest-list] [data-suggest-item]")) {
+        await page.keyboard.press("Enter");
+        await page.waitForURL(/patientId=/, { timeout: 8000 }).catch(() => errors.push("Lab New Visit: choosing a suggestion did not load the patient"));
+      }
+    }
+    await go(`/Lab/Book?patientId=${pid}`);
+    const frequent = await page.$$("[data-frequent] label.test-choice:not([hidden]), label.test-choice[data-frequent]:not([hidden])");
+    step(`lab new visit: ${frequent.length} suggested tests shown`);
+    const pay = await page.$("[data-lab-payment]");
+    if (!pay) errors.push("Lab New Visit: payment section missing");
+    await shot(page, "p13-06-lab-top6-and-payment");
+    // Pharmacy: a different purchase rate needs its own batch number (rates are never mixed)
+    await go("/Pharmacy/Receive");
+    const row = "[data-invoice-lines] tbody tr:nth-child(1)";
+    await page.type(`${row} [data-row-med]`, "Tab. Panadol Acc", { delay: 10 });
+    await page.waitForSelector(`${row} [data-med-result]`, { timeout: 5000 }).catch(() => {});
+    await page.keyboard.press("Enter");
+    if (await page.$(`${row} [data-name=UnitCost]`)) {
+      await page.fill(`${row} [data-name=UnitCost]`, "1.5");
+      const flagged = await page.$eval(`${row} [data-name=BatchNumber]`, b => b.required && b.classList.contains("input-error")).catch(() => false);
+      if (!flagged) errors.push("Supplier invoice: a different purchase rate did not ask for a batch number");
+      await shot(page, "p13-07-invoice-new-rate-needs-batch");
+    }
+    await go("/Settings/License");
+    if (!(await page.$("[data-machine-id]"))) errors.push("Licence screen: Machine ID missing");
+    await shot(page, "p13-08-licence-activation");
   }
 
   // ---- Navigation: administrator sidebar (11 pages) + top taskbar categories ----

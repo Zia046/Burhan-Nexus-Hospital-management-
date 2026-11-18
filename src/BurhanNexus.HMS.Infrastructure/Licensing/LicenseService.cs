@@ -17,6 +17,8 @@ public interface ILicenseService
     Task EnsureInitializedAsync(CancellationToken ct = default);
     Task<LicenseStatus> GetStatusAsync(CancellationToken ct = default);
     Task<ServiceResult<LicenseStatus>> ActivateAsync(string activationKey, CancellationToken ct = default);
+    /// <summary>Update 13: an authorised administrator deactivates the current licence (system becomes read-only; data is kept).</summary>
+    Task<ServiceResult<LicenseStatus>> DeactivateAsync(string reason, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -40,6 +42,12 @@ public sealed class LicenseService : ILicenseService
         public DateTime? ExpiresUtc { get; set; }
         public string? Serial { get; set; }
         public DateTime HighestSeenUtc { get; set; }
+        public string? Term { get; set; }
+        public string? MachineId { get; set; }
+        public bool Deactivated { get; set; }
+        public DateTime? DeactivatedUtc { get; set; }
+        /// <summary>Licence IDs deactivated on this installation – they can never be activated here again.</summary>
+        public List<string> RevokedSerials { get; set; } = new();
     }
 
     private readonly HmsDbContext _db;
@@ -119,8 +127,21 @@ public sealed class LicenseService : ILicenseService
             await _db.SaveChangesAsync(ct);
         }
 
+        if (state.Deactivated)
+            return new LicenseStatus(LicenseState.Invalid, state.Type, state.LicensedTo, state.InstallationId, state.TrialStartedUtc,
+                state.ActivatedUtc, state.ExpiresUtc, null,
+                $"The licence was deactivated by an administrator on {state.DeactivatedUtc:dd MMM yyyy}. All data is kept safely; the system is read-only until a licence key is activated.",
+                state.Serial, state.Term, Deactivated: true);
+
+        if (state.Type != LicenseType.Trial && !string.IsNullOrEmpty(state.MachineId)
+            && MachineIdentity.Normalize(state.MachineId) != MachineIdentity.Normalize(MachineIdentity.Current))
+            return new LicenseStatus(LicenseState.Invalid, state.Type, state.LicensedTo, state.InstallationId, state.TrialStartedUtc,
+                state.ActivatedUtc, state.ExpiresUtc, null,
+                "This licence belongs to a different computer (Machine ID does not match). Your data is safe; please request a new key for this computer.",
+                state.Serial, state.Term);
+
         int? days = state.ExpiresUtc is { } exp ? Math.Max(0, (int)Math.Ceiling((exp - now).TotalDays)) : null;
-        return state.Type switch
+        var status = state.Type switch
         {
             LicenseType.Trial when now < state.ExpiresUtc => new LicenseStatus(LicenseState.TrialActive, state.Type, null, state.InstallationId,
                 state.TrialStartedUtc, null, state.ExpiresUtc, days, $"Trial period: {days} day(s) remaining."),
@@ -130,11 +151,12 @@ public sealed class LicenseService : ILicenseService
             LicenseType.Lifetime => new LicenseStatus(LicenseState.Active, state.Type, state.LicensedTo, state.InstallationId,
                 state.TrialStartedUtc, state.ActivatedUtc, null, null, "Lifetime licence active."),
             _ when state.ExpiresUtc is { } e && now < e => new LicenseStatus(LicenseState.Active, state.Type, state.LicensedTo, state.InstallationId,
-                state.TrialStartedUtc, state.ActivatedUtc, e, days, $"Annual licence active: {days} day(s) remaining."),
+                state.TrialStartedUtc, state.ActivatedUtc, e, days, days <= LicenseStatus.WarnDays ? $"The licence expires in {days} day(s) – please renew it before {e:dd MMM yyyy}." : $"Licence active: {days} day(s) remaining."),
             _ => new LicenseStatus(LicenseState.Expired, state.Type, state.LicensedTo, state.InstallationId,
                 state.TrialStartedUtc, state.ActivatedUtc, state.ExpiresUtc, 0,
-                "The annual licence has expired. All data is kept safely; the system is read-only until the licence is renewed.")
+                "The licence has expired. All data is kept safely; the system is read-only until the licence is renewed.")
         };
+        return status with { LicenseId = state.Serial, Term = state.Term ?? (state.Type == LicenseType.Annual ? "Yearly" : state.Type.ToString()) };
     }
 
     public async Task<ServiceResult<LicenseStatus>> ActivateAsync(string activationKey, CancellationToken ct = default)
@@ -148,11 +170,18 @@ public sealed class LicenseService : ILicenseService
         if (payload.InstallationId != row.InstallationId)
             return await FailActivation("This activation key was issued for a different installation. Please send your Installation ID to Burhan Nexus.");
 
+        if (!string.IsNullOrEmpty(payload.MachineId) && MachineIdentity.Normalize(payload.MachineId) != MachineIdentity.Normalize(MachineIdentity.Current))
+            return await FailActivation($"This activation key was issued for a different computer (Machine ID). This computer's Machine ID is {MachineIdentity.Current}.");
+
         var now = Now;
         if (payload.Type == LicenseType.Annual && payload.ExpiresUtc <= now)
-            return await FailActivation("This annual activation key has already expired.");
+            return await FailActivation("This activation key has already expired.");
 
         var current = Unseal(row);
+        if (current is not null && now < current.HighestSeenUtc.AddHours(-24))
+            return await FailActivation("The server clock appears to have been set back. Please correct the date and time of the server computer first.");
+        if (current?.RevokedSerials.Contains(payload.Serial, StringComparer.OrdinalIgnoreCase) == true)
+            return await FailActivation($"Licence {payload.Serial} was deactivated on this installation and cannot be used again. Please request a new key.");
         var state = new SealedLicense
         {
             InstallationId = row.InstallationId,
@@ -162,7 +191,10 @@ public sealed class LicenseService : ILicenseService
             ActivatedUtc = now,
             ExpiresUtc = payload.Type == LicenseType.Lifetime ? null : payload.ExpiresUtc,
             Serial = payload.Serial,
-            HighestSeenUtc = now
+            HighestSeenUtc = current is not null && current.HighestSeenUtc > now ? current.HighestSeenUtc : now,
+            Term = payload.Term ?? (payload.Type == LicenseType.Annual ? "Yearly" : payload.Type.ToString()),
+            MachineId = payload.MachineId,
+            RevokedSerials = current?.RevokedSerials ?? new()
         };
         var old = new { row.LicenseType, row.ExpiresUtc, row.LicensedTo };
         Apply(row, state);
@@ -170,6 +202,29 @@ public sealed class LicenseService : ILicenseService
         _audit.Add(AuditActions.LicenseActivated, "License", row.InstallationId.ToString(),
             $"{payload.Type} licence activated for {payload.LicensedTo}", old,
             new { state.Type, state.ExpiresUtc, state.LicensedTo, payload.Serial });
+        await _db.SaveChangesAsync(ct);
+        _cache.Remove(CacheKey);
+        return ServiceResult<LicenseStatus>.Ok(await GetStatusAsync(ct));
+    }
+
+    public async Task<ServiceResult<LicenseStatus>> DeactivateAsync(string reason, CancellationToken ct = default)
+    {
+        reason = (reason ?? string.Empty).Trim();
+        if (reason.Length < 3) return ServiceResult<LicenseStatus>.Fail("Enter the reason for deactivating the licence.");
+        if (reason.Length > 300) reason = reason[..300];
+        var row = await _db.LicenseInformation.FirstOrDefaultAsync(ct);
+        var state = row is null ? null : Unseal(row);
+        if (row is null || state is null) return ServiceResult<LicenseStatus>.Fail("There is no verified licence to deactivate.");
+        if (state.Type == LicenseType.Trial) return ServiceResult<LicenseStatus>.Fail("The trial cannot be deactivated – only an activated licence.");
+        if (state.Deactivated) return ServiceResult<LicenseStatus>.Fail("The licence is already deactivated.");
+        var now = Now;
+        state.Deactivated = true;
+        state.DeactivatedUtc = now;
+        if (!string.IsNullOrEmpty(state.Serial) && !state.RevokedSerials.Contains(state.Serial, StringComparer.OrdinalIgnoreCase)) state.RevokedSerials.Add(state.Serial);
+        if (now > state.HighestSeenUtc) state.HighestSeenUtc = now;
+        Apply(row, state);
+        _audit.Add(AuditActions.LicenseDeactivated, "License", row.InstallationId.ToString(),
+            $"Licence {state.Serial} ({state.Type}, {state.LicensedTo}) deactivated: {reason}", null, new { state.Serial, Reason = reason });
         await _db.SaveChangesAsync(ct);
         _cache.Remove(CacheKey);
         return ServiceResult<LicenseStatus>.Ok(await GetStatusAsync(ct));

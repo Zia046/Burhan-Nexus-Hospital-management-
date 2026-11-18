@@ -160,6 +160,11 @@ public class ServiceItem
     [MaxLength(150)] public string Name { get; set; } = string.Empty;
     public EncounterType Category { get; set; }
     public decimal DefaultFee { get; set; }
+    /// <summary>
+    /// Update 13: FREE only when an administrator marks it so. A fee of 0 without this flag means "fee not set yet" – in Private mode
+    /// such a service cannot be billed until a fee is entered (no service is free by default).
+    /// </summary>
+    public bool IsFree { get; set; }
     public int? DoctorId { get; set; }
     public Doctor? Doctor { get; set; }
     public bool IsActive { get; set; } = true;
