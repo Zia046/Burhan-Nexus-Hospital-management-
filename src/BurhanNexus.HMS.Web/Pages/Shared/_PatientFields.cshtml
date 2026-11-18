@@ -76,7 +76,7 @@
             <input asp-for="Cnic" maxlength="15" inputmode="numeric" placeholder="xxxxx-xxxxxxx-x" autocomplete="off" data-cnic data-dup-watch />
         </div>
         <div class="field span-2">
-            <label asp-for="Address">Address @Html.Raw(req)</label>
+            <label asp-for="Address">Address <span class="muted">(optional)</span></label>
             <input asp-for="Address" maxlength="300" autocomplete="off" />
         </div>
         <div class="field">

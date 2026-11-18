@@ -197,4 +197,21 @@ public partial class Update9Tests
         }
         Assert.Contains("needs its own batch number", await admin.GetHtmlAsync("/Pharmacy/Receive"));
     }
+
+    [Fact]
+    public async Task Update13_registration_form_prefills_buner_and_only_city_is_required()
+    {
+        await SetupAsync("Private");
+        var admin = await LoginAdminAsync();
+        foreach (var url in new[] { "/Patients/Register", "/Emergency/Register" })
+            Assert.Contains("value=\"Buner\"", await admin.GetHtmlAsync(url));
+        var f = PatientFields("Buner Default Patient", "Father Buner");
+        f.Remove("Patient.Address");
+        f["Patient.CityOrVillage"] = "Daggar";
+        var pid = await RegisterPatientAsync(admin, f);
+        await using var db = Factory.NewDb();
+        var p = await db.Patients.SingleAsync(x => x.Id == pid);
+        Assert.Null(p.Address);
+        Assert.Equal("Daggar", p.CityOrVillage);
+    }
 }

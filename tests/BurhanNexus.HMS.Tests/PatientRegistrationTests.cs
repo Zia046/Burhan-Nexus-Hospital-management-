@@ -15,11 +15,12 @@ public class PatientRegistrationTests : Phase2TestBase
         await SetupAsync("Government");
         var admin = await LoginAdminAsync();
 
-        // Validation: address, city and age are required for a normal registration; optional fields stay optional.
+        // Validation: city / village and age are required for a normal registration; address and other fields are optional.
         var bad = await PostRegisterAsync(admin, new Dictionary<string, string> { ["Patient.FullName"] = "Gul Bibi", ["Patient.Gender"] = "Female", ["Next"] = "profile" });
         Assert.Equal(HttpStatusCode.OK, bad.StatusCode);
         var badHtml = await bad.Content.ReadAsStringAsync();
-        Assert.Contains("Address is required", badHtml);
+        Assert.DoesNotContain("Address is required", badHtml);
+        Assert.Contains("City / village is required", badHtml);
         Assert.Contains("Enter the age or the date of birth", badHtml);
         Assert.DoesNotContain("CNIC must", badHtml);
 

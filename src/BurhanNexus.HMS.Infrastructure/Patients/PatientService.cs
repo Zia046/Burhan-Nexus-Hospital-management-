@@ -22,7 +22,10 @@ public sealed class PatientInput
     public string? Cnic { get; set; }
     public string? MobileNumber { get; set; }
     public string? AlternateContact { get; set; }
+    /// <summary>Optional. New registrations start with <see cref="DefaultAddress"/> filled in.</summary>
     public string? Address { get; set; }
+    /// <summary>Address pre-filled on the registration forms (editable).</summary>
+    public const string DefaultAddress = "Buner";
     public string? CityOrVillage { get; set; }
     public string? BloodGroup { get; set; }
     public string? Notes { get; set; }
@@ -177,7 +180,6 @@ public sealed partial class PatientService : IPatientService
 
         if (!minimal && !i.IsUnidentified)
         {
-            if (string.IsNullOrWhiteSpace(i.Address)) e.Add("Address is required.");
             if (string.IsNullOrWhiteSpace(i.CityOrVillage)) e.Add("City / village is required.");
         }
         if ((i.Address?.Trim().Length ?? 0) > 300) e.Add("Address must not exceed 300 characters.");
