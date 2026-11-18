@@ -47,6 +47,13 @@ function PgBin {
     Get-ChildItem "C:\Program Files\PostgreSQL" -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending |
         ForEach-Object { Join-Path $_.FullName "bin" } | Where-Object { Test-Path (Join-Path $_ "psql.exe") } | Select-Object -First 1
 }
+# Native tools write progress to stderr; under "Stop" Windows PowerShell 5.1 would treat that as a failure.
+function RunNative([string]$exe, [string[]]$argv, [switch]$Quiet) {
+    $old = $ErrorActionPreference; $ErrorActionPreference = "Continue"
+    try { $out = & $exe @argv 2>&1 | ForEach-Object { "$_" }; $code = $LASTEXITCODE } finally { $ErrorActionPreference = $old }
+    if (-not $Quiet) { $out | ForEach-Object { Write-Host "      $_" } }
+    return $code
+}
 function PortOpen([int]$p) {
     try { $c = New-Object Net.Sockets.TcpClient; $c.Connect("127.0.0.1", $p); $c.Close(); return $true } catch { return $false }
 }
@@ -119,20 +126,19 @@ if ($bin) {
         $data = Join-Path $target "data"
         $pw = Join-Path $env:TEMP "bn_pgpw.txt"
         [IO.File]::WriteAllText($pw, $PostgresPassword)
-        & (Join-Path $target "bin\initdb.exe") -D $data -U postgres -E UTF8 "--pwfile=$pw" -A scram-sha-256 2>&1 | Write-Host
-        $code = $LASTEXITCODE
+        $code = RunNative (Join-Path $target "bin\initdb.exe") @("-D", $data, "-U", "postgres", "-E", "UTF8", "--pwfile=$pw", "-A", "scram-sha-256")
         Remove-Item $pw -Force -ErrorAction SilentlyContinue
         if ($code -ne 0) { Fail "initdb nakam (code $code). Agar 'VCRUNTIME140.dll' ka zikr hai to Visual C++ dobara install karein." }
         $pgctl = Join-Path $target "bin\pg_ctl.exe"
         $started = $false
         # Service account: Local System first (pg_ctl runs the server with a restricted token), then Network Service.
         foreach ($account in @($null, "NT AUTHORITY\NetworkService")) {
-            & $pgctl unregister -N "postgresql-x64-16" 2>&1 | Out-Null
+            RunNative $pgctl @("unregister", "-N", "postgresql-x64-16") -Quiet | Out-Null
             if ($account) {
                 icacls $data /grant "NT AUTHORITY\NetworkService:(OI)(CI)F" /T /Q | Out-Null
-                & $pgctl register -N "postgresql-x64-16" -D $data -S auto -U $account 2>&1 | Write-Host
+                RunNative $pgctl @("register", "-N", "postgresql-x64-16", "-D", $data, "-S", "auto", "-U", $account) | Out-Null
             } else {
-                & $pgctl register -N "postgresql-x64-16" -D $data -S auto 2>&1 | Write-Host
+                RunNative $pgctl @("register", "-N", "postgresql-x64-16", "-D", $data, "-S", "auto") | Out-Null
             }
             try { Start-Service "postgresql-x64-16" -ErrorAction Stop; $started = $true; break }
             catch { Write-Host "      service ($(if ($account) { $account } else { 'LocalSystem' })) start nahi hui: $($_.Exception.Message)" -ForegroundColor Yellow }
@@ -164,8 +170,8 @@ Ok "PostgreSQL is running on port 5432"
 
 # ---- 4. Burhan Nexus HMS ----
 Step 4 "Burhan Nexus HMS (database, Windows service, firewall)"
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "Install-Server.ps1") -PostgresPassword $PostgresPassword -Port $Port
-if ($LASTEXITCODE -ne 0) {
+$code = RunNative "powershell.exe" @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $PSScriptRoot "Install-Server.ps1"), "-PostgresPassword", $PostgresPassword, "-Port", "$Port")
+if ($code -ne 0) {
     Fail "Software install nakam. Agar 'Could not connect to PostgreSQL' likha hai to PostgreSQL ka password ghalat hai - INSTALL.cmd dobara chalayein aur sahi password likhein."
 }
 Ok "server installed"
