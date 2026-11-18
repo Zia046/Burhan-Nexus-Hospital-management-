@@ -123,9 +123,26 @@ if ($bin) {
         $code = $LASTEXITCODE
         Remove-Item $pw -Force -ErrorAction SilentlyContinue
         if ($code -ne 0) { Fail "initdb nakam (code $code). Agar 'VCRUNTIME140.dll' ka zikr hai to Visual C++ dobara install karein." }
-        icacls $data /grant "NT AUTHORITY\NetworkService:(OI)(CI)F" /T /Q | Out-Null
-        & (Join-Path $target "bin\pg_ctl.exe") register -N "postgresql-x64-16" -D $data -S auto -U "NT AUTHORITY\NetworkService" 2>&1 | Write-Host
-        Start-Service "postgresql-x64-16"
+        $pgctl = Join-Path $target "bin\pg_ctl.exe"
+        $started = $false
+        # Service account: Local System first (pg_ctl runs the server with a restricted token), then Network Service.
+        foreach ($account in @($null, "NT AUTHORITY\NetworkService")) {
+            & $pgctl unregister -N "postgresql-x64-16" 2>&1 | Out-Null
+            if ($account) {
+                icacls $data /grant "NT AUTHORITY\NetworkService:(OI)(CI)F" /T /Q | Out-Null
+                & $pgctl register -N "postgresql-x64-16" -D $data -S auto -U $account 2>&1 | Write-Host
+            } else {
+                & $pgctl register -N "postgresql-x64-16" -D $data -S auto 2>&1 | Write-Host
+            }
+            try { Start-Service "postgresql-x64-16" -ErrorAction Stop; $started = $true; break }
+            catch { Write-Host "      service ($(if ($account) { $account } else { 'LocalSystem' })) start nahi hui: $($_.Exception.Message)" -ForegroundColor Yellow }
+        }
+        if (-not $started) {
+            Get-ChildItem (Join-Path $data "log") -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object { Get-Content $_.FullName -Tail 30 }
+            Get-WinEvent -FilterHashtable @{ LogName = "Application"; StartTime = (Get-Date).AddMinutes(-10) } -MaxEvents 15 -ErrorAction SilentlyContinue |
+                Where-Object { $_.ProviderName -like "*PostgreSQL*" -or $_.Message -like "*postgres*" } | ForEach-Object { "$($_.TimeCreated) $($_.ProviderName): $($_.Message)" }
+            Fail "PostgreSQL service start nahi hui (upar log dekhein)."
+        }
         Ok "installed from zip as Windows service 'postgresql-x64-16'"
     } else {
         Write-Host "      installer se install (khamoshi se, 3-10 minute): $(Split-Path $exe -Leaf)"
