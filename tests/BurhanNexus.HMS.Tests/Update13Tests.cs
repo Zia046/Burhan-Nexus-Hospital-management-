@@ -195,6 +195,6 @@ public partial class Update9Tests
             var value = stock.Sum(s => s.Quantity * batches.Single(x => x.Id == s.BatchId).UnitCost!.Value);
             Assert.Equal(110m, value);
         }
-        Assert.Contains("separate batch number", await admin.GetHtmlAsync("/Pharmacy/Receive"));
+        Assert.Contains("needs its own batch number", await admin.GetHtmlAsync("/Pharmacy/Receive"));
     }
 }
