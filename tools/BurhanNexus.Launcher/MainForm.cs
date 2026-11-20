@@ -27,7 +27,7 @@ internal sealed class MainForm : Form
     private bool _sawOffline;
     private bool _testDone;
 
-    private const int WmSysCommand = 0x112, MenuSettings = 0x100, MenuReload = 0x110, MenuFullScreen = 0x120, MenuAbout = 0x130;
+    private const int WmSysCommand = 0x112, MenuSettings = 0x100, MenuReload = 0x110, MenuFullScreen = 0x120, MenuAbout = 0x130, MenuPrinters = 0x140;
     [DllImport("user32.dll")] private static extern IntPtr GetSystemMenu(IntPtr hWnd, bool revert);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool AppendMenu(IntPtr menu, uint flags, UIntPtr id, string? text);
 
@@ -75,6 +75,7 @@ internal sealed class MainForm : Form
         var menu = GetSystemMenu(Handle, false);
         AppendMenu(menu, 0x800, UIntPtr.Zero, null);
         AppendMenu(menu, 0, (UIntPtr)MenuSettings, "Server settings…");
+        AppendMenu(menu, 0, (UIntPtr)MenuPrinters, "Printers…");
         AppendMenu(menu, 0, (UIntPtr)MenuReload, "Reload page\tF5");
         AppendMenu(menu, 0, (UIntPtr)MenuFullScreen, "Full screen on/off\tF11");
         AppendMenu(menu, 0, (UIntPtr)MenuAbout, "About Burhan Nexus HMS Client");
@@ -87,6 +88,7 @@ internal sealed class MainForm : Form
             switch ((int)(m.WParam.ToInt64() & 0xFFF0))
             {
                 case MenuSettings: OpenSettings(); return;
+                case MenuPrinters: using (var f = new PrintersForm()) f.ShowDialog(this); return;
                 case MenuReload: _web.CoreWebView2?.Reload(); return;
                 case MenuFullScreen: ToggleFullScreen(); return;
                 case MenuAbout:
@@ -125,6 +127,7 @@ internal sealed class MainForm : Form
         var core = _web.CoreWebView2;
         core.Settings.AreDevToolsEnabled = false;
         core.Settings.IsStatusBarEnabled = false;
+        await PrintBridge.AttachAsync(core, this);
         core.DocumentTitleChanged += (_, _) => Text = string.IsNullOrWhiteSpace(core.DocumentTitle) ? "Burhan Nexus HMS" : $"{core.DocumentTitle} – Burhan Nexus HMS";
         core.NavigationStarting += (_, ev) =>
         {
@@ -140,6 +143,7 @@ internal sealed class MainForm : Form
             else if (ev.Control && ev.Alt && ev.KeyCode == Keys.S) OpenSettings();
         };
 
+        if (_opts.PrintTest) { await RunPrintTestAsync(core); return; }
         await CheckServerAsync(initial: true);
     }
 
@@ -180,7 +184,7 @@ internal sealed class MainForm : Form
         var src = _web.Source?.ToString();
         if (src is not null && Navigation.IsInternal(src, _server) && src.StartsWith("http", StringComparison.OrdinalIgnoreCase)) _lastGoodUrl = src;
         HideOffline();
-        if (_opts.SelfTest) await SelfTestOnPageAsync();
+        if (_opts.SelfTest && !_opts.PrintTest) await SelfTestOnPageAsync();
     }
 
     private async Task CheckServerAsync(bool initial = false)
@@ -310,6 +314,53 @@ internal sealed class MainForm : Form
             catch (Exception) { }
         }
         Finish(_offline.Visible, _offline.Visible ? "Reconnect screen shown for an unreachable server" : "Reconnect screen not visible");
+    }
+
+    private const string ThermalTestHtml = "<!DOCTYPE html><html><head><title>t</title></head><body class='thermal-body w80' data-width='80'>" +
+        "<div class='no-print'>toolbar</div><article class='t-slip' style='width:80mm;height:120mm;border:1px solid #000'>RECEIPT TEST</article></body></html>";
+    private const string A4TestHtml = "<!DOCTYPE html><html><head><title>Lab report test</title><style>@page { size: A4; margin: 12mm; }</style></head>" +
+        "<body class='lab-report-body'><h1>A4 REPORT TEST</h1></body></html>";
+
+    /// <summary>CI: the page's Print goes through the app's printing (PDF instead of a printer) – checks paper size of a receipt and an A4 page.</summary>
+    private async Task RunPrintTestAsync(CoreWebView2 core)
+    {
+        try
+        {
+            var dir = _opts.Out ?? Path.GetTempPath();
+            Directory.CreateDirectory(dir);
+            PrintBridge.PdfTestDir = dir;
+            var sizes = new Dictionary<string, (double W, double H)>();
+            foreach (var (name, html) in new[] { ("thermal", ThermalTestHtml), ("a4", A4TestHtml) })
+            {
+                var nav = new TaskCompletionSource();
+                EventHandler<CoreWebView2NavigationCompletedEventArgs> onNav = (_, _) => nav.TrySetResult();
+                core.NavigationCompleted += onNav;
+                core.NavigateToString(html);
+                await nav.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                core.NavigationCompleted -= onNav;
+                var written = new TaskCompletionSource<string>();
+                Action<string> onPdf = f => written.TrySetResult(f);
+                PrintBridge.PdfWritten += onPdf;
+                await core.ExecuteScriptAsync("window.print()");
+                var file = await written.Task.WaitAsync(TimeSpan.FromSeconds(60));
+                PrintBridge.PdfWritten -= onPdf;
+                sizes[name] = MediaBox(file);
+            }
+            var t = sizes["thermal"]; var a = sizes["a4"];
+            var mmW = t.W * 25.4 / 72; var mmH = t.H * 25.4 / 72;
+            var ok = Math.Abs(mmW - 80) < 1.5 && Math.Abs(mmH - 124) < 4 && a.W > 500;
+            Finish(ok, $"Receipt page {mmW:0.#} x {mmH:0.#} mm (expected 80 x 124: roll width x slip height, no A4 length); A4 page {a.W * 25.4 / 72:0} x {a.H * 25.4 / 72:0} mm; header/footer off");
+        }
+        catch (Exception ex) { Finish(false, "Print test failed: " + ex.Message); }
+    }
+
+    private static (double W, double H) MediaBox(string pdf)
+    {
+        var text = System.Text.Encoding.Latin1.GetString(File.ReadAllBytes(pdf));
+        var m = System.Text.RegularExpressions.Regex.Match(text, @"/MediaBox\s*\[\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)");
+        if (!m.Success) throw new InvalidOperationException("no MediaBox in " + pdf);
+        double D(int i) => double.Parse(m.Groups[i].Value, System.Globalization.CultureInfo.InvariantCulture);
+        return (D(3) - D(1), D(4) - D(2));
     }
 
     private void Finish(bool ok, string message)

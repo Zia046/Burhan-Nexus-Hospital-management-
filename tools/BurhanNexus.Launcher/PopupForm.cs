@@ -24,6 +24,7 @@ internal sealed class PopupForm : Form
         await _web.EnsureCoreWebView2Async(env);
         var core = _web.CoreWebView2;
         core.Settings.AreDevToolsEnabled = false;
+        await PrintBridge.AttachAsync(core, this);
         core.DocumentTitleChanged += (_, _) => Text = string.IsNullOrWhiteSpace(core.DocumentTitle) ? "Burhan Nexus HMS" : core.DocumentTitle;
         core.WindowCloseRequested += (_, _) => Close();
         core.NavigationStarting += (_, e) =>

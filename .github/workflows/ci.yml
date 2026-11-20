@@ -213,6 +213,9 @@ jobs:
           Start-Sleep -Seconds 15
           Start-Service BurhanNexusHMS
           Check $r "05-reconnect"
+          # 7. Printing through the app: receipt page = roll width x slip height (no A4 length of paper), header/footer off
+          $pt = Start-Process -FilePath $exe -ArgumentList "--server", "http://127.0.0.1:1", "--selftest", "--print-test", "--out", "$out\print", "--result", "$out\06-print.json", "--timeout", "90" -PassThru
+          Check $pt "06-print"
           "CLIENT LAUNCHER TESTS: PASSED" | Tee-Object -FilePath $log -Append
       - name: Upload Client Launcher (test build) and its test evidence
         if: always()
