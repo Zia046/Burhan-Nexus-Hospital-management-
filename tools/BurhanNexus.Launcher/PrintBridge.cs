@@ -33,7 +33,7 @@ internal static class PrintBridge
               try {
                 for (var si = 0; si < document.styleSheets.length; si++) {
                   var rules = document.styleSheets[si].cssRules || [];
-                  for (var ri = 0; ri < rules.length; ri++) if (rules[ri].type === 6 && rules[ri].style && rules[ri].style.size) pageSize = rules[ri].style.size;
+                  for (var ri = 0; ri < rules.length; ri++) if (rules[ri].type === 6 && rules[ri].style && rules[ri].style.getPropertyValue('size')) pageSize = rules[ri].style.getPropertyValue('size');
                 }
               } catch (e) { }
               window.chrome.webview.postMessage(JSON.stringify({ type: 'bn-print', thermal: thermal, widthMm: width, heightMm: height, pageSize: pageSize }));
