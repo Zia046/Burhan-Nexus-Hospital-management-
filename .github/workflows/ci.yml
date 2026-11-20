@@ -464,6 +464,15 @@ jobs:
           Note "reinstall exit: $($p3.ExitCode); health: $h3"
           if ($p3.ExitCode -ne 0 -or $h3 -ne 200 -or (Test-Path "$data\logs\INSTALL-FAILED.txt")) { Get-Content ci-setup/install-log-reinstall.txt -Tail 50; throw "reinstall failed" }
           "SERVER SETUP TESTS: PASSED" | Tee-Object -FilePath $log -Append
+      - name: Two computers working at the same time on the central server (login + patient registration)
+        shell: pwsh
+        run: |
+          ./tools/ci/MultiUser-Test.ps1 *>&1 | Tee-Object -FilePath ci-setup/multi-user-test.log
+          if (-not (Select-String -Path ci-setup/multi-user-test.log -Pattern "MULTI-USER LAN TEST: PASSED" -Quiet)) { throw "multi-user test failed" }
+          # The desktop window now shows the login page of the configured hospital
+          $c = Start-Process "C:\Program Files\Burhan Nexus HMS\Server\client\BurhanNexus.HMS.Client.exe" -ArgumentList "--server", "http://localhost:5000", "--selftest", "--expect", "Burhan LAN Test Hospital", "--result", "$((Resolve-Path ci-setup).Path)\client-login-page.json" -PassThru -Wait
+          "desktop window after setup: exit $($c.ExitCode) $(Get-Content ci-setup/client-login-page.json -Raw)" | Tee-Object -FilePath ci-setup/multi-user-test.log -Append
+          if ($c.ExitCode -ne 0) { throw "desktop window did not show the hospital's login page" }
       - name: Upload Server Setup.exe (TEST build) and evidence
         if: always()
         uses: actions/upload-artifact@v4
