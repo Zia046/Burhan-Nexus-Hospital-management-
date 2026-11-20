@@ -26,7 +26,10 @@ param(
     [string]$DbPassword = "",
     [Parameter(Mandatory = $true)][string]$PostgresPassword,
     [string]$PostgresAdminUser = "postgres",
-    [string]$ServiceName = "BurhanNexusHMS"
+    [string]$ServiceName = "BurhanNexusHMS",
+    # EXE installer (Server Setup.exe): keep hospital data outside the program folder, e.g. C:\ProgramData\BurhanNexusHMS.
+    # Empty = the classic layout (data / backups inside the installation folder).
+    [string]$DataRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -94,9 +97,25 @@ Write-Step "Copying application to $InstallDir"
 $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
 if ($svc -and $svc.Status -eq "Running") { Stop-Service $ServiceName; Start-Sleep -Seconds 3 }
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-# Never overwrite server data, backups or configuration of an existing installation.
-robocopy $packageDir $InstallDir /E /NFL /NDL /NJH /NJS /XD data backups /XF appsettings.Production.json | Out-Null
-New-Item -ItemType Directory -Force -Path (Join-Path $InstallDir "data"), (Join-Path $InstallDir "backups") | Out-Null
+$samePlace = [IO.Path]::GetFullPath("$packageDir").TrimEnd('\') -ieq [IO.Path]::GetFullPath($InstallDir).TrimEnd('\')
+if ($samePlace) {
+    Write-Host "Application files are already in place (installed by Server Setup)."
+} else {
+    # Never overwrite server data, backups or configuration of an existing installation.
+    robocopy $packageDir $InstallDir /E /NFL /NDL /NJH /NJS /XD data backups /XF appsettings.Production.json | Out-Null
+}
+if ([string]::IsNullOrWhiteSpace($DataRoot)) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $InstallDir "data"), (Join-Path $InstallDir "backups") | Out-Null
+    $dataDir = "data"; $backupDir = "backups"; $radiologyDir = "radiology-files"
+} else {
+    $dataDir = Join-Path $DataRoot "data"; $backupDir = Join-Path $DataRoot "backups"; $radiologyDir = Join-Path $DataRoot "radiology-files"
+    New-Item -ItemType Directory -Force -Path $DataRoot, $dataDir, $backupDir, $radiologyDir, (Join-Path $DataRoot "logs") | Out-Null
+    # Hospital data: only Administrators and the service (SYSTEM) - existing files are never touched or re-permissioned.
+    icacls $dataDir /inheritance:r /grant:r "Administrators:(OI)(CI)F" "SYSTEM:(OI)(CI)F" | Out-Null
+    icacls $radiologyDir /inheritance:r /grant:r "Administrators:(OI)(CI)F" "SYSTEM:(OI)(CI)F" | Out-Null
+    icacls $backupDir /inheritance:r /grant:r "Administrators:(OI)(CI)F" "SYSTEM:(OI)(CI)F" | Out-Null
+    Write-Host "Hospital data folder: $DataRoot"
+}
 
 # ---- Configuration ----
 $configPath = Join-Path $InstallDir "appsettings.Production.json"
@@ -105,7 +124,7 @@ if (-not (Test-Path $configPath)) {
     $config = [ordered]@{
         ConnectionStrings = @{ HmsDatabase = "Host=$DbHost;Port=$DbPort;Database=$DbName;Username=$DbUser;Password=$DbPassword" }
         Kestrel = @{ Endpoints = @{ Http = @{ Url = "http://0.0.0.0:$Port" } } }
-        Hms = @{ PostgresBinDirectory = $pgBin; DataDirectory = "data"; BackupDirectory = "backups" }
+        Hms = @{ PostgresBinDirectory = $pgBin; DataDirectory = $dataDir; BackupDirectory = $backupDir; RadiologyStorageDirectory = $radiologyDir }
     }
     $config | ConvertTo-Json -Depth 6 | Set-Content -Path $configPath -Encoding UTF8
     # Only Administrators and SYSTEM may read the configuration (it contains the DB password).
@@ -118,8 +137,18 @@ if (-not (Test-Path $configPath)) {
 Write-Step "Registering Windows service '$ServiceName'"
 $exe = Join-Path $InstallDir "BurhanNexus.HMS.Web.exe"
 if (-not (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)) {
-    New-Service -Name $ServiceName -BinaryPathName "`"$exe`"" -DisplayName "Burhan Nexus Hospital Management" `
-        -Description "Burhan Nexus Hospital Management server (web application on port $Port)" -StartupType Automatic | Out-Null
+    # Right after an uninstall Windows may still hold the old service "marked for deletion" for a few seconds - retry.
+    for ($try = 1; ; $try++) {
+        try {
+            New-Service -Name $ServiceName -BinaryPathName "`"$exe`"" -DisplayName "Burhan Nexus Hospital Management" `
+                -Description "Burhan Nexus Hospital Management server (web application on port $Port)" -StartupType Automatic -ErrorAction Stop | Out-Null
+            break
+        } catch {
+            if ($try -ge 12) { throw }
+            Write-Host "  Windows is still removing the previous service - waiting ($try)..."
+            Start-Sleep -Seconds 5
+        }
+    }
     sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/10000/restart/30000 | Out-Null
 }
 # Update 13: prepare / upgrade the database BEFORE starting the service. The first migration can take longer than

@@ -150,6 +150,124 @@ jobs:
           Restart-Service BurhanNexusHMS
           Start-Sleep -Seconds 8
           "after restart: $((Invoke-WebRequest -UseBasicParsing http://localhost:5000/health).StatusCode)" | Tee-Object -FilePath verify.log -Append
+      # ---- EXE packaging stage 1: Client Launcher (WebView2 desktop window around the existing HMS pages) ----
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Build Client Launcher.exe (self-contained, single file)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force ci-launcher | Out-Null
+          dotnet publish repo/tools/BurhanNexus.Launcher -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o client *> ci-launcher/build.log
+          if ($LASTEXITCODE -ne 0) { Get-Content ci-launcher/build.log -Tail 40; throw "launcher build failed" }
+          Get-ChildItem client | Format-Table Name, Length | Out-String | Tee-Object -FilePath ci-launcher/files.txt
+          if (-not (Test-Path client\BurhanNexus.HMS.Client.exe)) { throw "BurhanNexus.HMS.Client.exe missing" }
+      - name: Client Launcher – connection tests
+        shell: pwsh
+        run: |
+          $log = "ci-launcher/launcher-tests.log"
+          $exe = (Resolve-Path client\BurhanNexus.HMS.Client.exe).Path
+          $out = (Resolve-Path ci-launcher).Path
+          function Run-Client([string[]]$a, [string]$name) {
+            $p = Start-Process -FilePath $exe -ArgumentList ($a + @("--selftest", "--result", "$out\$name.json", "--out", "$out\$name.png")) -PassThru
+            return $p
+          }
+          function Check([System.Diagnostics.Process]$p, [string]$name) {
+            if (-not $p.WaitForExit(150000)) { $p.Kill(); "$name : TIMEOUT" | Tee-Object -FilePath $log -Append; throw "$name timed out" }
+            $r = if (Test-Path "$out\$name.json") { Get-Content "$out\$name.json" -Raw } else { "(no result file)" }
+            "$name : exit $($p.ExitCode) $r" | Tee-Object -FilePath $log -Append
+            if ($p.ExitCode -ne 0) { throw "$name failed" }
+          }
+          $wv = Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" -ErrorAction SilentlyContinue
+          "WebView2 Runtime on this machine: $($wv.pv)" | Tee-Object -FilePath $log -Append
+          (Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version | Out-String) | Tee-Object -FilePath $log -Append
+
+          # 1. The installer saves the server address for all users
+          $p = Start-Process -FilePath $exe -ArgumentList "--set-server", "127.0.0.1", "--machine" -PassThru -Wait
+          $cfg = Get-Content "$env:ProgramData\BurhanNexusHMS\client.json" -Raw
+          "set-server: exit $($p.ExitCode) $cfg" | Tee-Object -FilePath $log -Append
+          if ($cfg -notmatch "http://127.0.0.1:5000") { throw "server address not saved/normalized" }
+
+          # 2. Opens the HMS (fresh server shows the setup wizard) using the saved address
+          Check (Run-Client @("--expect", "Initial Setup Wizard") "01-online-saved-address") "01-online-saved-address"
+
+          # 3. Over the LAN address (not localhost) - the way other hospital computers connect
+          $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" } | Select-Object -First 1).IPAddress
+          "LAN address: $ip" | Tee-Object -FilePath $log -Append
+          Check (Run-Client @("--server", "http://${ip}:5000", "--expect", "Initial Setup Wizard") "02-online-lan-ip") "02-online-lan-ip"
+
+          # 4. Two client windows at the same time (separate profiles) on the same central server
+          $a = Run-Client @("--profile", "clientA", "--expect", "Initial Setup Wizard") "03-simultaneous-A"
+          $b = Run-Client @("--profile", "clientB", "--server", "http://${ip}:5000", "--expect", "Initial Setup Wizard") "03-simultaneous-B"
+          Check $a "03-simultaneous-A"; Check $b "03-simultaneous-B"
+
+          # 5. Server not reachable -> reconnect screen instead of a browser error
+          Check (Run-Client @("--server", "http://127.0.0.1:5999", "--expect-offline", "--timeout", "60") "04-offline-screen") "04-offline-screen"
+
+          # 6. Server stopped while the client starts, then started again -> the client reconnects by itself
+          Stop-Service BurhanNexusHMS
+          $r = Run-Client @("--reconnect", "--expect", "Initial Setup Wizard", "--timeout", "120") "05-reconnect"
+          Start-Sleep -Seconds 15
+          Start-Service BurhanNexusHMS
+          Check $r "05-reconnect"
+          # 7. Printing through the app: receipt page = roll width x slip height (no A4 length of paper), header/footer off
+          $pt = Start-Process -FilePath $exe -ArgumentList "--server", "http://127.0.0.1:1", "--selftest", "--print-test", "--out", "$out\print", "--result", "$out\06-print.json", "--timeout", "90" -PassThru
+          Check $pt "06-print"
+          "CLIENT LAUNCHER TESTS: PASSED" | Tee-Object -FilePath $log -Append
+      - name: Build Client Setup.exe (Inno Setup)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force payload-client/client, payload-client/webview2 | Out-Null
+          Copy-Item client\BurhanNexus.HMS.Client.exe payload-client/client/
+          Invoke-WebRequest -UseBasicParsing "https://go.microsoft.com/fwlink/p/?LinkId=2124703" -OutFile payload-client/webview2/MicrosoftEdgeWebview2Setup.exe
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc /Qp "/DPayloadDir=$((Resolve-Path payload-client).Path)" /DAppVersion=2.2.0 repo/deploy/installer/Client.iss *> ci-launcher/iscc-client.log
+          if ($LASTEXITCODE -ne 0) { Get-Content ci-launcher/iscc-client.log -Tail 40; throw "ISCC failed" }
+          Get-ChildItem repo/out | Format-Table Name, Length | Out-String | Tee-Object -FilePath ci-launcher/client-setup-file.txt
+      - name: Client Setup.exe – install on a hospital computer, connect, uninstall
+        shell: pwsh
+        run: |
+          $log = "ci-launcher/client-setup-tests.log"
+          function Note($t) { $t | Tee-Object -FilePath $log -Append }
+          $setup = (Get-ChildItem repo/out/BurhanNexus-HMS-Client-Setup-*.exe).FullName
+          $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" } | Select-Object -First 1).IPAddress
+          Remove-Item "$env:ProgramData\BurhanNexusHMS\client.json" -ErrorAction SilentlyContinue
+          $servicesBefore = (Get-Service).Name | Sort-Object
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SERVER=$ip", "/LOG=$((Resolve-Path ci-launcher).Path)\client-setup.log" -Wait -PassThru
+          Note "client setup exit: $($p.ExitCode) (server address given: $ip)"
+          if ($p.ExitCode -ne 0) { throw "client setup failed" }
+          $exe = "C:\Program Files\Burhan Nexus HMS\Client\BurhanNexus.HMS.Client.exe"
+          if (-not (Test-Path $exe)) { throw "client program not installed" }
+          foreach ($l in "$env:PUBLIC\Desktop\Burhan Nexus HMS.lnk", "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Burhan Nexus HMS\Burhan Nexus HMS.lnk") { if (-not (Test-Path $l)) { throw "missing shortcut $l" }; Note "shortcut: $l" }
+          $cfg = Get-Content "$env:ProgramData\BurhanNexusHMS\client.json" -Raw
+          Note "server address saved: $cfg"
+          if ($cfg -notmatch [regex]::Escape("http://${ip}:5000")) { throw "server address not saved" }
+          $newServices = Compare-Object $servicesBefore ((Get-Service).Name | Sort-Object) | Where-Object SideIndicator -eq "=>"
+          Note "new Windows services created by Client Setup: $(if ($newServices) { $newServices.InputObject -join ', ' } else { 'none (no database, no server)' })"
+          if ($newServices) { throw "client setup must not create services" }
+          $c = Start-Process $exe -ArgumentList "--selftest", "--expect", "Initial Setup Wizard", "--result", "$((Resolve-Path ci-launcher).Path)\07-installed-client.json" -PassThru -Wait
+          Note "installed client opens the central server (saved address): exit $($c.ExitCode) $(Get-Content ci-launcher/07-installed-client.json -Raw)"
+          if ($c.ExitCode -ne 0) { throw "installed client could not open the HMS" }
+          $chk = Start-Process $exe -ArgumentList "--check-server", "10.255.255.1" -PassThru -Wait
+          Note "address check for a wrong server: exit $($chk.ExitCode) (1 = correctly reported as not answering)"
+          $u = Start-Process "C:\Program Files\Burhan Nexus HMS\Client\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait -PassThru
+          Start-Sleep 3
+          Note "uninstall exit: $($u.ExitCode); program removed: $(-not (Test-Path $exe)); server still running: $((Invoke-WebRequest -UseBasicParsing http://localhost:5000/health).StatusCode)"
+          if (Test-Path $exe) { throw "client program not removed" }
+          "CLIENT SETUP TESTS: PASSED" | Tee-Object -FilePath $log -Append
+      - name: Upload Client Launcher (test build) and its test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: BurhanNexus-HMS-Client-TEST
+          path: |
+            client/BurhanNexus.HMS.Client.exe
+            repo/out/*.exe
+            ci-launcher
       - name: Print Agent – raw printing to a Windows printer queue
         shell: pwsh
         run: |
@@ -213,3 +331,153 @@ jobs:
             package/install-log.txt
             verify.log
             agent.log
+
+  # ---- EXE packaging stage 2: Server Setup.exe on a fresh Windows machine ----
+  server-setup:
+    needs: build-test
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/download-artifact@v4
+        with:
+          name: BurhanNexus-HMS-Server-win-x64
+          path: payload/server
+      - name: Simulate a fresh computer (hide the runner's PostgreSQL)
+        shell: pwsh
+        run: |
+          Get-Service -Name "postgresql*" | ForEach-Object { Stop-Service $_.Name -Force -ErrorAction SilentlyContinue; Set-Service $_.Name -StartupType Disabled }
+          if (Test-Path "C:\Program Files\PostgreSQL") { Rename-Item "C:\Program Files\PostgreSQL" "PostgreSQL-runner" }
+      - name: Prepare payload (server package, client, PostgreSQL zip, VC++ runtime)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force payload/prereqs, payload/client, ci-setup | Out-Null
+          Remove-Item payload/server/INSTALL.cmd -ErrorAction SilentlyContinue
+          $ok = $false
+          foreach ($v in "16.16-1", "16.15-1", "16.14-1", "16.13-1", "16.12-1", "16.11-1", "16.10-1", "16.9-1") {
+            try { Invoke-WebRequest -UseBasicParsing "https://get.enterprisedb.com/postgresql/postgresql-$v-windows-x64-binaries.zip" -OutFile "payload/prereqs/postgresql-$v-windows-x64-binaries.zip"; "PostgreSQL $v"; $ok = $true; break } catch { "no $v" }
+          }
+          if (-not $ok) { throw "could not download the PostgreSQL binaries zip" }
+          Invoke-WebRequest -UseBasicParsing "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile payload/prereqs/vc_redist.x64.exe
+          # Slim PostgreSQL: the server needs only the database engine and its tools - not pgAdmin, StackBuilder, docs or debug symbols.
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = (Get-ChildItem payload/prereqs/postgresql-*-binaries.zip).FullName
+          $before = (Get-Item $zip).Length
+          $tmp = Join-Path $env:RUNNER_TEMP "pgslim"; Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+          [IO.Compression.ZipFile]::ExtractToDirectory($zip, $tmp)
+          foreach ($d in "pgAdmin 4", "StackBuilder", "doc", "symbols", "include") { Remove-Item (Join-Path $tmp "pgsql\$d") -Recurse -Force -ErrorAction SilentlyContinue }
+          if (-not (Test-Path (Join-Path $tmp "pgsql\bin\initdb.exe"))) { throw "slim PostgreSQL lost initdb.exe" }
+          Remove-Item $zip
+          [IO.Compression.ZipFile]::CreateFromDirectory($tmp, $zip, [IO.Compression.CompressionLevel]::Optimal, $false)
+          "PostgreSQL zip: $([int]($before/1MB)) MB -> $([int]((Get-Item $zip).Length/1MB)) MB" | Tee-Object -FilePath ci-setup/payload.txt
+          dotnet publish tools/BurhanNexus.Launcher -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o payload/client *> ci-setup/launcher-build.log
+          if ($LASTEXITCODE -ne 0) { Get-Content ci-setup/launcher-build.log -Tail 30; throw "launcher build failed" }
+          Get-ChildItem payload/prereqs, payload/client | Format-Table Name, Length | Out-String | Tee-Object -FilePath ci-setup/payload.txt
+      - name: Build Server Setup.exe (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc /Qp "/DPayloadDir=$((Resolve-Path payload).Path)" /DAppVersion=2.2.0 deploy/installer/Server.iss *> ci-setup/iscc.log
+          if ($LASTEXITCODE -ne 0) { Get-Content ci-setup/iscc.log -Tail 40; throw "ISCC failed" }
+          Get-ChildItem out | Format-Table Name, Length | Out-String | Tee-Object -FilePath ci-setup/setup-file.txt
+      - name: Install with Server Setup.exe (silent) and verify
+        shell: pwsh
+        run: |
+          $log = "ci-setup/server-setup-tests.log"
+          function Note($t) { $t | Tee-Object -FilePath $log -Append }
+          $setup = (Get-ChildItem out\BurhanNexus-HMS-Server-Setup-*.exe).FullName
+          $t0 = Get-Date
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LOG=$((Resolve-Path ci-setup).Path)\setup-install.log", "/PGPASSWORD=BCGH" -Wait -PassThru
+          Note "setup exit code: $($p.ExitCode) after $([int]((Get-Date) - $t0).TotalSeconds) s"
+          $data = "C:\ProgramData\BurhanNexusHMS"
+          $app = "C:\Program Files\Burhan Nexus HMS\Server"
+          if (Test-Path "$data\logs\install-log.txt") { Copy-Item "$data\logs\install-log.txt" ci-setup/install-log.txt }
+          if (Test-Path "$data\logs\INSTALL-FAILED.txt") { Get-Content ci-setup/install-log.txt -Tail 60; throw "server install failed" }
+          if ($p.ExitCode -ne 0) { throw "setup exit code $($p.ExitCode)" }
+
+          $h = Invoke-WebRequest -UseBasicParsing http://localhost:5000/health
+          Note "health: $($h.StatusCode) $($h.Content)"
+          if ((Invoke-WebRequest -UseBasicParsing http://localhost:5000/ -MaximumRedirection 5).Content -notmatch "Initial Setup Wizard") { throw "setup wizard not shown" }
+          Note "setup wizard shown: OK"
+          Get-Service BurhanNexusHMS, postgresql-x64-16 | Format-Table Name, Status, StartType | Out-String | Tee-Object -FilePath $log -Append
+          if ((Get-Service BurhanNexusHMS).StartType -ne "Automatic" -or (Get-Service postgresql-x64-16).StartType -ne "Automatic") { throw "services must start automatically" }
+          Note ("HMS service recovery: " + ((sc.exe qfailure BurhanNexusHMS) -join ' '))
+
+          # Hospital data lives outside the program folder
+          $cfg = Get-Content "$app\appsettings.Production.json" -Raw | ConvertFrom-Json
+          Note "config Hms: $($cfg.Hms | ConvertTo-Json -Compress)"
+          if ($cfg.Hms.DataDirectory -ne "$data\data" -or $cfg.Hms.BackupDirectory -ne "$data\backups" -or $cfg.Hms.RadiologyStorageDirectory -ne "$data\radiology-files") { throw "data folders are not in $data" }
+          if (-not (Get-ChildItem "$data\data\keys" -Filter *.xml)) { throw "no data protection keys in $data\data\keys" }
+          if (Test-Path "$app\data") { throw "a data folder was created inside the program folder" }
+          $pgsvc = (Get-CimInstance Win32_Service -Filter "Name='postgresql-x64-16'").PathName
+          Note "PostgreSQL service: $pgsvc"
+          if ($pgsvc -notmatch [regex]::Escape("$data\pgdata")) { throw "PostgreSQL data directory is not $data\pgdata" }
+          Note ("data ACL: " + ((icacls "$data\data") -join ' | '))
+
+          # Shortcuts, firewall, client address
+          $lnk = @("$env:PUBLIC\Desktop\Burhan Nexus HMS.lnk", "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Burhan Nexus HMS\Burhan Nexus HMS.lnk", "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Burhan Nexus HMS\Server tools\Restart HMS server.lnk")
+          foreach ($l in $lnk) { if (-not (Test-Path $l)) { throw "missing shortcut $l" } ; Note "shortcut: $l" }
+          Get-NetFirewallRule -DisplayName "Burhan Nexus HMS*" | Format-List DisplayName, Enabled, Profile | Out-String | Tee-Object -FilePath $log -Append
+          Note "client.json: $(Get-Content "$env:ProgramData\BurhanNexusHMS\client.json" -Raw)"
+
+          # The desktop window installed on the server opens the HMS
+          $c = Start-Process "$app\client\BurhanNexus.HMS.Client.exe" -ArgumentList "--server", "http://localhost:5000", "--selftest", "--expect", "Initial Setup Wizard", "--result", "$((Resolve-Path ci-setup).Path)\client-on-server.json" -PassThru -Wait
+          Note "client window on the server: exit $($c.ExitCode) $(Get-Content ci-setup/client-on-server.json -Raw)"
+          if ($c.ExitCode -ne 0) { throw "client window failed" }
+
+          # Restart / recovery: restart the service; then kill the process - Windows must restart it
+          Restart-Service BurhanNexusHMS; Start-Sleep 8
+          Note "after restart: $((Invoke-WebRequest -UseBasicParsing http://localhost:5000/health).StatusCode)"
+          Stop-Process -Name BurhanNexus.HMS.Web -Force
+          $back = $false
+          for ($i = 0; $i -lt 30; $i++) { Start-Sleep 2; try { if ((Invoke-WebRequest -UseBasicParsing http://localhost:5000/health -TimeoutSec 3).StatusCode -eq 200) { $back = $true; break } } catch { } }
+          Note "after a crash (process killed): recovered automatically = $back"
+          if (-not $back) { throw "service did not recover after a crash" }
+
+          # Running Setup again on a computer that already has HMS: refused, nothing changed
+          $p2 = Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LOG=$((Resolve-Path ci-setup).Path)\setup-again.log" -Wait -PassThru
+          Note "second Setup run: exit $($p2.ExitCode) (expected non-zero = refused)"
+          if ($p2.ExitCode -eq 0) { throw "Setup did not refuse an existing installation" }
+          if ((Invoke-WebRequest -UseBasicParsing http://localhost:5000/health).StatusCode -ne 200) { throw "existing installation was disturbed" }
+
+          # Uninstall: service and firewall rule removed - database and hospital data kept
+          $env:PGPASSWORD = "BCGH"
+          $psql = "C:\Program Files\PostgreSQL\16\bin\psql.exe"
+          $tables = & $psql -h localhost -U postgres -d burhan_nexus_hms -tAc "select count(*) from information_schema.tables where table_schema='public'"
+          Note "tables in database before uninstall: $tables"
+          $u = Start-Process "$app\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait -PassThru
+          Start-Sleep 5
+          Note "uninstall exit: $($u.ExitCode); HMS service present: $([bool](Get-Service BurhanNexusHMS -ErrorAction SilentlyContinue)); firewall rule present: $([bool](Get-NetFirewallRule -DisplayName 'Burhan Nexus HMS*' -ErrorAction SilentlyContinue))"
+          if (Get-Service BurhanNexusHMS -ErrorAction SilentlyContinue) { throw "HMS service still present after uninstall" }
+          if (-not (Test-Path "$data\data\keys") -or -not (Test-Path "$data\pgdata\PG_VERSION")) { throw "hospital data was removed by uninstall" }
+          $tables2 = & $psql -h localhost -U postgres -d burhan_nexus_hms -tAc "select count(*) from information_schema.tables where table_schema='public'"
+          Note "tables in database after uninstall: $tables2 (data kept: $($tables -eq $tables2))"
+          if ($tables -ne $tables2 -or [int]$tables2 -lt 10) { throw "database not kept" }
+
+          # Install again after uninstall: uses the kept database
+          $p3 = Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LOG=$((Resolve-Path ci-setup).Path)\setup-reinstall.log", "/PGPASSWORD=BCGH" -Wait -PassThru
+          Copy-Item "$data\logs\install-log.txt" ci-setup/install-log-reinstall.txt -ErrorAction SilentlyContinue
+          $h3 = try { (Invoke-WebRequest -UseBasicParsing http://localhost:5000/health -TimeoutSec 10).StatusCode } catch { "no answer" }
+          Note "reinstall exit: $($p3.ExitCode); health: $h3"
+          if ($p3.ExitCode -ne 0 -or $h3 -ne 200 -or (Test-Path "$data\logs\INSTALL-FAILED.txt")) { Get-Content ci-setup/install-log-reinstall.txt -Tail 50; throw "reinstall failed" }
+          "SERVER SETUP TESTS: PASSED" | Tee-Object -FilePath $log -Append
+      - name: Two computers working at the same time on the central server (login + patient registration)
+        shell: pwsh
+        run: |
+          ./tools/ci/MultiUser-Test.ps1 *>&1 | Tee-Object -FilePath ci-setup/multi-user-test.log
+          if (-not (Select-String -Path ci-setup/multi-user-test.log -Pattern "MULTI-USER LAN TEST: PASSED" -Quiet)) { throw "multi-user test failed" }
+          # The desktop window now shows the login page of the configured hospital
+          $c = Start-Process "C:\Program Files\Burhan Nexus HMS\Server\client\BurhanNexus.HMS.Client.exe" -ArgumentList "--server", "http://localhost:5000", "--selftest", "--expect", "Burhan LAN Test Hospital", "--result", "$((Resolve-Path ci-setup).Path)\client-login-page.json" -PassThru -Wait
+          "desktop window after setup: exit $($c.ExitCode) $(Get-Content ci-setup/client-login-page.json -Raw)" | Tee-Object -FilePath ci-setup/multi-user-test.log -Append
+          if ($c.ExitCode -ne 0) { throw "desktop window did not show the hospital's login page" }
+      - name: Upload Server Setup.exe (TEST build) and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: BurhanNexus-HMS-Server-Setup-TEST
+          path: |
+            out/*.exe
+            ci-setup
