@@ -110,8 +110,11 @@ Step 3 "PostgreSQL database"
 $bin = PgBin
 if ($bin) {
     Ok "already installed: $bin"
-    Get-Service -Name "postgresql*" -ErrorAction SilentlyContinue | Where-Object { $_.Status -ne "Running" } | ForEach-Object {
-        Set-Service $_.Name -StartupType Automatic; Start-Service $_.Name
+    # Start stopped PostgreSQL services - but never ones an administrator disabled, and never fail because of an old one.
+    Get-Service -Name "postgresql*" -ErrorAction SilentlyContinue | Where-Object { $_.Status -ne "Running" -and $_.StartType -ne "Disabled" } | ForEach-Object {
+        $svcName = $_.Name
+        try { Set-Service $svcName -StartupType Automatic; Start-Service $svcName -ErrorAction Stop }
+        catch { Write-Host "      PostgreSQL service '$svcName' could not be started - ignored" -ForegroundColor Yellow }
     }
 } else {
     $zip = FindFile @("postgresql-1[6-9]*-binaries.zip", "postgresql-*-windows-x64-binaries.zip")
