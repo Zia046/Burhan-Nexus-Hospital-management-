@@ -156,6 +156,7 @@ var
 begin
   Log := GetDataRoot('') + '\logs\install-log.txt';
   ForceDirectories(GetDataRoot('') + '\logs');
+  DeleteFile(GetDataRoot('') + '\logs\INSTALL-FAILED.txt');
   WizardForm.StatusLabel.Caption := 'Installing PostgreSQL, the database and the HMS service (2-10 minutes)...';
   WizardForm.ProgressGauge.Style := npbstMarquee;
   Params := '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{app}') + '\deploy\windows\Easy-Install.ps1"' +
