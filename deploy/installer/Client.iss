@@ -80,7 +80,7 @@ end;
 
 procedure InitializeWizard();
 begin
-  ServerPage := CreateInputQueryWizardPage(wpSelectDir, 'Central HMS server',
+  ServerPage := CreateInputQueryPage(wpSelectDir, 'Central HMS server',
     'Which computer is the hospital''s HMS server?',
     'Enter the server computer''s IP address or name, e.g. 192.168.1.10 or SERVER-PC. ' +
     'Port 5000 is added automatically. (On the server: Start menu > Burhan Nexus HMS > Server tools > Server status shows the address.)');
