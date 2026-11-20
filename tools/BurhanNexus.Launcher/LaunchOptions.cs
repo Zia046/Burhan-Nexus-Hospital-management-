@@ -5,6 +5,7 @@ namespace BurhanNexus.Launcher;
 ///   (none)                              open the HMS window
 ///   --server URL                        use this server for this run (not saved)
 ///   --set-server URL [--machine]        save the address (installer uses --machine) and exit
+///   --check-server URL                  exit 0 when the HMS server answers (used by Client Setup)
 ///   --profile NAME                      separate browser profile (e.g. two windows logged in as different users)
 ///   --selftest --print-test --out DIR   checks receipt / A4 printing (to PDF)
 ///   --selftest [--expect TEXT] [--expect-offline] [--reconnect] [--out file.png] [--result file.json] [--timeout 90]
@@ -14,6 +15,7 @@ internal sealed class LaunchOptions
 {
     public string? Server { get; private set; }
     public string? SetServer { get; private set; }
+    public string? CheckServer { get; private set; }
     public bool MachineWide { get; private set; }
     public string Profile { get; private set; } = "default";
     public bool SelfTest { get; private set; }
@@ -35,6 +37,7 @@ internal sealed class LaunchOptions
             {
                 case "--server": o.Server = Next(); break;
                 case "--set-server": o.SetServer = Next(); break;
+                case "--check-server": o.CheckServer = Next(); break;
                 case "--machine": o.MachineWide = true; break;
                 case "--profile": o.Profile = SafeName(Next()); break;
                 case "--selftest": o.SelfTest = true; break;

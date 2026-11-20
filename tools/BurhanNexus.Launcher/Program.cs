@@ -20,6 +20,13 @@ internal static class Program
             catch (Exception) { return 4; }
         }
 
+        if (opts.CheckServer is not null)
+        {
+            // Used by Client Setup to test the address the user typed (no window).
+            var url = ClientConfig.Normalize(opts.CheckServer);
+            return url is not null && ServerProbe.CheckAsync(url).GetAwaiter().GetResult().Ok ? 0 : 1;
+        }
+
         try { _ = CoreWebView2Environment.GetAvailableBrowserVersionString(); }
         catch (WebView2RuntimeNotFoundException)
         {

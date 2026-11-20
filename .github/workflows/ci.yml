@@ -217,13 +217,56 @@ jobs:
           $pt = Start-Process -FilePath $exe -ArgumentList "--server", "http://127.0.0.1:1", "--selftest", "--print-test", "--out", "$out\print", "--result", "$out\06-print.json", "--timeout", "90" -PassThru
           Check $pt "06-print"
           "CLIENT LAUNCHER TESTS: PASSED" | Tee-Object -FilePath $log -Append
+      - name: Build Client Setup.exe (Inno Setup)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force payload-client/client, payload-client/webview2 | Out-Null
+          Copy-Item client\BurhanNexus.HMS.Client.exe payload-client/client/
+          Invoke-WebRequest -UseBasicParsing "https://go.microsoft.com/fwlink/p/?LinkId=2124703" -OutFile payload-client/webview2/MicrosoftEdgeWebview2Setup.exe
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc /Qp "/DPayloadDir=$((Resolve-Path payload-client).Path)" /DAppVersion=2.2.0 repo/deploy/installer/Client.iss *> ci-launcher/iscc-client.log
+          if ($LASTEXITCODE -ne 0) { Get-Content ci-launcher/iscc-client.log -Tail 40; throw "ISCC failed" }
+          Get-ChildItem repo/out | Format-Table Name, Length | Out-String | Tee-Object -FilePath ci-launcher/client-setup-file.txt
+      - name: Client Setup.exe – install on a hospital computer, connect, uninstall
+        shell: pwsh
+        run: |
+          $log = "ci-launcher/client-setup-tests.log"
+          function Note($t) { $t | Tee-Object -FilePath $log -Append }
+          $setup = (Get-ChildItem repo/out/BurhanNexus-HMS-Client-Setup-*.exe).FullName
+          $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" } | Select-Object -First 1).IPAddress
+          Remove-Item "$env:ProgramData\BurhanNexusHMS\client.json" -ErrorAction SilentlyContinue
+          $servicesBefore = (Get-Service).Name | Sort-Object
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SERVER=$ip", "/LOG=$((Resolve-Path ci-launcher).Path)\client-setup.log" -Wait -PassThru
+          Note "client setup exit: $($p.ExitCode) (server address given: $ip)"
+          if ($p.ExitCode -ne 0) { throw "client setup failed" }
+          $exe = "C:\Program Files\Burhan Nexus HMS\Client\BurhanNexus.HMS.Client.exe"
+          if (-not (Test-Path $exe)) { throw "client program not installed" }
+          foreach ($l in "$env:PUBLIC\Desktop\Burhan Nexus HMS.lnk", "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Burhan Nexus HMS\Burhan Nexus HMS.lnk") { if (-not (Test-Path $l)) { throw "missing shortcut $l" }; Note "shortcut: $l" }
+          $cfg = Get-Content "$env:ProgramData\BurhanNexusHMS\client.json" -Raw
+          Note "server address saved: $cfg"
+          if ($cfg -notmatch [regex]::Escape("http://${ip}:5000")) { throw "server address not saved" }
+          $newServices = Compare-Object $servicesBefore ((Get-Service).Name | Sort-Object) | Where-Object SideIndicator -eq "=>"
+          Note "new Windows services created by Client Setup: $(if ($newServices) { $newServices.InputObject -join ', ' } else { 'none (no database, no server)' })"
+          if ($newServices) { throw "client setup must not create services" }
+          $c = Start-Process $exe -ArgumentList "--selftest", "--expect", "Initial Setup Wizard", "--result", "$((Resolve-Path ci-launcher).Path)\07-installed-client.json" -PassThru -Wait
+          Note "installed client opens the central server (saved address): exit $($c.ExitCode) $(Get-Content ci-launcher/07-installed-client.json -Raw)"
+          if ($c.ExitCode -ne 0) { throw "installed client could not open the HMS" }
+          $chk = Start-Process $exe -ArgumentList "--check-server", "10.255.255.1" -PassThru -Wait
+          Note "address check for a wrong server: exit $($chk.ExitCode) (1 = correctly reported as not answering)"
+          $u = Start-Process "C:\Program Files\Burhan Nexus HMS\Client\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait -PassThru
+          Start-Sleep 3
+          Note "uninstall exit: $($u.ExitCode); program removed: $(-not (Test-Path $exe)); server still running: $((Invoke-WebRequest -UseBasicParsing http://localhost:5000/health).StatusCode)"
+          if (Test-Path $exe) { throw "client program not removed" }
+          "CLIENT SETUP TESTS: PASSED" | Tee-Object -FilePath $log -Append
       - name: Upload Client Launcher (test build) and its test evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: BurhanNexus-HMS-Client-Launcher-TEST
+          name: BurhanNexus-HMS-Client-TEST
           path: |
             client/BurhanNexus.HMS.Client.exe
+            repo/out/*.exe
             ci-launcher
       - name: Print Agent – raw printing to a Windows printer queue
         shell: pwsh
@@ -318,6 +361,17 @@ jobs:
           }
           if (-not $ok) { throw "could not download the PostgreSQL binaries zip" }
           Invoke-WebRequest -UseBasicParsing "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile payload/prereqs/vc_redist.x64.exe
+          # Slim PostgreSQL: the server needs only the database engine and its tools - not pgAdmin, StackBuilder, docs or debug symbols.
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = (Get-ChildItem payload/prereqs/postgresql-*-binaries.zip).FullName
+          $before = (Get-Item $zip).Length
+          $tmp = Join-Path $env:RUNNER_TEMP "pgslim"; Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+          [IO.Compression.ZipFile]::ExtractToDirectory($zip, $tmp)
+          foreach ($d in "pgAdmin 4", "StackBuilder", "doc", "symbols", "include") { Remove-Item (Join-Path $tmp "pgsql\$d") -Recurse -Force -ErrorAction SilentlyContinue }
+          if (-not (Test-Path (Join-Path $tmp "pgsql\bin\initdb.exe"))) { throw "slim PostgreSQL lost initdb.exe" }
+          Remove-Item $zip
+          [IO.Compression.ZipFile]::CreateFromDirectory($tmp, $zip, [IO.Compression.CompressionLevel]::Optimal, $false)
+          "PostgreSQL zip: $([int]($before/1MB)) MB -> $([int]((Get-Item $zip).Length/1MB)) MB" | Tee-Object -FilePath ci-setup/payload.txt
           dotnet publish tools/BurhanNexus.Launcher -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o payload/client *> ci-setup/launcher-build.log
           if ($LASTEXITCODE -ne 0) { Get-Content ci-setup/launcher-build.log -Tail 30; throw "launcher build failed" }
           Get-ChildItem payload/prereqs, payload/client | Format-Table Name, Length | Out-String | Tee-Object -FilePath ci-setup/payload.txt

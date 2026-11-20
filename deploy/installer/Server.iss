@@ -58,6 +58,12 @@ Name: "{group}\Server tools\Backups folder"; Filename: "{code:GetDataRoot}\backu
 Name: "{group}\Server tools\Installation log"; Filename: "{code:GetDataRoot}\logs\install-log.txt"
 Name: "{group}\Uninstall Burhan Nexus HMS Server"; Filename: "{uninstallexe}"
 
+[Registry]
+; Remembered for the uninstaller (firewall rule of the chosen port) and for later upgrades.
+Root: HKLM; Subkey: "Software\Burhan Nexus\HMS Server"; ValueType: string; ValueName: "Port"; ValueData: "{code:GetPort}"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\Burhan Nexus\HMS Server"; ValueType: string; ValueName: "DataRoot"; ValueData: "{code:GetDataRoot}"
+Root: HKLM; Subkey: "Software\Burhan Nexus\HMS Server"; ValueType: string; ValueName: "Version"; ValueData: "{#AppVersion}"
+
 [UninstallRun]
 ; Removes only the HMS Windows service and its firewall rule. Database, PostgreSQL and all hospital data stay.
 Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\deploy\windows\Uninstall-Server.ps1"" -Port {code:GetPort}"; Flags: runhidden waituntilterminated; RunOnceId: "RemoveHmsService"
@@ -119,7 +125,8 @@ end;
 
 function GetPort(Param: String): String;
 begin
-  if DbPage <> nil then Result := Trim(DbPage.Values[1]) else Result := '5000';
+  if DbPage <> nil then Result := Trim(DbPage.Values[1])
+  else if not RegQueryStringValue(HKLM, 'Software\Burhan Nexus\HMS Server', 'Port', Result) then Result := '5000';
   if Result = '' then Result := '5000';
 end;
 
