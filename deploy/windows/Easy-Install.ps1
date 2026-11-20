@@ -124,7 +124,10 @@ if ($bin) {
         $target = "C:\Program Files\PostgreSQL\16"
         $tmpDir = Join-Path $env:TEMP "bn_pgsql"
         Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
-        Expand-Archive -Path $zip -DestinationPath $tmpDir -Force
+        # .NET unzip instead of Expand-Archive: works the same in every PowerShell host (Expand-Archive can load the wrong
+        # module version when started from Setup.exe / PowerShell 7).
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [IO.Compression.ZipFile]::ExtractToDirectory($zip, $tmpDir)
         $src = Get-ChildItem $tmpDir -Directory | Where-Object { Test-Path (Join-Path $_.FullName "bin\initdb.exe") } | Select-Object -First 1
         if (-not $src) { Fail "zip ke andar 'pgsql\bin\initdb.exe' nahi mila - sahi PostgreSQL binaries zip download karein." }
         New-Item -ItemType Directory -Force -Path "C:\Program Files\PostgreSQL" | Out-Null
