@@ -15,8 +15,10 @@ function Token([string]$html) {
 function PostForm($session, [string]$getUrl, [string]$postUrl, [hashtable]$fields) {
     $page = Invoke-WebRequest -Uri "$Server$getUrl" -WebSession $session -SkipHttpErrorCheck
     $fields["__RequestVerificationToken"] = Token $page.Content
-    return Invoke-WebRequest -Uri "$Server$postUrl" -Method Post -Body $fields -WebSession $session -MaximumRedirection 0 -SkipHttpErrorCheck
+    # Redirects are followed; success = the page we end up on (a failed form shows the same form again).
+    return Invoke-WebRequest -Uri "$Server$postUrl" -Method Post -Body $fields -WebSession $session -SkipHttpErrorCheck
 }
+function Landed($response) { return $response.BaseResponse.RequestMessage.RequestUri.AbsolutePath }
 
 # 1. Setup wizard (fresh server)
 $setup = New-Object Microsoft.PowerShell.Commands.WebRequestSession
@@ -26,16 +28,16 @@ $r = PostForm $setup "/Setup" "/Setup" @{
     AdminPassword = "Hospital#2026"; AdminConfirmPassword = "Hospital#2026"; CurrencyCode = "PKR"; TimeZoneId = "Asia/Karachi"
     DateFormat = "dd/MM/yyyy"; TimeFormat = "hh:mm tt"; DefaultLanguage = "en"; ReceiptPaperSize = "80mm"; ReportPaperSize = "A4"
 }
-"setup wizard: $($r.StatusCode) -> $($r.Headers.Location)"
-if ($r.StatusCode -ne 302) { throw "setup wizard failed: $($r.Content.Substring(0, [Math]::Min(2000, $r.Content.Length)))" }
+"setup wizard: $($r.StatusCode) -> $(Landed $r)"
+if ((Landed $r) -ne "/Account/Login") { throw "setup wizard failed: $($r.Content.Substring(0, [Math]::Min(2000, $r.Content.Length)))" }
 
 # 2. Two computers log in at the same time (separate sessions = separate computers)
 $sessions = @{}
 foreach ($pc in "Reception-PC", "Lab-PC") {
     $s = New-Object Microsoft.PowerShell.Commands.WebRequestSession
     $l = PostForm $s "/Account/Login" "/Account/Login" @{ Username = "admin"; Password = "Hospital#2026"; Workstation = $pc }
-    "login from ${pc}: $($l.StatusCode) -> $($l.Headers.Location)"
-    if ($l.StatusCode -ne 302) { throw "login failed on $pc" }
+    "login from ${pc}: $($l.StatusCode) -> $(Landed $l)"
+    if ((Landed $l) -ne "/") { throw "login failed on $pc" }
     $sessions[$pc] = $s
 }
 
@@ -47,14 +49,15 @@ $results = $sessions.GetEnumerator() | ForEach-Object -ThrottleLimit 2 -Parallel
     $token = $Matches[1]
     1..$n | ForEach-Object {
         $name = "LAN $($pc.Split('-')[0]) Patient $_"
-        $res = Invoke-WebRequest -Uri "$server/Patients/Register" -Method Post -WebSession $s -MaximumRedirection 0 -SkipHttpErrorCheck -Body @{
+        $res = Invoke-WebRequest -Uri "$server/Patients/Register" -Method Post -WebSession $s -SkipHttpErrorCheck -Body @{
             "__RequestVerificationToken" = $token; "Patient.FullName" = $name; "Patient.GuardianRelation" = "SonOf"; "Patient.GuardianName" = "Guardian $pc $_"
             "Patient.Gender" = "Male"; "Patient.Age" = "30"; "Patient.AgeUnit" = "Years"; "Patient.CityOrVillage" = "Daggar"; "ConfirmNotDuplicate" = "true"; "Next" = "profile"
         }
-        [pscustomobject]@{ Computer = $pc; Name = $name; Status = $res.StatusCode; Location = "$($res.Headers.Location)" }
+        $landed = $res.BaseResponse.RequestMessage.RequestUri.AbsolutePath
+        [pscustomobject]@{ Computer = $pc; Name = $name; Saved = ($landed -match '^/Patients/\d+$'); Landed = $landed }
     }
 }
-$failed = $results | Where-Object { $_.Status -ne 302 }
+$failed = $results | Where-Object { -not $_.Saved }
 "registrations: $($results.Count) sent, $($results.Count - @($failed).Count) saved (redirect to the patient profile)"
 if ($failed) { $failed | Format-Table | Out-String; throw "some registrations failed" }
 
