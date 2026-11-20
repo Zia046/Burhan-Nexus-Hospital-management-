@@ -17,12 +17,19 @@
 param(
     [string]$PostgresPassword = "BCGH",
     [int]$Port = 5000,
-    [switch]$NoBrowser
+    [switch]$NoBrowser,
+    # Used by Server Setup.exe (defaults = the classic INSTALL.cmd behaviour):
+    [string]$InstallDir = "C:\BurhanNexusHMS",
+    [string]$DataRoot = "",
+    [string]$PgDataDir = "",
+    [string]$PrereqDir = "",
+    [string]$LogFile = ""
 )
 
 $ErrorActionPreference = "Stop"
 $root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
-$log = Join-Path $root "install-log.txt"
+$log = if ($LogFile) { $LogFile } else { Join-Path $root "install-log.txt" }
+if ($LogFile) { New-Item -ItemType Directory -Force -Path (Split-Path $LogFile -Parent) | Out-Null }
 try { Start-Transcript -Path $log -Force | Out-Null } catch { }
 
 function Step($n, $text) { Write-Host "`n[$n/5] $text" -ForegroundColor Cyan }
@@ -34,8 +41,8 @@ function Fail($text) {
     exit 1
 }
 function FindFile([string[]]$patterns) {
-    foreach ($dir in @($root, (Join-Path $root "prereqs"), (Split-Path $root -Parent))) {
-        if (-not (Test-Path $dir)) { continue }
+    foreach ($dir in @($PrereqDir, $root, (Join-Path $root "prereqs"), (Split-Path $root -Parent))) {
+        if (-not $dir -or -not (Test-Path $dir)) { continue }
         foreach ($p in $patterns) {
             $f = Get-ChildItem -Path $dir -Filter $p -File -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
             if ($f) { return $f.FullName }
@@ -123,7 +130,8 @@ if ($bin) {
         New-Item -ItemType Directory -Force -Path "C:\Program Files\PostgreSQL" | Out-Null
         if (Test-Path $target) { Fail "$target pehle se mojood hai magar adhoora hai. Isay delete kar ke dobara chalayein." }
         Move-Item $src.FullName $target
-        $data = Join-Path $target "data"
+        $data = if ($PgDataDir) { $PgDataDir } else { Join-Path $target "data" }
+        if ($PgDataDir -and (Test-Path (Join-Path $PgDataDir "PG_VERSION"))) { Fail "$PgDataDir already contains a PostgreSQL database - it is never overwritten. Choose another data folder or restore it with its own PostgreSQL." }
         $pw = Join-Path $env:TEMP "bn_pgpw.txt"
         [IO.File]::WriteAllText($pw, $PostgresPassword)
         $code = RunNative (Join-Path $target "bin\initdb.exe") @("-D", $data, "-U", "postgres", "-E", "UTF8", "--pwfile=$pw", "-A", "scram-sha-256")
@@ -170,7 +178,9 @@ Ok "PostgreSQL is running on port 5432"
 
 # ---- 4. Burhan Nexus HMS ----
 Step 4 "Burhan Nexus HMS (database, Windows service, firewall)"
-$code = RunNative "powershell.exe" @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $PSScriptRoot "Install-Server.ps1"), "-PostgresPassword", $PostgresPassword, "-Port", "$Port")
+$serverArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $PSScriptRoot "Install-Server.ps1"), "-PostgresPassword", $PostgresPassword, "-Port", "$Port", "-InstallDir", $InstallDir)
+if ($DataRoot) { $serverArgs += @("-DataRoot", $DataRoot) }
+$code = RunNative "powershell.exe" $serverArgs
 if ($code -ne 0) {
     Fail "Software install nakam. Agar 'Could not connect to PostgreSQL' likha hai to PostgreSQL ka password ghalat hai - INSTALL.cmd dobara chalayein aur sahi password likhein."
 }
