@@ -348,8 +348,8 @@ internal sealed class MainForm : Form
             }
             var t = sizes["thermal"]; var a = sizes["a4"];
             var mmW = t.W * 25.4 / 72; var mmH = t.H * 25.4 / 72;
-            var ok = Math.Abs(mmW - 80) < 1.5 && Math.Abs(mmH - 124) < 4 && a.W > 500;
-            Finish(ok, $"Receipt page {mmW:0.#} x {mmH:0.#} mm (expected 80 x 124: roll width x slip height, no A4 length); A4 page {a.W * 25.4 / 72:0} x {a.H * 25.4 / 72:0} mm; header/footer off");
+            var ok = Math.Abs(mmW - 80) < 1.5 && Math.Abs(mmH - 124) < 4 && Math.Abs(a.W * 25.4 / 72 - 210) < 2 && Math.Abs(a.H * 25.4 / 72 - 297) < 2;
+            Finish(ok, $"Receipt page {mmW:0.#} x {mmH:0.#} mm (expected 80 x 124: roll width x slip height, no A4 length); A4 page {a.W * 25.4 / 72:0} x {a.H * 25.4 / 72:0} mm (expected 210 x 297); header/footer off");
         }
         catch (Exception ex) { Finish(false, "Print test failed: " + ex.Message); }
     }

@@ -29,7 +29,14 @@ internal static class PrintBridge
                 height = max > 0 ? Math.ceil(max * 25.4 / 96) + 4 : 0;
                 if (!height) thermal = false;
               }
-              window.chrome.webview.postMessage(JSON.stringify({ type: 'bn-print', thermal: thermal, widthMm: width, heightMm: height }));
+              var pageSize = '';
+              try {
+                for (var si = 0; si < document.styleSheets.length; si++) {
+                  var rules = document.styleSheets[si].cssRules || [];
+                  for (var ri = 0; ri < rules.length; ri++) if (rules[ri].type === 6 && rules[ri].style && rules[ri].style.size) pageSize = rules[ri].style.size;
+                }
+              } catch (e) { }
+              window.chrome.webview.postMessage(JSON.stringify({ type: 'bn-print', thermal: thermal, widthMm: width, heightMm: height, pageSize: pageSize }));
             } catch (e) { nativePrint(); }
           };
         })();
@@ -39,7 +46,22 @@ internal static class PrintBridge
     public static string? PdfTestDir;
     public static event Action<string>? PdfWritten;
 
-    private sealed record Request(string? Type, bool Thermal, int WidthMm, int HeightMm);
+    private sealed record Request(string? Type, bool Thermal, int WidthMm, int HeightMm, string? PageSize);
+
+    /// <summary>Paper of an A4 / A5 document from its CSS @page size ("A4", "A5 landscape", "210mm 297mm"); A4 when not stated.</summary>
+    public static (double WidthMm, double HeightMm) PaperOf(string? cssSize)
+    {
+        var parts = (cssSize ?? string.Empty).ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        (double W, double H) size = (210, 297);
+        var mm = parts.Where(x => x.EndsWith("mm") && double.TryParse(x[..^2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _))
+                      .Select(x => double.Parse(x[..^2], System.Globalization.CultureInfo.InvariantCulture)).ToList();
+        if (mm.Count == 2) size = (mm[0], mm[1]);
+        else if (parts.Contains("a5")) size = (148, 210);
+        else if (parts.Contains("a3")) size = (297, 420);
+        else if (parts.Contains("letter")) size = (215.9, 279.4);
+        if (parts.Contains("landscape") && size.W < size.H) size = (size.H, size.W);
+        return size;
+    }
 
     public static async Task AttachAsync(CoreWebView2 core, Form owner)
     {
@@ -94,7 +116,11 @@ internal static class PrintBridge
             return;
         }
 
-        // A4 / A5 documents: margins like the HMS print layouts (about 12 mm), no header / footer.
+        // A4 / A5 documents: the page's own paper size, margins like the HMS print layouts (about 12 mm), no header / footer.
+        var paper = PaperOf(r.PageSize);
+        s.MediaSize = CoreWebView2PrintMediaSize.Custom;
+        s.PageWidth = paper.WidthMm / 25.4;
+        s.PageHeight = paper.HeightMm / 25.4;
         s.MarginTop = s.MarginBottom = s.MarginLeft = s.MarginRight = 12 / 25.4;
         if (PdfTestDir is not null) { await ToPdfAsync(core, s, "a4"); return; }
         using (var dlg = new PrintDialogForm(receipt: false, cfg.A4Printer))
