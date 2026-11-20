@@ -402,8 +402,10 @@ jobs:
 
           # Install again after uninstall: uses the kept database
           $p3 = Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LOG=$((Resolve-Path ci-setup).Path)\setup-reinstall.log", "/PGPASSWORD=BCGH" -Wait -PassThru
-          Note "reinstall exit: $($p3.ExitCode); health: $((Invoke-WebRequest -UseBasicParsing http://localhost:5000/health).StatusCode)"
-          if ($p3.ExitCode -ne 0) { throw "reinstall failed" }
+          Copy-Item "$data\logs\install-log.txt" ci-setup/install-log-reinstall.txt -ErrorAction SilentlyContinue
+          $h3 = try { (Invoke-WebRequest -UseBasicParsing http://localhost:5000/health -TimeoutSec 10).StatusCode } catch { "no answer" }
+          Note "reinstall exit: $($p3.ExitCode); health: $h3"
+          if ($p3.ExitCode -ne 0 -or $h3 -ne 200 -or (Test-Path "$data\logs\INSTALL-FAILED.txt")) { Get-Content ci-setup/install-log-reinstall.txt -Tail 50; throw "reinstall failed" }
           "SERVER SETUP TESTS: PASSED" | Tee-Object -FilePath $log -Append
       - name: Upload Server Setup.exe (TEST build) and evidence
         if: always()

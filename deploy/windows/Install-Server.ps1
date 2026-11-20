@@ -137,8 +137,18 @@ if (-not (Test-Path $configPath)) {
 Write-Step "Registering Windows service '$ServiceName'"
 $exe = Join-Path $InstallDir "BurhanNexus.HMS.Web.exe"
 if (-not (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)) {
-    New-Service -Name $ServiceName -BinaryPathName "`"$exe`"" -DisplayName "Burhan Nexus Hospital Management" `
-        -Description "Burhan Nexus Hospital Management server (web application on port $Port)" -StartupType Automatic | Out-Null
+    # Right after an uninstall Windows may still hold the old service "marked for deletion" for a few seconds - retry.
+    for ($try = 1; ; $try++) {
+        try {
+            New-Service -Name $ServiceName -BinaryPathName "`"$exe`"" -DisplayName "Burhan Nexus Hospital Management" `
+                -Description "Burhan Nexus Hospital Management server (web application on port $Port)" -StartupType Automatic -ErrorAction Stop | Out-Null
+            break
+        } catch {
+            if ($try -ge 12) { throw }
+            Write-Host "  Windows is still removing the previous service - waiting ($try)..."
+            Start-Sleep -Seconds 5
+        }
+    }
     sc.exe failure $ServiceName reset= 86400 actions= restart/5000/restart/10000/restart/30000 | Out-Null
 }
 # Update 13: prepare / upgrade the database BEFORE starting the service. The first migration can take longer than
