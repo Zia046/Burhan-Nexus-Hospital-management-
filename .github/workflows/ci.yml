@@ -150,6 +150,78 @@ jobs:
           Restart-Service BurhanNexusHMS
           Start-Sleep -Seconds 8
           "after restart: $((Invoke-WebRequest -UseBasicParsing http://localhost:5000/health).StatusCode)" | Tee-Object -FilePath verify.log -Append
+      # ---- EXE packaging stage 1: Client Launcher (WebView2 desktop window around the existing HMS pages) ----
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Build Client Launcher.exe (self-contained, single file)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force ci-launcher | Out-Null
+          dotnet publish repo/tools/BurhanNexus.Launcher -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o client *> ci-launcher/build.log
+          if ($LASTEXITCODE -ne 0) { Get-Content ci-launcher/build.log -Tail 40; throw "launcher build failed" }
+          Get-ChildItem client | Format-Table Name, Length | Out-String | Tee-Object -FilePath ci-launcher/files.txt
+          if (-not (Test-Path client\BurhanNexus.HMS.Client.exe)) { throw "BurhanNexus.HMS.Client.exe missing" }
+      - name: Client Launcher – connection tests
+        shell: pwsh
+        run: |
+          $log = "ci-launcher/launcher-tests.log"
+          $exe = (Resolve-Path client\BurhanNexus.HMS.Client.exe).Path
+          $out = (Resolve-Path ci-launcher).Path
+          function Run-Client([string[]]$a, [string]$name) {
+            $p = Start-Process -FilePath $exe -ArgumentList ($a + @("--selftest", "--result", "$out\$name.json", "--out", "$out\$name.png")) -PassThru
+            return $p
+          }
+          function Check([System.Diagnostics.Process]$p, [string]$name) {
+            if (-not $p.WaitForExit(150000)) { $p.Kill(); "$name : TIMEOUT" | Tee-Object -FilePath $log -Append; throw "$name timed out" }
+            $r = if (Test-Path "$out\$name.json") { Get-Content "$out\$name.json" -Raw } else { "(no result file)" }
+            "$name : exit $($p.ExitCode) $r" | Tee-Object -FilePath $log -Append
+            if ($p.ExitCode -ne 0) { throw "$name failed" }
+          }
+          $wv = Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" -ErrorAction SilentlyContinue
+          "WebView2 Runtime on this machine: $($wv.pv)" | Tee-Object -FilePath $log -Append
+          (Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version | Out-String) | Tee-Object -FilePath $log -Append
+
+          # 1. The installer saves the server address for all users
+          $p = Start-Process -FilePath $exe -ArgumentList "--set-server", "127.0.0.1", "--machine" -PassThru -Wait
+          $cfg = Get-Content "$env:ProgramData\BurhanNexusHMS\client.json" -Raw
+          "set-server: exit $($p.ExitCode) $cfg" | Tee-Object -FilePath $log -Append
+          if ($cfg -notmatch "http://127.0.0.1:5000") { throw "server address not saved/normalized" }
+
+          # 2. Opens the HMS (fresh server shows the setup wizard) using the saved address
+          Check (Run-Client @("--expect", "Initial Setup Wizard") "01-online-saved-address") "01-online-saved-address"
+
+          # 3. Over the LAN address (not localhost) - the way other hospital computers connect
+          $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" } | Select-Object -First 1).IPAddress
+          "LAN address: $ip" | Tee-Object -FilePath $log -Append
+          Check (Run-Client @("--server", "http://${ip}:5000", "--expect", "Initial Setup Wizard") "02-online-lan-ip") "02-online-lan-ip"
+
+          # 4. Two client windows at the same time (separate profiles) on the same central server
+          $a = Run-Client @("--profile", "clientA", "--expect", "Initial Setup Wizard") "03-simultaneous-A"
+          $b = Run-Client @("--profile", "clientB", "--server", "http://${ip}:5000", "--expect", "Initial Setup Wizard") "03-simultaneous-B"
+          Check $a "03-simultaneous-A"; Check $b "03-simultaneous-B"
+
+          # 5. Server not reachable -> reconnect screen instead of a browser error
+          Check (Run-Client @("--server", "http://127.0.0.1:5999", "--expect-offline", "--timeout", "60") "04-offline-screen") "04-offline-screen"
+
+          # 6. Server stopped while the client starts, then started again -> the client reconnects by itself
+          Stop-Service BurhanNexusHMS
+          $r = Run-Client @("--reconnect", "--expect", "Initial Setup Wizard", "--timeout", "120") "05-reconnect"
+          Start-Sleep -Seconds 15
+          Start-Service BurhanNexusHMS
+          Check $r "05-reconnect"
+          "CLIENT LAUNCHER TESTS: PASSED" | Tee-Object -FilePath $log -Append
+      - name: Upload Client Launcher (test build) and its test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: BurhanNexus-HMS-Client-Launcher-TEST
+          path: |
+            client/BurhanNexus.HMS.Client.exe
+            ci-launcher
       - name: Print Agent – raw printing to a Windows printer queue
         shell: pwsh
         run: |
