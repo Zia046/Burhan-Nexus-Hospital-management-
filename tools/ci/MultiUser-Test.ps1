@@ -54,7 +54,7 @@ $results = $sessions.GetEnumerator() | ForEach-Object -ThrottleLimit 2 -Parallel
             "Patient.Gender" = "Male"; "Patient.Age" = "30"; "Patient.AgeUnit" = "Years"; "Patient.CityOrVillage" = "Daggar"; "ConfirmNotDuplicate" = "true"; "Next" = "profile"
         }
         $landed = $res.BaseResponse.RequestMessage.RequestUri.AbsolutePath
-        [pscustomobject]@{ Computer = $pc; Name = $name; Saved = ($landed -match '^/Patients/\d+$'); Landed = $landed }
+        [pscustomobject]@{ Computer = $pc; Name = $name; Saved = ($landed -match '^/Patients/(Profile/)?\d+$'); Landed = $landed }
     }
 }
 $failed = $results | Where-Object { -not $_.Saved }
