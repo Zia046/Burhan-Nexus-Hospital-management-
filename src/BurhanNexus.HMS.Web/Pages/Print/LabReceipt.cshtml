@@ -15,10 +15,10 @@
     <meta charset="utf-8" />
     <title>Lab receipt @o.OrderNumber</title>
     <link rel="stylesheet" href="~/css/thermal.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/lab-report.css" asp-append-version="true" />
+    @* Update 14: no A4 report stylesheet on the receipt – it is a thermal roll page only. *@
     <script src="~/js/lab-report.js" asp-append-version="true" defer></script>
 </head>
-<body class="thermal-body w@(Model.Width)" data-lab-receipt data-width="@Model.Width">
+<body class="thermal-body w@(Model.Width)" data-lab-receipt data-width="@Model.Width" data-autoprint="@(Model.AutoPrint ? "1" : null)">
 <div class="t-toolbar no-print">
     <div class="t-row">
         <strong>Laboratory receipt @o.OrderNumber</strong>

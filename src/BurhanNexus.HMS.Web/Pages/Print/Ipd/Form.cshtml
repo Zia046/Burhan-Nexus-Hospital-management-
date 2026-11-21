@@ -32,7 +32,8 @@
     </div>
     <div class="lr-status">For a PDF choose “Save as PDF” in the print dialog. Reprinting only reads the stored record – nothing is created. @(s.PrintHeader ? "" : "Header off – printing on the hospital letterhead.")</div>
 </div>
-@{ var copyLabels = Model.Form == "admission" ? new string?[] { "PATIENT / ATTENDANT COPY", "HOSPITAL / ADMISSION OFFICE COPY" } : new string?[] { null }; }
+@* Update 14: the admission form is one clean A4 copy (no patient copy, no signature fields). *@
+@{ var copyLabels = new string?[] { null }; }
 @foreach (var copyLabel in copyLabels)
 {
 <main class="lr-page rr-page @(copyLabel is null ? "" : "f-two-copy")" data-form-page data-copy="@copyLabel">
@@ -58,6 +59,11 @@
             <tr><th>Admission</th><td class="mono">@a.AdmissionNumber · @a.Kind</td><th>Admitted</th><td>@D(a.AdmittedUtc)</td></tr>
             <tr><th>Ward / bed</th><td>@bedText</td><th>Department / doctor</th><td>@V(a.Department?.Name) · @V(a.AdmittingDoctor?.Name ?? a.AdmittingDoctorName)</td></tr>
             <tr><th>Allergies</th><td colspan="3" class="@(string.IsNullOrWhiteSpace(a.Allergies) ? "" : "f-allergy")">@Nr(a.Allergies)</td></tr>
+            @if (Model.Nicu is { } nicuInfo && Model.Form.StartsWith("nicu"))
+            {
+                @* Update 14: NICU admission weight in kg on every NICU form. *@
+                <tr data-nicu-weight><th>NICU admission weight</th><td>@(nicuInfo.AdmissionWeightGrams is int nw ? BurhanNexus.HMS.Web.Services.DisplayFormatter.Kg(nw) : "not recorded")</td><th>Gestational age</th><td>@V(nicuInfo.GestationalAge)</td></tr>
+            }
         }
     </table>
 
@@ -74,15 +80,22 @@
                     <tr><th>Phone / CNIC</th><td>@V(p.MobileNumber)</td><td colspan="2">@V(p.Cnic)</td></tr>
                     <tr><th>Address</th><td colspan="3">@V(p.Address ?? p.CityOrVillage)</td></tr>
                     <tr><th>Registered by</th><td>@a.CreatedByUsername</td><th></th><td></td></tr>
-                    @if (Model.ShowFee && Model.AdmissionFeeCharge is { } fee)
+                    @if (Model.ShowFee)
                     {
-                        <tr data-admission-fee><th>Admission fee</th><td>@Fmt.Money(fee.Fee)@(fee.Discount > 0 ? " (waived " + Fmt.Money(fee.Discount) + ")" : "")</td><th>Payment status</th><td data-fee-status><strong>@Model.FeeStatus</strong></td></tr>
+                        @* Update 14: the admission fee is always shown on the form (its own charge – never mixed with other charges). *@
+                        if (Model.AdmissionFeeCharge is { } fee)
+                        {
+                            <tr data-admission-fee><th>Admission fee</th><td data-fee-amount><strong>@Fmt.Money(fee.Fee)</strong>@(fee.Discount > 0 ? " (waived " + Fmt.Money(fee.Discount) + ")" : "")</td><th>Payment status</th><td data-fee-status><strong>@Model.FeeStatus</strong></td></tr>
+                        }
+                        else
+                        {
+                            <tr data-admission-fee><th>Admission fee</th><td data-fee-amount>No admission fee</td><th></th><td></td></tr>
+                        }
                     }
                 </table>
             </section>
             <section class="rr-section"><h3>Consent</h3>
                 <p class="small">I agree to the admission and to the treatment considered necessary by the treating doctors, which has been explained to me.</p>
-                <div class="f-sign-row" data-sign-row><div>Admitting doctor</div></div>
             </section>
             break;
 
@@ -136,7 +149,7 @@
             {
                 <section class="rr-section"><h3>Birth &amp; NICU details</h3>
                     <p>@(Model.Newborn is { } nb ? $"Born {Fmt.DateTimeText(nb.BirthUtc)} · birth weight {(nb.BirthWeightGrams is int bw ? bw + " g" : "not recorded")} · APGAR {nb.Apgar1?.ToString() ?? "—"}/{nb.Apgar5?.ToString() ?? "—"}/{nb.Apgar10?.ToString() ?? "—"}" : "")</p>
-                    <p>Reason for NICU: @V(Model.Nicu?.Reason) · gestational age @V(Model.Nicu?.GestationalAge) · admission weight @(Model.Nicu?.AdmissionWeightGrams is int aw ? $"{aw} g" : "not recorded")</p>
+                    <p>Reason for NICU: @V(Model.Nicu?.Reason) · gestational age @V(Model.Nicu?.GestationalAge) · admission weight @(Model.Nicu?.AdmissionWeightGrams is int aw ? BurhanNexus.HMS.Web.Services.DisplayFormatter.Kg(aw) : "not recorded")</p>
                     @if (Model.Mother is { } mo) { <p>Mother: @mo.Patient!.FullName (@mo.Patient.PatientNumber)</p> }
                 </section>
             }

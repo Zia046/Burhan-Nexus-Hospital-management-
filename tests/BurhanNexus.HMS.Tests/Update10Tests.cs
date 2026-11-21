@@ -430,11 +430,13 @@ public partial class Update10Tests : Phase2TestBase
             var fee = await db.Charges.SingleAsync(c => c.Id == a.AdmissionFeeChargeId);
             Assert.Equal((1000m, 1000m, ChargeStatus.Paid), (fee.Fee, fee.PaidAmount, fee.Status));
         }
-        // 20. Two copies of the admission form with the same admission number; reprinting creates nothing.
+        // 20. Update 14: ONE copy of the admission form (no patient copy, no signature fields); reprinting creates nothing.
         var form = await admin.GetHtmlAsync($"/Print/Ipd/admission/{adm}");
-        Assert.Contains("PATIENT / ATTENDANT COPY", form);
-        Assert.Contains("HOSPITAL / ADMISSION OFFICE COPY", form);
-        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(form, "data-fee-status><strong>PAID").Count);
+        Assert.DoesNotContain("PATIENT / ATTENDANT COPY", form);
+        Assert.DoesNotContain("HOSPITAL / ADMISSION OFFICE COPY", form);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(form, "data-form-page"));
+        Assert.DoesNotContain("data-sign-row", form);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(form, "data-fee-status><strong>PAID"));
         int chargesBefore;
         await using (var db = Factory.NewDb()) chargesBefore = await db.Charges.CountAsync();
         await admin.GetHtmlAsync($"/Print/Ipd/admission/{adm}");

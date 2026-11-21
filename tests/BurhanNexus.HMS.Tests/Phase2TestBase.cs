@@ -9,7 +9,7 @@ namespace BurhanNexus.HMS.Tests;
 public abstract partial class Phase2TestBase : HmsTestBase
 {
     [GeneratedRegex(@"/Patients/Profile/(\d+)")] private static partial Regex ProfileRegex();
-    [GeneratedRegex(@"/(?:Print/Opd|Opd/Visit|Print/Emergency|Emergency/Visit)/(\d+)")] private static partial Regex EncounterRegex();
+    [GeneratedRegex(@"/(?:Print/Opd|Opd/Visit|Print/Emergency|Emergency/Visit|Print/Registration)/(\d+)")] private static partial Regex EncounterRegex();
 
     protected static Dictionary<string, string> PatientFields(string name, string guardian = "Akbar Khan", string gender = "Male") => new()
     {

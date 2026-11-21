@@ -79,7 +79,8 @@ public class RegisterModel : HmsPageModel
         FlashSuccess = $"Emergency {enc.EncounterNumber} registered. Patient ID: {enc.Patient?.PatientNumber}";
         var settings = await _setup.GetSettingsAsync();
         if (await CanAsync(Perm.EmergencyPrint))
-            return Redirect($"/Print/Emergency/{enc.Id}" + (settings.AutoPrintAfterRegistration ? "?autoprint=true" : ""));
+            // Update 14: the registration receipt prints on the thermal printer (the A5 / A4 slip is one click away on it).
+            return Redirect($"/Print/Registration/{enc.Id}" + (settings.AutoPrintAfterRegistration ? "?autoprint=true" : ""));
         return Redirect($"/Emergency/Visit/{enc.Id}");
     }
 }

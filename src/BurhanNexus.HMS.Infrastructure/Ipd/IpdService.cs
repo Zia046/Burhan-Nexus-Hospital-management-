@@ -34,6 +34,8 @@ public sealed class AdmitInput
     public DateTime? AdmittedLocal { get; set; }
     public long? PregnancyId { get; set; }
     public long? MotherAdmissionId { get; set; }
+    /// <summary>Update 14: admission fee entered at admission (empty = the fee from Fees &amp; Services). Saved as the admission's own fee charge.</summary>
+    public decimal? AdmissionFeeAmount { get; set; }
 }
 
 public sealed class DischargeInput
@@ -214,6 +216,7 @@ public sealed class IpdService : IIpdService
         var patient = await _db.Patients.AsNoTracking().FirstOrDefaultAsync(p => p.Id == i.PatientId, ct);
         if (patient is null) return ServiceResult<IpdAdmission>.Fail("Select the patient.");
         var errors = await ValidateAdmitAsync(i, patient, ct);
+        if (i.AdmissionFeeAmount is decimal fa && (fa < 0 || fa > 10_000_000 || !FinanceMath.IsMoney(fa))) errors.Add("Enter a valid admission fee (at most 2 decimals).");
         if (errors.Count > 0) return ServiceResult<IpdAdmission>.Fail(errors.ToArray());
         var today = await _clock.TodayAsync();
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
@@ -300,8 +303,13 @@ public sealed class IpdService : IIpdService
         Event(a.Id, a.PregnancyId, "Admission", "Registered", null, AdmissionStatus.Registered.ToString(), $"{a.Kind} admission from {a.Source}");
         // Phase 3: admission fee (configurable) on the patient's IPD bill.
         var settings = await _setup.SettingsAsync(ct);
-        if (settings.AdmissionServiceItemId is int svc && a.Kind is not AdmissionKind.Newborn)
-            a.AdmissionFeeChargeId = (await ChargeAsync(a, svc, 1, 0, null, today, ct, (await _db.ServiceItems.Where(s => s.Id == svc).Select(s => s.Name).FirstAsync(ct)))).Id;
+        // Update 14: the fee can be entered at admission; without a configured admission service the standard "Admission fee" service carries it.
+        var feeSvc = settings.AdmissionServiceItemId;
+        if (feeSvc is null && i.AdmissionFeeAmount is > 0)
+            feeSvc = await _db.ServiceItems.Where(s => s.Code == "SVC-IPD-ADM").Select(s => (int?)s.Id).FirstOrDefaultAsync(ct);
+        if (feeSvc is int svc && a.Kind is not AdmissionKind.Newborn)
+            a.AdmissionFeeChargeId = (await ChargeAsync(a, svc, 1, 0, null, today, ct, (await _db.ServiceItems.Where(s => s.Id == svc).Select(s => s.Name).FirstAsync(ct)),
+                unitOverride: i.AdmissionFeeAmount)).Id;
         _audit.Add(AuditActions.IpdAdmitted, "IpdAdmission", a.AdmissionNumber,
             $"{a.Kind} admission {a.AdmissionNumber} for {patient.PatientNumber} from {a.Source}" + (a.AdmissionDiagnosis is null ? "" : $" – {a.AdmissionDiagnosis}")
             + $"; admitted at {TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(admittedUtc, DateTimeKind.Utc), await _clock.ZoneAsync()):dd-MM-yyyy HH:mm}" + (adjusted ? $" (time entered by {_ctx.Username})" : ""));
@@ -617,13 +625,15 @@ public sealed class IpdService : IIpdService
     // Billing (Phase 3 charges only)
     // =====================================================================================
 
-    private Task<Charge> ChargeAsync(IpdAdmission a, int serviceItemId, int quantity, decimal discount, string? reason, DateOnly date, CancellationToken ct, string? name = null) =>
-        ChargeAsync(a, serviceItemId, (decimal)quantity, discount, reason, date, ct, name);
+    private Task<Charge> ChargeAsync(IpdAdmission a, int serviceItemId, int quantity, decimal discount, string? reason, DateOnly date, CancellationToken ct, string? name = null,
+        decimal? unitOverride = null) =>
+        ChargeAsync(a, serviceItemId, (decimal)quantity, discount, reason, date, ct, name, unitOverride);
 
-    private async Task<Charge> ChargeAsync(IpdAdmission a, int serviceItemId, decimal quantity, decimal discount, string? reason, DateOnly date, CancellationToken ct, string? name = null)
+    private async Task<Charge> ChargeAsync(IpdAdmission a, int serviceItemId, decimal quantity, decimal discount, string? reason, DateOnly date, CancellationToken ct, string? name = null,
+        decimal? unitOverride = null)
     {
         var svc = await _db.ServiceItems.AsNoTracking().FirstAsync(s => s.Id == serviceItemId, ct);
-        var unit = await _finance.FeeOnAsync(svc.Id, date, ct);
+        var unit = unitOverride ?? await _finance.FeeOnAsync(svc.Id, date, ct);
         var fee = decimal.Round(unit * quantity, 2, MidpointRounding.AwayFromZero);
         // Update 10: a service included in a package of this admission is shown on the bill but not charged again.
         var package = await _db.AdmissionPackages.Where(x => x.AdmissionId == a.Id && x.IsActive && x.Package!.Items.Any(i => i.ServiceItemId == serviceItemId))

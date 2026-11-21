@@ -16,6 +16,9 @@ public class WardsModel : IpdPageModel
     [BindProperty(SupportsGet = true, Name = "ward")] public int? EditWard { get; set; }
     [BindProperty(SupportsGet = true, Name = "room")] public int? EditRoom { get; set; }
     [BindProperty(SupportsGet = true, Name = "bed")] public int? EditBed { get; set; }
+    /// <summary>Update 14: after saving, the page stays on the same ward / room (the bed list shows that ward).</summary>
+    [BindProperty(SupportsGet = true, Name = "inward")] public int? KeepWard { get; set; }
+    [BindProperty(SupportsGet = true, Name = "inroom")] public int? KeepRoom { get; set; }
     [BindProperty] public WardInput Ward { get; set; } = new();
     [BindProperty] public RoomInput Room { get; set; } = new();
     [BindProperty] public BedInput Bed { get; set; } = new();
@@ -50,12 +53,32 @@ public class WardsModel : IpdPageModel
             Room = new RoomInput { WardId = r.WardId, Name = r.Name, Type = r.Type, BedCapacity = r.BedCapacity, IsActive = r.IsActive, Notes = r.Notes };
         if (Beds.FirstOrDefault(b => b.Id == EditBed) is { } b)
             Bed = new BedInput { RoomId = b.RoomId, Code = b.Code, Type = b.Type, EquipmentId = b.EquipmentId, IsActive = b.IsActive, SortOrder = b.SortOrder };
+        KeepSelection();
     }
 
-    private async Task<IActionResult> DoneAsync(Core.Abstractions.ServiceResult r, string ok)
+    private void KeepSelection()
     {
-        if (r.Succeeded) { FlashSuccess = ok; return RedirectToPage(); }
+        if (Rooms.FirstOrDefault(r => r.Id == KeepRoom) is { } kr)
+        {
+            KeepWard ??= kr.WardId;
+            if (EditBed is null) Bed.RoomId = kr.Id;
+        }
+        if (KeepWard is int kw && Wards.Any(w => w.Id == kw))
+        {
+            if (EditRoom is null) Room.WardId = kw;
+            if (EditBed is null && Rooms.FirstOrDefault(r => r.Id == Bed.RoomId)?.WardId != kw && Rooms.FirstOrDefault(r => r.WardId == kw) is { } first) Bed.RoomId = first.Id;
+        }
+        else KeepWard = null;
+    }
+
+    /// <summary>Rooms shown in "Rooms & beds": the selected ward only (Update 14), else all.</summary>
+    public IEnumerable<IpdRoom> ShownRooms => KeepWard is int w ? Rooms.Where(r => r.WardId == w) : Rooms;
+
+    private async Task<IActionResult> DoneAsync(Core.Abstractions.ServiceResult r, string ok, object? keep = null)
+    {
+        if (r.Succeeded) { FlashSuccess = ok; return RedirectToPage(keep); }
         await LoadAsync();
+        KeepSelection();
         AddErrors(r);
         return Page();
     }
@@ -63,18 +86,18 @@ public class WardsModel : IpdPageModel
     public async Task<IActionResult> OnPostWardAsync()
     {
         if (await DenyUnlessAsync(Perm.IpdManageWards) is { } deny) return deny;
-        return await DoneAsync(await Setup.SaveWardAsync(EditWard, Ward), "Ward saved.");
+        return await DoneAsync(await Setup.SaveWardAsync(EditWard, Ward), "Ward saved.", EditWard is int w ? new { inward = w } : null);
     }
 
     public async Task<IActionResult> OnPostRoomAsync()
     {
         if (await DenyUnlessAsync(Perm.IpdManageRooms) is { } deny) return deny;
-        return await DoneAsync(await Setup.SaveRoomAsync(EditRoom, Room), "Room saved.");
+        return await DoneAsync(await Setup.SaveRoomAsync(EditRoom, Room), "Room saved.", new { inward = Room.WardId });
     }
 
     public async Task<IActionResult> OnPostBedAsync()
     {
         if (await DenyUnlessAsync(Perm.IpdManageBeds) is { } deny) return deny;
-        return await DoneAsync(await Setup.SaveBedAsync(EditBed, Bed), "Bed saved.");
+        return await DoneAsync(await Setup.SaveBedAsync(EditBed, Bed), "Bed saved.", new { inroom = Bed.RoomId }); // Update 14: stay on this ward / room
     }
 }

@@ -698,6 +698,7 @@ form.inline { display: inline; }
 /* ---- Update 9: consultation fee at booking ---- */
 .fee-box { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 14px 4px; margin-top: 12px; }
 .fee-box legend { font-weight: 700; padding: 0 6px; }
+.input-static { padding: 7px 0; font-size: 1.05rem; } /* Update 14: read-only totals in a form grid */
 .fee-line { margin: 0 0 8px; }
 .free-box { margin: 8px 0 10px; }
 .free-box summary { cursor: pointer; font-weight: 600; color: var(--blue-600); margin-bottom: 8px; }

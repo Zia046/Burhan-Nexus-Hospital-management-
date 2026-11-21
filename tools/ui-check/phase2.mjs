@@ -151,7 +151,11 @@ try {
   await page.fill("#Visit_ChiefComplaint", "Fever and cough for 3 days");
   await shot(page, "p2-06-opd-register-government");
   await submit("button:has-text('Register')");
-  const govUrl = page.url().split("?")[0].replace(base, "");
+  const regUrl = page.url().split("?")[0].replace(base, "");
+  step("OPD registration lands on the thermal receipt: " + regUrl);
+  await shot(page, "p2-06b-registration-thermal-receipt");
+  await pdf(regUrl, "sample-registration-receipt-thermal-80mm.pdf");
+  const govUrl = regUrl.replace("/Print/Registration/", "/Print/Opd/");
   await pdf(govUrl + "?paper=A5", "sample-opd-slip-A5.pdf");
   await pdf(govUrl + "?paper=A4", "sample-opd-slip-A4.pdf");
 
@@ -173,7 +177,7 @@ try {
   await page.check("[name='Visit.IsMedicoLegal']");
   await shot(page, "p2-09-emergency-register");
   await submit("button:has-text('Register')");
-  const erUrl = page.url().split("?")[0].replace(base, "");
+  const erUrl = page.url().split("?")[0].replace(base, "").replace("/Print/Registration/", "/Print/Emergency/");
   await pdf(erUrl + "?paper=A4", "sample-emergency-slip-A4.pdf");
   await pdf(erUrl + "?paper=A5", "sample-emergency-slip-A5.pdf");
 
