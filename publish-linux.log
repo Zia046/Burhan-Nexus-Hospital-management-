@@ -1,0 +1,6 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  BurhanNexus.HMS.Core -> /home/runner/work/Burhan-Nexus-Hospital-management-/Burhan-Nexus-Hospital-management-/src/BurhanNexus.HMS.Core/bin/Release/net10.0/BurhanNexus.HMS.Core.dll
+  BurhanNexus.HMS.Infrastructure -> /home/runner/work/Burhan-Nexus-Hospital-management-/Burhan-Nexus-Hospital-management-/src/BurhanNexus.HMS.Infrastructure/bin/Release/net10.0/BurhanNexus.HMS.Infrastructure.dll
+  BurhanNexus.HMS.Web -> /home/runner/work/Burhan-Nexus-Hospital-management-/Burhan-Nexus-Hospital-management-/src/BurhanNexus.HMS.Web/bin/Release/net10.0/BurhanNexus.HMS.Web.dll
+  BurhanNexus.HMS.Web -> /home/runner/work/Burhan-Nexus-Hospital-management-/Burhan-Nexus-Hospital-management-/publish/linux/
