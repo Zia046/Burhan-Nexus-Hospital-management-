@@ -405,7 +405,7 @@
     <div class="card" data-nicu>
         <div class="card-body">
             @if (Model.Birth is { } br) { <p>Born @Fmt.DateTimeText(br.BirthUtc) · delivery <a href="/Ipd/Delivery/@br.DeliveryId">@br.Delivery?.Number</a> · birth weight @(br.BirthWeightGrams is int bw ? $"{bw} g" : "not recorded") · APGAR @(br.Apgar1?.ToString() ?? "—")/@(br.Apgar5?.ToString() ?? "—")/@(br.Apgar10?.ToString() ?? "—")</p> }
-            @if (Model.Nicu is { } n) { <p>NICU reason: @(n.Reason ?? "—") · condition: @(n.ClinicalCondition ?? "—") · admission weight @(n.AdmissionWeightGrams is int aw ? $"{aw} g" : "not recorded") · clinician @(n.ResponsibleClinician ?? "—")</p> }
+            @if (Model.Nicu is { } n) { <p>NICU reason: @(n.Reason ?? "—") · condition: @(n.ClinicalCondition ?? "—") · admission weight <span data-nicu-weight>@(n.AdmissionWeightGrams is int aw ? BurhanNexus.HMS.Web.Services.DisplayFormatter.Kg(aw) : "not recorded")</span> · clinician @(n.ResponsibleClinician ?? "—")</p> }
             @if (!closed && a.Kind == AdmissionKind.Nicu && Model.Mother is not null)
             {
                 <form bn-permission="@Perm.IpdManageNicu" method="post" asp-page-handler="ReturnToMother" asp-route-id="@a.Id" class="inline-form wrap"><input name="Reason" placeholder="Reason" maxlength="300" />

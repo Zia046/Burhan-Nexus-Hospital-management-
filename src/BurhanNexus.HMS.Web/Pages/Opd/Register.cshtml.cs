@@ -93,7 +93,8 @@ public class RegisterModel : HmsPageModel
         FlashSuccess = $"OPD visit {enc.EncounterNumber} registered" + (enc.TokenNumber is int t ? $" – token {t}" : "") + ".";
         var settings = await _setup.GetSettingsAsync();
         if (await CanAsync(Perm.OpdPrint))
-            return Redirect($"/Print/Opd/{enc.Id}" + (settings.AutoPrintAfterRegistration ? "?autoprint=true" : ""));
+            // Update 14: the registration receipt prints on the thermal printer (the A5 / A4 slip is one click away on it).
+            return Redirect($"/Print/Registration/{enc.Id}" + (settings.AutoPrintAfterRegistration ? "?autoprint=true" : ""));
         return Redirect($"/Opd/Visit/{enc.Id}");
     }
 }

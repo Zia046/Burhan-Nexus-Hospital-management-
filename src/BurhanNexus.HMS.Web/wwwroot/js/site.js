@@ -403,8 +403,25 @@
         sum += Math.max(0, (parseFloat(cb.dataset.price || "0") || 0) - (disc ? parseFloat(disc.value || "0") || 0 : 0));
       });
       if (count) count.textContent = n + " selected";
-      if (total) total.textContent = money(sum);
+      // Update 14: one discount for the visit – total − discount = net payable (cash received stays a separate box).
+      const gross = book.querySelector("[data-lab-gross]");
+      const discBox = book.querySelector("[data-lab-discount]");
+      let net = sum;
+      if (gross) gross.textContent = money(sum);
+      if (discBox) {
+        const d = Math.max(0, parseFloat(discBox.value || "0") || 0);
+        const err = book.querySelector("[data-lab-discount-error]");
+        if (err) err.hidden = d <= sum + 0.0001;
+        net = Math.max(0, sum - d);
+      }
+      const netEl = book.querySelector("[data-lab-net]");
+      if (netEl) netEl.textContent = money(net);
+      const rec = book.querySelector("[data-lab-received]");
+      if (rec) rec.placeholder = money(net);
+      if (total) total.textContent = money(net);
     };
+    const discInput = book.querySelector("[data-lab-discount]");
+    if (discInput) discInput.addEventListener("input", () => recalc());
     choices.forEach(c => c.querySelectorAll("input").forEach(i => i.addEventListener(i.type === "checkbox" ? "change" : "input", () => { recalc(); show(); })));
     // Update 11: no categories – frequently used tests below the search bar, any test through the search; each test exists once (no duplicates).
     const names = book.querySelector("[data-selected-names]");

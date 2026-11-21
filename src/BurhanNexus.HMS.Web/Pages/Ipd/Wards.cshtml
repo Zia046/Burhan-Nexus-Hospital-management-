@@ -64,23 +64,27 @@
                 <tr class="@(w.IsActive ? "" : "row-muted")"><td><strong>@w.Name</strong> <small class="mono muted">@w.Code</small><small class="block muted">@w.Location @w.ResponsibleStaff</small></td><td>@w.Type</td><td>@w.Department?.Name</td>
                     <td>@string.Join(", ", Model.Rooms.Where(r => r.WardId == w.Id).Select(r => $"{r.Name} ({Model.Beds.Count(b => b.RoomId == r.Id)})"))</td>
                     <td>@(w.BedChargeServiceItem?.Name ?? "—")</td><td>@(w.IsActive ? "Active" : "Inactive")</td>
-                    <td class="actions"><a class="btn btn-light btn-sm" href="/Ipd/Wards?ward=@w.Id">Edit</a></td></tr>
+                    <td class="actions"><a class="btn btn-light btn-sm" href="/Ipd/Wards?ward=@w.Id&amp;inward=@w.Id">Edit</a></td></tr>
             }
             </tbody>
         </table>
     </div>
 </div>
 <div class="card">
-    <div class="card-header"><h2>Rooms &amp; beds</h2></div>
+    <div class="card-header"><h2>Rooms &amp; beds@(Model.KeepWard is int kw ? " – " + Model.Wards.First(w => w.Id == kw).Name : "")</h2>
+        <form method="get" class="inline-form" data-ward-filter>
+            <select name="inward" aria-label="Ward"><option value="">All wards</option>@foreach (var w in Model.Wards) { <option value="@w.Id" selected="@(Model.KeepWard == w.Id)">@w.Name</option> }</select>
+            <button class="btn btn-light btn-sm" type="submit">Show</button>
+        </form></div>
     <div class="table-wrap">
         <table class="table table-compact">
             <thead><tr><th>Ward / room</th><th>Type</th><th>Beds</th><th></th></tr></thead>
             <tbody>
-            @foreach (var r in Model.Rooms)
+            @foreach (var r in Model.ShownRooms)
             {
-                <tr class="@(r.IsActive ? "" : "row-muted")"><td>@r.Ward!.Name / <strong>@r.Name</strong></td><td>@r.Type (capacity @r.BedCapacity)</td>
-                    <td>@foreach (var b in Model.Beds.Where(b => b.RoomId == r.Id)) { <a class="chip" href="/Ipd/Wards?bed=@b.Id" title="@b.Status">@b.Code</a> }</td>
-                    <td class="actions"><a class="btn btn-light btn-sm" href="/Ipd/Wards?room=@r.Id">Edit</a></td></tr>
+                <tr class="@(r.IsActive ? "" : "row-muted")" data-room-row="@r.Id"><td>@r.Ward!.Name / <strong>@r.Name</strong></td><td>@r.Type (capacity @r.BedCapacity)</td>
+                    <td>@foreach (var b in Model.Beds.Where(b => b.RoomId == r.Id)) { <a class="chip" href="/Ipd/Wards?bed=@b.Id&amp;inroom=@b.RoomId" title="@b.Status">@b.Code</a> }</td>
+                    <td class="actions"><a class="btn btn-light btn-sm" href="/Ipd/Wards?room=@r.Id&amp;inward=@r.WardId">Edit</a></td></tr>
             }
             </tbody>
         </table>

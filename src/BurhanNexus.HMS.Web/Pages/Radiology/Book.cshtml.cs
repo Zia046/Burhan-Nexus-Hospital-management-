@@ -36,7 +36,8 @@ public class BookModel : RadiologyPageModel
     [BindProperty(SupportsGet = true, Name = "q")] public string? Q { get; set; }
     [BindProperty] public RadiologyBookingInput Input { get; set; } = new();
     [BindProperty] public List<int> ServiceIds { get; set; } = new();
-    [BindProperty] public Dictionary<int, decimal> Discounts { get; set; } = new();
+    // Update 14: nullable – an empty discount box no longer gives "The value '' is invalid".
+    [BindProperty] public Dictionary<int, decimal?> Discounts { get; set; } = new();
     [BindProperty] public DateOnly? ExamDate { get; set; }
     [BindProperty] public TimeOnly? ExamTime { get; set; }
     [BindProperty] public string? VisitChoice { get; set; }
@@ -113,7 +114,7 @@ public class BookModel : RadiologyPageModel
         Input.EncounterId = long.TryParse(VisitChoice, out var visit) ? visit : null;
         Input.ServiceIds = ServiceIds;
         Input.IpdAdmissionId = AdmissionId;
-        Input.Discounts = Discounts.Where(d => d.Value != 0).ToDictionary(d => d.Key, d => d.Value);
+        Input.Discounts = Discounts.Where(d => d.Value is decimal v && v != 0).ToDictionary(d => d.Key, d => d.Value!.Value);
         var today = await _clock.TodayAsync();
         var local = await _clock.LocalNowAsync();
         var date = ExamDate ?? today;

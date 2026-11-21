@@ -42,6 +42,9 @@ public sealed class DisplayFormatter
     /// <summary>Update 13: a service fee – the amount, "FREE" (explicitly marked) or "Fee not set".</summary>
     public string Fee(decimal amount, bool isFree) => amount > 0 ? Money(amount) : isFree ? "FREE" : "Fee not set";
 
+    /// <summary>Update 14: a weight stored in whole grams shown in kilograms with its decimals (3250 → "3.25 kg", 800 → "0.8 kg").</summary>
+    public static string Kg(int grams) => (grams / 1000m).ToString("0.###", CultureInfo.InvariantCulture) + " kg";
+
     public string Money(decimal amount) => $"{_profile?.CurrencySymbol ?? "Rs."} {amount.ToString("N2", CultureInfo.InvariantCulture)}";
 
     public static string Bytes(long bytes) => bytes switch

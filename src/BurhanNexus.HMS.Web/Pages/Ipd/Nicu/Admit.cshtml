@@ -21,7 +21,7 @@ else
                 <div class="field"><label>Source</label><select name="Input.Source">@foreach (var s in new[] { AdmissionSource.DeliveryRoom, AdmissionSource.LabourRoom, AdmissionSource.PostnatalWard, AdmissionSource.Emergency, AdmissionSource.Opd, AdmissionSource.ExternalReferral, AdmissionSource.Other }) { <option value="@s" selected="@(i.Source == s)">@s</option> }</select></div>
                 <div class="field"><label>Gestational age</label><input name="Input.GestationalAge" value="@i.GestationalAge" maxlength="20" /></div>
                 <div class="field"><label>Birth weight (g)</label><input type="number" min="0" name="Input.BirthWeightGrams" value="@i.BirthWeightGrams" /></div>
-                <div class="field"><label>Admission weight (g)</label><input type="number" min="0" name="Input.AdmissionWeightGrams" value="@i.AdmissionWeightGrams" /></div>
+                <div class="field"><label for="Input_AdmissionWeightKg">Admission weight (kg)</label><input id="Input_AdmissionWeightKg" type="number" min="0.2" max="10" step="0.001" inputmode="decimal" placeholder="e.g. 3.25" name="Input.AdmissionWeightKg" value="@i.AdmissionWeightKg?.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-test="nicu-weight-kg" /></div>
                 <div class="field"><label>Responsible clinician</label><input name="Input.ResponsibleClinician" value="@i.ResponsibleClinician" maxlength="150" /></div>
                 <div class="field"><label>Referral details</label><input name="Input.ReferralDetails" value="@i.ReferralDetails" maxlength="300" /></div>
             </div>

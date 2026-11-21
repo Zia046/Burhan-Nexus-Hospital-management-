@@ -9,6 +9,7 @@
         <a class="@(Model.Paper == "A5" ? "on" : "")" href="@basePath?paper=A5">A5</a>
         <a class="@(Model.Paper == "A4" ? "on" : "")" href="@basePath?paper=A4">A4</a>
     </span>
+    <a class="tb-btn tb-light" href="/Print/Registration/@Model.Encounter.Id" data-test="thermal-receipt">Thermal receipt</a>
     <span class="print-hint">@(Model.CopyNumber > 1 ? $"Reprint – copy {Model.CopyNumber}" : "First print")</span>
     <span class="grow"></span>
     <span class="print-hint">For PDF: choose “Save as PDF” as the printer.</span>

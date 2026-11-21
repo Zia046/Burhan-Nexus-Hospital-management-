@@ -34,7 +34,8 @@ public class BookModel : HmsPageModel
     [BindProperty(SupportsGet = true, Name = "q")] public string? Q { get; set; }
     [BindProperty] public LabBookingInput Input { get; set; } = new();
     [BindProperty] public List<int> TestIds { get; set; } = new();
-    [BindProperty] public Dictionary<int, decimal> Discounts { get; set; } = new();
+    // Update 14: nullable – an empty discount box no longer gives "The value '' is invalid".
+    [BindProperty] public Dictionary<int, decimal?> Discounts { get; set; } = new();
 
     public Patient? Patient { get; private set; }
     public string AgeText { get; private set; } = "—";
@@ -157,7 +158,7 @@ public class BookModel : HmsPageModel
         Input.EncounterId = EncounterId;
         Input.IpdAdmissionId = AdmissionId;
         Input.TestIds = TestIds;
-        Input.Discounts = Discounts.Where(d => d.Value != 0).ToDictionary(d => d.Key, d => d.Value);
+        Input.Discounts = Discounts.Where(d => d.Value is decimal v && v != 0).ToDictionary(d => d.Key, d => d.Value!.Value);
         var canDiscount = await CanAsync(Perm.LabViewFinancial) && await CanAsync(Perm.FinanceDiscount);
         var canCollect = await CanAsync(Perm.LabCollectPayments) && AdmissionId is null;
         if (AdmissionId is not null) Input.CollectPayment = false;
