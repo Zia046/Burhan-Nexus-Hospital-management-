@@ -348,10 +348,33 @@ internal sealed class MainForm : Form
             }
             var t = sizes["thermal"]; var a = sizes["a4"];
             var mmW = t.W * 25.4 / 72; var mmH = t.H * 25.4 / 72;
-            var ok = Math.Abs(mmW - 80) < 1.5 && Math.Abs(mmH - 124) < 4 && Math.Abs(a.W * 25.4 / 72 - 210) < 2 && Math.Abs(a.H * 25.4 / 72 - 297) < 2;
-            Finish(ok, $"Receipt page {mmW:0.#} x {mmH:0.#} mm (expected 80 x 124: roll width x slip height, no A4 length); A4 page {a.W * 25.4 / 72:0} x {a.H * 25.4 / 72:0} mm (expected 210 x 297); header/footer off");
+            var (escOk, escText) = CheckEscPos(Path.Combine(dir, PrintBridge.EscPosTestFile));
+            var ok = escOk && Math.Abs(mmW - 80) < 1.5 && Math.Abs(mmH - 124) < 4 && Math.Abs(a.W * 25.4 / 72 - 210) < 2 && Math.Abs(a.H * 25.4 / 72 - 297) < 2;
+            Finish(ok, $"Receipt page {mmW:0.#} x {mmH:0.#} mm (expected 80 x 124: roll width x slip height, no A4 length); A4 page {a.W * 25.4 / 72:0} x {a.H * 25.4 / 72:0} mm (expected 210 x 297); header/footer off; {escText}");
         }
         catch (Exception ex) { Finish(false, "Print test failed: " + ex.Message); }
+    }
+
+    /// <summary>Update 14: the direct thermal job – ESC @, raster 576 dots wide, about the slip's height (120 mm slip ≈ 860 rows), cut at the end.</summary>
+    private static (bool Ok, string Text) CheckEscPos(string file)
+    {
+        if (!File.Exists(file)) return (false, "ESC/POS job not written");
+        var b = File.ReadAllBytes(file);
+        int rows = 0, bytesPerRow = 0, ink = 0;
+        for (var i = 2; i + 8 <= b.Length;)
+        {
+            if (b[i] == 0x1D && b[i + 1] == 0x76 && b[i + 2] == 0x30)
+            {
+                bytesPerRow = b[i + 4] | b[i + 5] << 8;
+                var h = b[i + 6] | b[i + 7] << 8;
+                for (var k = 0; k < bytesPerRow * h && i + 8 + k < b.Length; k++) if (b[i + 8 + k] != 0) ink++;
+                rows += h; i += 8 + bytesPerRow * h;
+            }
+            else i++;
+        }
+        var cut = b.Length >= 4 && b[^4] == 0x1D && b[^3] == 0x56 && b[^2] == 0x42;
+        var ok = b[0] == 0x1B && b[1] == 0x40 && bytesPerRow == 72 && rows is > 780 and < 960 && ink > 100 && cut;
+        return (ok, $"ESC/POS job: {bytesPerRow * 8} dots wide, {rows} rows (≈{rows / 8.0:0} mm), {(cut ? "cut" : "NO cut")}, {(ink > 0 ? "ink" : "blank")}");
     }
 
     private static (double W, double H) MediaBox(string pdf)

@@ -24,8 +24,11 @@ internal static class PrintBridge
               if (thermal) {
                 width = b.classList.contains('w58') ? 58 : 80;
                 var dw = parseInt(b.getAttribute('data-width'), 10); if (dw === 58 || dw === 80) width = dw;
-                var slips = document.querySelectorAll('.t-slip'), max = 0;
-                for (var i = 0; i < slips.length; i++) { var h = slips[i].getBoundingClientRect().height; if (h > max) max = h; }
+                var slips = document.querySelectorAll('.t-slip'), max = 0, rects = [];
+                for (var i = 0; i < slips.length; i++) {
+                  var rc = slips[i].getBoundingClientRect(); if (rc.height > max) max = rc.height;
+                  if (rc.width > 0 && rc.height > 0) rects.push({ x: rc.left + window.scrollX, y: rc.top + window.scrollY, w: rc.width, h: rc.height });
+                }
                 height = max > 0 ? Math.ceil(max * 25.4 / 96) + 4 : 0;
                 if (!height) thermal = false;
               }
@@ -36,7 +39,7 @@ internal static class PrintBridge
                   for (var ri = 0; ri < rules.length; ri++) if (rules[ri].type === 6 && rules[ri].style && rules[ri].style.getPropertyValue('size')) pageSize = rules[ri].style.getPropertyValue('size');
                 }
               } catch (e) { }
-              window.chrome.webview.postMessage(JSON.stringify({ type: 'bn-print', thermal: thermal, widthMm: width, heightMm: height, pageSize: pageSize }));
+              window.chrome.webview.postMessage(JSON.stringify({ type: 'bn-print', thermal: thermal, widthMm: width, heightMm: height, pageSize: pageSize, slips: thermal ? rects : [] }));
             } catch (e) { nativePrint(); }
           };
         })();
@@ -46,7 +49,39 @@ internal static class PrintBridge
     public static string? PdfTestDir;
     public static event Action<string>? PdfWritten;
 
-    private sealed record Request(string? Type, bool Thermal, int WidthMm, int HeightMm, string? PageSize);
+    private sealed record Slip(double X, double Y, double W, double H);
+    private sealed record Request(string? Type, bool Thermal, int WidthMm, int HeightMm, string? PageSize, Slip[]? Slips);
+
+    /// <summary>CI self-test: the ESC/POS job written next to the PDF.</summary>
+    public const string EscPosTestFile = "thermal.escpos";
+
+    /// <summary>Each slip on the page as an image at the printer's resolution (roll width in dots).</summary>
+    private static async Task<List<System.Drawing.Bitmap>> CaptureSlipsAsync(CoreWebView2 core, Request r, int dots)
+    {
+        var list = new List<System.Drawing.Bitmap>();
+        foreach (var sl in r.Slips ?? Array.Empty<Slip>())
+        {
+            var json = JsonSerializer.Serialize(new
+            {
+                format = "png", captureBeyondViewport = true, fromSurface = true,
+                clip = new { x = sl.X, y = sl.Y, width = sl.W, height = sl.H, scale = dots / sl.W },
+            });
+            var res = await core.CallDevToolsProtocolMethodAsync("Page.captureScreenshot", json);
+            using var doc = JsonDocument.Parse(res);
+            using var ms = new MemoryStream(Convert.FromBase64String(doc.RootElement.GetProperty("data").GetString()!));
+            using var tmp = new System.Drawing.Bitmap(ms);
+            list.Add(new System.Drawing.Bitmap(tmp));
+        }
+        return list;
+    }
+
+    private static async Task<byte[]?> EscPosJobAsync(CoreWebView2 core, Request r)
+    {
+        var dots = EscPos.DotsFor(r.WidthMm);
+        var slips = await CaptureSlipsAsync(core, r, dots);
+        try { return slips.Count == 0 ? null : EscPos.Build(slips, dots); }
+        finally { slips.ForEach(b => b.Dispose()); }
+    }
 
     /// <summary>Paper of an A4 / A5 document from its CSS @page size ("A4", "A5 landscape", "210mm 297mm"); A4 when not stated.</summary>
     public static (double WidthMm, double HeightMm) PaperOf(string? cssSize)
@@ -96,7 +131,12 @@ internal static class PrintBridge
             s.PageWidth = r.WidthMm / 25.4;
             s.PageHeight = Math.Max(30, r.HeightMm) / 25.4;
             s.MarginTop = s.MarginBottom = s.MarginLeft = s.MarginRight = 0;
-            if (PdfTestDir is not null) { await ToPdfAsync(core, s, "thermal"); return; }
+            if (PdfTestDir is not null)
+            {
+                if (await EscPosJobAsync(core, r) is { } test) await File.WriteAllBytesAsync(Path.Combine(PdfTestDir, EscPosTestFile), test);
+                await ToPdfAsync(core, s, "thermal");
+                return;
+            }
 
             var printer = PrinterConfig.Exists(cfg.ReceiptPrinter) ? cfg.ReceiptPrinter : null;
             var copies = 1;
@@ -110,6 +150,13 @@ internal static class PrintBridge
                 if (dlg.Remember && printer is not null) { cfg.ReceiptPrinter = printer; cfg.Save(); }
             }
             if (printer is null) return;
+            // Update 14: straight to the thermal printer as an ESC/POS image – exact slip length, cut, no driver paper size
+            // (some POS drivers print a blank or an A4-length page for a custom paper size).
+            if (cfg.ReceiptAsImage && await EscPosJobAsync(core, r) is { } job)
+            {
+                for (var c = 0; c < copies; c++) EscPos.SendRaw(printer, job, "Burhan Nexus HMS receipt");
+                return;
+            }
             s.PrinterName = printer;
             s.Copies = copies;
             await Report(owner, await core.PrintAsync(s), printer);

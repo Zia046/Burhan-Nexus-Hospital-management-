@@ -8,6 +8,8 @@ internal sealed class PrinterConfig
 {
     public string? ReceiptPrinter { get; set; }
     public string? A4Printer { get; set; }
+    /// <summary>Update 14: receipts go to the thermal printer as an ESC/POS image (exact length + cut). Off = through the Windows driver.</summary>
+    public bool ReceiptAsImage { get; set; } = true;
 
     private static string File => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "BurhanNexusHMS", "printers.json");
 
