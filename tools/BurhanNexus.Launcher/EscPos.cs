@@ -38,7 +38,7 @@ internal static class EscPos
     /// <summary>1-bit raster (1 = black) of the image scaled to the roll width; white rows at the bottom are dropped.</summary>
     public static (int BytesPerRow, int Rows, byte[] Data) Raster(Bitmap src, int dots)
     {
-        var width = Math.Min(dots, src.Width) / 8 * 8;
+        var width = dots / 8 * 8; // always the full printable width (the screenshot may be a pixel narrower)
         var height = (int)Math.Round(src.Height * (double)width / src.Width);
         using var bmp = new Bitmap(width, Math.Max(1, height), PixelFormat.Format32bppArgb);
         using (var g = Graphics.FromImage(bmp))
