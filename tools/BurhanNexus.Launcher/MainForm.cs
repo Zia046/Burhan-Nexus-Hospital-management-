@@ -349,8 +349,8 @@ internal sealed class MainForm : Form
             var t = sizes["thermal"]; var a = sizes["a4"];
             var mmW = t.W * 25.4 / 72; var mmH = t.H * 25.4 / 72;
             var (escOk, escText) = CheckEscPos(Path.Combine(dir, PrintBridge.EscPosTestFile));
-            var ok = escOk && Math.Abs(mmW - 80) < 1.5 && Math.Abs(mmH - 124) < 4 && Math.Abs(a.W * 25.4 / 72 - 210) < 2 && Math.Abs(a.H * 25.4 / 72 - 297) < 2;
-            Finish(ok, $"Receipt page {mmW:0.#} x {mmH:0.#} mm (expected 80 x 124: roll width x slip height, no A4 length); A4 page {a.W * 25.4 / 72:0} x {a.H * 25.4 / 72:0} mm (expected 210 x 297); header/footer off; {escText}");
+            var ok = escOk && Math.Abs(mmW - 80) < 1.5 && Math.Abs(mmH - PrintBridge.DriverRollLengthMm) < 2 && Math.Abs(a.W * 25.4 / 72 - 210) < 2 && Math.Abs(a.H * 25.4 / 72 - 297) < 2;
+            Finish(ok, $"Receipt page {mmW:0.#} x {mmH:0.#} mm (expected 80 x 210: the driver's roll form, no A4 length); A4 page {a.W * 25.4 / 72:0} x {a.H * 25.4 / 72:0} mm (expected 210 x 297); header/footer off; {escText}");
         }
         catch (Exception ex) { Finish(false, "Print test failed: " + ex.Message); }
     }

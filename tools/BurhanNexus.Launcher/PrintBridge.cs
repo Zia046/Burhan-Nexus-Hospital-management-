@@ -49,6 +49,9 @@ internal static class PrintBridge
     public static string? PdfTestDir;
     public static event Action<string>? PdfWritten;
 
+    /// <summary>Paper length of the driver's roll form ("80 x 210 mm"); the printer stops at the end of the slip.</summary>
+    public const double DriverRollLengthMm = 210;
+
     private sealed record Slip(double X, double Y, double W, double H);
     private sealed record Request(string? Type, bool Thermal, int WidthMm, int HeightMm, string? PageSize, Slip[]? Slips);
 
@@ -129,7 +132,9 @@ internal static class PrintBridge
         {
             s.MediaSize = CoreWebView2PrintMediaSize.Custom;
             s.PageWidth = r.WidthMm / 25.4;
-            s.PageHeight = Math.Max(30, r.HeightMm) / 25.4;
+            // Update 14: through the Windows driver the page is the driver's standard roll form (80 / 58 x 210 mm) – POS drivers print
+            // only up to the last printed line on it, while a custom slip-height page was printed blank by some drivers.
+            s.PageHeight = DriverRollLengthMm / 25.4;
             s.MarginTop = s.MarginBottom = s.MarginLeft = s.MarginRight = 0;
             if (PdfTestDir is not null)
             {
