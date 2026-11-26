@@ -73,6 +73,19 @@ public partial class Update10Tests
             var receipt = await db.Receipts.SingleAsync();
             Assert.Equal(20m, receipt.AmountPaid);
             Assert.Equal(await db.Users.Where(u => u.Username == "admin").Select(u => u.Id).SingleAsync(), receipt.CashierUserId); // in the admin's (registering user's) account
+            var er = await db.ServiceItems.SingleAsync(x => x.Code == "ER-REG");
+            er.IsActive = true;
+            db.ServiceFees.Add(new ServiceFee { ServiceItemId = er.Id, Fee = 50, EffectiveFrom = new DateOnly(2000, 1, 1), CreatedUtc = DateTime.UtcNow, CreatedByUsername = "test" });
+            await db.SaveChangesAsync();
+        }
+        // Emergency: the same – the slip prints, the fee goes to the registering user's account.
+        var e = await PostEmergencyAsync(admin, pid, ("Visit.BriefComplaint", "Injury"));
+        Assert.True(e.StatusCode == HttpStatusCode.Redirect, "Emergency: " + Errors(await e.Content.ReadAsStringAsync()));
+        Assert.StartsWith("/Print/Emergency/", e.Headers.Location!.OriginalString);
+        await using (var db = Factory.NewDb())
+        {
+            Assert.Equal(2, await db.Receipts.CountAsync());
+            Assert.Contains(await db.Charges.ToListAsync(), c => c.Fee == 50m && c.Status == ChargeStatus.Paid);
         }
     }
 
