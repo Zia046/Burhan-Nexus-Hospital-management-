@@ -50,6 +50,33 @@ public partial class Update10Tests
     }
 
     [Fact]
+    public async Task Government_opd_fee_from_fees_and_services_goes_to_the_registering_users_cash_account()
+    {
+        await SetupAsync("Government");
+        var admin = await LoginAdminAsync();
+        await using (var db = Factory.NewDb())
+        {
+            var item = await db.ServiceItems.SingleAsync(x => x.Code == "OPD-REG");
+            item.IsActive = true;
+            db.ServiceFees.Add(new ServiceFee { ServiceItemId = item.Id, Fee = 20, EffectiveFrom = new DateOnly(2000, 1, 1), CreatedUtc = DateTime.UtcNow, CreatedByUsername = "test" });
+            await db.SaveChangesAsync();
+        }
+        var pid = await RegisterPatientAsync(admin, PatientFields("Fee Slip", "Father Fee"));
+        var r = await admin.PostFormAsync("/Patients/Register", new[] { P("Visit.ChiefComplaint", "Fever") }, $"/Opd/Register?patientId={pid}");
+        Assert.True(r.StatusCode == HttpStatusCode.Redirect, "OPD: " + Errors(await r.Content.ReadAsStringAsync()));
+        Assert.StartsWith("/Print/Opd/", r.Headers.Location!.OriginalString);                 // still the OPD slip, no receipt page
+        await using (var db = Factory.NewDb())
+        {
+            var charge = await db.Charges.SingleAsync();
+            Assert.Equal((20m, 20m, ChargeStatus.Paid), (charge.Fee, charge.PaidAmount, charge.Status));
+            Assert.NotNull(charge.EncounterId);
+            var receipt = await db.Receipts.SingleAsync();
+            Assert.Equal(20m, receipt.AmountPaid);
+            Assert.Equal(await db.Users.Where(u => u.Username == "admin").Select(u => u.Id).SingleAsync(), receipt.CashierUserId); // in the admin's (registering user's) account
+        }
+    }
+
+    [Fact]
     public async Task Cbc_has_the_14_default_parameters_and_can_be_configured_without_changing_old_reports()
     {
         await SetupAsync("Private");

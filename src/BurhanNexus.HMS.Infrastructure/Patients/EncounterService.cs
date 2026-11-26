@@ -5,6 +5,7 @@ using BurhanNexus.HMS.Infrastructure.Persistence;
 using BurhanNexus.HMS.Infrastructure.Security;
 using BurhanNexus.HMS.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -102,10 +103,12 @@ public sealed class EncounterService : IEncounterService
     private readonly IAuditService _audit;
     private readonly IRequestContext _ctx;
     private readonly HospitalClock _clock;
+    private readonly IServiceProvider _services;
 
     public EncounterService(HmsDbContext db, IPatientService patients, IRegistrationSetupService setup, IPermissionService permissions,
-        IAuditService audit, IRequestContext ctx, HospitalClock clock)
+        IAuditService audit, IRequestContext ctx, HospitalClock clock, IServiceProvider services)
     {
+        _services = services;
         _db = db;
         _patients = patients;
         _setup = setup;
@@ -200,8 +203,44 @@ public sealed class EncounterService : IEncounterService
             + (doctor is null ? "" : $", {doctor.Name}"),
             newValues: new { number, patient.PatientNumber, token, departmentId, Doctor = doctor?.Name, HospitalType = hospitalType.ToString(), repeat });
         await _db.SaveChangesAsync(ct);
+        // Update 15: Government – when Fees & Services gives the OPD registration a fee, saving / printing the slip records it as
+        // collected by this user (it appears in the user's cash account, to be handed over to the administrator). No receipt is printed.
+        // No fee set (or free) = free OPD slip.
+        if (hospitalType == HospitalType.Government && serviceId is int feeService)
+        {
+            var paid = await CollectGovernmentOpdFeeAsync(enc, feeService, date, ct);
+            if (!paid.Succeeded)
+            {
+                await tx.RollbackAsync(ct);
+                _db.ChangeTracker.Clear();
+                return Fail(paid.Errors.ToArray());
+            }
+        }
         await tx.CommitAsync(ct);
         return ServiceResult<PatientEncounter>.Ok(enc);
+    }
+
+    private async Task<ServiceResult> CollectGovernmentOpdFeeAsync(PatientEncounter enc, int serviceId, DateOnly date, CancellationToken ct)
+    {
+        if (!await _db.ServiceItems.AnyAsync(s => s.Id == serviceId && s.IsActive, ct)) return ServiceResult.Ok();
+        if (await Finance.ServiceCatalogue.FeeNotSetErrorAsync(_db, serviceId, date, ct) is not null) return ServiceResult.Ok(); // no rate = free slip
+        var fee = await Finance.ServiceCatalogue.FeeOnAsync(_db, serviceId, date, ct);
+        if (fee <= 0) return ServiceResult.Ok();
+        if (_ctx.UserId is not int uid) return ServiceResult.Fail("Please sign in again.");
+        var counter = await _db.CounterAssignments.Where(a => a.UserId == uid && a.EndedUtc == null && a.Counter!.IsActive).Select(a => (int?)a.CounterId).FirstOrDefaultAsync(ct)
+                      ?? (await _db.Users.AnyAsync(u => u.Id == uid && u.IsSystemAdministrator, ct)
+                          ? await _db.Counters.Where(c => c.IsActive).OrderBy(c => c.Id).Select(c => (int?)c.Id).FirstOrDefaultAsync(ct) : null);
+        if (counter is null)
+            return ServiceResult.Fail($"The OPD fee ({fee:N2}) is set in Fees & Services, so it is recorded in the cash account of the user who registers. You are not assigned to a cash counter – ask the administrator (Finance → Counters).");
+        var cash = await _db.PaymentMethods.Where(m => m.Code == "CASH" && m.IsActive).Select(m => (int?)m.Id).FirstOrDefaultAsync(ct);
+        if (cash is null) return ServiceResult.Fail("The payment method Cash is not available.");
+        var r = await _services.GetRequiredService<Finance.IBillingService>().CollectAsync(new Finance.CollectInput
+        {
+            IdempotencyKey = Guid.NewGuid(), PatientId = enc.PatientId, CounterId = counter.Value, PaymentMethodId = cash.Value,
+            Notes = $"OPD slip {enc.EncounterNumber}",
+            Lines = { new Finance.NewChargeLine { ServiceItemId = serviceId, EncounterId = enc.Id } },
+        }, canDiscount: false, ct);
+        return r.Succeeded ? ServiceResult.Ok() : ServiceResult.Fail(r.Errors.Select(e => "The OPD fee could not be recorded: " + e).ToArray());
     }
 
     private async Task<List<string>> ValidateOpdAsync(OpdVisitInput i, RegistrationSettings s, HospitalType type, CancellationToken ct)
