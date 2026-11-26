@@ -41,7 +41,7 @@ public class Update15LicenseTests : HmsTestBase
         Assert.Contains("Buner Children Hospital", html);
         Assert.Contains("CUST-77", html);
         Assert.Contains("Burhan Nexus HMS", html);
-        Assert.Contains("BNHMS1-…", html);                                                   // key shown only by its fingerprint
+        Assert.Contains("data-license-key>BNHMS1-", html);                                   // key shown only by its fingerprint
         Assert.DoesNotContain(trial.Key, html);
 
         // Modified key and a key signed by another private key are rejected.
