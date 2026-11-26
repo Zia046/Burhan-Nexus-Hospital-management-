@@ -55,24 +55,29 @@ else
             </div>
             @if (Model.AdmissionFee is decimal fee)
             {
+                var feeNow = i.AdmissionFeeAmount ?? fee;
                 <fieldset class="fee-box" data-admission-fee="@fee.ToString(System.Globalization.CultureInfo.InvariantCulture)">
-                    <legend>Admission fee: <strong>@Fmt.Money(fee)</strong></legend>
-                    @if (fee > 0)
-                    {
-                        <div class="checks">
-                            <label class="check"><input type="radio" name="FeeAction" value="later" checked="@(Model.FeeAction is null or "later")" /> Not received now (stays on the patient's account)</label>
-                            @if (Model.CanPayFee) { <label class="check"><input type="radio" name="FeeAction" value="pay" checked="@(Model.FeeAction == "pay")" data-test="fee-pay" /> Received now</label> }
-                            @if (Model.CanWaiveFee) { <label class="check"><input type="radio" name="FeeAction" value="waive" checked="@(Model.FeeAction == "waive")" /> Free admission (authorised waiver)</label> }
-                        </div>
-                        <div class="grid-2">
-                            @if (Model.CanPayFee)
-                            {
-                                <div class="field"><label for="fm">Payment method</label><select id="fm" name="FeeMethodId">@foreach (var pm in Model.Methods) { <option value="@pm.Id" selected="@(pm.Code == "CASH")">@pm.Name</option> }</select></div>
-                                <div class="field"><label for="fr">Reference</label><input id="fr" name="FeeReference" maxlength="100" /></div>
-                            }
-                            @if (Model.CanWaiveFee) { <div class="field"><label for="fw">Reason for free admission</label><input id="fw" name="FeeWaiverReason" maxlength="200" /></div> }
-                        </div>
-                    }
+                    <legend>Admission fee</legend>
+                    @* Update 14: the admission fee is entered / confirmed here; it is saved as the admission's own fee charge. *@
+                    <div class="grid-2">
+                        <div class="field"><label for="Input_AdmissionFeeAmount">Admission fee (Rs)</label>
+                            <input id="Input_AdmissionFeeAmount" name="Input.AdmissionFeeAmount" type="number" step="0.01" min="0" inputmode="decimal" data-test="admission-fee-amount"
+                                   value="@feeNow.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)" /></div>
+                        <p class="small muted">@(fee > 0 ? "Fees & Services: " + Fmt.Money(fee) + "." : "No admission fee is set in Fees & Services.") The amount entered here is saved on this admission (its own charge, separate from bed and other charges) and printed on the admission form.</p>
+                    </div>
+                    <div class="checks">
+                        <label class="check"><input type="radio" name="FeeAction" value="later" checked="@(Model.FeeAction is null or "later")" /> Not received now (stays on the patient's account)</label>
+                        @if (Model.CanPayFee) { <label class="check"><input type="radio" name="FeeAction" value="pay" checked="@(Model.FeeAction == "pay")" data-test="fee-pay" /> Received now</label> }
+                        @if (Model.CanWaiveFee) { <label class="check"><input type="radio" name="FeeAction" value="waive" checked="@(Model.FeeAction == "waive")" /> Free admission (authorised waiver)</label> }
+                    </div>
+                    <div class="grid-2">
+                        @if (Model.CanPayFee)
+                        {
+                            <div class="field"><label for="fm">Payment method</label><select id="fm" name="FeeMethodId">@foreach (var pm in Model.Methods) { <option value="@pm.Id" selected="@(pm.Code == "CASH")">@pm.Name</option> }</select></div>
+                            <div class="field"><label for="fr">Reference</label><input id="fr" name="FeeReference" maxlength="100" /></div>
+                        }
+                        @if (Model.CanWaiveFee) { <div class="field"><label for="fw">Reason for free admission</label><input id="fw" name="FeeWaiverReason" maxlength="200" /></div> }
+                    </div>
                 </fieldset>
             }
             <div class="card-footer form-actions"><a class="btn btn-light" href="/Ipd/Admit">Change patient</a><button class="btn btn-primary btn-lg" type="submit" data-test="ipd-admit-save" data-once>Admit patient</button></div>

@@ -20,7 +20,7 @@
         @if (!Model.Simple && active.Any(i => i.Status == LabOrderItemStatus.AwaitingVerification)) { <a bn-permission="@Perm.LabVerifyResults" class="btn btn-light" href="/Lab/Verify/@o.Id">Verify</a> }
         @if (printable.Count > 0 && canPrint) { <a class="btn btn-success" href="/Print/LabReport/@o.Id" data-test="lab-print"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Report</a> }
         @if (Model.ShowFees && Model.Payment.Balance > 0) { <a bn-permission="@Perm.FinanceCollect" class="btn btn-light" href="/Finance/Collect?patientId=@p.Id&labOrderId=@o.Id" data-test="lab-collect"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Collect payment</a> }
-        <a bn-permission="@Perm.LabPrintReceipts" class="btn btn-primary" href="/Print/LabReceipt/@o.Id" target="_blank" data-test="lab-receipt">Print receipt (2 copies)</a>
+        <a bn-permission="@Perm.LabPrintReceipts" class="btn btn-primary" href="/Print/LabReceipt/@o.Id?autoprint=true" target="_blank" data-test="lab-receipt">Print receipt (2 copies)</a>
         @if (!Model.Simple) { <a bn-permission="@Perm.LabBook" class="btn btn-light" href="/Print/LabSlip/@o.Id" target="_blank">Order slip</a> }
     </div>
 </div>

@@ -73,12 +73,29 @@ else
                                 <input type="checkbox" name="TestIds" value="@t.Test.Id" checked="@Model.TestIds.Contains(t.Test.Id)" data-price="@t.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
                                 <span><strong>@t.Test.Name</strong> <small class="muted">@t.Test.Code · @t.Test.SampleType!.Name</small>
                                     @if (Model.ShowFees) { <small class="block">@Fmt.Fee(t.Price, t.Test.ServiceItem?.IsFree ?? false)</small> }</span>
-                                @if (Model.CanDiscount && t.Price > 0) { <input class="input-num" type="number" step="0.01" min="0" max="@t.Price" name="Discounts[@t.Test.Id]" placeholder="disc." aria-label="Discount" /> }
                             </label>
                     }
                 </div>
                 <p class="small muted" data-no-match hidden>No test matches the search.</p>
                 @* Update 13: payment directly below the suggested tests (same method as before). *@
+                @* Update 14: one discount for the whole visit; cash received is a separate box. *@
+                @if (Model.ShowFees)
+                {
+                <fieldset class="fee-box" data-lab-charges>
+                    <legend>Charges</legend>
+                    <div class="grid-2">
+                        <div class="field"><label>Total amount</label><div class="input-static"><strong data-lab-gross>0.00</strong></div></div>
+                        @if (Model.CanDiscount)
+                        {
+                            <div class="field"><label for="Input_TotalDiscount">Discount</label>
+                                <input id="Input_TotalDiscount" name="Input.TotalDiscount" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0" data-lab-discount value="@Model.Input.TotalDiscount?.ToString(System.Globalization.CultureInfo.InvariantCulture)" /></div>
+                            <div class="field"><label for="Input_DiscountReason">Discount reason <span class="muted">(optional)</span></label><input id="Input_DiscountReason" name="Input.DiscountReason" value="@Model.Input.DiscountReason" maxlength="200" /></div>
+                        }
+                        <div class="field"><label>Net payable</label><div class="input-static"><strong data-lab-net data-test="lab-net">0.00</strong></div></div>
+                    </div>
+                    <p class="small muted" data-lab-discount-error hidden>The discount cannot be more than the total.</p>
+                </fieldset>
+                }
                 @if (Model.CanCollect)
             {
                 <fieldset class="fee-box" data-lab-payment>
@@ -86,8 +103,8 @@ else
                     <div class="grid-2">
                         <div class="field"><label for="Input_PaymentMethodId">Payment method</label><select id="Input_PaymentMethodId" name="Input.PaymentMethodId">
                             @foreach (var m in Model.Methods) { <option value="@m.Id" selected="@(Model.Input.PaymentMethodId == m.Id || (Model.Input.PaymentMethodId is null && m.Code == "CASH"))">@m.Name</option> }</select></div>
-                        <div class="field"><label for="Input_AmountReceived">Amount received <span class="muted">(empty = full amount)</span></label>
-                            <input id="Input_AmountReceived" name="Input.AmountReceived" type="number" step="0.01" min="0" value="@Model.Input.AmountReceived?.ToString(System.Globalization.CultureInfo.InvariantCulture)" /></div>
+                        <div class="field"><label for="Input_AmountReceived">Cash received <span class="muted">(empty = net payable)</span></label>
+                            <input id="Input_AmountReceived" name="Input.AmountReceived" type="number" step="0.01" min="0" inputmode="decimal" data-lab-received value="@Model.Input.AmountReceived?.ToString(System.Globalization.CultureInfo.InvariantCulture)" /></div>
                         @if (Model.Counters.Count > 1)
                         {
                             <div class="field"><label for="Input_CounterId">Counter</label><select id="Input_CounterId" name="Input.CounterId">
@@ -116,12 +133,11 @@ else
                     {
                         <label class="check" data-pregnant><input type="checkbox" name="Input.Pregnant" value="true" checked="@Model.Input.Pregnant" /> Patient is pregnant (pregnancy reference ranges are used where defined)</label>
                     }
-                    @if (Model.CanDiscount) { <div class="field"><label for="Input_DiscountReason">Discount reason</label><input id="Input_DiscountReason" name="Input.DiscountReason" value="@Model.Input.DiscountReason" maxlength="200" /></div> }
                 </div>
                 <label class="check"><input type="checkbox" name="Input.IsUrgent" value="true" checked="@Model.Input.IsUrgent" /> Urgent</label>
             </div>
             <div class="card-footer form-actions">
-                @if (Model.ShowFees) { <span class="collect-total">Total: <strong data-lab-total>0.00</strong></span> }
+                @if (Model.ShowFees) { <span class="collect-total">Net payable: <strong data-lab-total>0.00</strong></span> }
                 <a class="btn btn-light" href="/Lab/Book">Change patient</a>
                 @if (Model.CanCollect && Model.Counters.Count > 0)
                 {

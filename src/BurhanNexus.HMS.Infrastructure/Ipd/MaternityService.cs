@@ -92,6 +92,8 @@ public sealed class NicuInput
     public string? GestationalAge { get; set; }
     public int? BirthWeightGrams { get; set; }
     public int? AdmissionWeightGrams { get; set; }
+    /// <summary>Update 14: admission weight entered in kilograms with decimals (3.4, 2.9, 0.8, 3.25); stored exactly (up to 3 decimals = whole grams).</summary>
+    public decimal? AdmissionWeightKg { get; set; }
     public string? Reason { get; set; }
     public string? ClinicalCondition { get; set; }
     public string? BirthHistory { get; set; }
@@ -549,6 +551,13 @@ public sealed class MaternityService : IMaternityService
         var baby = await _db.Patients.AsNoTracking().FirstOrDefaultAsync(p => p.Id == i.PatientId, ct);
         if (baby is null) return ServiceResult<IpdAdmission>.Fail("Select the newborn patient.");
         if (T(i.Reason, 500) is null) return ServiceResult<IpdAdmission>.Fail("Enter the admission reason.");
+        if (i.AdmissionWeightKg is decimal kg)
+        {
+            // Update 14: kg with decimals – no rounding: more than 3 decimals (below one gram) is refused instead of being rounded.
+            if (kg < 0.2m || kg > 10m) return ServiceResult<IpdAdmission>.Fail("The admission weight must be between 0.2 and 10 kg.");
+            if (decimal.Round(kg, 3) != kg) return ServiceResult<IpdAdmission>.Fail("Enter the admission weight in kg with at most 3 decimals (e.g. 3.25).");
+            i.AdmissionWeightGrams = (int)(kg * 1000m);
+        }
         if (i.NewbornRecordId is long rid && !await _db.NewbornRecords.AnyAsync(r => r.Id == rid && r.NewbornPatientId == baby.Id, ct))
             return ServiceResult<IpdAdmission>.Fail("The birth record does not belong to this baby.");
         if (!await _db.IpdBeds.AnyAsync(b => b.Id == i.BedId && b.Ward!.Type == WardType.Nicu, ct)) return ServiceResult<IpdAdmission>.Fail("Select a NICU cot / incubator.");

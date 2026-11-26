@@ -32,6 +32,8 @@ public sealed class LabBookingInput
     /// <summary>Optional discounts per test id (needs the Phase 3 "Give Discounts" permission).</summary>
     public Dictionary<int, decimal> Discounts { get; set; } = new();
     public string? DiscountReason { get; set; }
+    /// <summary>Update 14: one discount amount for the whole visit (spread over the tests in proportion to their fees). The reason is optional.</summary>
+    public decimal? TotalDiscount { get; set; }
     // ---- Update 10: payment recorded at booking (Phase 3 receipt) ----
     public bool CollectPayment { get; set; }
     public int? CounterId { get; set; }
@@ -173,8 +175,9 @@ public sealed class LabService : ILabService
             errors.Add("The visit does not belong to this patient.");
         if (i.IpdAdmissionId is long ipd && !await _db.IpdAdmissions.AnyAsync(a => a.Id == ipd && a.PatientId == i.PatientId, ct))
             errors.Add("The admission does not belong to this patient.");
-        if (i.Discounts.Any(d => d.Value != 0) && !canDiscount) errors.Add("You are not allowed to give discounts.");
-        if (i.Discounts.Any(d => d.Value > 0) && T(i.DiscountReason, 200) is null) errors.Add("Enter the reason for the discount.");
+        if ((i.Discounts.Any(d => d.Value != 0) || i.TotalDiscount is > 0) && !canDiscount) errors.Add("You are not allowed to give discounts.");
+        // Update 14: the discount reason is optional.
+        if (i.TotalDiscount is decimal td0 && (td0 < 0 || !FinanceMath.IsMoney(td0))) errors.Add("Enter a valid discount (at most 2 decimals).");
         if (i.CollectPayment && !canCollect) errors.Add("You are not allowed to collect laboratory payments.");
         if (i.CollectPayment && i.PaymentMethodId is null) errors.Add("Select the payment method.");
         if (i.AmountReceived is decimal ar0 && (ar0 < 0 || !FinanceMath.IsMoney(ar0))) errors.Add("Enter a valid amount received.");
@@ -197,7 +200,7 @@ public sealed class LabService : ILabService
             };
             _db.LabOrders.Add(order);
             await _db.SaveChangesAsync(ct);
-            var add = await AddItemsAsync(order, patient, testIds, i.Discounts, T(i.DiscountReason, 200), today, ct);
+            var add = await AddItemsAsync(order, patient, testIds, i.Discounts, T(i.DiscountReason, 200), today, ct, i.TotalDiscount ?? 0);
             if (!add.Succeeded)
             {
                 await tx.RollbackAsync(ct);
@@ -289,7 +292,7 @@ public sealed class LabService : ILabService
 
     /// <summary>Adds tests to an order: definition + reference-range snapshot, shared samples per sample type and a Phase 3 charge per test.</summary>
     private async Task<ServiceResult> AddItemsAsync(LabOrder order, Patient patient, IReadOnlyList<int> testIds, IReadOnlyDictionary<int, decimal> discounts,
-        string? discountReason, DateOnly today, CancellationToken ct)
+        string? discountReason, DateOnly today, CancellationToken ct, decimal totalDiscount = 0)
     {
         var tests = await _db.LabTests.AsNoTracking().Include(t => t.Category).Include(t => t.SampleType).Include(t => t.ServiceItem)
             .Include(t => t.Parameters.Where(p => p.IsActive).OrderBy(p => p.SortOrder).ThenBy(p => p.Id)).ThenInclude(p => p.Ranges)
@@ -363,10 +366,22 @@ public sealed class LabService : ILabService
         await _db.SaveChangesAsync(ct);
 
         // Phase 3 billing: one charge (bill line) per test at today's price; paid later at any cash counter.
+        var fees = new List<decimal>();
+        foreach (var (_, t) in newItems) fees.Add(await _finance.FeeOnAsync(t.ServiceItemId, today, ct));
+        decimal[]? spread = null;
+        if (totalDiscount > 0)
+        {
+            // Update 14: one discount for the visit, e.g. total 1000 − discount 200 = net 800.
+            var gross = fees.Sum();
+            if (totalDiscount > gross) return ServiceResult.Fail($"The discount ({totalDiscount:N2}) is more than the total ({gross:N2}).");
+            spread = SpreadDiscount(totalDiscount, fees);
+        }
+        var ix = 0;
         foreach (var (item, t) in newItems)
         {
-            var fee = await _finance.FeeOnAsync(t.ServiceItemId, today, ct);
-            var discount = Math.Clamp(discounts.GetValueOrDefault(t.Id), 0, fee);
+            var fee = fees[ix];
+            var discount = spread?[ix] ?? Math.Clamp(discounts.GetValueOrDefault(t.Id), 0, fee);
+            ix++;
             if (!FinanceMath.IsMoney(discount)) return ServiceResult.Fail("Discounts may have at most 2 decimals.");
             var charge = new Charge
             {
@@ -384,6 +399,25 @@ public sealed class LabService : ILabService
         }
         await _db.SaveChangesAsync(ct);
         return ServiceResult.Ok();
+    }
+
+    /// <summary>Update 14: spreads one visit discount over the tests in proportion to their fees (whole paisa, each at most its fee, the sum exactly the discount).</summary>
+    public static decimal[] SpreadDiscount(decimal total, IReadOnlyList<decimal> fees)
+    {
+        var res = new decimal[fees.Count];
+        var gross = fees.Sum();
+        if (total <= 0 || gross <= 0) return res;
+        if (total >= gross) { for (var k = 0; k < fees.Count; k++) res[k] = fees[k]; return res; }
+        decimal given = 0;
+        for (var k = 0; k < fees.Count; k++) { res[k] = Math.Floor(total * fees[k] / gross * 100m) / 100m; given += res[k]; }
+        var left = total - given;
+        foreach (var k in Enumerable.Range(0, fees.Count).OrderByDescending(k => fees[k]).ThenBy(k => k))
+        {
+            var add = Math.Min(left, fees[k] - res[k]);
+            res[k] += add; left -= add;
+            if (left <= 0) break;
+        }
+        return res;
     }
 
     /// <summary>Most specific matching range: pregnancy range for a pregnant patient, gender-specific beats "both", narrower age band beats wider.</summary>

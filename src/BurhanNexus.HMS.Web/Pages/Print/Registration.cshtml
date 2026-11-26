@@ -1,0 +1,78 @@
+@page "{id:long}"
+@model BurhanNexus.HMS.Web.Pages.Print.RegistrationModel
+@{
+    Layout = null;
+    var e = Model.Encounter;
+    var p = Model.Patient;
+    var h = Model.Hospital;
+    var fee = Model.Charges.Sum(c => c.Fee);
+    var discount = Model.Charges.Sum(c => c.Discount);
+    var paid = Model.Charges.Sum(c => c.PaidAmount);
+    var balance = Model.Charges.Sum(c => c.NetAmount - c.PaidAmount);
+    var receiptNo = Model.Receipts.Count == 0 ? null : string.Join(", ", Model.Receipts.Select(r => r.ReceiptNumber));
+    var methods = string.Join(", ", Model.Receipts.Select(r => r.PaymentMethod?.Name).Where(n => n is not null).Distinct());
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Registration receipt @e.EncounterNumber</title>
+    <link rel="stylesheet" href="~/css/thermal.css" asp-append-version="true" />
+    <script src="~/js/lab-report.js" asp-append-version="true" defer></script>
+</head>
+<body class="thermal-body w@(Model.Width)" data-registration-receipt data-width="@Model.Width" data-autoprint="@(Model.AutoPrint ? "1" : null)">
+<div class="t-toolbar no-print">
+    <div class="t-row">
+        <strong>Registration receipt @e.EncounterNumber</strong>
+        <a class="t-btn light" href="@Model.BackUrl">&larr; Visit</a>
+        <a class="t-btn light @(Model.Width == 58 ? "on" : "")" href="?width=58">58 mm</a>
+        <a class="t-btn light @(Model.Width == 80 ? "on" : "")" href="?width=80">80 mm</a>
+        <button type="button" class="t-btn" data-print-now data-test="registration-print">Print receipt</button>
+        <a class="t-btn light" href="@Model.SlipUrl" data-test="doctor-slip">@(Model.IsEmergency ? "Emergency slip" : "OPD slip") (A5 / A4)</a>
+    </div>
+    <div class="t-small">Prints on the receipt (thermal) printer – roll width only, no header, footer or blank paper.</div>
+</div>
+<main class="slip-wrap">
+    <article class="t-slip" data-receipt="@(receiptNo ?? e.EncounterNumber)" data-visit="@e.EncounterNumber">
+        @if (Model.Printer.ShowLogo && h.HasLogo) { <img class="t-logo" src="/branding/logo?v=@h.LogoVersion" alt="" /> }
+        <div class="t-hosp">@h.HospitalName</div>
+        @if (!string.IsNullOrWhiteSpace(h.ContactNumber)) { <div class="t-small">@h.ContactNumber</div> }
+        <div class="t-sep"></div>
+        <div class="t-title">@(Model.IsEmergency ? "EMERGENCY REGISTRATION" : "REGISTRATION RECEIPT")</div>
+        @if (e.TokenNumber is int tok) { <div class="t-token-label">TOKEN NO.</div><div class="t-token" data-field="token">@tok</div> }
+        <table class="t-kv">
+            <tr><td>Receipt no.</td><td data-field="receipt">@(receiptNo ?? e.EncounterNumber)</td></tr>
+            <tr><td>Visit no.</td><td data-field="visit">@e.EncounterNumber</td></tr>
+            <tr><td>Date / time</td><td>@Fmt.DateTimeText(e.EncounterUtc)</td></tr>
+        </table>
+        <div class="t-sep"></div>
+        <div class="t-patient" data-field="patient">@p.FullName</div>
+        <table class="t-kv">
+            <tr><td>Patient ID</td><td data-field="patient-id">@p.PatientNumber</td></tr>
+            <tr><td>Age / Gender</td><td>@Model.AgeText / @Model.GenderText</td></tr>
+            @if (p.GuardianName is not null) { <tr><td>Father / Husband</td><td>@Model.Guardian</td></tr> }
+            @if (p.MobileNumber is not null) { <tr><td>Mobile</td><td>@p.MobileNumber</td></tr> }
+            @if ((p.CityOrVillage ?? p.Address) is { Length: > 0 } addr) { <tr><td>Address</td><td>@addr</td></tr> }
+            @if (e.Doctor is not null) { <tr><td>Doctor</td><td data-field="doctor">@e.Doctor.Name</td></tr> }
+            @if (e.Department is not null) { <tr><td>Department</td><td>@e.Department.Name</td></tr> }
+        </table>
+        @if (Model.Charges.Count > 0)
+        {
+            <div class="t-sep"></div>
+            <table class="t-lines">
+                @foreach (var c in Model.Charges) { <tr><td>@c.ServiceName</td><td class="r">@Fmt.Money(c.Fee)</td></tr> }
+            </table>
+            <table class="t-kv">
+                <tr><td>Amount</td><td data-field="total">@Fmt.Money(fee)</td></tr>
+                @if (discount > 0) { <tr><td>Discount</td><td data-field="discount">@Fmt.Money(discount)</td></tr> }
+                <tr><td>Paid</td><td data-field="paid">@Fmt.Money(paid)</td></tr>
+                @if (balance > 0) { <tr><td><strong>Balance</strong></td><td><strong>@Fmt.Money(balance)</strong></td></tr> }
+                @if (methods.Length > 0) { <tr><td>Paid by</td><td>@methods</td></tr> }
+            </table>
+        }
+        <div class="t-sep"></div>
+        <div class="t-tiny">Registered by @(e.CreatedByUsername ?? "—") · keep this receipt for your next visit.</div>
+    </article>
+</main>
+</body>
+</html>
