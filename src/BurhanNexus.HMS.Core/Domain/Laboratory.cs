@@ -59,7 +59,9 @@ public class LabTest
 
 public enum LabResultType { Numeric = 1, Text = 2, PositiveNegative = 3, Options = 4,
     /// <summary>Update 9: culture – organism (or "No growth") plus an antibiotic sensitivity table (S / I / R).</summary>
-    Culture = 5 }
+    Culture = 5,
+    /// <summary>Update 15: a section heading inside a test (e.g. "DLC" in the CBC) – no result is entered for it.</summary>
+    Heading = 6 }
 
 public class LabTestParameter
 {

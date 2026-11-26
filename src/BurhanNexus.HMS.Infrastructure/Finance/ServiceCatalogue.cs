@@ -52,7 +52,7 @@ public static class ServiceCatalogue
         yield return R("SVC-RAD-DOP", "Doppler ultrasound", ServiceKind.Ultrasound);
         yield return R("SVC-RAD-CT", "CT scan");
         yield return R("SVC-RAD-MRI", "MRI");
-        yield return R("SVC-RAD-ECG", "ECG");
+        yield return R("SVC-RAD-ECG", "ECG", ServiceKind.Ecg); // Update 15: booked in Radiology
         yield return R("SVC-RAD-ECHO", "Echocardiography");
         yield return R("SVC-RAD-OTH", "Other diagnostic services");
         S EE(string c, string n, ChargeUnit u = ChargeUnit.PerProcedure) => new(c, n, Er, ServiceKind.Procedure, u);
@@ -129,7 +129,7 @@ public static class ServiceCatalogue
         ServiceKind.OpdRegistration or ServiceKind.Consultation => Opd,
         ServiceKind.EmergencyRegistration => Er,
         ServiceKind.Laboratory => Lab,
-        ServiceKind.XRay or ServiceKind.Ultrasound => Rad,
+        ServiceKind.XRay or ServiceKind.Ultrasound or ServiceKind.Ecg => Rad,
         ServiceKind.Procedure => Proc,
         ServiceKind.Pharmacy => Pharm,
         ServiceKind.Inpatient => Ipd,
@@ -180,7 +180,7 @@ public static class ServiceCatalogue
             if (s.ChargeUnit == ChargeUnit.Fixed)
                 s.ChargeUnit = s.Kind switch
                 {
-                    ServiceKind.Laboratory or ServiceKind.XRay or ServiceKind.Ultrasound => ChargeUnit.PerTest,
+                    ServiceKind.Laboratory or ServiceKind.XRay or ServiceKind.Ultrasound or ServiceKind.Ecg => ChargeUnit.PerTest,
                     ServiceKind.Consultation or ServiceKind.OpdRegistration or ServiceKind.EmergencyRegistration => ChargeUnit.PerVisit,
                     ServiceKind.Procedure => ChargeUnit.PerProcedure,
                     ServiceKind.Pharmacy => ChargeUnit.PerItem,

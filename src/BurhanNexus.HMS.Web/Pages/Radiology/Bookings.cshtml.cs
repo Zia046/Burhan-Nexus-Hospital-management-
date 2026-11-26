@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace BurhanNexus.HMS.Web.Pages.Radiology;
 
 /// <summary>All radiology bookings of a period (any status, cancelled included).</summary>
-[HasPermission(Perm.RadCreateBooking, Perm.RadEditBooking, Perm.RadViewXRay, Perm.RadViewUltrasound)]
+[HasPermission(Perm.RadCreateBooking, Perm.RadEditBooking, Perm.RadViewXRay, Perm.RadViewUltrasound, Perm.RadViewEcg)]
 public class BookingsModel : RadiologyListModel
 {
     [BindProperty(SupportsGet = true)] public DateOnly? From { get; set; }

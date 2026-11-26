@@ -10,7 +10,8 @@
             <div class="field"><label for="Input_Name">Template name</label><input id="Input_Name" name="Input.Name" value="@i.Name" maxlength="120" /></div>
             <div class="field"><label for="Input_Modality">Modality</label><select id="Input_Modality" name="Input.Modality">
                 <option value="XRay" selected="@(i.Modality == RadiologyModality.XRay)">X-Ray</option>
-                <option value="Ultrasound" selected="@(i.Modality == RadiologyModality.Ultrasound)">Ultrasound</option></select></div>
+                <option value="Ultrasound" selected="@(i.Modality == RadiologyModality.Ultrasound)">Ultrasound</option>
+                <option value="Ecg" selected="@(i.Modality == RadiologyModality.Ecg)">ECG</option></select></div>
         </div>
         <div class="field"><label for="Input_Technique">Technique</label><textarea id="Input_Technique" name="Input.Technique" rows="2" maxlength="2000">@i.Technique</textarea></div>
         <div class="field"><label for="Input_Findings">Findings</label><textarea id="Input_Findings" name="Input.Findings" rows="10" maxlength="8000">@i.Findings</textarea></div>

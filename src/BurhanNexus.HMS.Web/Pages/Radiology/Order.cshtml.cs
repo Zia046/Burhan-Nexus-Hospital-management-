@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace BurhanNexus.HMS.Web.Pages.Radiology;
 
 /// <summary>One radiology booking (order): its examinations, payment, referral details and added examinations.</summary>
-[HasPermission(Perm.RadViewXRay, Perm.RadViewUltrasound, Perm.RadCreateBooking, Perm.RadEditBooking, Perm.RadViewHistory, Perm.RadEnterReport, Perm.RadVerifyReport)]
+[HasPermission(Perm.RadViewXRay, Perm.RadViewUltrasound, Perm.RadViewEcg, Perm.RadCreateBooking, Perm.RadEditBooking, Perm.RadViewHistory, Perm.RadEnterReport, Perm.RadVerifyReport)]
 public class OrderModel : RadiologyPageModel
 {
     public RadiologyOrder Order { get; private set; } = null!;
@@ -20,6 +20,9 @@ public class OrderModel : RadiologyPageModel
     public IReadOnlyList<Doctor> Doctors { get; private set; } = Array.Empty<Doctor>();
     public IReadOnlyList<Department> Departments { get; private set; } = Array.Empty<Department>();
     public bool ShowFees { get; private set; }
+    /// <summary>Update 15: receipts of this booking (reprint) – the one just received is printed straight away.</summary>
+    public IReadOnlyList<Receipt> Receipts { get; private set; } = Array.Empty<Receipt>();
+    [BindProperty(SupportsGet = true, Name = "receipt")] public long? NewReceipt { get; set; }
 
     [BindProperty] public RadiologyOrderDetailsInput Details { get; set; } = new();
     [BindProperty] public List<int> AddServiceIds { get; set; } = new();
@@ -35,6 +38,12 @@ public class OrderModel : RadiologyPageModel
         Nav("rad-bookings", "bookings");
         ShowFees = await CanAsync(Perm.RadViewFinancial);
         Payments = ShowFees ? await Rad.PaymentsAsync(id) : new Dictionary<long, ExamPayment>();
+        if (ShowFees)
+        {
+            var db = HttpContext.RequestServices.GetRequiredService<HmsDbContext>();
+            Receipts = await db.Receipts.AsNoTracking()
+                .Where(r => db.ReceiptLines.Any(l => l.ReceiptId == r.Id && l.Charge!.RadiologyOrderId == id)).OrderBy(r => r.Id).ToListAsync();
+        }
         if (await CanAsync(Perm.RadEditBooking))
         {
             var only = await OnlyModalityAsync();

@@ -29,6 +29,7 @@
 .lr-results { width: 100%; border-collapse: collapse; }
 .lr-results th { text-align: left; font-size: 11px; color: #475569; border-bottom: 1px solid #94a3b8; padding: 2px 6px; }
 .lr-results td { padding: 2.5px 6px; border-bottom: 1px dotted #cbd5e1; }
+.lr-results tr.lr-heading td { padding-top: 5px; border-bottom: 1px solid #94a3b8; text-transform: uppercase; letter-spacing: .03em; } /* Update 15: CBC "DLC" heading */
 .lr-results td.val { font-weight: 700; width: 18%; }
 .lr-results td.flag { width: 6%; font-weight: 800; color: #b91c1c; }
 .lr-results tr.abn td.val { color: #b91c1c; }

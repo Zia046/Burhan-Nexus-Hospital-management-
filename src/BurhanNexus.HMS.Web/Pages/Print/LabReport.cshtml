@@ -95,8 +95,15 @@
                     <table class="lr-results">
                         <thead><tr><th>Test</th><th>Result</th><th>Flag</th><th>Unit</th><th>Reference range</th></tr></thead>
                         <tbody>
-                        @foreach (var v in i.Values.Where(v => v.Value != null).OrderBy(v => v.SortOrder))
+                        @{ var ordered = i.Values.OrderBy(v => v.SortOrder).ThenBy(v => v.Id).ToList(); }
+                        @foreach (var v in ordered.Where((v, ix) => v.Value != null || v.ResultType == LabResultType.Heading
+                                     && ordered.Skip(ix + 1).TakeWhile(n => n.ResultType != LabResultType.Heading).Any(n => n.Value != null)))
                         {
+                            if (v.ResultType == LabResultType.Heading)
+                            {
+                                <tr class="lr-heading" data-heading="@v.Name"><td colspan="5"><strong>@v.Name</strong></td></tr>
+                                continue;
+                            }
                             <tr class="@(v.Flag != LabFlag.None ? "abn" : "")"><td>@v.Name</td><td class="val">@v.Value</td>
                                 <td class="flag">@(v.Flag switch { LabFlag.High => "H", LabFlag.Low => "L", LabFlag.CriticalHigh => "HH", LabFlag.CriticalLow => "LL", LabFlag.Abnormal => "*", _ => "" })</td>
                                 <td>@v.Unit</td><td>@v.ReferenceDisplay</td></tr>

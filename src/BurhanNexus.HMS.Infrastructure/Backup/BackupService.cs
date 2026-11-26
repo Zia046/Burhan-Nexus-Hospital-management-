@@ -23,6 +23,11 @@ public interface IBackupService
     Task<ServiceResult> DeleteAsync(int id, CancellationToken ct = default);
     /// <summary>Restores the database. Always creates a safety backup of the current data first.</summary>
     Task<ServiceResult<string>> RestoreAsync(int id, string actorPassword, CancellationToken ct = default);
+    /// <summary>Update 15: daily automatic backup – creates today's complete backup if there is none yet, then deletes automatic
+    /// backups older than the retention period (only after the new one succeeded; manual backups are never touched).</summary>
+    Task<ServiceResult<BackupHistory?>> RunDailyAsync(DateTime localNow, CancellationToken ct = default);
+    /// <summary>Update 15: deletes automatic backups (files + history) started before the cut-off. Returns the number removed.</summary>
+    Task<int> PruneScheduledAsync(DateTime cutoffUtc, CancellationToken ct = default);
     string BackupDirectory { get; }
     string? ToolsStatus();
 }
@@ -165,6 +170,37 @@ public sealed class BackupService : IBackupService
             $"{kind} backup created: {fileName} ({record.SizeBytes:N0} bytes{(fileCount > 0 ? $", {fileCount} radiology file(s)" : "")})", newValues: new { fileName, record.SizeBytes, record.Sha256, radiologyFiles = fileCount });
         await _db.SaveChangesAsync(ct);
         return ServiceResult<BackupHistory>.Ok(record);
+    }
+
+    public async Task<ServiceResult<BackupHistory?>> RunDailyAsync(DateTime localNow, CancellationToken ct = default)
+    {
+        var dayStartUtc = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(localNow.Date, DateTimeKind.Unspecified), TimeZoneInfo.Local);
+        var done = await _db.BackupHistory.AsNoTracking()
+            .AnyAsync(b => b.Kind == BackupKind.Scheduled && b.Status == BackupStatus.Completed && b.StartedUtc >= dayStartUtc, ct);
+        if (done) return ServiceResult<BackupHistory?>.Ok(null);
+        var r = await CreateAsync(BackupKind.Scheduled, "Automatic daily backup", ct);
+        if (!r.Succeeded) return ServiceResult<BackupHistory?>.Fail(r.Errors.ToArray());
+        var days = Math.Max(1, _options.AutoBackupRetentionDays);
+        await PruneScheduledAsync(Now.AddDays(-days), ct);
+        return ServiceResult<BackupHistory?>.Ok(r.Value);
+    }
+
+    public async Task<int> PruneScheduledAsync(DateTime cutoffUtc, CancellationToken ct = default)
+    {
+        var old = await _db.BackupHistory.Where(b => b.Kind == BackupKind.Scheduled && b.Status != BackupStatus.InProgress && b.StartedUtc < cutoffUtc).ToListAsync(ct);
+        // Never delete the newest completed backup, whatever its age.
+        var newest = await _db.BackupHistory.AsNoTracking().Where(b => b.Status == BackupStatus.Completed).OrderByDescending(b => b.StartedUtc).Select(b => (int?)b.Id).FirstOrDefaultAsync(ct);
+        var removed = 0;
+        foreach (var b in old.Where(b => b.Id != newest))
+        {
+            var path = SafePath(b.FileName);
+            if (path is not null) { TryDelete(path); TryDelete(Radiology.RadiologyFileStore.ArchiveNameFor(path)); }
+            _db.BackupHistory.Remove(b);
+            _audit.Add(AuditActions.BackupDeleted, "Backup", b.Id.ToString(), $"Automatic backup older than the retention period deleted: {b.FileName}", new { b.FileName, b.SizeBytes, b.StartedUtc });
+            removed++;
+        }
+        if (removed > 0) await _db.SaveChangesAsync(ct);
+        return removed;
     }
 
     public async Task<ServiceResult<string>> GetFileForDownloadAsync(int id, CancellationToken ct = default)

@@ -152,10 +152,11 @@ try {
   await shot(page, "p2-06-opd-register-government");
   await submit("button:has-text('Register')");
   const regUrl = page.url().split("?")[0].replace(base, "");
-  step("OPD registration lands on the thermal receipt: " + regUrl);
-  await shot(page, "p2-06b-registration-thermal-receipt");
-  await pdf(regUrl, "sample-registration-receipt-thermal-80mm.pdf");
-  const govUrl = regUrl.replace("/Print/Registration/", "/Print/Opd/");
+  step("Government OPD registration lands on the OPD slip (no receipt): " + regUrl);
+  if (!regUrl.startsWith("/Print/Opd/")) throw new Error("Government OPD registration should open the OPD slip, got " + regUrl);
+  await shot(page, "p2-06b-government-opd-slip-direct");
+  const govUrl = regUrl;
+  await pdf(govUrl.replace("/Print/Opd/", "/Print/Registration/"), "sample-registration-receipt-thermal-80mm.pdf");
   await pdf(govUrl + "?paper=A5", "sample-opd-slip-A5.pdf");
   await pdf(govUrl + "?paper=A4", "sample-opd-slip-A4.pdf");
 

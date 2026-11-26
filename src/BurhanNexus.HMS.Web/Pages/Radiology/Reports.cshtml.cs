@@ -35,6 +35,7 @@ public class ReportsModel : RadiologyPageModel
         ("summary", "Daily / monthly examination statistics", false),
         ("xray", "Daily X-Ray examinations", false),
         ("ultrasound", "Daily Ultrasound examinations", false),
+        ("ecg", "Daily ECG examinations", false),
         ("services", "Service-wise examination count", false),
         ("departments", "Department-wise referrals", false),
         ("doctors", "Doctor-wise referrals", false),
@@ -75,6 +76,7 @@ public class ReportsModel : RadiologyPageModel
         {
             "xray" => RadiologyModality.XRay,
             "ultrasound" => RadiologyModality.Ultrasound,
+            "ecg" => RadiologyModality.Ecg,
             _ => only ?? (Enum.TryParse<RadiologyModality>(Modality, true, out var m) ? m : null),
         };
         if (only is not null && ModalityFilter != only) return Forbid();
@@ -121,13 +123,13 @@ public class ReportsModel : RadiologyPageModel
                 .Concat(list.Select(r => new object?[] { r.Name, r.Modality ?? "", r.Booked, r.Reported, r.Pending, r.Cancelled })).ToArray();
         return Report switch
         {
-            "summary" => new[] { new object?[] { "Period", "X-Ray", "Ultrasound", "Total", "Reported", "Cancelled" } }
-                .Concat(d.Activity.Select(a => new object?[] { Label(a.Period), a.XRay, a.Ultrasound, a.XRay + a.Ultrasound, a.Completed, a.Cancelled })).ToArray(),
+            "summary" => new[] { new object?[] { "Period", "X-Ray", "Ultrasound", "ECG", "Total", "Reported", "Cancelled" } }
+                .Concat(d.Activity.Select(a => new object?[] { Label(a.Period), a.XRay, a.Ultrasound, a.Ecg, a.XRay + a.Ultrasound + a.Ecg, a.Completed, a.Cancelled })).ToArray(),
             "services" => Counts(d.ByService, "Service"),
             "departments" => Counts(d.ByDepartment, "Referring department"),
             "doctors" => Counts(d.ByDoctor, "Referring doctor"),
-            "revenue" => new[] { new object?[] { "Period", "Receipts", "X-Ray", "Ultrasound", "Total (net of refunds)", "Refunded" } }
-                .Concat((d.Revenue ?? new List<RadiologyRevenueRow>()).Select(r => new object?[] { Label(r.Period), r.Receipts, r.XRay, r.Ultrasound, r.Total, r.Refunded })).ToArray(),
+            "revenue" => new[] { new object?[] { "Period", "Receipts", "X-Ray", "Ultrasound", "ECG", "Total (net of refunds)", "Refunded" } }
+                .Concat((d.Revenue ?? new List<RadiologyRevenueRow>()).Select(r => new object?[] { Label(r.Period), r.Receipts, r.XRay, r.Ultrasound, r.Ecg, r.Total, r.Refunded })).ToArray(),
             _ => new[] { new object?[] { "Date", "Token", "Order", "Patient ID", "Patient", "Examination", "Department", "Status", "Note" } }
                 .Concat(Rows.Select(r => new object?[] { r.ScheduledDate, r.TokenNumber, r.OrderNumber, r.PatientNumber, r.PatientName, r.ServiceName, r.ReferringDepartment ?? "",
                     RadiologyWorkflowService.Label(r.Status), r.Status == RadiologyExamStatus.Cancelled ? r.CorrectionReason : r.VerifiedBy is null ? "" : "Verified by " + r.VerifiedBy })).ToArray(),

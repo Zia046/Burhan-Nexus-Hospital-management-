@@ -64,6 +64,7 @@ public sealed class HmsFactory : WebApplicationFactory<Program>
         builder.UseSetting("Hms:DataDirectory", DataDir);
         builder.UseSetting("Hms:BackupDirectory", BackupDir);
         builder.UseSetting("Hms:LoginRateLimitPerMinute", "100000");
+        builder.UseSetting("Hms:AutoBackup", "false"); // Update 15: the daily backup is tested directly
         builder.UseSetting("Testing:LicensePublicKeyPem", TestKeys.Instance.PublicPem);
         builder.ConfigureTestServices(services =>
         {

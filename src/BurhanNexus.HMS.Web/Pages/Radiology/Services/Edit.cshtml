@@ -9,7 +9,8 @@
         <div class="grid-2">
             <div class="field"><label for="Input_Modality">Modality</label><select id="Input_Modality" name="Input.Modality">
                 <option value="XRay" selected="@(i.Modality == RadiologyModality.XRay)">X-Ray</option>
-                <option value="Ultrasound" selected="@(i.Modality == RadiologyModality.Ultrasound)">Ultrasound</option></select></div>
+                <option value="Ultrasound" selected="@(i.Modality == RadiologyModality.Ultrasound)">Ultrasound</option>
+                <option value="Ecg" selected="@(i.Modality == RadiologyModality.Ecg)">ECG</option></select></div>
             <div class="field"><label for="Input_Code">Code</label><input id="Input_Code" name="Input.Code" value="@i.Code" maxlength="24" placeholder="e.g. XR-WRIST" /></div>
             <div class="field"><label for="Input_Name">Service name</label><input id="Input_Name" name="Input.Name" value="@i.Name" maxlength="150" /></div>
             <div class="field"><label for="Input_BodyPart">Body part / examination type</label><input id="Input_BodyPart" name="Input.BodyPart" value="@i.BodyPart" maxlength="100" /></div>

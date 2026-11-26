@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace BurhanNexus.HMS.Web.Pages.Radiology;
 
 /// <summary>One examination: queue steps, report (read-only), verification, release, printing, attachments and full history.</summary>
-[HasPermission(Perm.RadViewXRay, Perm.RadViewUltrasound, Perm.RadEnterReport, Perm.RadVerifyReport, Perm.RadViewHistory, Perm.RadDashboard)]
+[HasPermission(Perm.RadViewXRay, Perm.RadViewUltrasound, Perm.RadViewEcg, Perm.RadEnterReport, Perm.RadVerifyReport, Perm.RadViewHistory, Perm.RadDashboard)]
 [RequestFormLimits(MultipartBodyLengthLimit = 210_000_000)]
 [RequestSizeLimit(210_000_000)]
 public class ExamModel : RadiologyPageModel
@@ -38,7 +38,7 @@ public class ExamModel : RadiologyPageModel
         if (e is null) return NotFound();
         if (!await CanSeeAsync(e.Modality)) return Forbid();
         Exam = e;
-        Nav(e.Modality == RadiologyModality.XRay ? "rad-xray" : "rad-ultrasound", e.Modality == RadiologyModality.XRay ? "xray" : "ultrasound");
+        Nav("rad-" + NavKey(e.Modality), NavKey(e.Modality));
         Settings = await Catalog.SettingsAsync();
         ShowFees = await CanAsync(Perm.RadViewFinancial);
         if (ShowFees) Payment = (await Rad.PaymentsAsync(e.OrderId)).GetValueOrDefault(e.Id);

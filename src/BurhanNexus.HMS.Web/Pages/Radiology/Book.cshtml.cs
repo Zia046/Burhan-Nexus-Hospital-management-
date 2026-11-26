@@ -54,6 +54,10 @@ public class BookModel : RadiologyPageModel
     public bool ShowFees { get; private set; }
     public bool CanDiscount { get; private set; }
     public bool CanRegister { get; private set; }
+    /// <summary>Update 15: payment received at booking – one receipt (like the laboratory booking).</summary>
+    public bool CanCollect { get; private set; }
+    public IReadOnlyList<PaymentMethod> Methods { get; private set; } = Array.Empty<PaymentMethod>();
+    public IReadOnlyList<Counter> Counters { get; private set; } = Array.Empty<Counter>();
     public DateOnly Today { get; private set; }
 
     private async Task LoadAsync()
@@ -62,6 +66,14 @@ public class BookModel : RadiologyPageModel
         ShowFees = await CanAsync(Perm.RadViewFinancial);
         CanDiscount = ShowFees && await CanAsync(Perm.FinanceDiscount);
         CanRegister = await CanAsync(Perm.PatientsAdd);
+        CanCollect = ShowFees && await CanAsync(Perm.FinanceCollect) && AdmissionId is null; // inpatient examinations go on the IPD account
+        if (CanCollect)
+        {
+            var finance = HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Finance.IFinanceSetupService>();
+            Methods = await finance.PaymentMethodsAsync(activeOnly: true);
+            if (User.IsSystemAdministrator()) Counters = (await finance.CountersAsync(activeOnly: true)).Select(c => c.Counter).ToList();
+            else if (CurrentUserId is int uid) Counters = await finance.CountersOfUserAsync(uid);
+        }
         Settings = await Catalog.SettingsAsync();
         Today = await _clock.TodayAsync();
         // Staff of one modality only see (and book) their own examinations.
@@ -127,7 +139,8 @@ public class BookModel : RadiologyPageModel
             if (other) return Forbid();
         }
         var canDiscount = await CanAsync(Perm.RadViewFinancial) && await CanAsync(Perm.FinanceDiscount);
-        var r = await Rad.BookAsync(Input, canDiscount);
+        var canCollect = await CanAsync(Perm.RadViewFinancial) && await CanAsync(Perm.FinanceCollect) && AdmissionId is null;
+        var r = await Rad.BookAsync(Input, canDiscount, default, canCollect);
         if (!r.Succeeded)
         {
             await LoadAsync();
@@ -137,7 +150,9 @@ public class BookModel : RadiologyPageModel
         var tokens = string.Join(", ", r.Value!.Order.Exams.GroupBy(e => e.Modality).Select(g => $"{RadiologyCatalogService.Label(g.Key)} token {g.First().TokenNumber}"));
         FlashSuccess = r.Value.WasDuplicate
             ? $"This booking was already saved as {r.Value.Order.OrderNumber}. No second order was created."
-            : $"Radiology order {r.Value.Order.OrderNumber} booked ({tokens}). Fees are payable at the cash counter.";
-        return Redirect($"/Radiology/Order/{r.Value.Order.Id}");
+            : r.Value.ReceiptId is not null
+                ? $"Radiology order {r.Value.Order.OrderNumber} booked ({tokens}) and the payment received. Print the receipt."
+                : $"Radiology order {r.Value.Order.OrderNumber} booked ({tokens}). Fees are payable at the cash counter.";
+        return Redirect($"/Radiology/Order/{r.Value.Order.Id}" + (r.Value.ReceiptId is long rid ? $"?receipt={rid}" : ""));
     }
 }

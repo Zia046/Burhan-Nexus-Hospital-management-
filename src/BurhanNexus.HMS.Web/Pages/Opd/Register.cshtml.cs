@@ -93,8 +93,13 @@ public class RegisterModel : HmsPageModel
         FlashSuccess = $"OPD visit {enc.EncounterNumber} registered" + (enc.TokenNumber is int t ? $" – token {t}" : "") + ".";
         var settings = await _setup.GetSettingsAsync();
         if (await CanAsync(Perm.OpdPrint))
-            // Update 14: the registration receipt prints on the thermal printer (the A5 / A4 slip is one click away on it).
+        {
+            // Update 15: a Government hospital prints the OPD slip (A4 / A5 from the registration settings) straight away – no fee,
+            // no receipt. Other hospitals keep the Update 14 thermal registration receipt.
+            if ((await _hospital.GetConfigurationAsync()).HospitalType == HospitalType.Government)
+                return Redirect($"/Print/Opd/{enc.Id}?autoprint=true");
             return Redirect($"/Print/Registration/{enc.Id}" + (settings.AutoPrintAfterRegistration ? "?autoprint=true" : ""));
+        }
         return Redirect($"/Opd/Visit/{enc.Id}");
     }
 }

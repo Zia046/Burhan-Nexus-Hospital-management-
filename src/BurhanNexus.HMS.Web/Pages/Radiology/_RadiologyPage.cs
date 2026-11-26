@@ -10,7 +10,10 @@ public abstract class RadiologyPageModel : HmsPageModel
     protected IRadiologyService Rad => HttpContext.RequestServices.GetRequiredService<IRadiologyService>();
     protected IRadiologyCatalogService Catalog => HttpContext.RequestServices.GetRequiredService<IRadiologyCatalogService>();
 
-    public static string WorklistPermission(RadiologyModality m) => m == RadiologyModality.XRay ? Perm.RadViewXRay : Perm.RadViewUltrasound;
+    public static string WorklistPermission(RadiologyModality m) => m switch
+    {
+        RadiologyModality.XRay => Perm.RadViewXRay, RadiologyModality.Ecg => Perm.RadViewEcg, _ => Perm.RadViewUltrasound,
+    };
 
     /// <summary>X-Ray staff see X-Ray work, Ultrasound staff see Ultrasound work; reporting / verifying users see both.</summary>
     protected async Task<bool> CanSeeAsync(RadiologyModality m) =>
@@ -19,10 +22,16 @@ public abstract class RadiologyPageModel : HmsPageModel
 
     protected async Task<RadiologyModality?> OnlyModalityAsync()
     {
-        var x = await CanAsync(Perm.RadViewXRay);
-        var u = await CanAsync(Perm.RadViewUltrasound);
-        return x == u ? null : x ? RadiologyModality.XRay : RadiologyModality.Ultrasound;
+        // Update 15: three modalities – staff who may see exactly one of them see only that one.
+        var seen = new List<RadiologyModality>();
+        if (await CanAsync(Perm.RadViewXRay)) seen.Add(RadiologyModality.XRay);
+        if (await CanAsync(Perm.RadViewUltrasound)) seen.Add(RadiologyModality.Ultrasound);
+        if (await CanAsync(Perm.RadViewEcg)) seen.Add(RadiologyModality.Ecg);
+        return seen.Count == 1 ? seen[0] : null;
     }
+
+    /// <summary>Update 15: "xray", "ultrasound" or "ecg" (navigation keys).</summary>
+    public static string NavKey(RadiologyModality m) => m switch { RadiologyModality.XRay => "xray", RadiologyModality.Ecg => "ecg", _ => "ultrasound" };
 
     protected void Nav(string nav, string tab)
     {

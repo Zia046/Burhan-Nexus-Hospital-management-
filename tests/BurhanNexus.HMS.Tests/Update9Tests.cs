@@ -55,14 +55,14 @@ public partial class Update9Tests : Phase2TestBase
             Assert.All(tests, t => Assert.True(t.IsActive && t.RequiresReview && t.ServiceItem!.DefaultFee == 0, t.Code));
             Assert.Equal(tests.Count, tests.Select(t => t.Code).Distinct().Count());
             var cbc = tests.Single(t => t.Code == "CBC-FULL");
-            var hb = cbc.Parameters.Single(p => p.Name == "Haemoglobin");
+            var hb = cbc.Parameters.Single(p => p.Name == "Hemoglobin (HGB)"); // Update 15: default CBC names
             Assert.Equal("g/dL", hb.Unit);
             Assert.Contains(hb.Ranges, r => r.Gender == Gender.Male && r.Low == 13.0m);
             Assert.Contains(hb.Ranges, r => r.IsPregnancy);
             Assert.Contains(tests.Single(t => t.Code == "BG").Parameters, p => p.ResultType == LabResultType.Options && p.Options!.Contains("AB"));
             Assert.Contains(tests.Single(t => t.Code == "HBSAG").Parameters, p => p.Options!.Contains("Reactive"));
             Assert.Contains(tests.Single(t => t.Code == "URNCS").Parameters, p => p.ResultType == LabResultType.Culture);
-            Assert.Equal(1, (await db.LabSettings.SingleAsync()).StandardCatalogueVersion);
+            Assert.Equal(2, (await db.LabSettings.SingleAsync()).StandardCatalogueVersion); // Update 15: version 2 = default CBC
         }
         // Running the seeder again (every start) adds nothing and never changes the laboratory's own edits.
         int count;

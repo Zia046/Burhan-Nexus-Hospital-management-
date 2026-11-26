@@ -69,6 +69,7 @@ public static class DependencyInjection
         services.AddScoped<Finance.IDoctorAccountService, Finance.DoctorAccountService>();
         services.AddScoped<Finance.IFinanceReportService, Finance.FinanceReportService>();
         services.AddScoped<Laboratory.ILabCatalogService, Laboratory.LabCatalogService>();
+        services.AddScoped<Laboratory.ICbcConfigService, Laboratory.CbcConfigService>(); // Update 15
         services.AddScoped<Laboratory.ILabService, Laboratory.LabService>();
         services.AddScoped<Laboratory.ILabReportService, Laboratory.LabReportService>();
         services.AddScoped<Pharmacy.IPharmacyCatalogService, Pharmacy.PharmacyCatalogService>();

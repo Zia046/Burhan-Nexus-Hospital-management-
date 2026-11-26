@@ -1,0 +1,45 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Lab.CbcModel
+@{ ViewData["Title"] = "CBC configuration"; }
+<partial name="_LabNav" />
+<partial name="_ValidationSummary" />
+@if (Model.Test is null)
+{
+    <div class="card"><div class="card-body">The CBC test (code CBC-FULL) is not in the laboratory catalogue.</div></div>
+}
+else
+{
+<form method="post" class="card" data-cbc-config>
+    <div class="card-header"><h2><svg class="icon"><use href="#i-sliders" /></svg> CBC configuration – @Model.Test.Name</h2>
+        <small class="muted">Only active parameters appear in the result entry and on new reports, in this order. Units and reference ranges are not changed here; earlier reports never change.</small></div>
+    <div class="table-wrap">
+        <table class="table">
+            <thead><tr><th>Order</th><th>Parameter name</th><th>Active</th><th>Unit</th><th>Type</th></tr></thead>
+            <tbody>
+            @for (var i = 0; i < Model.Rows.Count; i++)
+            {
+                var row = Model.Rows[i];
+                var p = Model.Param(row.Id);
+                <tr data-cbc-row="@row.Name" class="@(row.IsActive ? "" : "row-muted")">
+                    <td><input type="hidden" name="Rows[@i].Id" value="@row.Id" />
+                        <input type="number" name="Rows[@i].Position" value="@row.Position" min="1" max="99" class="input-num" aria-label="Order" /></td>
+                    <td><input name="Rows[@i].Name" value="@row.Name" maxlength="100" required aria-label="Name" /></td>
+                    <td><label class="check"><input type="checkbox" name="Rows[@i].IsActive" value="true" checked="@row.IsActive" /> Active</label>
+                        <input type="hidden" name="Rows[@i].IsActive" value="false" /></td>
+                    <td>@p?.Unit</td>
+                    <td class="muted">@(p?.ResultType == LabResultType.Heading ? "Heading" : p?.ResultType.ToString())</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer form-actions">
+        <button class="btn btn-primary" type="submit" data-test="save-cbc">Save CBC configuration</button>
+        <a class="btn btn-light" href="/Lab/Catalogue/Test/@Model.Test.Id">Units &amp; reference ranges…</a>
+    </div>
+</form>
+<form method="post" asp-page-handler="Restore" class="card" data-confirm="Restore the default 14 CBC parameters? Other parameters become inactive (nothing is deleted).">
+    <div class="card-body"><strong>Default:</strong> Total WBC, Total RBC, Hemoglobin (HGB), PCV (HCT), MCV, MCH, MCHC, DLC, Neutrophils, Lymphocytes, Monocytes, Eosinophils, Basophils, Platelets Count.</div>
+    <div class="card-footer form-actions"><button class="btn btn-light" type="submit" data-test="restore-cbc">Restore default CBC</button></div>
+</form>
+}

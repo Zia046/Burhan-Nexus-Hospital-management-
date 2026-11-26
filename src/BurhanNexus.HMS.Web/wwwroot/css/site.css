@@ -761,3 +761,4 @@ dialog.modal::backdrop { background: rgba(15,42,74,.45); }
 .input-group { display: flex; gap: 6px; }
 .input-group input { flex: 1; min-width: 0; }
 progress.progress-bar { width: 100%; height: 8px; accent-color: var(--amber-600); }
+.lab-entry tr.lab-heading td { background: #f1f5f9; padding-top: 8px; } /* Update 15 */
