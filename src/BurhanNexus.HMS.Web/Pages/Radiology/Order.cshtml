@@ -13,6 +13,10 @@
     <div><a class="btn btn-light" href="/Radiology/Bookings">&larr; Bookings</a></div>
     <div class="toolbar-actions">
         @if (Model.ShowFees && net > paid) { <a bn-permission="@Perm.FinanceCollect" class="btn btn-primary" href="/Finance/Collect?patientId=@p.Id&radiologyOrderId=@o.Id" data-test="rad-order-collect"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Collect payment</a> }
+        @foreach (var rc in Model.Receipts)
+        {
+            <a class="btn @(Model.NewReceipt == rc.Id ? "btn-primary" : "btn-light")" href="/Print/Receipt/@rc.Id@(Model.NewReceipt == rc.Id ? "?autoprint=true" : "")" target="_blank" data-test="rad-receipt"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Receipt @rc.ReceiptNumber</a>
+        }
         <a bn-permission="@Perm.RadViewHistory" class="btn btn-light" href="/Radiology/Patient/@p.Id">Radiology history</a>
     </div>
 </div>
@@ -38,7 +42,7 @@
             {
                 Model.Payments.TryGetValue(e.Id, out var pay);
                 <tr class="@(e.Status == RadiologyExamStatus.Cancelled ? "row-muted" : "")" data-exam="@e.ServiceCode">
-                    <td><span class="token-badge">@(e.Modality == RadiologyModality.XRay ? "X" : "U")-@e.TokenNumber</span></td>
+                    <td><span class="token-badge">@RadiologyCatalogService.Short(e.Modality)-@e.TokenNumber</span></td>
                     <td><strong>@e.ServiceName</strong><small class="muted block">@RadiologyCatalogService.Label(e.Modality) · @e.ServiceCode</small>
                         @if (e.CancelReason is not null) { <small class="block">Cancelled: @e.CancelReason</small> }</td>
                     <td class="nowrap">@Fmt.DateTimeText(e.ScheduledUtc)</td>

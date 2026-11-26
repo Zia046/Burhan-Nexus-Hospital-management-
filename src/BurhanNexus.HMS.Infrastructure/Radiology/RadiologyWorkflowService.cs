@@ -6,6 +6,7 @@ using BurhanNexus.HMS.Infrastructure.Patients;
 using BurhanNexus.HMS.Infrastructure.Persistence;
 using BurhanNexus.HMS.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace BurhanNexus.HMS.Infrastructure.Radiology;
 
@@ -28,6 +29,13 @@ public sealed class RadiologyBookingInput
     /// <summary>Optional discounts per service id (needs the Phase 3 "Give Discounts" permission).</summary>
     public Dictionary<int, decimal> Discounts { get; set; } = new();
     public string? DiscountReason { get; set; }
+    // ---- Update 15: payment received at booking (like the laboratory) – one receipt for the booking.
+    public bool CollectPayment { get; set; }
+    public int? CounterId { get; set; }
+    public int? PaymentMethodId { get; set; }
+    public string? PaymentReference { get; set; }
+    /// <summary>Empty = the full amount due.</summary>
+    public decimal? AmountReceived { get; set; }
 }
 
 public sealed class RadiologyOrderDetailsInput
@@ -52,7 +60,7 @@ public sealed class RadiologyReportInput
     public string? TemplateName { get; set; }
 }
 
-public sealed record RadiologyBookingResult(RadiologyOrder Order, bool WasDuplicate);
+public sealed record RadiologyBookingResult(RadiologyOrder Order, bool WasDuplicate, long? ReceiptId = null);
 
 public enum ExamPaymentState { NotBilled, Free, Unpaid, PartiallyPaid, Paid, Cancelled }
 
@@ -89,7 +97,7 @@ public sealed record RadiologyDashboard(
 
 public interface IRadiologyService
 {
-    Task<ServiceResult<RadiologyBookingResult>> BookAsync(RadiologyBookingInput input, bool canDiscount, CancellationToken ct = default);
+    Task<ServiceResult<RadiologyBookingResult>> BookAsync(RadiologyBookingInput input, bool canDiscount, CancellationToken ct = default, bool canCollect = false);
     Task<ServiceResult> AddExamsAsync(long orderId, IReadOnlyList<int> serviceIds, CancellationToken ct = default);
     Task<ServiceResult> UpdateOrderAsync(long orderId, RadiologyOrderDetailsInput input, CancellationToken ct = default);
     Task<ServiceResult> RescheduleAsync(long examId, DateTime local, CancellationToken ct = default);
@@ -130,10 +138,12 @@ public sealed class RadiologyWorkflowService : IRadiologyService
     private readonly IFinanceSetupService _finance;
     private readonly IRadiologyCatalogService _catalog;
     private readonly RadiologyFileStore _files;
+    private readonly IServiceProvider _services;
 
     public RadiologyWorkflowService(HmsDbContext db, IAuditService audit, IRequestContext ctx, HospitalClock clock, IFinanceSetupService finance,
-        IRadiologyCatalogService catalog, RadiologyFileStore files)
+        IRadiologyCatalogService catalog, RadiologyFileStore files, IServiceProvider services)
     {
+        _services = services;
         _db = db;
         _audit = audit;
         _ctx = ctx;
@@ -174,7 +184,7 @@ public sealed class RadiologyWorkflowService : IRadiologyService
     // Booking
     // =====================================================================================
 
-    public async Task<ServiceResult<RadiologyBookingResult>> BookAsync(RadiologyBookingInput i, bool canDiscount, CancellationToken ct = default)
+    public async Task<ServiceResult<RadiologyBookingResult>> BookAsync(RadiologyBookingInput i, bool canDiscount, CancellationToken ct = default, bool canCollect = false)
     {
         if (i.IdempotencyKey == Guid.Empty) return ServiceResult<RadiologyBookingResult>.Fail("The booking form has expired. Please reload the page.");
         if (await _db.RadiologyOrders.AsNoTracking().FirstOrDefaultAsync(o => o.IdempotencyKey == i.IdempotencyKey, ct) is { } dup)
@@ -200,6 +210,9 @@ public sealed class RadiologyWorkflowService : IRadiologyService
         if (i.Discounts.Any(d => d.Value != 0) && !canDiscount) errors.Add("You are not allowed to give discounts.");
         if (i.Discounts.Any(d => d.Value < 0)) errors.Add("A discount cannot be negative.");
         if (i.Discounts.Any(d => d.Value > 0) && T(i.DiscountReason, 200) is null) errors.Add("Enter the reason for the discount.");
+        if (i.CollectPayment && (!canCollect || i.IpdAdmissionId is not null)) errors.Add("You are not allowed to collect the payment here.");
+        if (i.CollectPayment && i.PaymentMethodId is null) errors.Add("Select the payment method.");
+        if (i.AmountReceived is < 0) errors.Add("The amount received cannot be negative.");
         var today = await _clock.TodayAsync();
         var localNow = await _clock.LocalNowAsync();
         var scheduledLocal = i.ScheduledLocal ?? localNow;
@@ -234,8 +247,20 @@ public sealed class RadiologyWorkflowService : IRadiologyService
                 $"Radiology order {order.OrderNumber} for {patient.PatientNumber}: {string.Join(", ", order.Exams.Select(x => $"{x.ServiceCode} (token {x.TokenNumber})"))}" +
                 (order.ReferredBy is { Length: > 0 } r ? $", referred by {r}" : ""));
             await _db.SaveChangesAsync(ct);
+            long? receiptId = null;
+            if (i.CollectPayment)
+            {
+                var paid = await CollectForOrderAsync(order, i, ct);
+                if (!paid.Succeeded)
+                {
+                    await tx.RollbackAsync(ct);
+                    _db.ChangeTracker.Clear();
+                    return ServiceResult<RadiologyBookingResult>.Fail(paid.Errors.Select(e => "The booking was not saved – the payment could not be recorded: " + e).ToArray());
+                }
+                receiptId = paid.Value;
+            }
             await tx.CommitAsync(ct);
-            return ServiceResult<RadiologyBookingResult>.Ok(new RadiologyBookingResult(order, false));
+            return ServiceResult<RadiologyBookingResult>.Ok(new RadiologyBookingResult(order, false, receiptId));
         }
         catch (DbUpdateException ex) when (FinanceDb.IsUniqueViolation(ex, "UX_RadiologyOrders_Idempotency"))
         {
@@ -280,6 +305,44 @@ public sealed class RadiologyWorkflowService : IRadiologyService
     {
         await FinanceDb.LockAsync(_db, $"RADTOKEN|{modality}|{date:yyyyMMdd}", ct);
         return (await _db.RadiologyExams.Where(e => e.Modality == modality && e.ScheduledDate == date).MaxAsync(e => (int?)e.TokenNumber, ct) ?? 0) + 1;
+    }
+
+    /// <summary>Update 15: one receipt for the whole booking (same rules as the laboratory booking).</summary>
+    private async Task<ServiceResult<long?>> CollectForOrderAsync(RadiologyOrder order, RadiologyBookingInput i, CancellationToken ct)
+    {
+        var charges = await _db.Charges.Where(c => c.RadiologyOrderId == order.Id && c.Status != ChargeStatus.Cancelled && c.NetAmount > c.PaidAmount).OrderBy(c => c.Id).ToListAsync(ct);
+        var due = charges.Sum(c => c.NetAmount - c.PaidAmount);
+        if (due == 0) return ServiceResult<long?>.Ok(null);
+        var received = i.AmountReceived ?? due;
+        if (received <= 0) return ServiceResult<long?>.Fail("Enter the amount received, or book without payment.");
+        if (received > due) return ServiceResult<long?>.Fail($"The amount received ({received:N2}) is more than the total due ({due:N2}).");
+        var counter = i.CounterId ?? await DefaultCounterAsync(ct);
+        if (counter is null) return ServiceResult<long?>.Fail("You are not assigned to a cash counter. Ask the administrator to assign you (Finance → Counters).");
+        var input = new CollectInput
+        {
+            IdempotencyKey = i.IdempotencyKey, PatientId = order.PatientId, CounterId = counter.Value, PaymentMethodId = i.PaymentMethodId!.Value,
+            PaymentReference = T(i.PaymentReference, 100), Notes = $"Radiology booking {order.OrderNumber}"
+        };
+        var left = received;
+        foreach (var c in charges)
+        {
+            if (left <= 0) break;
+            var pay = Math.Min(left, c.NetAmount - c.PaidAmount);
+            input.Balances.Add(new BalancePayment { ChargeId = c.Id, PayNow = pay });
+            left -= pay;
+        }
+        var r = await _services.GetRequiredService<IBillingService>().CollectAsync(input, canDiscount: false, ct);
+        if (!r.Succeeded) return ServiceResult<long?>.Fail(r.Errors.ToArray());
+        return ServiceResult<long?>.Ok(r.Value?.Receipt?.Id);
+    }
+
+    private async Task<int?> DefaultCounterAsync(CancellationToken ct)
+    {
+        if (_ctx.UserId is not int uid) return null;
+        var mine = await _db.CounterAssignments.Where(a => a.UserId == uid && a.EndedUtc == null && a.Counter!.IsActive).Select(a => (int?)a.CounterId).ToListAsync(ct);
+        if (mine.Count > 0) return mine[0];
+        var isAdmin = await _db.Users.AnyAsync(u => u.Id == uid && u.IsSystemAdministrator, ct);
+        return isAdmin ? await _db.Counters.Where(c => c.IsActive).OrderBy(c => c.Id).Select(c => (int?)c.Id).FirstOrDefaultAsync(ct) : null;
     }
 
     private async Task<ServiceResult> AddItemsAsync(RadiologyOrder order, IReadOnlyList<int> serviceIds, DateTime scheduledLocal, IReadOnlyDictionary<int, decimal> discounts,
@@ -333,7 +396,7 @@ public sealed class RadiologyWorkflowService : IRadiologyService
             {
                 ChargeNumber = await FinanceDb.NextNumberAsync(_db, HmsDbContext.ChargeNumberSequence, "CHG", today, ct),
                 PatientId = order.PatientId, EncounterId = order.EncounterId, RadiologyOrderId = order.Id, IpdAdmissionId = order.IpdAdmissionId, ServiceItemId = s.ServiceItemId,
-                ServiceKind = s.Modality == RadiologyModality.XRay ? ServiceKind.XRay : ServiceKind.Ultrasound, ServiceName = s.Name,
+                ServiceKind = RadiologyCatalogService.KindOf(s.Modality), ServiceName = s.Name,
                 DepartmentId = s.ServiceItem!.DepartmentId, Fee = fee, Discount = discount, NetAmount = fee - discount,
                 AllowPartialPayment = s.ServiceItem.AllowPartialPayment, DiscountReason = discount > 0 ? discountReason : null,
                 DoctorShareType = DoctorShareType.HospitalKeepsAll, Status = fee - discount == 0 ? ChargeStatus.Paid : ChargeStatus.Unpaid,
@@ -864,7 +927,8 @@ public sealed class RadiologyWorkflowService : IRadiologyService
             {
                 RadiologyModality.XRay => new[] { ServiceKind.XRay },
                 RadiologyModality.Ultrasound => new[] { ServiceKind.Ultrasound },
-                _ => new[] { ServiceKind.XRay, ServiceKind.Ultrasound },
+                RadiologyModality.Ecg => new[] { ServiceKind.Ecg },
+                _ => new[] { ServiceKind.XRay, ServiceKind.Ultrasound, ServiceKind.Ecg },
             };
             revenue = await _db.ReceiptLines.Where(l => l.Charge!.RadiologyOrderId != null && kinds.Contains(l.Charge.ServiceKind) && l.Receipt!.Status == ReceiptStatus.Valid
                                                           && l.Receipt.BusinessDate >= from && l.Receipt.BusinessDate <= to)

@@ -10,6 +10,7 @@
             <option value="" selected="@string.IsNullOrEmpty(Model.Modality)">X-Ray &amp; Ultrasound</option>
             <option value="XRay" selected="@(Model.Modality == "XRay")">X-Ray</option>
             <option value="Ultrasound" selected="@(Model.Modality == "Ultrasound")">Ultrasound</option>
+            <option value="Ecg" selected="@(Model.Modality == "Ecg")">ECG</option>
         </select>
         <div class="input-icon"><svg class="icon"><use href="#i-search" /></svg><input name="q" value="@Model.Q" placeholder="Order no., Patient ID, name, phone, CNIC" maxlength="100" /></div>
         <button class="btn btn-light" type="submit">Search</button>

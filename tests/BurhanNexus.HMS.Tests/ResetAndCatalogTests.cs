@@ -33,7 +33,7 @@ public class ResetAndCatalogTests : HmsTestBase
         // Phase 6: X-Ray and Ultrasound became one real Radiology module.
         var rad = PermissionCatalog.FindModule("Radiology")!;
         Assert.True(rad.IsAvailable);
-        Assert.Equal(27, rad.Actions.Count);
+        Assert.Equal(28, rad.Actions.Count); // Update 15: + View ECG Worklist
         Assert.Null(PermissionCatalog.FindModule("XRay"));
         Assert.Contains(Perm.RadVerifyReport, PermissionCatalog.AllKeys);
         // Phase 7: IPD, maternity and NICU.

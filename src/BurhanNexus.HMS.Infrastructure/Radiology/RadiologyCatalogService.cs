@@ -97,7 +97,11 @@ public sealed class RadiologyCatalogService : IRadiologyCatalogService
 
     internal static string? T(string? v, int max) => string.IsNullOrWhiteSpace(v) ? null : v.Trim().Length > max ? v.Trim()[..max] : v.Trim();
 
-    public static string Label(RadiologyModality m) => m == RadiologyModality.XRay ? "X-Ray" : "Ultrasound";
+    public static string Label(RadiologyModality m) => m switch { RadiologyModality.XRay => "X-Ray", RadiologyModality.Ecg => "ECG", _ => "Ultrasound" };
+    /// <summary>Token prefix: X-12, U-3, E-5.</summary>
+    public static string Short(RadiologyModality m) => m switch { RadiologyModality.XRay => "X", RadiologyModality.Ecg => "E", _ => "U" };
+    public static string Icon(RadiologyModality m) => m switch { RadiologyModality.XRay => "scan", RadiologyModality.Ecg => "activity", _ => "wave" };
+    public static ServiceKind KindOf(RadiologyModality m) => m switch { RadiologyModality.XRay => ServiceKind.XRay, RadiologyModality.Ecg => ServiceKind.Ecg, _ => ServiceKind.Ultrasound };
 
     public async Task<bool> IsPrivateAsync(CancellationToken ct = default) =>
         await _db.HospitalConfigurations.AsNoTracking().Select(c => c.HospitalType).FirstOrDefaultAsync(ct) == HospitalType.Private;
@@ -109,7 +113,7 @@ public sealed class RadiologyCatalogService : IRadiologyCatalogService
     public async Task<IReadOnlyList<RadiologyServiceRow>> ServicesAsync(bool activeOnly, RadiologyModality? modality = null, CancellationToken ct = default)
     {
         var list = await _db.RadiologyServices.AsNoTracking().Include(s => s.ServiceItem).Include(s => s.DefaultTemplate)
-            .Where(s => (!activeOnly || s.IsActive) && (modality == null || s.Modality == modality))
+            .Where(s => (!activeOnly || s.IsActive && (s.Modality != RadiologyModality.Ecg || s.ServiceItem!.IsActive)) && (modality == null || s.Modality == modality))
             .OrderBy(s => s.Modality).ThenBy(s => s.SortOrder).ThenBy(s => s.Name).ToListAsync(ct);
         var today = await _clock.TodayAsync();
         // Modality is stored as text: order X-Ray before Ultrasound in memory, not alphabetically.
@@ -127,7 +131,7 @@ public sealed class RadiologyCatalogService : IRadiologyCatalogService
 
     private async Task<int?> DepartmentAsync(RadiologyModality m, CancellationToken ct)
     {
-        var name = m == RadiologyModality.XRay ? "X-Ray" : "Ultrasound";
+        var name = m == RadiologyModality.Ecg ? "Radiology" : Label(m);
         return await _db.Departments.Where(d => d.Name == name).Select(d => (int?)d.Id).FirstOrDefaultAsync(ct)
                ?? await _db.Departments.Where(d => d.Name == "Radiology").Select(d => (int?)d.Id).FirstOrDefaultAsync(ct);
     }
@@ -139,7 +143,7 @@ public sealed class RadiologyCatalogService : IRadiologyCatalogService
         var name = T(i.Name, 150);
         if (code is null) errors.Add("Service code is required.");
         if (name is null) errors.Add("Service name is required.");
-        if (!Enum.IsDefined(i.Modality)) errors.Add("Select X-Ray or Ultrasound.");
+        if (!Enum.IsDefined(i.Modality)) errors.Add("Select X-Ray, Ultrasound or ECG.");
         if (code is not null && await _db.RadiologyServices.AnyAsync(s => s.Id != id && s.Code == code, ct)) errors.Add("Another radiology service already uses this code.");
         if (i.DurationMinutes is < 0 or > 600) errors.Add("Estimated duration must be between 0 and 600 minutes.");
         if (i.DefaultTemplateId is int tid && !await _db.RadiologyTemplates.AnyAsync(t => t.Id == tid && t.Modality == i.Modality, ct))
@@ -150,7 +154,7 @@ public sealed class RadiologyCatalogService : IRadiologyCatalogService
         if (errors.Count > 0) return ServiceResult<int>.Fail(errors.ToArray());
 
         var now = _clock.UtcNow;
-        var kind = i.Modality == RadiologyModality.XRay ? ServiceKind.XRay : ServiceKind.Ultrasound;
+        var kind = KindOf(i.Modality);
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         RadiologyService s;
         object? old = null;
@@ -283,7 +287,12 @@ public sealed class RadiologyCatalogService : IRadiologyCatalogService
             foreach (var t in StarterTemplates()) { t.UpdatedUtc = now; t.UpdatedByUsername = "SYSTEM"; db.RadiologyTemplates.Add(t); }
         }
         await db.SaveChangesAsync(ct);
-        if (await db.RadiologyServices.AnyAsync(ct)) return;
+        if (!await db.RadiologyServices.AnyAsync(s => s.Modality != RadiologyModality.Ecg, ct)) await SeedStarterServicesAsync(db, now, ct);
+        await EnsureEcgAsync(db, now, ct);
+    }
+
+    private static async Task SeedStarterServicesAsync(HmsDbContext db, DateTime now, CancellationToken ct)
+    {
 
         var templates = await db.RadiologyTemplates.ToDictionaryAsync(t => t.Name, t => t.Id, ct);
         var xray = await db.Departments.Where(d => d.Name == "X-Ray").Select(d => (int?)d.Id).FirstOrDefaultAsync(ct);
@@ -294,7 +303,7 @@ public sealed class RadiologyCatalogService : IRadiologyCatalogService
             if (await db.ServiceItems.AnyAsync(s => s.Code == "RAD-" + code, ct)) continue;
             var svc = new ServiceItem
             {
-                Code = "RAD-" + code, Name = name, Category = EncounterType.ServiceOnly, Kind = modality == RadiologyModality.XRay ? ServiceKind.XRay : ServiceKind.Ultrasound,
+                Code = "RAD-" + code, Name = name, Category = EncounterType.ServiceOnly, Kind = KindOf(modality),
                 DepartmentId = modality == RadiologyModality.XRay ? xray : us, DefaultFee = 0, IsActive = false, CreatedUtc = now, UpdatedUtc = now,
                 Description = $"{Label(modality)} examination (starter catalogue)"
             };
@@ -309,6 +318,52 @@ public sealed class RadiologyCatalogService : IRadiologyCatalogService
             });
             await db.SaveChangesAsync(ct);
         }
+    }
+
+    /// <summary>
+    /// Update 15: ECG service (both hospital types). The fee and "enabled" live in Settings → Fees &amp; Services (service "ECG"); the service
+    /// starts disabled with no fee until the administrator sets it. Existing installations get it on the next start.
+    /// </summary>
+    public static async Task EnsureEcgAsync(HmsDbContext db, DateTime now, CancellationToken ct = default)
+    {
+        if (!await db.RadiologyTemplates.AnyAsync(t => t.Modality == RadiologyModality.Ecg, ct))
+        {
+            db.RadiologyTemplates.Add(new RadiologyTemplate
+            {
+                Name = "ECG – 12 lead", Modality = RadiologyModality.Ecg, Technique = "Resting 12-lead ECG.",
+                Findings = "Rhythm: \nRate:  /min\nPR interval: \nQRS: \nQT / QTc: \nAxis: \nST-T: ", Impression = "", IsActive = true, UpdatedUtc = now, UpdatedByUsername = "SYSTEM"
+            });
+            await db.SaveChangesAsync(ct);
+        }
+        var existing = await db.RadiologyServices.Include(s => s.ServiceItem).FirstOrDefaultAsync(s => s.Modality == RadiologyModality.Ecg, ct);
+        if (existing is not null)
+        {
+            if (existing.ServiceItem is { ServiceCategoryId: null } si) { si.ServiceCategoryId = await Finance.ServiceCatalogue.CategoryIdAsync(db, ServiceKind.Ecg, ct); await db.SaveChangesAsync(ct); }
+            return;
+        }
+        var item = await db.ServiceItems.FirstOrDefaultAsync(s => s.Code == "SVC-RAD-ECG", ct) ?? await db.ServiceItems.FirstOrDefaultAsync(s => s.Code == "RAD-ECG", ct);
+        if (item is null)
+        {
+            item = new ServiceItem
+            {
+                Code = "RAD-ECG", Name = "ECG", Category = EncounterType.ServiceOnly, Kind = ServiceKind.Ecg, DefaultFee = 0, IsActive = false,
+                CreatedUtc = now, UpdatedUtc = now, Description = "ECG (electrocardiography) – set the fee and enable it"
+            };
+            db.ServiceItems.Add(item);
+            await db.SaveChangesAsync(ct);
+            db.ServiceFees.Add(new ServiceFee { ServiceItemId = item.Id, Fee = 0, EffectiveFrom = DateOnly.MinValue, CreatedUtc = now, CreatedByUsername = "SYSTEM", Note = "ECG – set the fee" });
+        }
+        item.Kind = ServiceKind.Ecg;
+        item.ChargeUnit = ChargeUnit.PerTest;
+        item.ServiceCategoryId ??= await Finance.ServiceCatalogue.CategoryIdAsync(db, ServiceKind.Ecg, ct);
+        item.DepartmentId ??= await db.Departments.Where(d => d.Name == "Radiology" || d.Name == "X-Ray").Select(d => (int?)d.Id).FirstOrDefaultAsync(ct);
+        var template = await db.RadiologyTemplates.Where(t => t.Modality == RadiologyModality.Ecg).Select(t => (int?)t.Id).FirstOrDefaultAsync(ct);
+        db.RadiologyServices.Add(new RadiologyService
+        {
+            Code = "ECG", Name = "ECG (12-lead)", Modality = RadiologyModality.Ecg, BodyPart = "Heart", DurationMinutes = 10, DefaultTemplateId = template,
+            ServiceItemId = item.Id, IsActive = true, SortOrder = 10, CreatedUtc = now, UpdatedUtc = now
+        });
+        await db.SaveChangesAsync(ct);
     }
 
     /// <summary>Booking rule that follows the hospital type: Government books only against an OPD / Emergency visit, Private also other patients.</summary>

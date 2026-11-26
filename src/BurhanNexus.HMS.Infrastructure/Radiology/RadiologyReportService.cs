@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BurhanNexus.HMS.Infrastructure.Radiology;
 
-public sealed record RadiologyPeriodRow(DateOnly Period, int XRay, int Ultrasound, int Completed, int Cancelled);
+public sealed record RadiologyPeriodRow(DateOnly Period, int XRay, int Ultrasound, int Completed, int Cancelled, int Ecg = 0);
 public sealed record RadiologyCountRow(string Name, string? Modality, int Booked, int Reported, int Pending, int Cancelled);
-public sealed record RadiologyRevenueRow(DateOnly Period, int Receipts, decimal XRay, decimal Ultrasound, decimal Refunded)
+public sealed record RadiologyRevenueRow(DateOnly Period, int Receipts, decimal XRay, decimal Ultrasound, decimal Refunded, decimal Ecg = 0)
 {
-    public decimal Total => XRay + Ultrasound;
+    public decimal Total => XRay + Ultrasound + Ecg;
 }
 
 public sealed record RadiologyStatistics(
@@ -45,7 +45,8 @@ public sealed class RadiologyReportService : IRadiologyReportService
             .Select(g => new RadiologyPeriodRow(g.Key,
                 g.Count(e => e.Modality == RadiologyModality.XRay && e.Status != RadiologyExamStatus.Cancelled),
                 g.Count(e => e.Modality == RadiologyModality.Ultrasound && e.Status != RadiologyExamStatus.Cancelled),
-                g.Count(e => Reported(e.Status)), g.Count(e => e.Status == RadiologyExamStatus.Cancelled))).ToList();
+                g.Count(e => Reported(e.Status)), g.Count(e => e.Status == RadiologyExamStatus.Cancelled),
+                g.Count(e => e.Modality == RadiologyModality.Ecg && e.Status != RadiologyExamStatus.Cancelled))).ToList();
 
         RadiologyCountRow Count(string name, string? mod, IEnumerable<RadiologyExamStatus> s)
         {
@@ -66,13 +67,13 @@ public sealed class RadiologyReportService : IRadiologyReportService
         {
             var lines = await _db.ReceiptLines.AsNoTracking()
                 .Where(l => l.Charge!.RadiologyOrderId != null && l.Receipt!.Status == ReceiptStatus.Valid && l.Receipt.BusinessDate >= from && l.Receipt.BusinessDate <= to
-                            && (modality == null || (modality == RadiologyModality.XRay ? l.Charge.ServiceKind == ServiceKind.XRay : l.Charge.ServiceKind == ServiceKind.Ultrasound)))
+                            && (modality == null || l.Charge.ServiceKind == (modality == RadiologyModality.XRay ? ServiceKind.XRay : modality == RadiologyModality.Ecg ? ServiceKind.Ecg : ServiceKind.Ultrasound)))
                 .Select(l => new { l.Receipt!.BusinessDate, l.ReceiptId, l.Charge!.ServiceKind, l.Amount, l.RefundedAmount }).ToListAsync(ct);
             revenue = lines.GroupBy(l => Key(l.BusinessDate)).OrderBy(g => g.Key)
                 .Select(g => new RadiologyRevenueRow(g.Key, g.Select(l => l.ReceiptId).Distinct().Count(),
                     g.Where(l => l.ServiceKind == ServiceKind.XRay).Sum(l => l.Amount - l.RefundedAmount),
                     g.Where(l => l.ServiceKind == ServiceKind.Ultrasound).Sum(l => l.Amount - l.RefundedAmount),
-                    g.Sum(l => l.RefundedAmount))).ToList();
+                    g.Sum(l => l.RefundedAmount), g.Where(l => l.ServiceKind == ServiceKind.Ecg).Sum(l => l.Amount - l.RefundedAmount))).ToList();
         }
         return new RadiologyStatistics(from, to, grouping, modality, activity, byService, byDepartment, byDoctor, revenue);
     }

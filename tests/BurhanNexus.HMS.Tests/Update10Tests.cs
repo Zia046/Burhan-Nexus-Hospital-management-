@@ -484,7 +484,7 @@ public partial class Update10Tests : Phase2TestBase
             { P("Input.IdempotencyKey", Guid.NewGuid().ToString()), P("PatientId", pid.ToString()), P("AdmissionId", adm.ToString()), P("TestIds", fbs.ToString()), P("Input.ReferralType", "None") })).StatusCode);
         // 23. Radiology for the admitted patient.
         int radSvc;
-        await using (var db = Factory.NewDb()) radSvc = await db.RadiologyServices.Where(r => r.IsActive).Select(r => r.Id).FirstAsync();
+        await using (var db = Factory.NewDb()) radSvc = await db.RadiologyServices.Where(r => r.IsActive && r.Modality != RadiologyModality.Ecg).OrderBy(r => r.Id).Select(r => r.Id).FirstAsync();
         var radR = await admin.PostFormAsync($"/Radiology/Book?patientId={pid}&admissionId={adm}", new[]
         {
             P("Input.IdempotencyKey", Guid.NewGuid().ToString()), P("PatientId", pid.ToString()), P("AdmissionId", adm.ToString()), P("VisitChoice", ""), P("Input.ReferralType", "External"),

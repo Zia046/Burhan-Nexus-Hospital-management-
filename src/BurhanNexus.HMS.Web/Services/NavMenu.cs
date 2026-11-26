@@ -84,13 +84,14 @@ public static class NavMenu
             (Has(Perm.OtManageCatalogue), new("ot-procedures", "/Ot/Procedures", "sliders", "Surgery Catalogue")),
             (Any(Perm.OtSettings, Perm.OtManageCatalogue), new("ot-setup", "/Ot/Setup", "settings", "OT Settings")));
 
-        Add("radiology", "Radiology", "scan", Any(Perm.RadDashboard, Perm.RadCreateBooking, Perm.RadViewXRay, Perm.RadViewUltrasound, Perm.RadEnterReport, Perm.RadEditDraft, Perm.RadVerifyReport,
+        Add("radiology", "Radiology", "scan", Any(Perm.RadDashboard, Perm.RadCreateBooking, Perm.RadViewXRay, Perm.RadViewUltrasound, Perm.RadViewEcg, Perm.RadEnterReport, Perm.RadEditDraft, Perm.RadVerifyReport,
                 Perm.RadViewHistory, Perm.RadViewStatistics, Perm.RadManageServices, Perm.RadManageTemplates, Perm.RadSettings),
             (Has(Perm.RadDashboard), new("rad-dashboard", "/Radiology", "scan", "Radiology Dashboard")),
             (Has(Perm.RadCreateBooking), new("rad-book", "/Radiology/Book", "plus", "New Booking")),
             (Has(Perm.RadViewXRay), new("rad-xray", "/Radiology/Worklist/XRay", "scan", "X-Ray Worklist")),
             (Has(Perm.RadViewUltrasound), new("rad-ultrasound", "/Radiology/Worklist/Ultrasound", "wave", "Ultrasound Worklist")),
-            (Any(Perm.RadCreateBooking, Perm.RadEditBooking, Perm.RadViewXRay, Perm.RadViewUltrasound), new("rad-bookings", "/Radiology/Bookings", "calendar", "Bookings")),
+            (Has(Perm.RadViewEcg), new("rad-ecg", "/Radiology/Worklist/Ecg", "activity", "ECG Worklist")),
+            (Any(Perm.RadCreateBooking, Perm.RadEditBooking, Perm.RadViewXRay, Perm.RadViewUltrasound, Perm.RadViewEcg), new("rad-bookings", "/Radiology/Bookings", "calendar", "Bookings")),
             (Any(Perm.RadEnterReport, Perm.RadEditDraft), new("rad-reporting", "/Radiology/Reporting", "edit", "Reporting")),
             (Has(Perm.RadVerifyReport), new("rad-verify", "/Radiology/Verify", "check-circle", "Report Verification")),
             (Has(Perm.RadViewHistory), new("rad-history", "/Radiology/History", "history", "Patient History")),

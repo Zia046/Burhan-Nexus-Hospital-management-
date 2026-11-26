@@ -19,6 +19,10 @@ public sealed class HmsOptions
 
     /// <summary>Apply database migrations automatically at start-up.</summary>
     public bool AutoMigrate { get; set; } = true;
+    /// <summary>Update 15: one complete automatic backup per day (the server checks every 30 minutes).</summary>
+    public bool AutoBackup { get; set; } = true;
+    /// <summary>Update 15: automatic (scheduled) backups older than this many days are deleted after a new one succeeds.</summary>
+    public int AutoBackupRetentionDays { get; set; } = 30;
 
     public string ResolveDataDirectory() => Resolve(DataDirectory);
     public string ResolveBackupDirectory() => Resolve(BackupDirectory);

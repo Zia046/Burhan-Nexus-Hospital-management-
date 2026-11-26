@@ -18,8 +18,8 @@
         <select name="group" aria-label="Group by"><option value="day" selected="@(Model.Group == "day")">Daily</option><option value="month" selected="@(Model.Group == "month")">Monthly</option><option value="year" selected="@(Model.Group == "year")">Yearly</option></select>
         @if (Model.Report is not ("xray" or "ultrasound"))
         {
-            <select name="modality" aria-label="Modality"><option value="">X-Ray &amp; Ultrasound</option>
-                <option value="XRay" selected="@(Model.Modality == "XRay")">X-Ray</option><option value="Ultrasound" selected="@(Model.Modality == "Ultrasound")">Ultrasound</option></select>
+            <select name="modality" aria-label="Modality"><option value="">All (X-Ray, Ultrasound, ECG)</option>
+                <option value="XRay" selected="@(Model.Modality == "XRay")">X-Ray</option><option value="Ultrasound" selected="@(Model.Modality == "Ultrasound")">Ultrasound</option><option value="Ecg" selected="@(Model.Modality == "Ecg")">ECG</option></select>
         }
         <button class="btn btn-light" type="submit">Show</button>
     </form>

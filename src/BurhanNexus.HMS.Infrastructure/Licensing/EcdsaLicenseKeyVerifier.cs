@@ -24,15 +24,65 @@ public sealed class EcdsaLicenseKeyVerifier : ILicenseKeyVerifier
         -----END PUBLIC KEY-----
         """;
 
+    /// <summary>
+    /// Update 15: every public key the HMS trusts. The first is the original vendor key (kept so existing licences keep working);
+    /// the key created by the "Burhan Nexus HMS License Key Generator" on the vendor's own computer is added here. Only PUBLIC keys –
+    /// a private key is never part of the HMS.
+    /// </summary>
+    public static readonly string[] TrustedPublicKeys = { VendorPublicKeyPem };
+
+    public const string RevocationPrefix = "BNHMSREV1-";
+
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         Converters = { new JsonStringEnumConverter() }
     };
 
-    private readonly string _publicKeyPem;
+    private readonly string[] _publicKeys;
 
-    public EcdsaLicenseKeyVerifier(string? publicKeyPem = null) => _publicKeyPem = publicKeyPem ?? VendorPublicKeyPem;
+    public EcdsaLicenseKeyVerifier(string? publicKeyPem = null) => _publicKeys = publicKeyPem is null ? TrustedPublicKeys : new[] { publicKeyPem };
+
+    private bool SignedByTrustedKey(byte[] data, byte[] signature)
+    {
+        foreach (var pem in _publicKeys)
+        {
+            using var ecdsa = ECDsa.Create();
+            ecdsa.ImportFromPem(pem);
+            if (ecdsa.VerifyData(data, signature, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>Update 15: verifies a signed revocation list (BNHMSREV1-payload.signature) from the licence key generator.</summary>
+    public bool TryVerifyRevocations(string text, out LicenseRevocationList? list, out string error)
+    {
+        list = null;
+        error = "The revocation list is not valid.";
+        var key = new string((text ?? string.Empty).Where(c => !char.IsWhiteSpace(c)).ToArray());
+        if (!key.StartsWith(RevocationPrefix, StringComparison.Ordinal)) return false;
+        var body = key[RevocationPrefix.Length..];
+        var dot = body.IndexOf('.');
+        if (dot <= 0 || dot == body.Length - 1) return false;
+        byte[] data, sig;
+        try { data = Base64UrlDecode(body[..dot]); sig = Base64UrlDecode(body[(dot + 1)..]); }
+        catch (FormatException) { return false; }
+        if (!SignedByTrustedKey(data, sig)) { error = "The revocation list signature is not valid."; return false; }
+        try { list = JsonSerializer.Deserialize<LicenseRevocationList>(data, JsonOptions); } catch (JsonException) { list = null; }
+        if (list is null || list.Product != "BNHMS" || list.V != 1) { error = "The revocation list is not for this product."; list = null; return false; }
+        error = string.Empty;
+        return true;
+    }
+
+    /// <summary>Creates a signed revocation list (generator / tests only – needs the private key).</summary>
+    public static string CreateRevocationList(LicenseRevocationList list, string privateKeyPem)
+    {
+        var json = JsonSerializer.SerializeToUtf8Bytes(list, JsonOptions);
+        using var ecdsa = ECDsa.Create();
+        ecdsa.ImportFromPem(privateKeyPem);
+        var sig = ecdsa.SignData(json, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+        return RevocationPrefix + Base64UrlEncode(json) + "." + Base64UrlEncode(sig);
+    }
 
     public bool TryVerify(string activationKey, out LicenseKeyPayload? payload, out string error)
     {
@@ -56,9 +106,7 @@ public sealed class EcdsaLicenseKeyVerifier : ILicenseKeyVerifier
             return false;
         }
 
-        using var ecdsa = ECDsa.Create();
-        ecdsa.ImportFromPem(_publicKeyPem);
-        if (!ecdsa.VerifyData(payloadBytes, signature, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation))
+        if (!SignedByTrustedKey(payloadBytes, signature))
         {
             error = "The activation key signature is not valid.";
             return false;
@@ -79,15 +127,15 @@ public sealed class EcdsaLicenseKeyVerifier : ILicenseKeyVerifier
             payload = null;
             return false;
         }
-        if (payload.Type is not (LicenseType.Annual or LicenseType.Lifetime))
+        if (payload.Type is not (LicenseType.Annual or LicenseType.Lifetime or LicenseType.Trial))
         {
             error = "The activation key has an unsupported licence type.";
             payload = null;
             return false;
         }
-        if (payload.Type == LicenseType.Annual && payload.ExpiresUtc is null)
+        if (payload.Type is LicenseType.Annual or LicenseType.Trial && payload.ExpiresUtc is null)
         {
-            error = "The annual activation key has no expiry date.";
+            error = payload.Type == LicenseType.Trial ? "The trial activation key has no expiry date." : "The annual activation key has no expiry date.";
             payload = null;
             return false;
         }

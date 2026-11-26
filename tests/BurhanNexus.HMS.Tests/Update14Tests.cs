@@ -102,8 +102,11 @@ public partial class Update10Tests
         var pid = await RegisterPatientAsync(admin, PatientFields("Thermal Receipt Patient", "Gul Khan"));
         var r = await admin.PostFormAsync("/Patients/Register", new[] { P("Visit.ChiefComplaint", "Fever") }, $"/Opd/Register?patientId={pid}");
         Assert.Equal(HttpStatusCode.Redirect, r.StatusCode);
-        var location = r.Headers.Location!.OriginalString;
-        Assert.StartsWith("/Print/Registration/", location);
+        // Update 15: a Government hospital opens the OPD slip straight away; the thermal receipt stays available.
+        var slipLocation = r.Headers.Location!.OriginalString;
+        Assert.StartsWith("/Print/Opd/", slipLocation);
+        Assert.Contains("autoprint=true", slipLocation);
+        var location = slipLocation.Split('?')[0].Replace("/Print/Opd/", "/Print/Registration/");
         var html = await admin.GetHtmlAsync(location);
         Assert.Contains("thermal-body w80", html);
         Assert.Contains("REGISTRATION RECEIPT", html);
@@ -117,7 +120,8 @@ public partial class Update10Tests
 
         var er = await PostEmergencyAsync(admin, pid, ("Visit.BriefComplaint", "Chest pain"));
         Assert.Equal(HttpStatusCode.Redirect, er.StatusCode);
-        var erHtml = await admin.GetHtmlAsync(er.Headers.Location!.OriginalString);
+        Assert.StartsWith("/Print/Emergency/", er.Headers.Location!.OriginalString); // Update 15: Government → emergency slip
+        var erHtml = await admin.GetHtmlAsync(er.Headers.Location!.OriginalString.Split('?')[0].Replace("/Print/Emergency/", "/Print/Registration/"));
         Assert.Contains("EMERGENCY REGISTRATION", erHtml);
         Assert.Contains("thermal-body", erHtml);
     }

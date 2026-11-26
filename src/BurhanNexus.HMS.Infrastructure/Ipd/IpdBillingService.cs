@@ -161,7 +161,7 @@ public sealed class IpdBillingService : IIpdBillingService
             : pkgIds.Contains(c.Id) ? LedgerGroup.Package
             : c.PharmacyIssueId != null || c.ServiceKind == ServiceKind.Pharmacy ? LedgerGroup.Pharmacy
             : c.LabOrderId != null || c.ServiceKind == ServiceKind.Laboratory ? LedgerGroup.Laboratory
-            : c.RadiologyOrderId != null || c.ServiceKind is ServiceKind.XRay or ServiceKind.Ultrasound ? LedgerGroup.Radiology
+            : c.RadiologyOrderId != null || c.ServiceKind is ServiceKind.XRay or ServiceKind.Ultrasound or ServiceKind.Ecg ? LedgerGroup.Radiology
             : c.SurgeryId != null ? LedgerGroup.OperationTheatre
             : LedgerGroup.Services;
         var lines = charges.Select(c => new LedgerLine(c, Group(c))).ToList();

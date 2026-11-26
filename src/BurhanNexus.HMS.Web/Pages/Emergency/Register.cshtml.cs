@@ -1,6 +1,7 @@
 using BurhanNexus.HMS.Core.Domain;
 using BurhanNexus.HMS.Core.Security;
 using BurhanNexus.HMS.Infrastructure.Patients;
+using BurhanNexus.HMS.Infrastructure.Services;
 using BurhanNexus.HMS.Web.Security;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,13 +15,14 @@ public class RegisterModel : HmsPageModel
     private readonly IEncounterService _encounters;
     private readonly IRegistrationSetupService _setup;
     private readonly HospitalClock _clock;
+    private readonly IHospitalAdminService _hospital;
 
-    public RegisterModel(IPatientService patients, IEncounterService encounters, IRegistrationSetupService setup, HospitalClock clock)
+    public RegisterModel(IPatientService patients, IEncounterService encounters, IRegistrationSetupService setup, HospitalClock clock, IHospitalAdminService hospital)
     {
         _patients = patients;
         _encounters = encounters;
         _setup = setup;
-        _clock = clock;
+        _clock = clock; _hospital = hospital;
     }
 
     [BindProperty(SupportsGet = true)] public long? PatientId { get; set; }
@@ -79,8 +81,12 @@ public class RegisterModel : HmsPageModel
         FlashSuccess = $"Emergency {enc.EncounterNumber} registered. Patient ID: {enc.Patient?.PatientNumber}";
         var settings = await _setup.GetSettingsAsync();
         if (await CanAsync(Perm.EmergencyPrint))
-            // Update 14: the registration receipt prints on the thermal printer (the A5 / A4 slip is one click away on it).
+        {
+            // Update 15: Government – the emergency slip (A4 / A5) prints straight away, no receipt; others – thermal registration receipt.
+            if ((await _hospital.GetConfigurationAsync()).HospitalType == HospitalType.Government)
+                return Redirect($"/Print/Emergency/{enc.Id}?autoprint=true");
             return Redirect($"/Print/Registration/{enc.Id}" + (settings.AutoPrintAfterRegistration ? "?autoprint=true" : ""));
+        }
         return Redirect($"/Emergency/Visit/{enc.Id}");
     }
 }

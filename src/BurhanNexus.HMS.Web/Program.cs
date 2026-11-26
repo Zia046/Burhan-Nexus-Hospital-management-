@@ -34,6 +34,7 @@ builder.Services.AddScoped<UserPermissionContext>();
 builder.Services.AddScoped<DisplayFormatter>();
 builder.Services.AddScoped<AppointmentSlipFactory>();
 builder.Services.AddScoped<ReceiptSlipFactory>();
+builder.Services.AddHostedService<BurhanNexus.HMS.Web.Services.AutoBackupWorker>(); // Update 15: daily automatic backup
 
 // ---- Authentication: server-validated cookie sessions ----
 builder.Services.AddScoped<HmsCookieEvents>();

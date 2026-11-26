@@ -12,7 +12,7 @@
 @foreach (var g in Model.Services.GroupBy(s => s.Service.Modality))
 {
     <div class="card" data-services="@g.Key">
-        <div class="card-header"><h2><svg class="icon"><use href="#i-@(g.Key == RadiologyModality.XRay ? "scan" : "wave")" /></svg> @RadiologyCatalogService.Label(g.Key) services</h2><span class="pill pill-blue">@g.Count()</span></div>
+        <div class="card-header"><h2><svg class="icon"><use href="#i-@RadiologyCatalogService.Icon(g.Key)" /></svg> @RadiologyCatalogService.Label(g.Key) services</h2><span class="pill pill-blue">@g.Count()</span></div>
         <div class="table-wrap">
             <table class="table table-compact">
                 <thead><tr><th>Code</th><th>Service</th><th>Body part / type</th><th>Duration</th>@if (Model.ShowFees) { <th class="num">Fee</th> }<th>Default template</th><th>Status</th><th></th></tr></thead>

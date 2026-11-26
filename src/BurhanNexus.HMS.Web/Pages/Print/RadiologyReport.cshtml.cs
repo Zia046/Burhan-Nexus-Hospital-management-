@@ -42,7 +42,7 @@ public class RadiologyReportModel : HmsPageModel
     {
         var e = await _rad.ExamAsync(id);
         if (e is null) return NotFound();
-        var seeModality = await CanAsync(e.Modality == RadiologyModality.XRay ? Perm.RadViewXRay : Perm.RadViewUltrasound)
+        var seeModality = await CanAsync(e.Modality == RadiologyModality.XRay ? Perm.RadViewXRay : e.Modality == RadiologyModality.Ecg ? Perm.RadViewEcg : Perm.RadViewUltrasound)
                           || await CanAsync(Perm.RadViewHistory) || await CanAsync(Perm.RadVerifyReport) || await CanAsync(Perm.RadEnterReport);
         if (!seeModality) return Forbid();
         Exam = e;

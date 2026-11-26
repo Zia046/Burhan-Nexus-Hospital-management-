@@ -264,7 +264,7 @@ public sealed class LabCatalogService : ILabCatalogService
         }
         else p = await _db.LabTestParameters.FirstOrDefaultAsync(x => x.Id == parameterId && x.LabTestId == testId, ct) ?? throw new KeyNotFoundException();
         p.Name = name; p.Unit = T(i.Unit, 30); p.ResultType = i.ResultType; p.Options = i.ResultType == LabResultType.Options ? options : null;
-        p.Decimals = i.Decimals; p.IsOptional = i.IsOptional; p.IsActive = i.IsActive; p.SortOrder = i.SortOrder; p.DefaultValue = T(i.DefaultValue, 60);
+        p.Decimals = i.Decimals; p.IsOptional = i.IsOptional || i.ResultType == LabResultType.Heading; p.IsActive = i.IsActive; p.SortOrder = i.SortOrder; p.DefaultValue = T(i.DefaultValue, 60);
         test.DefinitionVersion++;
         test.UpdatedUtc = _clock.UtcNow;
         _audit.Add(AuditActions.LabTestSaved, "LabTest", test.Code, $"Parameter {name} of {test.Name} {(parameterId is null ? "added" : "updated")} (definition v{test.DefinitionVersion})");
@@ -419,7 +419,19 @@ public sealed class LabCatalogService : ILabCatalogService
     public static async Task SeedStandardCatalogueAsync(HmsDbContext db, DateTime now, CancellationToken ct = default)
     {
         var settings = await db.LabSettings.FirstOrDefaultAsync(ct);
-        if (settings is null || settings.StandardCatalogueVersion >= 1) return;
+        if (settings is null) return;
+        if (settings.StandardCatalogueVersion < 1) await SeedStandardCatalogueV1Async(db, settings, now, ct);
+        if (settings.StandardCatalogueVersion < 2)
+        {
+            // Update 15: the CBC shows the 14 default parameters (others inactive, nothing deleted) – once per installation.
+            await CbcConfigService.ApplyDefaultOnceAsync(db, ct);
+            settings.StandardCatalogueVersion = 2;
+            await db.SaveChangesAsync(ct);
+        }
+    }
+
+    private static async Task SeedStandardCatalogueV1Async(HmsDbContext db, LabSettings settings, DateTime now, CancellationToken ct)
+    {
 
         var categories = await db.LabCategories.ToListAsync(ct);
         var sort = categories.Count == 0 ? 0 : categories.Max(c => c.SortOrder);

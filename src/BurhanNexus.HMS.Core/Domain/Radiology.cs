@@ -10,7 +10,8 @@ namespace BurhanNexus.HMS.Core.Domain;
 // Attachments (images, PDFs, DICOM files) are stored as files in a server folder; only their metadata is in the DB.
 // =====================================================================================================
 
-public enum RadiologyModality { XRay = 1, Ultrasound = 2 }
+/// <summary>Update 15: ECG (electrocardiography) is booked, charged and listed like the other radiology services.</summary>
+public enum RadiologyModality { XRay = 1, Ultrasound = 2, Ecg = 3 }
 
 public enum RadiologyPriority { Routine = 1, Urgent = 2 }
 

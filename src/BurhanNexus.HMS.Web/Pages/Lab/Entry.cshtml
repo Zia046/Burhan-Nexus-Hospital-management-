@@ -59,6 +59,12 @@ else
                 @{ var first = true; }
                 @foreach (var v in c.Values)
                 {
+                    if (v.ResultType == LabResultType.Heading)
+                    {
+                        @* Update 15: section heading (e.g. DLC) – nothing to enter *@
+                        <tr class="lab-heading" data-heading="@v.Name"><td colspan="4"><strong>@v.Name</strong></td></tr>
+                        continue;
+                    }
                     Model.Values.TryGetValue(v.Id, out var val);
                     var dis = !editable || !allowed || samplePending;
                     <tr data-param="@v.Name">

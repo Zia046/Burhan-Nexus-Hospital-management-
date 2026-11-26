@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace BurhanNexus.HMS.Web.Pages.Radiology;
 
 /// <summary>X-Ray / Ultrasound worklist (queue) of one day – open work of earlier days stays visible.</summary>
-[HasPermission(Perm.RadViewXRay, Perm.RadViewUltrasound)]
+[HasPermission(Perm.RadViewXRay, Perm.RadViewUltrasound, Perm.RadViewEcg)]
 public class WorklistModel : RadiologyPageModel
 {
     private readonly HospitalClock _clock;
@@ -29,7 +29,7 @@ public class WorklistModel : RadiologyPageModel
         if (!Enum.TryParse<RadiologyModality>(modality, true, out var m)) return NotFound();
         Modality = m;
         if (await DenyUnlessAsync(WorklistPermission(m)) is { } deny) return deny;
-        Nav(m == RadiologyModality.XRay ? "rad-xray" : "rad-ultrasound", m == RadiologyModality.XRay ? "xray" : "ultrasound");
+        Nav("rad-" + NavKey(m), NavKey(m));
         return null;
     }
 

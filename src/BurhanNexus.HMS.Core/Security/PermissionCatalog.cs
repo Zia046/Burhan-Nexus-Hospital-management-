@@ -155,12 +155,13 @@ public static class PermissionCatalog
                 new(LabActions.PrintReceipts, "Print Laboratory Receipts", "Print the two-copy laboratory receipt (patient and laboratory copy)"),
                 new(LabActions.ReviewResults, "Review / Edit Saved Results", "Correct a saved (verified) result with a reason – the previous result is kept in history"),
             }),
-        new(Modules_.Radiology, "Radiology Management (X-Ray & Ultrasound)", "Radiology bookings, worklists, examinations, reporting, verification and A4 reports", "scan", true, "/Radiology",
+        new(Modules_.Radiology, "Radiology Management (X-Ray, Ultrasound & ECG)", "Radiology bookings, worklists, examinations, reporting, verification and A4 reports", "scan", true, "/Radiology",
             new PermissionAction[]
             {
                 new(RadiologyActions.Dashboard, "View Radiology Dashboard", "Radiology counts and work-lists"),
                 new(RadiologyActions.ViewXRay, "View X-Ray Worklist", "X-Ray queue and examinations"),
                 new(RadiologyActions.ViewUltrasound, "View Ultrasound Worklist", "Ultrasound queue and examinations"),
+                new(RadiologyActions.ViewEcg, "View ECG Worklist", "ECG bookings, queue and examinations (Update 15)"),
                 new(RadiologyActions.CreateBooking, "Create Booking", "Book X-Ray / Ultrasound examinations (from the doctor's handwritten advice)"),
                 new(RadiologyActions.EditBooking, "Edit Booking", "Change date / time, referral, indication and priority; add examinations"),
                 new(RadiologyActions.CancelBooking, "Cancel Booking", "Cancel examinations with a reason (kept in history)"),
@@ -534,6 +535,7 @@ public static class PermissionCatalog
         public const string Dashboard = "Dashboard";
         public const string ViewXRay = "ViewXRayWorklist";
         public const string ViewUltrasound = "ViewUltrasoundWorklist";
+        public const string ViewEcg = "ViewEcgWorklist";
         public const string CreateBooking = "CreateBooking";
         public const string EditBooking = "EditBooking";
         public const string CancelBooking = "CancelBooking";
@@ -900,6 +902,7 @@ public static class Perm
     public const string RadDashboard = "Radiology.Dashboard";
     public const string RadViewXRay = "Radiology.ViewXRayWorklist";
     public const string RadViewUltrasound = "Radiology.ViewUltrasoundWorklist";
+    public const string RadViewEcg = "Radiology.ViewEcgWorklist";
     public const string RadCreateBooking = "Radiology.CreateBooking";
     public const string RadEditBooking = "Radiology.EditBooking";
     public const string RadCancelBooking = "Radiology.CancelBooking";

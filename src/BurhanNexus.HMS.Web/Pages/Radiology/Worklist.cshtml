@@ -24,7 +24,7 @@
     <div class="toolbar-actions"><a bn-permission="@Perm.RadCreateBooking" class="btn btn-primary" href="/Radiology/Book"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New booking</a></div>
 </div>
 <div class="card">
-    <div class="card-header"><h2><svg class="icon"><use href="#i-@(Model.Modality == RadiologyModality.XRay ? "scan" : "wave")" /></svg> @label worklist – @Fmt.Day(Model.Date!.Value)</h2>
+    <div class="card-header"><h2><svg class="icon"><use href="#i-@RadiologyCatalogService.Icon(Model.Modality)" /></svg> @label worklist – @Fmt.Day(Model.Date!.Value)</h2>
         <span class="pill pill-blue" data-worklist-count>@Model.Rows.Count examination(s)</span></div>
     <div class="table-wrap">
         <table class="table" data-worklist="@Model.Modality">

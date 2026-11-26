@@ -25,7 +25,7 @@
 <partial name="_ValidationSummary" />
 <div class="card">
     <div class="card-header">
-        <h2><svg class="icon"><use href="#i-@(e.Modality == RadiologyModality.XRay ? "scan" : "wave")" /></svg> @e.ServiceName <span class="token-badge">@label token @e.TokenNumber</span>
+        <h2><svg class="icon"><use href="#i-@RadiologyCatalogService.Icon(e.Modality)" /></svg> @e.ServiceName <span class="token-badge">@label token @e.TokenNumber</span>
             @if (o.Priority == RadiologyPriority.Urgent) { <span class="status status-bad">Urgent</span> }</h2>
         <partial name="_RadStatus" model="e.Status" />
     </div>

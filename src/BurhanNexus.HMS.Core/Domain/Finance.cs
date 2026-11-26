@@ -55,7 +55,7 @@ public class PaymentMethod
 
 public enum ServiceKind
 {
-    OpdRegistration = 1, EmergencyRegistration = 2, Consultation = 3, Laboratory = 4, XRay = 5, Ultrasound = 6, Procedure = 7, Pharmacy = 8, Inpatient = 9, Other = 99
+    OpdRegistration = 1, EmergencyRegistration = 2, Consultation = 3, Laboratory = 4, XRay = 5, Ultrasound = 6, Procedure = 7, Pharmacy = 8, Inpatient = 9, /* Update 15 */ Ecg = 10, Other = 99
 }
 
 /// <summary>Update 10: how a service is charged (shown on bills; quantity is days, hours, sessions … accordingly).</summary>

@@ -89,6 +89,10 @@ jobs:
           cp README.md publish/win-x64/
           cp docs/*.md publish/win-x64/docs/ 2>/dev/null || true
           rm -f publish/win-x64/appsettings.Development.json
+          # Update 15: the HMS package must never contain a private signing key or the licence key generator.
+          if grep -rlaE "BEGIN (EC |ENCRYPTED )?PRIVATE KEY" publish/win-x64 publish/linux; then echo "PRIVATE KEY FOUND IN THE HMS PACKAGE"; exit 1; fi
+          if ls -R publish/win-x64 | grep -qi "LicenseKeyGenerator\|bnhms-license"; then echo "LICENCE GENERATOR FOUND IN THE HMS PACKAGE"; exit 1; fi
+          echo "No private key and no licence generator in the HMS package." | tee -a ci-output/publish.log
       - name: Upload Windows server package
         uses: actions/upload-artifact@v4
         with:
@@ -268,6 +272,26 @@ jobs:
             client/BurhanNexus.HMS.Client.exe
             repo/out/*.exe
             ci-launcher
+      # ---- Update 15: Burhan Nexus HMS License Key Generator (separate program, never part of the HMS installers) ----
+      - name: Build and self-test the License Key Generator
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force ci-keygen | Out-Null
+          dotnet publish repo/tools/BurhanNexus.LicenseKeyGenerator -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o keygen *> ci-keygen/build.log
+          if ($LASTEXITCODE -ne 0) { Get-Content ci-keygen/build.log -Tail 40; throw "generator build failed" }
+          $exe = (Resolve-Path keygen/BurhanNexus.HMS.LicenseKeyGenerator.exe).Path
+          $p = Start-Process -FilePath $exe -ArgumentList "--selftest", "$((Resolve-Path ci-keygen).Path)\selftest" -Wait -PassThru
+          Get-Content ci-keygen/selftest/selftest.json | Tee-Object -FilePath ci-keygen/result.txt
+          if ($p.ExitCode -ne 0) { throw "generator self-test failed" }
+          Remove-Item -Recurse -Force ci-keygen/selftest/generator   # test key only – not published
+          Get-ChildItem keygen | Format-Table Name, Length | Out-String | Tee-Object -FilePath ci-keygen/files.txt
+      - name: Upload License Key Generator (for Burhan Nexus only)
+        uses: actions/upload-artifact@v4
+        with:
+          name: BurhanNexus-HMS-LicenseKeyGenerator
+          path: |
+            keygen/BurhanNexus.HMS.LicenseKeyGenerator.exe
+            ci-keygen/result.txt
       - name: Print Agent – raw printing to a Windows printer queue
         shell: pwsh
         run: |
