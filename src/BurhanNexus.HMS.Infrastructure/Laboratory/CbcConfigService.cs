@@ -117,21 +117,30 @@ public sealed class CbcConfigService : ICbcConfigService
     private static IReadOnlyList<string> Apply(HmsDbContext db, LabTest test)
     {
         static string Key(string s) => new string(s.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
-        var used = new HashSet<int>();
         var missing = new List<string>();
+        var found = new LabTestParameter?[Default.Length];
+        var taken = new HashSet<LabTestParameter>();
+        // 1st pass: exact names / aliases; 2nd pass: a parameter renamed by the hospital that still starts with the default name ("MCV (fL)").
+        for (var pass = 0; pass < 2; pass++)
+            for (var i = 0; i < Default.Length; i++)
+            {
+                if (found[i] is not null) continue;
+                var keys = Default[i].Aliases.Append(Default[i].Name).Select(Key).ToList();
+                found[i] = test.Parameters.Where(x => !taken.Contains(x))
+                    .FirstOrDefault(x => pass == 0 ? keys.Contains(Key(x.Name)) : keys.Any(k => Key(x.Name).StartsWith(k, StringComparison.Ordinal)));
+                if (found[i] is { } f) taken.Add(f);
+            }
         var placed = new List<LabTestParameter>();
-        foreach (var (name, aliases, heading) in Default)
+        for (var i = 0; i < Default.Length; i++)
         {
-            var keys = aliases.Append(name).Select(Key).ToHashSet();
-            var p = test.Parameters.Where(x => !used.Contains(x.Id) || x.Id == 0).Where(x => !placed.Contains(x))
-                .FirstOrDefault(x => keys.Contains(Key(x.Name)));
+            var (name, _, heading) = Default[i];
+            var p = found[i];
             if (p is null && heading)
             {
                 p = new LabTestParameter { Name = name, ResultType = LabResultType.Heading, IsOptional = true, Decimals = 0 };
                 test.Parameters.Add(p);
             }
             if (p is null) { missing.Add(name); continue; }
-            if (p.Id != 0) used.Add(p.Id);
             placed.Add(p);
             p.Name = name;
             p.IsActive = true;

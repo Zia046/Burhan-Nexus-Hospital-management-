@@ -7,7 +7,7 @@ using BurhanNexus.HMS.Core.Licensing;
 namespace BurhanNexus.HMS.Infrastructure.Licensing;
 
 /// <summary>Licence term chosen by Burhan Nexus when a key is generated.</summary>
-public enum LicenseTerm { Lifetime, Yearly, Custom }
+public enum LicenseTerm { Lifetime, Yearly, Custom, /* Update 15 */ Trial }
 
 /// <summary>One issued licence (a row of the vendor's licence register).</summary>
 public sealed record IssuedLicense(
@@ -37,30 +37,34 @@ public static class LicenseIssuer
     }
 
     public static IssuedLicense Issue(string privateKeyPem, Guid installationId, string? machineId, string hospitalName, string? customer,
-        LicenseTerm term, int years = 1, DateOnly? customExpiry = null, DateTime? nowUtc = null)
+        LicenseTerm term, int years = 1, DateOnly? customExpiry = null, DateTime? nowUtc = null, DateOnly? startDate = null)
     {
         if (installationId == Guid.Empty) throw new ArgumentException("The Installation ID is required.");
         hospitalName = (hospitalName ?? string.Empty).Trim();
         if (hospitalName.Length is < 2 or > 200) throw new ArgumentException("Enter the hospital / customer name (2–200 characters).");
         var now = nowUtc ?? DateTime.UtcNow;
+        // Update 15: the activation (start) date chosen in the generator; the 1-year expiry counts from it.
+        var start = startDate?.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc) ?? now.Date;
+        if (term == LicenseTerm.Trial && customExpiry is null) customExpiry = DateOnly.FromDateTime(start.AddDays(30));
         DateTime? expires = term switch
         {
             LicenseTerm.Lifetime => null,
-            LicenseTerm.Yearly when years is >= 1 and <= 10 => now.Date.AddYears(years).AddDays(1),
+            LicenseTerm.Yearly when years is >= 1 and <= 10 => start.AddYears(years).AddDays(1),
             LicenseTerm.Yearly => throw new ArgumentException("Years must be 1–10."),
             _ when customExpiry is DateOnly d && d.ToDateTime(TimeOnly.MinValue) > now.Date => d.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(1),
             _ => throw new ArgumentException("A custom licence needs an expiry date after today.")
         };
         var payload = new LicenseKeyPayload
         {
-            Type = term == LicenseTerm.Lifetime ? LicenseType.Lifetime : LicenseType.Annual,
+            Type = term switch { LicenseTerm.Lifetime => LicenseType.Lifetime, LicenseTerm.Trial => LicenseType.Trial, _ => LicenseType.Annual },
             InstallationId = installationId,
             LicensedTo = hospitalName,
             IssuedUtc = now,
             ExpiresUtc = expires,
             Serial = $"BNL-{now:yyyyMMdd}-{Convert.ToHexString(RandomNumberGenerator.GetBytes(4))}",
             Term = term.ToString(),
-            MachineId = string.IsNullOrWhiteSpace(machineId) ? null : machineId.Trim().ToUpperInvariant()
+            MachineId = string.IsNullOrWhiteSpace(machineId) ? null : machineId.Trim().ToUpperInvariant(),
+            CustomerId = string.IsNullOrWhiteSpace(customer) ? null : customer.Trim()
         };
         var key = EcdsaLicenseKeyVerifier.CreateKey(payload, privateKeyPem);
         return new IssuedLicense(payload.Serial, now, hospitalName, string.IsNullOrWhiteSpace(customer) ? null : customer.Trim(), term, expires,

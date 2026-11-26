@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Update 15: "Burhan Nexus HMS License Key Generator" – FOR BURHAN NEXUS ONLY. Never part of the HMS installers.
+       The signing (private) key is created on the vendor's own computer and stored there encrypted with the administrator password. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <AssemblyName>BurhanNexus.HMS.LicenseKeyGenerator</AssemblyName>
+    <RootNamespace>BurhanNexus.LicenseKeyGenerator</RootNamespace>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <Product>Burhan Nexus HMS License Key Generator</Product>
+    <Version>1.0.0</Version>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BurhanNexus.HMS.Core\BurhanNexus.HMS.Core.csproj" />
+    <!-- the same signing / key format code the HMS uses to verify keys -->
+    <Compile Include="..\..\src\BurhanNexus.HMS.Infrastructure\Licensing\EcdsaLicenseKeyVerifier.cs" Link="Shared\EcdsaLicenseKeyVerifier.cs" />
+    <Compile Include="..\..\src\BurhanNexus.HMS.Infrastructure\Licensing\LicenseIssuer.cs" Link="Shared\LicenseIssuer.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="app.ico" LogicalName="app.ico" />
+  </ItemGroup>
+</Project>

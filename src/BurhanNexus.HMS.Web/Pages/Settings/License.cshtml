@@ -27,9 +27,14 @@
                 <p class="muted small">@d of 30 trial days remaining</p>
             }
             <dl class="kv">
+                <dt>Software</dt><dd>Burhan Nexus HMS</dd>
+                <dt>Licence status</dt><dd data-license-status>@s.DisplayName</dd>
                 <dt>Licence ID</dt><dd class="mono" data-license-id>@(s.LicenseId ?? "—")</dd>
-                <dt>Licence type</dt><dd>@(s.Type == BurhanNexus.HMS.Core.Domain.LicenseType.Trial ? "Trial" : s.Term ?? s.Type?.ToString() ?? "—")</dd>
-                <dt>Licensed to</dt><dd>@(s.LicensedTo ?? "—")</dd>
+                <dt>Licence type</dt><dd data-license-type>@(s.Type switch { BurhanNexus.HMS.Core.Domain.LicenseType.Trial => s.LicenseId is null ? "Trial (built-in)" : "Trial licence", BurhanNexus.HMS.Core.Domain.LicenseType.Lifetime => "Lifetime", _ => s.Term == "Yearly" ? "1-Year" : s.Term ?? s.Type?.ToString() ?? "—" })</dd>
+                <dt>Registered hospital</dt><dd data-licensed-to>@(s.LicensedTo ?? "—")</dd>
+                <dt>Customer / registration ID</dt><dd>@(s.CustomerId ?? "—")</dd>
+                <dt>Licence key</dt><dd class="mono" data-license-key>@(Model.KeyFingerprint is { } fp ? "BNHMS1-…" + fp : "—")</dd>
+                <dt>Machine / device ID</dt><dd class="mono">@Model.MachineId</dd>
                 <dt>Trial started</dt><dd>@Fmt.Date(s.StartedUtc)</dd>
                 <dt>Activation date</dt><dd>@Fmt.Date(s.ActivatedUtc)</dd>
                 <dt>Expiry date</dt><dd>@(s.Type == BurhanNexus.HMS.Core.Domain.LicenseType.Lifetime ? "Never (lifetime)" : Fmt.Date(s.ExpiresUtc))</dd>
@@ -69,7 +74,7 @@
             </div>
             <div class="card-footer form-actions"><button class="btn btn-primary" type="submit"><svg class="icon icon-sm"><use href="#i-check" /></svg> Activate</button></div>
         </form>
-        @if (s.State == LicenseState.Active && s.Type != BurhanNexus.HMS.Core.Domain.LicenseType.Trial)
+        @if (s.LicenseId is not null && (s.State == LicenseState.Active || s.State == LicenseState.TrialActive))
         {
             <form method="post" asp-page-handler="Deactivate" class="card" bn-permission="@Perm.LicenseActivate" data-license-deactivate>
                 <div class="card-header"><h3><svg class="icon"><use href="#i-lock" /></svg> Deactivate licence</h3></div>
@@ -84,5 +89,14 @@
                 <div class="card-footer form-actions"><button class="btn btn-danger" type="submit">Deactivate licence</button></div>
             </form>
         }
+        <form method="post" asp-page-handler="Revocations" class="card" bn-permission="@Perm.LicenseActivate" data-license-revocations>
+            <div class="card-header"><h3><svg class="icon"><use href="#i-shield" /></svg> Revocation list</h3></div>
+            <div class="card-body">
+                <p class="muted small">Only if Burhan Nexus sends you a revocation list (signed file from the licence key generator). A revoked licence makes the system read-only – no data is deleted.</p>
+                <div class="field"><label for="RevocationList">Revocation list</label>
+                    <textarea id="RevocationList" name="RevocationList" rows="3" class="mono" placeholder="BNHMSREV1-..." maxlength="20000"></textarea></div>
+            </div>
+            <div class="card-footer form-actions"><button class="btn btn-light" type="submit">Import revocation list</button></div>
+        </form>
     </div>
 </div>

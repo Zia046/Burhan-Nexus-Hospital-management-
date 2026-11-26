@@ -3,6 +3,7 @@ using BurhanNexus.HMS.Core.Security;
 using BurhanNexus.HMS.Infrastructure.Licensing;
 using BurhanNexus.HMS.Web.Security;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace BurhanNexus.HMS.Web.Pages.Settings;
 
@@ -18,6 +19,9 @@ public class LicenseModel : HmsPageModel
     [BindProperty] public string? Reason { get; set; }
     [BindProperty] public bool Confirm { get; set; }
     public string MachineId => MachineIdentity.Current;
+    [BindProperty] public string? RevocationList { get; set; }
+    /// <summary>Update 15: the active key is shown only by its fingerprint (never in full).</summary>
+    public string? KeyFingerprint { get; private set; }
 
     public async Task OnGetAsync(int? @readonly)
     {
@@ -25,6 +29,18 @@ public class LicenseModel : HmsPageModel
         ViewData["SettingsTab"] = "license";
         ReadOnlyRedirect = @readonly == 1;
         Status = await _license.GetStatusAsync();
+        KeyFingerprint = Status.LicenseId is null ? null : await HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Persistence.HmsDbContext>()
+            .LicenseInformation.Select(l => l.KeyFingerprint).FirstOrDefaultAsync();
+    }
+
+    public async Task<IActionResult> OnPostRevocationsAsync()
+    {
+        if (await DenyUnlessAsync(Perm.LicenseActivate) is { } deny) return deny;
+        if (string.IsNullOrWhiteSpace(RevocationList) || RevocationList.Length > 20000) { FlashError = "Paste the revocation list."; return RedirectToPage(); }
+        var r = await _license.ImportRevocationsAsync(RevocationList);
+        if (r.Succeeded) FlashSuccess = $"Revocation list imported ({r.Value} new licence ID(s)).";
+        else FlashError = r.ErrorText;
+        return RedirectToPage();
     }
 
     public async Task<IActionResult> OnPostAsync()

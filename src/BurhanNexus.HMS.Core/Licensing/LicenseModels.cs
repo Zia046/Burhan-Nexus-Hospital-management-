@@ -22,6 +22,17 @@ public sealed class LicenseKeyPayload
     public string? Term { get; set; }
     /// <summary>Update 13: optional machine binding – when present the key works only on the computer with this Machine ID.</summary>
     public string? MachineId { get; set; }
+    /// <summary>Update 15: hospital registration / customer ID entered in the licence key generator (display only).</summary>
+    public string? CustomerId { get; set; }
+}
+
+/// <summary>Update 15: list of licence IDs revoked by Burhan Nexus (signed by the vendor key, imported on the licence page).</summary>
+public sealed class LicenseRevocationList
+{
+    public int V { get; set; } = 1;
+    public string Product { get; set; } = "BNHMS";
+    public DateTime IssuedUtc { get; set; }
+    public List<string> Serials { get; set; } = new();
 }
 
 public enum LicenseState
@@ -46,7 +57,9 @@ public sealed record LicenseStatus(
     string Message,
     string? LicenseId = null,
     string? Term = null,
-    bool Deactivated = false)
+    bool Deactivated = false,
+    string? CustomerId = null,
+    bool Revoked = false)
 {
     /// <summary>Update 13: days before expiry when every page starts warning.</summary>
     public const int WarnDays = 30;
@@ -59,11 +72,11 @@ public sealed record LicenseStatus(
 
     public string DisplayName => State switch
     {
-        LicenseState.TrialActive => "Trial (active)",
+        LicenseState.TrialActive => LicenseId is null ? "Trial (active)" : "Trial licence (active)",
         LicenseState.TrialExpired => "Trial expired",
         LicenseState.Active => Type == LicenseType.Lifetime ? "Lifetime licence" : Term == "Custom" ? "Licence (custom period)" : "Yearly licence",
         LicenseState.Expired => "Licence expired",
-        LicenseState.Invalid => Deactivated ? "Licence deactivated" : "Licence verification required",
+        LicenseState.Invalid => Revoked ? "Licence revoked" : Deactivated ? "Licence deactivated" : "Licence verification required",
         _ => "Not initialised"
     };
 }
@@ -75,4 +88,6 @@ public sealed record LicenseStatus(
 public interface ILicenseKeyVerifier
 {
     bool TryVerify(string activationKey, out LicenseKeyPayload? payload, out string error);
+    /// <summary>Update 15: signed list of revoked licence IDs.</summary>
+    bool TryVerifyRevocations(string text, out LicenseRevocationList? list, out string error) { list = null; error = "Revocation lists are not supported."; return false; }
 }
