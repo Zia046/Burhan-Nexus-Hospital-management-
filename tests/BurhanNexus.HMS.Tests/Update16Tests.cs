@@ -95,7 +95,7 @@ public partial class Update10Tests
         {
             P("NewService.Name", "Blood pressure check"), P("NewService.Category", "Opd"), P("NewService.Fee", "150"),
             P("NewService.IsFree", "false"), P("NewService.IsActive", "true"),
-        }, "/Fees", "/Fees?handler=Add");
+        }, "/Fees?handler=Add");
         Assert.True(r.StatusCode == HttpStatusCode.Redirect, "Add: " + Errors(await r.Content.ReadAsStringAsync()));
         await using var db = Factory.NewDb();
         var item = await db.ServiceItems.SingleAsync(s => s.Name == "Blood pressure check");
