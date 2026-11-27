@@ -29,7 +29,15 @@ public sealed class EcdsaLicenseKeyVerifier : ILicenseKeyVerifier
     /// the key created by the "Burhan Nexus HMS License Key Generator" on the vendor's own computer is added here. Only PUBLIC keys –
     /// a private key is never part of the HMS.
     /// </summary>
-    public static readonly string[] TrustedPublicKeys = { VendorPublicKeyPem };
+    public static readonly string[] TrustedPublicKeys = { VendorPublicKeyPem, GeneratorPublicKey69997459 };
+
+    /// <summary>Public key of the "Burhan Nexus HMS License Key Generator" signing key 69997459AA0BC5EB (created on the vendor's own computer, 27 Nov 2026).</summary>
+    public const string GeneratorPublicKey69997459 = """
+        -----BEGIN PUBLIC KEY-----
+        MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcyclMqC/qInJ4AXmt/rEP9zF0huo
+        DN6JE4oIYXEjXBDSUbt6qyRDSf2Mp1IzE/gJJxYub1sYppEp7qCsJylqpQ==
+        -----END PUBLIC KEY-----
+        """;
 
     public const string RevocationPrefix = "BNHMSREV1-";
 
