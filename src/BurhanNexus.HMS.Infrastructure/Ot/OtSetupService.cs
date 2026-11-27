@@ -105,8 +105,8 @@ public sealed class OtSetupService : IOtSetupService
 
     internal static string? T(string? v, int max) => string.IsNullOrWhiteSpace(v) ? null : v.Trim().Length > max ? v.Trim()[..max] : v.Trim();
 
-    public async Task<bool> IsPrivateAsync(CancellationToken ct = default) =>
-        await _db.HospitalConfigurations.AsNoTracking().Select(c => c.HospitalType).FirstOrDefaultAsync(ct) == HospitalType.Private;
+    /// <summary>Update 16: one unified HMS – services are charged as configured (the stored hospital type only drives the pharmacy).</summary>
+    public Task<bool> IsPrivateAsync(CancellationToken ct = default) => Task.FromResult(true);
 
     // ---------------------------------------------------------------- theatres
     public async Task<IReadOnlyList<OtTheatre>> TheatresAsync(bool activeOnly, CancellationToken ct = default) =>

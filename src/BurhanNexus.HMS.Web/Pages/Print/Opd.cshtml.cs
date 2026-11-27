@@ -13,7 +13,8 @@ public class OpdModel : SlipModelBase
 {
     public OpdModel(IEncounterService e, IRegistrationSetupService s, DisplayFormatter f) : base(e, s, f) { }
 
-    public bool IsPrivate => Encounter.HospitalTypeAtVisit == HospitalType.Private;
+    /// <summary>Update 16: every OPD visit prints the OPD slip.</summary>
+    public bool IsPrivate => false;
 
     public async Task<IActionResult> OnGetAsync(long id, string? paper, bool autoprint)
     {

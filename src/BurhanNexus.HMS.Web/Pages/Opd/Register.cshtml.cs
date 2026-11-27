@@ -51,7 +51,7 @@ public class RegisterModel : HmsPageModel
         Departments = await _departments.ListAsync(includeInactive: false);
         Doctors = await _setup.DoctorsAsync(activeOnly: true);
         Services = (await _setup.ServiceItemsAsync(activeOnly: true)).Where(s => s.Category == EncounterType.Opd).ToList();
-        DoctorRequired = HospitalType == HospitalType.Private && Settings.RequireDoctorForPrivateOpd && Doctors.Count > 0;
+        DoctorRequired = false; // Update 16: OPD doctor is optional (the Consultant button books a doctor)
         if (PatientId is long id)
         {
             Patient = await _patients.GetAsync(id);
@@ -70,9 +70,9 @@ public class RegisterModel : HmsPageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
-        // Private hospitals register OPD patients through doctor appointments (doctor-wise tokens + thermal slip).
-        if ((await _hospital.GetConfigurationAsync()).HospitalType == HospitalType.Private && await CanAsync(Perm.AppointmentsAdd))
-            return Redirect("/Appointments/Book" + (PatientId is long pid ? $"?patientId={pid}" : !string.IsNullOrWhiteSpace(Q) ? "?q=" + Uri.EscapeDataString(Q) : ""));
+        // Update 16: OPD opens the new-patient registration form; the patient search opens only with the Search button.
+        if (PatientId is null && string.IsNullOrWhiteSpace(Q) && !Search && await CanAsync(Perm.PatientsAdd))
+            return Redirect("/Patients/Register?next=opd");
         await LoadAsync();
         Visit.DepartmentId = Settings.DefaultOpdDepartmentId;
         Visit.ServiceItemId = Settings.DefaultOpdServiceItemId;
@@ -94,11 +94,9 @@ public class RegisterModel : HmsPageModel
         var settings = await _setup.GetSettingsAsync();
         if (await CanAsync(Perm.OpdPrint))
         {
-            // Update 15: a Government hospital prints the OPD slip (A4 / A5 from the registration settings) straight away – no fee,
-            // no receipt. Other hospitals keep the Update 14 thermal registration receipt.
-            if ((await _hospital.GetConfigurationAsync()).HospitalType == HospitalType.Government)
-                return Redirect($"/Print/Opd/{enc.Id}?autoprint=true");
-            return Redirect($"/Print/Registration/{enc.Id}" + (settings.AutoPrintAfterRegistration ? "?autoprint=true" : ""));
+            // Update 15/16: the OPD slip (A4 / A5 from the registration settings) prints straight away; a fee set in Fees & Services
+            // goes to the registering user's cash account.
+            return Redirect($"/Print/Opd/{enc.Id}?autoprint=true");
         }
         return Redirect($"/Opd/Visit/{enc.Id}");
     }

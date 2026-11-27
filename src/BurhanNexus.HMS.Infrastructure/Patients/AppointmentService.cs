@@ -146,7 +146,7 @@ public sealed class AppointmentService : IAppointmentService
     public async Task<ServiceResult<Appointment>> BookAsync(BookAppointmentInput input, bool canCollectFee, bool canMarkFree, CancellationToken ct = default)
     {
         var config = await _db.HospitalConfigurations.AsNoTracking().FirstAsync(ct);
-        if (config.HospitalType != HospitalType.Private)
+        if (false) // Update 16: consultant (doctor) tokens in every hospital
             return ServiceResult<Appointment>.Fail("Doctor appointments with thermal token slips are used in Private hospital mode. Use OPD registration in Government mode.");
         if (input.IdempotencyKey == Guid.Empty) return ServiceResult<Appointment>.Fail("The booking form has expired. Please reload the page.");
         // A repeated submission (double click, browser retry) returns the appointment that was already booked – the fee is never collected twice.

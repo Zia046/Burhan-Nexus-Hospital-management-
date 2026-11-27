@@ -52,7 +52,7 @@ public class BookModel : HmsPageModel
     {
         ViewData["Nav"] = "appointment-book";
         Settings = await _setup.GetSettingsAsync();
-        IsPrivate = (await _hospital.GetConfigurationAsync()).HospitalType == HospitalType.Private;
+        IsPrivate = true; // Update 16: one unified HMS
         CanCollect = await CanAsync(Perm.AppointmentsCollectFee);
         CanMarkFree = await CanAsync(Perm.AppointmentsFreeByDoctor);
         // The fee is shown to whoever collects or waives it (it is printed on the token slip).

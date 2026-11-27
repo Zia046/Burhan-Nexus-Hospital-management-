@@ -103,8 +103,8 @@ public sealed class RadiologyCatalogService : IRadiologyCatalogService
     public static string Icon(RadiologyModality m) => m switch { RadiologyModality.XRay => "scan", RadiologyModality.Ecg => "activity", _ => "wave" };
     public static ServiceKind KindOf(RadiologyModality m) => m switch { RadiologyModality.XRay => ServiceKind.XRay, RadiologyModality.Ecg => ServiceKind.Ecg, _ => ServiceKind.Ultrasound };
 
-    public async Task<bool> IsPrivateAsync(CancellationToken ct = default) =>
-        await _db.HospitalConfigurations.AsNoTracking().Select(c => c.HospitalType).FirstOrDefaultAsync(ct) == HospitalType.Private;
+    /// <summary>Update 16: one unified HMS – services are charged as configured (the stored hospital type only drives the pharmacy).</summary>
+    public Task<bool> IsPrivateAsync(CancellationToken ct = default) => Task.FromResult(true);
 
     // =====================================================================================
     // Services
@@ -279,8 +279,7 @@ public sealed class RadiologyCatalogService : IRadiologyCatalogService
     {
         if (!await db.RadiologySettings.AnyAsync(ct))
         {
-            var isGovernment = await db.HospitalConfigurations.AnyAsync(c => c.HospitalType == HospitalType.Government, ct);
-            db.RadiologySettings.Add(new RadiologySettings { Id = 1, UpdatedUtc = now, AllowBookingWithoutVisit = !isGovernment });
+            db.RadiologySettings.Add(new RadiologySettings { Id = 1, UpdatedUtc = now, AllowBookingWithoutVisit = true }); // Update 16: one HMS
         }
         if (!await db.RadiologyTemplates.AnyAsync(ct))
         {
@@ -371,7 +370,7 @@ public sealed class RadiologyCatalogService : IRadiologyCatalogService
     {
         var s = await db.RadiologySettings.FirstOrDefaultAsync(ct);
         if (s is null) return;
-        s.AllowBookingWithoutVisit = type == HospitalType.Private;
+        s.AllowBookingWithoutVisit = true; // Update 16: one HMS
         await db.SaveChangesAsync(ct);
     }
 

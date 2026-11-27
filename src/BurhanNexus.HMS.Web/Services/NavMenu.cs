@@ -34,7 +34,7 @@ public static class NavMenu
         void Add(string key, string title, string icon, bool visible, params (bool Show, NavItem Item)[] items) =>
             sections.Add(new NavSection(key, title, icon, visible, items.Where(i => i.Show).Select(i => i.Item).ToList()));
 
-        Add("appointments", "Appointments", "calendar", isPrivate && Any(Perm.AppointmentsView, Perm.AppointmentsAdd, Perm.AppointmentsReports),
+        Add("appointments", "Appointments", "calendar", Any(Perm.AppointmentsView, Perm.AppointmentsAdd, Perm.AppointmentsReports),
             (Has(Perm.AppointmentsAdd), new("appointment-book", "/Appointments/Book", "plus", "New Appointment")),
             (Has(Perm.AppointmentsView), new("appointments", "/Appointments", "calendar", "Doctor-wise Lists")),
             (Has(Perm.AppointmentsReports), new("appointment-reports", "/Appointments/Reports", "chart", "Appointment Reports", EmitDataNav: false)));
@@ -43,7 +43,7 @@ public static class NavMenu
             (Has(Perm.PatientsAdd), new("patient-register", "/Patients/Register", "plus", "Register Patient", EmitDataNav: false)),
             (Has(Perm.PatientsSearch), new("patients", "/Patients", "search", "Patient Search", EmitDataNav: false)),
             (Has(Perm.OpdView), new("opd", "/Opd", "stethoscope", "OPD", EmitDataNav: false)),
-            (!Has(Perm.OpdView) && Has(Perm.OpdAdd) && !(isPrivate && Has(Perm.AppointmentsAdd)), new("opd", "/Opd/Register", "stethoscope", "OPD Registration", EmitDataNav: false)),
+            (!Has(Perm.OpdView) && Has(Perm.OpdAdd), new("opd", "/Opd/Register", "stethoscope", "OPD Registration", EmitDataNav: false)),
             (Has(Perm.EmergencyView), new("emergency", "/Emergency", "siren", "Emergency", EmitDataNav: false)),
             (!Has(Perm.EmergencyView) && Has(Perm.EmergencyAdd), new("emergency", "/Emergency/Register", "siren", "Emergency Registration", EmitDataNav: false)));
 

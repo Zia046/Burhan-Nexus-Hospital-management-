@@ -83,9 +83,7 @@ public class RegisterModel : HmsPageModel
         if (await CanAsync(Perm.EmergencyPrint))
         {
             // Update 15: Government – the emergency slip (A4 / A5) prints straight away, no receipt; others – thermal registration receipt.
-            if ((await _hospital.GetConfigurationAsync()).HospitalType == HospitalType.Government)
-                return Redirect($"/Print/Emergency/{enc.Id}?autoprint=true");
-            return Redirect($"/Print/Registration/{enc.Id}" + (settings.AutoPrintAfterRegistration ? "?autoprint=true" : ""));
+            return Redirect($"/Print/Emergency/{enc.Id}?autoprint=true"); // Update 16: one HMS – the emergency slip, fee to the user's cash account
         }
         return Redirect($"/Emergency/Visit/{enc.Id}");
     }

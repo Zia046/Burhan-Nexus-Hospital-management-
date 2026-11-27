@@ -77,7 +77,7 @@ public class IndexModel : HmsPageModel
             AdmittedNow = (await ipdQuery.AdmissionsAsync("active", null, null, null, wards, take: 100000)).Count;
             Clinical ??= await _encounters.CountsAsync();
         }
-        if (Perms.Contains(Perm.AppointmentsView) && (await _hospital.GetConfigurationAsync()).HospitalType == HospitalType.Private)
+        if (Perms.Contains(Perm.AppointmentsView))
         {
             var today = await _clock.TodayAsync();
             DoctorsToday = (await _appointments.StatsAsync(today, today)).Where(d => d.Total > 0).ToList();

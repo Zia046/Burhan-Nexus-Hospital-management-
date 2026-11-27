@@ -25,10 +25,10 @@
         </div>
         <ol class="steps" data-steps>
             <li data-step-link="1" class="current"><span>1</span> Hospital</li>
-            <li data-step-link="2"><span>2</span> Type</li>
-            @if (firstInstall) { <li data-step-link="3"><span>3</span> Administrator</li> }
-            <li data-step-link="4"><span>@(firstInstall ? 4 : 3)</span> Preferences</li>
-            <li data-step-link="5"><span>@(firstInstall ? 5 : 4)</span> Review</li>
+            @* Update 16: one unified HMS – no Government / Private choice. *@
+            @if (firstInstall) { <li data-step-link="3"><span>2</span> Administrator</li> }
+            <li data-step-link="4"><span>@(firstInstall ? 3 : 2)</span> Preferences</li>
+            <li data-step-link="5"><span>@(firstInstall ? 4 : 3)</span> Review</li>
         </ol>
     </header>
 
@@ -81,29 +81,6 @@
                         <input asp-for="Logo" type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-logo-input />
                     </div>
                 </div>
-            </div>
-        </section>
-
-        <section class="wizard-step" data-step="2" hidden>
-            <h2>Hospital type</h2>
-            <p class="muted">The type sets the default rules for later modules (for example pharmacy pricing). Every rule can be adjusted later in Settings.</p>
-            <div class="choice-grid">
-                <label class="choice">
-                    <input type="radio" asp-for="HospitalType" value="Government" required data-review="Hospital type" data-review-text="Government Hospital" />
-                    <span class="choice-body">
-                        <svg class="icon icon-lg"><use href="#i-building" /></svg>
-                        <strong>Government Hospital</strong>
-                        <small>Medicines issued from government stock without purchase or sale prices.</small>
-                    </span>
-                </label>
-                <label class="choice">
-                    <input type="radio" asp-for="HospitalType" value="Private" required data-review="Hospital type" data-review-text="Private Hospital" />
-                    <span class="choice-body">
-                        <svg class="icon icon-lg"><use href="#i-hospital" /></svg>
-                        <strong>Private Hospital</strong>
-                        <small>Medicine purchases, purchase and sale prices, retail sales and profit calculation.</small>
-                    </span>
-                </label>
             </div>
         </section>
 

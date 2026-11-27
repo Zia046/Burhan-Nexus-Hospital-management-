@@ -227,6 +227,6 @@ public static class ServiceCatalogue
         return q.NotSet ? $"The fee of “{q.Name}” is not set yet. Ask the administrator to enter it (Fees & Services) – or to mark it FREE." : null;
     }
 
-    public static async Task<bool> IsGovernmentAsync(HmsDbContext db, CancellationToken ct = default) =>
-        await db.HospitalConfigurations.AsNoTracking().Select(c => (HospitalType?)c.HospitalType).FirstOrDefaultAsync(ct) == HospitalType.Government;
+    /// <summary>Update 16: one unified HMS – there is no Government fee schedule any more (the stored type only drives the pharmacy).</summary>
+    public static Task<bool> IsGovernmentAsync(HmsDbContext db, CancellationToken ct = default) => Task.FromResult(false);
 }
