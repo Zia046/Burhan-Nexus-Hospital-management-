@@ -33,13 +33,24 @@ public class ServiceModel : HmsPageModel
     public IReadOnlyList<ServiceFee> FeeHistory { get; private set; } = Array.Empty<ServiceFee>();
     public bool CanServices { get; private set; }
     public bool CanFees { get; private set; }
+    /// <summary>Update 16: fees of laboratory, radiology and IPD / maternity services are set in their own modules.</summary>
+    public (string Where, string Url)? ManagedIn { get; private set; }
+
+    public static (string Where, string Url)? ManagedElsewhere(ServiceItem s) => (s.Kind, s.ServiceCategory?.Code) switch
+    {
+        (ServiceKind.Laboratory, _) or (_, ServiceCatalogue.Lab) => ("Laboratory → Test Catalogue", "/Lab/Catalogue"),
+        (ServiceKind.XRay or ServiceKind.Ultrasound or ServiceKind.Ecg, _) or (_, ServiceCatalogue.Rad) => ("Radiology → Services", "/Radiology/Services"),
+        (ServiceKind.Inpatient, _) or (_, ServiceCatalogue.Ipd or ServiceCatalogue.Ward or ServiceCatalogue.Nicu or ServiceCatalogue.Ot) => ("IPD → Fees", "/Ipd/Fees"),
+        (ServiceKind.Pharmacy, _) or (_, ServiceCatalogue.Pharm) => ("Pharmacy", "/Pharmacy"),
+        _ => null,
+    };
 
     private async Task LoadAsync()
     {
         ViewData["Nav"] = "fees-catalogue";
         ViewData["FeesTab"] = Id is null ? "new" : "catalogue";
         CanServices = await CanAsync(Perm.SvcManageServices);
-        CanFees = await CanAsync(Perm.SvcManageFees);
+        CanFees = User.IsSystemAdministrator(); // Update 16: fees – administrator only (also enforced in FinanceSetupService)
         Categories = await _setup.CategoriesAsync(activeOnly: false);
         Departments = await _departments.ListAsync(includeInactive: false);
         Doctors = await _registration.DoctorsAsync(activeOnly: false);
@@ -47,6 +58,7 @@ public class ServiceModel : HmsPageModel
         {
             Editing = await _setup.ServiceAsync(id);
             if (Editing is not null) FeeHistory = await _setup.FeeHistoryAsync(id);
+            if (Editing is not null && ManagedElsewhere(Editing.Item) is { } m) { ManagedIn = m; CanFees = false; }
         }
     }
 
@@ -94,7 +106,7 @@ public class ServiceModel : HmsPageModel
         if (Editing is null && !CanServices) return Forbid();
         if (feeChanged && !CanFees)
         {
-            ModelState.AddModelError(string.Empty, "You may change the service details but not its fee (permission: Manage Service Fees).");
+            ModelState.AddModelError(string.Empty, ManagedIn is { } mi ? $"The fee of this service is set in {mi.Where}." : FeeAdmin.Denied);
             return Page();
         }
         if (Editing is not null && !feeChanged) Form.FeeEffectiveFrom = null;

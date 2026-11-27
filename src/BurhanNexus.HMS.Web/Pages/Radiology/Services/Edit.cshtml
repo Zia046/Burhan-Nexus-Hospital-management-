@@ -35,7 +35,7 @@
         }
         else
         {
-            <p class="small muted">@(Model.Id is null ? "A new service has no fee until a user with “Manage Radiology Fees” sets it (or marks it FREE) – it cannot be booked before." : $"Current fee: {(Model.CurrentFee == 0 ? "not set / FREE" : Fmt.Money(Model.CurrentFee))}. Changing the fee needs “Manage Radiology Fees”.")</p>
+            <p class="small muted">@(Model.Id is null ? "A new service has no fee until the administrator sets it (or marks it FREE) – it cannot be booked before." : $"Current fee: {(Model.CurrentFee == 0 ? "not set / FREE" : Fmt.Money(Model.CurrentFee))}. Only the administrator can change the fee.")</p>
         }
         <label class="check"><input type="checkbox" name="Input.IsActive" value="true" checked="@i.IsActive" /> Active (can be booked)</label><input type="hidden" name="Input.IsActive" value="false" />
     </div>

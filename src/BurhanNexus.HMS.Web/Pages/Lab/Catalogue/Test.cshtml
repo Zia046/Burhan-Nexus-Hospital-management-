@@ -32,7 +32,7 @@
         <div class="field"><label for="Input_Price">Price</label><input asp-for="Input.Price" type="number" min="0" step="0.01" /></div>
         @if (t is not null) { <div class="field"><label for="Input_PriceEffectiveFrom">New price effective from</label><input asp-for="Input.PriceEffectiveFrom" type="date" /></div> }
         <label class="check"><input type="checkbox" asp-for="Input.AllowPartialPayment" /> Allow partial payment</label>
-        @if (!Model.CanFees) { <small class="muted">Only users with “Manage Laboratory Fees” can change prices.</small> }
+        @if (!Model.CanFees) { <small class="muted">Only the administrator can change test prices.</small> }
     </fieldset>
     @if (Model.CanEdit) { <div class="card-footer form-actions"><button class="btn btn-primary" type="submit" data-test="save-test">Save test</button></div> }
 </form>

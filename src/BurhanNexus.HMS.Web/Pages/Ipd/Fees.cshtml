@@ -1,0 +1,42 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Ipd.FeesModel
+@using BurhanNexus.HMS.Web.Pages.Ipd
+@{ ViewData["Title"] = "IPD & maternity fees"; }
+<partial name="_IpdNav" />
+<div class="page-header">
+    <div><h1>IPD &amp; maternity fees</h1><p class="muted">Admission, ward / bed, NICU, Gynae / maternity and OT fees. A change applies to new charges only – old bills keep the fee that was charged.</p></div>
+    @if (!Model.IsAdmin) { <span class="status">Only the administrator can change fees</span> }
+</div>
+@foreach (var g in FeesModel.Groups)
+{
+    var rows = Model.Rows.Where(r => FeesModel.GroupOf(r.Item) == g.Code).ToList();
+    if (rows.Count == 0) { continue; }
+    <div class="card" data-ipd-fee-group="@g.Code">
+        <div class="card-header"><h2>@g.Title</h2></div>
+        <div class="table-wrap"><table class="table table-compact" data-ipd-fees>
+            <thead><tr><th>Code</th><th>Service</th><th class="num">Fee</th><th>Status</th></tr></thead>
+            <tbody>
+            @foreach (var r in rows)
+            {
+                var s = r.Item;
+                <tr class="@(s.IsActive ? "" : "row-muted")" data-service="@s.Code">
+                    <td class="mono">@s.Code</td><td><strong>@s.Name</strong></td>
+                    <td class="num" data-fee>
+                        @if (Model.IsAdmin)
+                        {
+                            <form method="post" class="inline-form">
+                                <input type="hidden" name="id" value="@s.Id" />
+                                <input name="fee" type="number" step="0.01" min="0" class="input-sm" value="@r.CurrentFee.ToString(System.Globalization.CultureInfo.InvariantCulture)" aria-label="Fee of @s.Name" />
+                                <label class="check small"><input type="checkbox" name="isFree" value="true" checked="@s.IsFree" /> Free</label>
+                                <button class="btn btn-light btn-sm">Save</button>
+                            </form>
+                        }
+                        else { @(s.IsFree ? "FREE" : r.CurrentFee == 0 ? "not set" : Fmt.Money(r.CurrentFee)) }
+                    </td>
+                    <td>@(s.IsActive ? "Active" : "Inactive")</td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+    </div>
+}

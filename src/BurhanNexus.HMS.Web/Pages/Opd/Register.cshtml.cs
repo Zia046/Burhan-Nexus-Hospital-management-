@@ -30,6 +30,8 @@ public class RegisterModel : HmsPageModel
 
     [BindProperty(SupportsGet = true)] public long? PatientId { get; set; }
     [BindProperty(SupportsGet = true, Name = "q")] public string? Q { get; set; }
+    /// <summary>Update 16: the Search button beside "OPD registration – find the patient".</summary>
+    [BindProperty(SupportsGet = true, Name = "search")] public bool Search { get; set; }
     [BindProperty] public OpdVisitInput Visit { get; set; } = new();
 
     public Patient? Patient { get; private set; }

@@ -36,8 +36,7 @@
                     <div class="field"><label for="Form_DoctorId">Doctor (consultation)</label><select id="Form_DoctorId" name="Form.DoctorId"><option value="">—</option>
                         @foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(f.DoctorId == d.Id)">@d.Name</option> }</select></div>
                 </div>
-                <div class="field"><label for="Form_Applicability">Applies to</label><select id="Form_Applicability" name="Form.Applicability">
-                    @foreach (var a in Enum.GetValues<ServiceApplicability>()) { <option value="@a" selected="@((f.Applicability ?? ServiceApplicability.Both) == a)">@IndexModel.Applies(a)</option> }</select></div>
+                <input type="hidden" name="Form.Applicability" value="@(f.Applicability ?? ServiceApplicability.Both)" /> @* Update 16: one HMS *@
                 <div class="field"><label for="Form_Description">Description</label><input id="Form_Description" name="Form.Description" value="@f.Description" maxlength="300" /></div>
                 <label class="check"><input type="checkbox" name="Form.AllowPartialPayment" value="true" checked="@f.AllowPartialPayment" /> Allow partial payment</label>
                 <input type="hidden" name="Form.AllowPartialPayment" value="false" />
@@ -46,11 +45,13 @@
             </fieldset>
             <fieldset disabled="@feeLocked" class="fee-box">
                 <legend>Fee</legend>
+                @if (Model.ManagedIn is { } mi) { <p class="small muted" data-fee-managed>This fee is set in <a href="@mi.Url">@mi.Where</a> (administrator only).</p> }
+                else if (!Model.CanFees) { <p class="small muted">Only the administrator can change fees.</p> }
                 <label class="check"><input type="checkbox" name="Form.IsFree" value="true" checked="@f.IsFree" /> Free service</label>
                 <input type="hidden" name="Form.IsFree" value="false" />
                 <div class="grid-2">
-                    <div class="field"><label for="Form_Fee">Fee (private / standard rate)</label><input id="Form_Fee" name="Form.Fee" type="number" step="0.01" min="0" value="@f.Fee.ToString(System.Globalization.CultureInfo.InvariantCulture)" /></div>
-                    <div class="field"><label for="Form_GovernmentFee">Government rate <span class="muted">(empty = same)</span></label><input id="Form_GovernmentFee" name="Form.GovernmentFee" type="number" step="0.01" min="0" value="@f.GovernmentFee?.ToString(System.Globalization.CultureInfo.InvariantCulture)" /></div>
+                    <div class="field"><label for="Form_Fee">Fee</label><input id="Form_Fee" name="Form.Fee" type="number" step="0.01" min="0" value="@f.Fee.ToString(System.Globalization.CultureInfo.InvariantCulture)" /></div>
+                    <input type="hidden" name="Form.GovernmentFee" value="@f.GovernmentFee?.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
                 </div>
                 <div class="grid-2">
                     <div class="field"><label for="Form_FeeEffectiveFrom">Effective date</label><input id="Form_FeeEffectiveFrom" name="Form.FeeEffectiveFrom" type="date" value="@f.FeeEffectiveFrom?.ToString("yyyy-MM-dd")" /></div>
