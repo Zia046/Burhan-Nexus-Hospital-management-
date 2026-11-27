@@ -424,14 +424,13 @@ public partial class AppointmentTests : Phase2TestBase
         var er = await PostEmergencyAsync(admin, pid, ("Visit.BriefComplaint", "Chest pain"));
         Assert.Equal(HttpStatusCode.Redirect, er.StatusCode);
 
+        // Update 16: one HMS – consultant (doctor) tokens are available in every hospital.
         var home = await admin.GetHtmlAsync("/");
-        Assert.DoesNotContain("data-nav=\"appointment-book\"", home);
-        Assert.DoesNotContain("Today's appointments by doctor", home);
-        var doc = await AddDoctorAsync(admin, "Dr. Govt");
-        var book = await admin.PostFormAsync("/Patients/Register", BookFields(doc), $"/Appointments/Book?patientId={pid}");
-        Assert.Contains("private hospital", Errors(await book.Content.ReadAsStringAsync()), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("data-nav=\"appointment-book\"", home);
+        var doc = await AddDoctorAsync(admin, "Dr. Govt", "Medicine", fee: 300);
+        await BookAsync(admin, pid, doc);
         await using var db = Factory.NewDb();
-        Assert.Empty(await db.Appointments.ToListAsync());
+        Assert.Single(await db.Appointments.ToListAsync());
     }
 
     [Fact]
@@ -443,7 +442,7 @@ public partial class AppointmentTests : Phase2TestBase
         var pid = await RegisterPatientAsync(admin, PatientFields("Link Patient", "Link Father"));
 
         // OPD entry points forward to appointment booking; new patients come back to booking.
-        Assert.Equal($"/Appointments/Book?patientId={pid}", (await admin.GetAsync($"/Opd/Register?patientId={pid}")).Headers.Location!.OriginalString);
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync($"/Opd/Register?patientId={pid}")).StatusCode); // Update 16: OPD stays OPD
         var fields = PatientFields("Second Link", "Other Father");
         fields["Next"] = "appointment";
         fields["ConfirmNotDuplicate"] = "true";

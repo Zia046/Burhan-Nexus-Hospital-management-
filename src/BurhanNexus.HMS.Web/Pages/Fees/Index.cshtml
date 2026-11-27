@@ -1,43 +1,100 @@
 @page
 @model BurhanNexus.HMS.Web.Pages.Fees.IndexModel
 @using BurhanNexus.HMS.Web.Pages.Fees
-@{ ViewData["Title"] = "Fees & Services"; }
+@using BurhanNexus.HMS.Infrastructure.Finance
+@{
+    ViewData["Title"] = "Fees & Services";
+    var tab = Model.CurrentTab;
+    string T(string t) => tab == t ? "tab active" : "tab";
+    var ns = Model.NewService;
+}
 <div class="page-header">
-    <div><h1>Fees &amp; Services</h1><p class="muted">One catalogue for every department. A fee change applies to new transactions only – old bills keep the fee that was charged.</p></div>
+    <div><h1>Fees &amp; Services</h1><p class="muted">OPD, Emergency and Consultant fees. A fee change applies to new transactions only – old bills keep the fee that was charged.
+        Laboratory prices: <a href="/Lab/Catalogue">Laboratory → Test Catalogue</a> · Radiology: <a href="/Radiology/Services">Radiology → Services</a> · IPD / ward / NICU / maternity: <a href="/Ipd/Fees">IPD → Fees</a>.</p></div>
 </div>
 <partial name="_FeesNav" />
+<partial name="_ValidationSummary" />
+<nav class="tabs" aria-label="Fee sections" data-fee-sections>
+    <a class="@T("opd")" href="/Fees?tab=opd" data-fee-tab="opd">OPD</a>
+    <a class="@T("emergency")" href="/Fees?tab=emergency" data-fee-tab="emergency">Emergency</a>
+    <a class="@T("consultant")" href="/Fees?tab=consultant" data-fee-tab="consultant">Consultant</a>
+</nav>
 <form method="get" class="card filters" data-fees-search>
+    <input type="hidden" name="tab" value="@tab" />
     <div class="form-grid">
-        <div class="field span-2"><label for="q">Search</label><input id="q" name="q" value="@Model.Q" placeholder="Service name, code, department" autocomplete="off" /></div>
-        <div class="field"><label for="cat">Category</label><select id="cat" name="category"><option value="">All categories</option>
-            @foreach (var c in Model.Categories) { <option value="@c.Category.Id" selected="@(Model.Category == c.Category.Id)">@c.Category.Name</option> }
-            <option value="0" selected="@(Model.Category == 0)">Uncategorised</option></select></div>
+        <div class="field span-2"><label for="q">Search</label><input id="q" name="q" value="@Model.Q" placeholder="Service name, code, doctor" autocomplete="off" /></div>
         <div class="field"><label for="st">Status</label><select id="st" name="status"><option value="">Active</option><option value="inactive" selected="@(Model.Status == "inactive")">Inactive</option><option value="all" selected="@(Model.Status == "all")">All</option></select></div>
     </div>
-    <div class="form-actions"><button class="btn btn-primary">Search</button> <a class="btn btn-light" href="/Fees">Clear</a></div>
+    <div class="form-actions"><button class="btn btn-primary">Search</button> <a class="btn btn-light" href="/Fees?tab=@tab">Clear</a></div>
 </form>
 <div class="card">
-    <div class="card-header"><h2>@Model.Rows.Count service(s)</h2>@if (Model.Government) { <span class="status">Government mode – government rates are used where set</span> }</div>
+    <div class="card-header"><h2>@Model.Rows.Count @(tab == "consultant" ? "consultant fee(s)" : "service(s)")</h2>@if (!Model.IsAdmin) { <span class="status">Only the administrator can change fees</span> }</div>
     <div class="table-wrap">
         <table class="table table-compact" data-fee-catalogue>
-            <thead><tr><th>Category</th><th>Code</th><th>Service</th><th>Department</th><th>Charging</th><th class="num">Fee</th><th class="num">Government rate</th><th>Applies to</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Code</th><th>@(tab == "consultant" ? "Doctor" : "Service")</th><th>Charging</th><th class="num">Fee</th><th>Status</th><th></th></tr></thead>
             <tbody>
             @foreach (var r in Model.Rows)
             {
                 var s = r.Item;
                 <tr class="@(s.IsActive ? "" : "row-muted")" data-service="@s.Code">
-                    <td>@(s.ServiceCategory?.Name ?? "—")</td><td class="mono">@s.Code</td>
-                    <td><strong>@s.Name</strong>@if (s.Description is not null) { <small class="muted block">@s.Description</small> }</td>
-                    <td>@s.Department?.Name @s.Doctor?.Name</td><td>@IndexModel.Unit(s.ChargeUnit)</td>
-                    <td class="num" data-fee>@(r.CurrentFee == 0 ? "0 (set the fee)" : Fmt.Money(r.CurrentFee))@if (r.NextChange is { } n) { <small class="muted block">@Fmt.Money(n.Fee) from @Fmt.Day(n.EffectiveFrom)</small> }</td>
-                    <td class="num" data-gov-fee>@(r.CurrentGovernmentFee is decimal g ? Fmt.Money(g) : "same")</td>
-                    <td>@IndexModel.Applies(s.Applicability)</td>
+                    <td class="mono">@s.Code</td>
+                    <td><strong>@(tab == "consultant" && s.Doctor is not null ? s.Doctor.Name : s.Name)</strong>@if (tab == "consultant") { <small class="muted block">@s.Name</small> } else if (s.Description is not null) { <small class="muted block">@s.Description</small> }</td>
+                    <td>@IndexModel.Unit(s.ChargeUnit)</td>
+                    <td class="num" data-fee>
+                        @if (Model.IsAdmin)
+                        {
+                            <form method="post" asp-page-handler="Fee" class="inline-form" data-fee-form>
+                                <input type="hidden" name="id" value="@s.Id" /><input type="hidden" name="tab" value="@tab" />
+                                <input name="fee" type="number" step="0.01" min="0" class="input-sm" value="@r.CurrentFee.ToString(System.Globalization.CultureInfo.InvariantCulture)" aria-label="Fee of @s.Name" />
+                                <label class="check small"><input type="checkbox" name="isFree" value="true" checked="@s.IsFree" /> Free</label>
+                                <button class="btn btn-light btn-sm">Save</button>
+                            </form>
+                        }
+                        else { @(s.IsFree ? "FREE" : r.CurrentFee == 0 ? "not set" : Fmt.Money(r.CurrentFee)) }
+                        @if (r.NextChange is { } n) { <small class="muted block">@Fmt.Money(n.Fee) from @Fmt.Day(n.EffectiveFrom)</small> }
+                    </td>
                     <td>@(s.IsActive ? "Active" : "Inactive")</td>
                     <td class="actions">@if (Model.CanEdit) { <a class="btn btn-light btn-sm" href="/Fees/Service?id=@s.Id">Edit</a> }</td>
                 </tr>
             }
-            @if (Model.Rows.Count == 0) { <tr><td colspan="10" class="empty">No services match.</td></tr> }
+            @if (Model.Rows.Count == 0) { <tr><td colspan="6" class="empty">No services match.</td></tr> }
             </tbody>
         </table>
     </div>
 </div>
+@if (tab == "consultant" && Model.IsAdmin && Model.DoctorsWithoutFee.Count > 0)
+{
+    <div class="card" data-doctors-without-fee>
+        <div class="card-header"><h2>Doctors without a consultant fee</h2><span class="muted small">A consultant token cannot be issued until the fee is set (or marked FREE).</span></div>
+        <div class="table-wrap"><table class="table table-compact"><tbody>
+        @foreach (var d in Model.DoctorsWithoutFee)
+        {
+            <tr data-doctor="@d.Id"><td><strong>@d.Name</strong> <small class="muted">@d.Specialty</small></td>
+                <td class="num"><form method="post" asp-page-handler="DoctorFee" class="inline-form">
+                    <input type="hidden" name="doctorId" value="@d.Id" />
+                    <input name="fee" type="number" step="0.01" min="0" class="input-sm" placeholder="Fee" aria-label="Consultant fee of @d.Name" />
+                    <label class="check small"><input type="checkbox" name="isFree" value="true" /> Free</label>
+                    <button class="btn btn-primary btn-sm">Set fee</button></form></td></tr>
+        }
+        </tbody></table></div>
+    </div>
+}
+@if (Model.IsAdmin)
+{
+    <form method="post" asp-page-handler="Add" class="card" id="add-service" data-add-service novalidate>
+        <div class="card-header"><h2><svg class="icon"><use href="#i-plus" /></svg> Add Service</h2></div>
+        <div class="card-body form-grid">
+            <div class="field span-2"><label for="NewService_Name">Service name</label><input id="NewService_Name" name="NewService.Name" value="@ns.Name" maxlength="150" required /></div>
+            <div class="field"><label for="NewService_Category">Category</label><select id="NewService_Category" name="NewService.Category" data-add-category>
+                <option value="Opd" selected="@(ns.Category == SimpleServiceCategory.Opd)">OPD</option>
+                <option value="Emergency" selected="@(ns.Category == SimpleServiceCategory.Emergency)">Emergency</option>
+                <option value="Consultant" selected="@(ns.Category == SimpleServiceCategory.Consultant)">Consultant</option></select></div>
+            <div class="field"><label for="NewService_DoctorId">Doctor <span class="muted">(Consultant only)</span></label><select id="NewService_DoctorId" name="NewService.DoctorId"><option value="">—</option>
+                @foreach (var d in Model.Doctors) { <option value="@d.Id" selected="@(ns.DoctorId == d.Id)">@d.Name</option> }</select></div>
+            <div class="field"><label for="NewService_Fee">Fee</label><input id="NewService_Fee" name="NewService.Fee" type="number" step="0.01" min="0" value="@(ns.Fee == 0 ? "" : ns.Fee.ToString(System.Globalization.CultureInfo.InvariantCulture))" /></div>
+            <label class="check"><input type="checkbox" name="NewService.IsFree" value="true" checked="@ns.IsFree" /> Free</label><input type="hidden" name="NewService.IsFree" value="false" />
+            <label class="check"><input type="checkbox" name="NewService.IsActive" value="true" checked="@ns.IsActive" /> Active</label><input type="hidden" name="NewService.IsActive" value="false" />
+        </div>
+        <div class="card-footer form-actions"><button class="btn btn-primary" data-add-service-save><svg class="icon icon-sm"><use href="#i-check" /></svg> Save</button></div>
+    </form>
+}

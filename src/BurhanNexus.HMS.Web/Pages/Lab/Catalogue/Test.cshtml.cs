@@ -35,7 +35,7 @@ public class TestModel : HmsPageModel
         ViewData["LabTab"] = "catalogue";
         Categories = await _catalog.CategoriesAsync(activeOnly: false);
         SampleTypes = await _catalog.SampleTypesAsync(activeOnly: false);
-        CanFees = await CanAsync(Perm.LabManageFees);
+        CanFees = User.IsSystemAdministrator(); // Update 16: lab prices – administrator only
         CanEdit = await CanAsync(Perm.LabManageCatalogue);
         CanParams = await CanAsync(Perm.LabManageParameters);
         CanRanges = await CanAsync(Perm.LabManageRanges);
@@ -72,7 +72,7 @@ public class TestModel : HmsPageModel
     public async Task<IActionResult> OnPostAsync(int? id)
     {
         if (await DenyUnlessAsync(Perm.LabManageCatalogue) is { } deny) return deny;
-        var r = await _catalog.SaveTestAsync(id, Input, await CanAsync(Perm.LabManageFees));
+        var r = await _catalog.SaveTestAsync(id, Input, User.IsSystemAdministrator());
         if (!r.Succeeded) return await FailAsync(id, r);
         FlashSuccess = "Test saved.";
         return RedirectToPage(new { id = r.Value });

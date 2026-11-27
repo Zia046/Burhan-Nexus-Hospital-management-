@@ -277,6 +277,8 @@ public sealed partial class RegistrationSetupService : IRegistrationSetupService
         if (!Enum.IsDefined(i.Category)) return ServiceResult<int>.Fail("Unknown category.");
         if (i.DoctorId is int doc && !await _db.Doctors.AnyAsync(d => d.Id == doc, ct)) return ServiceResult<int>.Fail("Doctor not found.");
         if (await _db.ServiceItems.AnyAsync(s => s.Code == code && s.Id != (id ?? 0), ct)) return ServiceResult<int>.Fail($"Code '{code}' is already used.");
+        if (id is null && i.DefaultFee != 0 && !await Finance.FeeAdmin.IsAdminAsync(_db, _services.GetRequiredService<IRequestContext>(), ct))
+            return ServiceResult<int>.Fail(Finance.FeeAdmin.Denied); // Update 16: fees are set by the administrator
 
         ServiceItem item;
         object? old = null;
@@ -292,6 +294,8 @@ public sealed partial class RegistrationSetupService : IRegistrationSetupService
             if (found is null) return ServiceResult<int>.Fail("Fee reference not found.");
             item = found;
             previousFee = item.DefaultFee;
+            if (decimal.Round(i.DefaultFee, 2) != item.DefaultFee
+                && !await Finance.FeeAdmin.IsAdminAsync(_db, _services.GetRequiredService<IRequestContext>(), ct)) return ServiceResult<int>.Fail(Finance.FeeAdmin.Denied); // Update 16
             old = new { item.Code, item.Name, item.Category, item.DefaultFee, item.DoctorId, item.IsActive };
         }
         item.Code = code;

@@ -368,7 +368,13 @@ public partial class RadiologyTests : Phase2TestBase
     {
         await SetupAsync("Government");
         var admin = await LoginAdminAsync();
-        await using (var db = Factory.NewDb()) Assert.False((await db.RadiologySettings.SingleAsync()).AllowBookingWithoutVisit); // Government default
+        await using (var db = Factory.NewDb())
+        {
+            var rs = await db.RadiologySettings.SingleAsync();
+            Assert.True(rs.AllowBookingWithoutVisit); // Update 16: one HMS – booking without a visit is the default
+            rs.AllowBookingWithoutVisit = false;       // the "visit required" rule is still a radiology setting
+            await db.SaveChangesAsync();
+        }
         var cxr = await ServiceAsync(admin, "XR-G", "Chest X-Ray", "XRay", 0);
         var usg = await ServiceAsync(admin, "US-G", "Ultrasound KUB", "Ultrasound", 0);
         var pid = await RegisterPatientAsync(admin, PatientFields("Government Rad Patient", "Gov Father"));

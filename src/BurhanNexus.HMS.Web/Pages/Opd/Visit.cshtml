@@ -13,10 +13,10 @@
         <h2>@p.FullName <span class="muted mono small">@p.PatientNumber</span></h2>
         <p class="muted">@Fmt.DateTimeText(e.EncounterUtc) · @(e.Department?.Name ?? "No department")@(e.Doctor is null ? "" : " · " + e.Doctor.Name)
             @if (e.TokenNumber is int t) { <span class="token">Token @t</span> }</p>
-        <p><span class="tag tag-blue">@(e.HospitalTypeAtVisit == HospitalType.Private ? "Private visit" : "Government OPD")</span> <span class="tag">@(e.Opd?.IsRepeatVisit == true ? "Follow-up" : "New visit")</span></p>
+        <p><span class="tag tag-blue">OPD visit</span> <span class="tag">@(e.Opd?.IsRepeatVisit == true ? "Follow-up" : "New visit")</span></p>
     </div>
     <div class="profile-actions">
-        <a bn-permission="@Perm.OpdPrint" class="btn btn-primary" href="/Print/Opd/@e.Id" target="_blank"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print @(e.HospitalTypeAtVisit == HospitalType.Private ? "visit document" : "OPD slip")</a>
+        <a bn-permission="@Perm.OpdPrint" class="btn btn-primary" href="/Print/Opd/@e.Id" target="_blank"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print OPD slip</a>
         <a bn-permission="@Perm.FinanceCollect" class="btn btn-light" href="/Finance/Collect?encounterId=@e.Id" data-test="collect-fee"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> Collect fee</a>
         <a bn-permission="@Perm.PatientsView" class="btn btn-light" href="/Patients/Profile/@p.Id">Patient profile</a>
         <a bn-permission="@Perm.OpdAdd" class="btn btn-light" href="/Opd/Register">Next patient</a>

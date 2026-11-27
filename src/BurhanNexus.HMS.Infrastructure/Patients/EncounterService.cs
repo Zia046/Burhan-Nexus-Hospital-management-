@@ -206,7 +206,7 @@ public sealed class EncounterService : IEncounterService
         // Update 15: Government – when Fees & Services gives the OPD registration a fee, saving / printing the slip records it as
         // collected by this user (it appears in the user's cash account, to be handed over to the administrator). No receipt is printed.
         // No fee set (or free) = free OPD slip.
-        if (hospitalType == HospitalType.Government && serviceId is int feeService)
+        if (serviceId is int feeService) // Update 16: one HMS (no Government / Private rule)
         {
             var paid = await CollectGovernmentOpdFeeAsync(enc, feeService, date, ct);
             if (!paid.Succeeded)
@@ -249,7 +249,7 @@ public sealed class EncounterService : IEncounterService
         if (i.DepartmentId is int d && !await _db.Departments.AnyAsync(x => x.Id == d && x.IsActive, ct)) e.Add("Selected department is not available.");
         if (i.DoctorId is int doc && !await _db.Doctors.AnyAsync(x => x.Id == doc && x.IsActive, ct)) e.Add("Selected doctor is not available.");
         if (i.ServiceItemId is int sid && !await _db.ServiceItems.AnyAsync(x => x.Id == sid && x.IsActive, ct)) e.Add("Selected service is not available.");
-        if (type == HospitalType.Private && s.RequireDoctorForPrivateOpd && i.DoctorId is null && await _db.Doctors.AnyAsync(x => x.IsActive, ct))
+        if (false && type == HospitalType.Private && s.RequireDoctorForPrivateOpd && i.DoctorId is null && await _db.Doctors.AnyAsync(x => x.IsActive, ct)) // Update 16: doctor optional
             e.Add("Please select the doctor for this visit.");
         if ((i.ChiefComplaint?.Trim().Length ?? 0) > 300) e.Add("Complaint must not exceed 300 characters.");
         if ((i.Notes?.Trim().Length ?? 0) > 1000) e.Add("Notes must not exceed 1000 characters.");
@@ -343,7 +343,7 @@ public sealed class EncounterService : IEncounterService
             newValues: new { number, patient.PatientNumber, input.CategoryId, input.BriefComplaint, input.IsMedicoLegal, ArrivalUtc = arrivalUtc });
         await _db.SaveChangesAsync(ct);
         // Update 15: Government – the emergency registration fee (Fees & Services) goes to the registering user's cash account; no fee = free.
-        if (hospitalType == HospitalType.Government && enc.ServiceItemId is int erFee)
+        if (enc.ServiceItemId is int erFee) // Update 16: one HMS
         {
             var paid = await CollectGovernmentOpdFeeAsync(enc, erFee, await _clock.TodayAsync(), ct);
             if (!paid.Succeeded)

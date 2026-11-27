@@ -70,8 +70,11 @@ public partial class Update10Tests : Phase2TestBase
             // Services of other modules are placed in their category (laboratory tests → Laboratory).
             Assert.True(await db.ServiceItems.Where(s => s.Kind == ServiceKind.Laboratory).AllAsync(s => s.ServiceCategory!.Code == "LAB"));
         }
-        var list = await admin.GetHtmlAsync("/Fees?q=incubator");
-        Assert.Contains("SVC-NICU-INC", list);
+        // Update 16: NICU / IPD fees are set in IPD → Fees, not in Fees & Services.
+        Assert.DoesNotContain("SVC-NICU-INC", await admin.GetHtmlAsync("/Fees?q=incubator"));
+        Assert.Contains("SVC-NICU-INC", await admin.GetHtmlAsync("/Ipd/Fees"));
+        var list = await admin.GetHtmlAsync("/Fees?q=specialist");
+        Assert.Contains("SVC-OPD-SPEC", list);
         Assert.DoesNotContain("SVC-PR-SUT", list);
 
         // 35. New category.
@@ -117,7 +120,7 @@ public partial class Update10Tests : Phase2TestBase
                 cfg.HospitalType = HospitalType.Government;
                 await db.SaveChangesAsync();
             }
-            Assert.Equal(300m, await setup.FeeOnAsync(svc, today));
+            Assert.Equal(700m, await setup.FeeOnAsync(svc, today)); // Update 16: one HMS – no separate government rate any more
             await using (var db = Factory.NewDb())
             {
                 var cfg = await db.HospitalConfigurations.SingleAsync();
@@ -139,7 +142,7 @@ public partial class Update10Tests : Phase2TestBase
 
         // Permissions are enforced on the server: view-only cannot save; details-only cannot change the fee.
         var viewer = await UserWithAsync(admin, "feeviewer", Perm.DashboardView, Perm.SvcViewFees);
-        Assert.Contains("SVC-NICU-INC", await viewer.GetHtmlAsync("/Fees"));
+        Assert.Contains("SVC-OPD-SPEC", await viewer.GetHtmlAsync("/Fees"));
         var denied = await viewer.PostFormAsync("/Fees", ServiceForm("PHY-1", "Hacked", cat, "PerSession", 1, null), $"/Fees/Service?id={svc}");
         Assert.True(denied.StatusCode is HttpStatusCode.Forbidden || denied.Headers.Location?.ToString().Contains("AccessDenied") == true, $"viewer save: {(int)denied.StatusCode}");
         Assert.NotEqual(HttpStatusCode.OK, (await viewer.Http.GetAsync("/Fees/Categories")).StatusCode);
@@ -161,11 +164,26 @@ public partial class Update10Tests : Phase2TestBase
 
     private async Task SetFeeAsync(Browser admin, string serviceCode, decimal fee)
     {
-        await using var db = Factory.NewDb();
-        var s = await db.ServiceItems.SingleAsync(x => x.Code == serviceCode);
-        var r = await admin.PostFormAsync($"/Fees/Service?id={s.Id}", ServiceForm(s.Code, s.Name, s.ServiceCategoryId, s.ChargeUnit.ToString(), fee, null)
-            .Select(kv => kv.Key == "Form.Kind" ? P("Form.Kind", s.Kind.ToString()) : kv).ToArray());
+        // Update 16: every fee is changed by the administrator in the module that owns it.
+        ServiceItem s;
+        await using (var db = Factory.NewDb()) s = await db.ServiceItems.Include(x => x.ServiceCategory).SingleAsync(x => x.Code == serviceCode);
+        var managed = BurhanNexus.HMS.Web.Pages.Fees.ServiceModel.ManagedElsewhere(s);
+        HttpResponseMessage r;
+        if (managed is null)
+            r = await admin.PostFormAsync("/Fees", new[] { P("id", s.Id.ToString()), P("fee", fee.ToString(System.Globalization.CultureInfo.InvariantCulture)) }, "/Fees?handler=Fee");
+        else if (managed.Value.Url == "/Ipd/Fees")
+            r = await admin.PostFormAsync("/Ipd/Fees", new[] { P("id", s.Id.ToString()), P("fee", fee.ToString(System.Globalization.CultureInfo.InvariantCulture)) }, "/Ipd/Fees");
+        else
+        {
+            // Laboratory / radiology price: the same server method their catalogue pages use.
+            using var scope = Factory.Services.CreateScope();
+            var res = await scope.ServiceProvider.GetRequiredService<BurhanNexus.HMS.Infrastructure.Finance.IFinanceSetupService>().SetFeeAsync(s.Id, fee, fee == 0 && s.IsFree, null);
+            Assert.True(res.Succeeded, string.Join(" ", res.Errors));
+            return;
+        }
         Assert.True(r.StatusCode == HttpStatusCode.Redirect, "Set fee: " + Errors(await r.Content.ReadAsStringAsync()));
+        await using (var db = Factory.NewDb())
+            Assert.Equal(fee, await db.ServiceFees.Where(f => f.ServiceItemId == s.Id).OrderByDescending(f => f.Id).Select(f => f.Fee).FirstAsync());
     }
 
     private async Task<HttpResponseMessage> EntryAsync(Browser b, long orderId, long itemId, string handler, params (long ValueId, string Value)[] values)

@@ -74,6 +74,28 @@ public sealed class FinanceSettingsInput
     public int DefaultReceiptWidthMm { get; set; } = 80;
 }
 
+/// <summary>Update 16: only the administrator may set or change a fee – enforced here on the server for every module.</summary>
+public static class FeeAdmin
+{
+    public const string Denied = "Only the administrator can set or change fees.";
+    /// <summary>True for the system administrator and for system work (seeding, background jobs – no signed-in user).</summary>
+    public static async Task<bool> IsAdminAsync(HmsDbContext db, IRequestContext ctx, CancellationToken ct = default) =>
+        ctx.UserId is not int uid || await db.Users.AsNoTracking().AnyAsync(u => u.Id == uid && u.IsSystemAdministrator, ct);
+}
+
+/// <summary>Update 16: the simple "Add Service" form of Fees &amp; Services.</summary>
+public enum SimpleServiceCategory { Opd = 1, Emergency = 2, Consultant = 3 }
+
+public sealed class SimpleServiceInput
+{
+    public string? Name { get; set; }
+    public SimpleServiceCategory? Category { get; set; }
+    public int? DoctorId { get; set; }
+    public decimal Fee { get; set; }
+    public bool IsFree { get; set; }
+    public bool IsActive { get; set; } = true;
+}
+
 public sealed record CounterRow(Counter Counter, IReadOnlyList<(int UserId, string Username, string FullName, DateTime AssignedUtc)> Staff);
 
 public sealed record ServiceRow(ServiceItem Item, decimal CurrentFee, ServiceFee? NextChange, IReadOnlyList<string> CounterNames, decimal? CurrentGovernmentFee = null, bool HasTransactions = false);
@@ -102,6 +124,13 @@ public interface IFinanceSetupService
     Task<ServiceResult<int>> SaveCategoryAsync(int? id, ServiceCategoryInput input, CancellationToken ct = default);
     /// <summary>Fee that applies on <paramref name="date"/> (history aware).</summary>
     Task<decimal> FeeOnAsync(int serviceId, DateOnly date, CancellationToken ct = default);
+
+    /// <summary>Update 16: change only the fee of a service (administrator only). Details stay as they are.</summary>
+    Task<ServiceResult> SetFeeAsync(int serviceId, decimal fee, bool isFree, DateOnly? effectiveFrom, CancellationToken ct = default);
+    /// <summary>Update 16: a doctor's own consultation (consultant) fee – creates the doctor's consultation service when missing.</summary>
+    Task<ServiceResult<int>> SetDoctorFeeAsync(int doctorId, decimal fee, bool isFree, CancellationToken ct = default);
+    /// <summary>Update 16: Fees &amp; Services "Add Service" (Name, Category OPD / Emergency / Consultant, Fee, Active).</summary>
+    Task<ServiceResult<int>> AddSimpleServiceAsync(SimpleServiceInput input, CancellationToken ct = default);
 
     Task<ServiceResult> SetDoctorShareAsync(int doctorId, DoctorShareType type, decimal value, CancellationToken ct = default);
 }
@@ -349,6 +378,80 @@ public sealed class FinanceSetupService : IFinanceSetupService
     public async Task<IReadOnlyList<ServiceFee>> FeeHistoryAsync(int serviceId, CancellationToken ct = default) =>
         await _db.ServiceFees.AsNoTracking().Where(f => f.ServiceItemId == serviceId).OrderByDescending(f => f.EffectiveFrom).ThenByDescending(f => f.Id).ToListAsync(ct);
 
+    public async Task<ServiceResult> SetFeeAsync(int serviceId, decimal fee, bool isFree, DateOnly? effectiveFrom, CancellationToken ct = default)
+    {
+        if (!await FeeAdmin.IsAdminAsync(_db, _ctx, ct)) return ServiceResult.Fail(FeeAdmin.Denied);
+        var e = await ServiceAsync(serviceId, ct);
+        if (e is null) return ServiceResult.Fail("Service not found.");
+        var r = await SaveServiceAsync(serviceId, new ServiceInput
+        {
+            Code = e.Item.Code, Name = e.Item.Name, Kind = e.Item.Kind, DepartmentId = e.Item.DepartmentId, DoctorId = e.Item.DoctorId,
+            IsFree = isFree, Fee = isFree ? 0 : fee, GovernmentFee = isFree ? null : e.CurrentGovernmentFee, FeeEffectiveFrom = effectiveFrom,
+            AllowPartialPayment = e.Item.AllowPartialPayment, IsActive = e.Item.IsActive, Description = e.Item.Description,
+            CounterIds = e.Item.Counters.Select(c => c.CounterId).ToList(), ServiceCategoryId = e.Item.ServiceCategoryId,
+            ChargeUnit = e.Item.ChargeUnit, Applicability = e.Item.Applicability,
+        }, ct);
+        return r.Succeeded ? ServiceResult.Ok() : ServiceResult.Fail(r.Errors.ToArray());
+    }
+
+    public async Task<ServiceResult<int>> SetDoctorFeeAsync(int doctorId, decimal fee, bool isFree, CancellationToken ct = default)
+    {
+        if (!await FeeAdmin.IsAdminAsync(_db, _ctx, ct)) return ServiceResult<int>.Fail(FeeAdmin.Denied);
+        var doctor = await _db.Doctors.AsNoTracking().FirstOrDefaultAsync(d => d.Id == doctorId, ct);
+        if (doctor is null) return ServiceResult<int>.Fail("Doctor not found.");
+        // The same service the consultant token (appointments) uses.
+        var existing = await _db.ServiceItems.AsNoTracking().Where(x => x.DoctorId == doctorId && x.IsActive && x.Category == EncounterType.Opd)
+            .OrderBy(x => x.Id).Select(x => (int?)x.Id).FirstOrDefaultAsync(ct);
+        if (existing is int sid)
+        {
+            var r = await SetFeeAsync(sid, fee, isFree, null, ct);
+            return r.Succeeded ? ServiceResult<int>.Ok(sid) : ServiceResult<int>.Fail(r.Errors.ToArray());
+        }
+        var code = await UniqueCodeAsync($"CONS-DR{doctorId}", ct);
+        return await SaveServiceAsync(null, new ServiceInput
+        {
+            Code = code, Name = $"Consultation – {doctor.Name}", Kind = ServiceKind.Consultation, DoctorId = doctorId, DepartmentId = doctor.DepartmentId,
+            IsFree = isFree, Fee = isFree ? 0 : fee, IsActive = true, ChargeUnit = ChargeUnit.PerVisit,
+        }, ct);
+    }
+
+    public async Task<ServiceResult<int>> AddSimpleServiceAsync(SimpleServiceInput i, CancellationToken ct = default)
+    {
+        if (!await FeeAdmin.IsAdminAsync(_db, _ctx, ct)) return ServiceResult<int>.Fail(FeeAdmin.Denied);
+        var name = T(i.Name);
+        var errors = new List<string>();
+        if (name is null || name.Length > 150) errors.Add("Service name is required (max 150 characters).");
+        if (i.Category is not { } cat || !Enum.IsDefined(cat)) errors.Add("Select the category (OPD, Emergency or Consultant).");
+        if (i.Category == SimpleServiceCategory.Consultant && (i.DoctorId is not int d || !await _db.Doctors.AnyAsync(x => x.Id == d, ct)))
+            errors.Add("Select the doctor (consultant fees are separate for every doctor).");
+        if (!i.IsFree && i.Fee <= 0) errors.Add("Enter the fee, or mark the service as FREE.");
+        if (errors.Count > 0) return ServiceResult<int>.Fail(errors.ToArray());
+        var (kind, catCode, prefix) = i.Category switch
+        {
+            SimpleServiceCategory.Emergency => (ServiceKind.Procedure, ServiceCatalogue.Er, "SVC-ER"),
+            SimpleServiceCategory.Consultant => (ServiceKind.Consultation, ServiceCatalogue.Opd, "CONS"),
+            _ => (ServiceKind.Other, ServiceCatalogue.Opd, "SVC-OPD"),
+        };
+        var catId = await _db.ServiceCategories.Where(c => c.Code == catCode).Select(c => (int?)c.Id).FirstOrDefaultAsync(ct);
+        var slug = new string(name!.ToUpperInvariant().Where(char.IsLetterOrDigit).Take(8).ToArray());
+        var code = await UniqueCodeAsync($"{prefix}-{(slug.Length == 0 ? "X" : slug)}", ct);
+        int? deptId = i.DoctorId is int did ? await _db.Doctors.Where(x => x.Id == did).Select(x => x.DepartmentId).FirstOrDefaultAsync(ct) : null;
+        return await SaveServiceAsync(null, new ServiceInput
+        {
+            Code = code, Name = name, Kind = kind, DoctorId = i.Category == SimpleServiceCategory.Consultant ? i.DoctorId : null, DepartmentId = deptId,
+            IsFree = i.IsFree, Fee = i.IsFree ? 0 : i.Fee, IsActive = i.IsActive, ServiceCategoryId = catId,
+            ChargeUnit = i.Category == SimpleServiceCategory.Emergency ? ChargeUnit.PerProcedure : ChargeUnit.PerVisit,
+        }, ct);
+    }
+
+    private async Task<string> UniqueCodeAsync(string baseCode, CancellationToken ct)
+    {
+        baseCode = baseCode.Length > 26 ? baseCode[..26] : baseCode;
+        var code = baseCode;
+        for (var n = 2; await _db.ServiceItems.AnyAsync(x => x.Code == code, ct); n++) code = $"{baseCode}-{n}";
+        return code;
+    }
+
     public async Task<ServiceResult<int>> SaveServiceAsync(int? id, ServiceInput i, CancellationToken ct = default)
     {
         var errors = new List<string>();
@@ -378,6 +481,9 @@ public sealed class FinanceSetupService : IFinanceSetupService
         if (govFee is decimal gf && (gf < 0 || gf > 10_000_000 || !FinanceMath.IsMoney(gf))) errors.Add("Government rate must be a valid amount (0 or more, 2 decimals).");
         if (i.ServiceCategoryId is int sc && !await _db.ServiceCategories.AnyAsync(c => c.Id == sc, ct)) errors.Add("Unknown category.");
         if (errors.Count > 0) return ServiceResult<int>.Fail(errors.ToArray());
+        var isAdmin = await FeeAdmin.IsAdminAsync(_db, _ctx, ct);
+        // Update 16: a new service may be saved without a fee ("fee not set") by anyone allowed; setting a fee is for the administrator.
+        if (id is null && !isAdmin && (fee != 0 || i.IsFree || (i.GovernmentFee is decimal ng && ng != 0))) return ServiceResult<int>.Fail(FeeAdmin.Denied);
 
         var now = _clock.UtcNow;
         ServiceItem s;
@@ -397,6 +503,7 @@ public sealed class FinanceSetupService : IFinanceSetupService
             oldFee = row?.Fee ?? s.DefaultFee;
             oldGov = row?.GovernmentFee;
             if (keepGov) govFee = i.IsFree ? null : oldGov;
+            if (!isAdmin && (oldFee != fee || oldGov != govFee || s.IsFree != i.IsFree)) return ServiceResult<int>.Fail(FeeAdmin.Denied);
             old = new { s.Code, s.Name, s.Kind, s.DepartmentId, s.DoctorId, s.AllowPartialPayment, s.IsActive, s.ServiceCategoryId, s.ChargeUnit, s.Applicability, Fee = oldFee, GovernmentFee = oldGov };
         }
         s.Code = code!; s.Name = name!; s.Kind = i.Kind; s.DepartmentId = i.DepartmentId; s.DoctorId = i.DoctorId;

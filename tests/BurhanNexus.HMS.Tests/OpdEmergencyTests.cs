@@ -74,19 +74,16 @@ public class OpdEmergencyTests : Phase2TestBase
         }
         var pid = await RegisterPatientAsync(admin, PatientFields("Rukhsana Bibi", "Javed Iqbal", "Female"));
 
-        // Private hospitals now book through /Appointments; the classic private OPD visit (A5 visit record) still works for direct posts.
-        Assert.Equal($"/Appointments/Book?patientId={pid}", (await admin.GetAsync($"/Opd/Register?patientId={pid}")).Headers.Location!.OriginalString);
+        // Update 16: one HMS – OPD visits (with or without a doctor) print the OPD slip; the Consultant button books doctor tokens.
+        Assert.Equal(HttpStatusCode.OK, (await admin.GetAsync($"/Opd/Register?patientId={pid}")).StatusCode);
         var noDoctor = await admin.PostFormAsync("/Patients/Register", Array.Empty<KeyValuePair<string, string>>(), $"/Opd/Register?patientId={pid}");
-        Assert.Contains("Please select the doctor", await noDoctor.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.Redirect, noDoctor.StatusCode); // the doctor is optional
 
         var v1 = await RegisterOpdAsync(admin, pid, ("Visit.DoctorId", sana.ToString()));
         var v2 = await RegisterOpdAsync(admin, pid, ("Visit.DoctorId", imran.ToString()));
         var doc = await admin.GetHtmlAsync($"/Print/Opd/{v1}");
-        Assert.Contains("VISIT RECORD", doc);
-        Assert.DoesNotContain("OPD SLIP", doc);
+        Assert.Contains("OPD SLIP", doc);
         Assert.Contains("Dr. Sana Khan", doc);
-        Assert.Contains("MBBS, FCPS", doc);
-        Assert.Equal(PrintedDocumentType.PrivateVisitDocument, (await EncounterAsync(v1)).PrintedDocuments.Single().DocumentType);
 
         var sanaList = await admin.GetHtmlAsync($"/Opd?doctor={sana}");
         Assert.Contains((await EncounterAsync(v1)).EncounterNumber, sanaList);

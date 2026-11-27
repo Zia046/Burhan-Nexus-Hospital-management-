@@ -20,7 +20,7 @@ public class EditModel : RadiologyPageModel
     {
         Nav("rad-services", "services");
         Id = id;
-        CanManageFees = await CanAsync(Perm.RadManageFees);
+        CanManageFees = User.IsSystemAdministrator(); // Update 16: radiology fees – administrator only
         Templates = await Catalog.TemplatesAsync(activeOnly: true);
     }
 
@@ -45,7 +45,7 @@ public class EditModel : RadiologyPageModel
 
     public async Task<IActionResult> OnPostAsync(int? id)
     {
-        var r = await Catalog.SaveServiceAsync(id, Input, await CanAsync(Perm.RadManageFees));
+        var r = await Catalog.SaveServiceAsync(id, Input, User.IsSystemAdministrator());
         if (r.Succeeded)
         {
             FlashSuccess = "Radiology service saved.";

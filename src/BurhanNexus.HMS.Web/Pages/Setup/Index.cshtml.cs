@@ -90,7 +90,6 @@ public class IndexModel : PageModel
         if (guard is not null) return AccessBlocked ? Forbid() : guard;
 
         var firstInstall = State == SetupState.NotConfigured;
-        if (HospitalType is null) ModelState.AddModelError(nameof(HospitalType), "Please select the hospital type (Government or Private).");
         if (firstInstall)
         {
             if (string.IsNullOrWhiteSpace(AdminFullName)) ModelState.AddModelError(nameof(AdminFullName), "Administrator full name is required.");
@@ -118,7 +117,7 @@ public class IndexModel : PageModel
 
         var result = await _setup.CompleteAsync(new SetupInput
         {
-            HospitalName = HospitalName, HospitalType = HospitalType!.Value, RegistrationNumber = RegistrationNumber,
+            HospitalName = HospitalName, HospitalType = HospitalType ?? Core.Domain.HospitalType.Private, // Update 16: no choice any more (kept internally for the pharmacy only) RegistrationNumber = RegistrationNumber,
             Address = Address, City = City, Province = Province, ContactNumber = ContactNumber, Email = Email, Website = Website,
             LogoContent = logoBytes, LogoContentType = logoType,
             AdminFullName = AdminFullName ?? string.Empty, AdminUsername = AdminUsername ?? string.Empty,

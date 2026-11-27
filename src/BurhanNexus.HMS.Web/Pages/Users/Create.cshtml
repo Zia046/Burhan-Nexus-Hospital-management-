@@ -40,6 +40,15 @@
                 }
             </div>
         }
+        @if (Model.CanAssignCounter)
+        {
+            <h3 class="section-title">Cash counter</h3>
+            <div class="form-grid">
+                <div class="field"><label for="CounterId">Counter</label><select id="CounterId" name="CounterId" data-user-counter><option value="">— No counter —</option>
+                    @foreach (var c in Model.Counters) { <option value="@c.Id" selected="@(Model.CounterId == c.Id)">@c.Name (@c.Code)</option> }</select>
+                    <small class="muted">Fees this user collects go to this counter. It can be changed later in Finance → Counters.</small></div>
+            </div>
+        }
     </div>
     <div class="card-footer form-actions">
         <a class="btn btn-light" href="/Users">Cancel</a>

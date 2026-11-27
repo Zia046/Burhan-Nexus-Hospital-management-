@@ -31,10 +31,7 @@ try {
   await page.fill("#Website", "www.alshifa-hospital.pk");
   await page.setInputFiles("#Logo", "sample-logo.png");
   await shot(page, "02-setup-step1-filled");
-  await page.click("[data-wizard-next]");
-  await page.click("label.choice:has-text('Private Hospital')");
-  await shot(page, "03-setup-step2-type");
-  await page.click("[data-wizard-next]");
+  await page.click("[data-wizard-next]"); // Update 16: no hospital-type step
   await page.fill("#AdminFullName", "Ziaullah Khan");
   await page.fill("#AdminUsername", "admin");
   await page.fill("#AdminPassword", "Hospital#2026");
@@ -102,7 +99,7 @@ try {
 
   // ---- Settings ----
   for (const [url, name] of [["/Settings", "17-settings-hospital"], ["/Settings/Preferences", "18-settings-preferences"], ["/Settings/Printing", "19-settings-printing"],
-                             ["/Settings/HospitalType", "20-settings-type"], ["/Settings/Security", "21-settings-security"], ["/Settings/License", "22-license"]]) {
+                             ["/Settings/Security", "21-settings-security"], ["/Settings/License", "22-license"]]) {
     await page.goto(base + url);
     await shot(page, name);
   }

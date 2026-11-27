@@ -4,6 +4,17 @@
     ViewData["Title"] = "Register patient";
     var canOpd = await PermCtx.HasAsync(Perm.OpdAdd);
     var canEr = await PermCtx.HasAsync(Perm.EmergencyAdd);
+    var canConsultant = await PermCtx.HasAsync(Perm.AppointmentsAdd);
+    var opdMode = Model.Next == "opd";
+}
+@if (opdMode)
+{
+    <div class="card" data-opd-find>
+        <div class="card-header">
+            <h2><svg class="icon"><use href="#i-search" /></svg> OPD Registration – Find the Patient</h2>
+            <a class="btn btn-light" href="/Opd/Register?search=true" data-opd-search><svg class="icon icon-sm"><use href="#i-search" /></svg> Search</a>
+        </div>
+    </div>
 }
 <form method="post" class="card" novalidate data-patient-form>
     <div class="card-header">
@@ -25,7 +36,9 @@
     <div class="card-footer form-actions">
         <a class="btn btn-light" href="/Patients">Cancel</a>
         <button type="submit" class="btn btn-light" name="Next" value="profile"><svg class="icon icon-sm"><use href="#i-check" /></svg> Register</button>
-        @if (canEr) { <button type="submit" class="btn btn-danger-outline" name="Next" value="emergency"><svg class="icon icon-sm"><use href="#i-siren" /></svg> Register &amp; Emergency</button> }
-        @if (canOpd) { <button type="submit" class="btn btn-primary" name="Next" value="opd"><svg class="icon icon-sm"><use href="#i-stethoscope" /></svg> Register &amp; OPD visit</button> }
+        @* Update 16: the three registration buttons. *@
+        @if (canOpd) { <button type="submit" class="btn btn-primary" name="Next" value="opd" data-reg-opd><svg class="icon icon-sm"><use href="#i-stethoscope" /></svg> OPD</button> }
+        @if (canEr) { <button type="submit" class="btn btn-danger-outline" name="Next" value="emergency" data-reg-emergency><svg class="icon icon-sm"><use href="#i-siren" /></svg> Emergency</button> }
+        @if (canConsultant) { <button type="submit" class="btn btn-primary" name="Next" value="consultant" data-reg-consultant><svg class="icon icon-sm"><use href="#i-calendar" /></svg> Consultant</button> }
     </div>
 </form>

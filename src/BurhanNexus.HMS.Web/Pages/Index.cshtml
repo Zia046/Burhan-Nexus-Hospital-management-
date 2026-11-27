@@ -14,7 +14,6 @@
     </div>
     @if (profile is not null)
     {
-        <span class="pill @(profile.HospitalType == HospitalType.Government ? "pill-navy" : "pill-blue")">@profile.HospitalType Hospital</span>
     }
 </section>
 
@@ -171,7 +170,7 @@ else
             var link = m.Key switch
             {
                 "Patients" => Model.Perms.Contains(Perm.PatientsSearch) ? "/Patients" : Model.Perms.Contains(Perm.PatientsAdd) ? "/Patients/Register" : null,
-                "Opd" => Model.Perms.Contains(Perm.OpdView) ? "/Opd" : "/Opd/Register",
+                "Opd" => "/Opd/Register", // Update 16: OPD opens the new-patient registration form directly
                 "Radiology" => Model.Perms.Contains(Perm.RadDashboard) ? "/Radiology" : Model.Perms.Contains(Perm.RadCreateBooking) ? "/Radiology/Book"
                     : Model.Perms.Contains(Perm.RadViewXRay) ? "/Radiology/Worklist/XRay" : Model.Perms.Contains(Perm.RadViewUltrasound) ? "/Radiology/Worklist/Ultrasound"
                     : Model.Perms.Contains(Perm.RadEnterReport) ? "/Radiology/Reporting" : Model.Perms.Contains(Perm.RadVerifyReport) ? "/Radiology/Verify" : "/Radiology/History",

@@ -65,7 +65,7 @@ public partial class NavigationTests : Phase2TestBase
         await SetupAsync("Government");
         var admin = await LoginAdminAsync();
         var gov = Block(await admin.GetHtmlAsync("/"), "data-sidebar-nav=\"admin\"");
-        Assert.DoesNotContain("/Appointments", gov); // Government: no appointments, as before
+        Assert.Contains("/Appointments", gov); // Update 16: one HMS – consultant (appointment) tokens everywhere
 
         var lab = await UserWithAsync(admin, "lab.tech", Perm.DashboardView, Perm.LabDashboard, Perm.LabEnterResults, Perm.FinanceViewOwnAccount);
         var html = await lab.GetHtmlAsync("/");

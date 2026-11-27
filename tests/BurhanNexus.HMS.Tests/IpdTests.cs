@@ -533,7 +533,7 @@ public partial class IpdTests : Phase2TestBase
         await Ok(r, "Government admission");
         var adm = Id(AdmissionRegex(), r);
         var settings = await admin.GetHtmlAsync("/Ipd/Settings");
-        Assert.Contains("Government mode", settings);
+        Assert.DoesNotContain("Government mode", settings); // Update 16: one HMS
         foreach (var page in new[] { $"/Ipd/Admission/{adm}?tab=billing", $"/Print/Ipd/bill/{adm}", "/Ipd" })
         {
             var html = (await admin.GetHtmlAsync(page)).ToLowerInvariant();

@@ -10,6 +10,7 @@
         <div class="card-header"><h2><svg class="icon"><use href="#i-stethoscope" /></svg> OPD registration – find the patient</h2></div>
         <div class="card-body">
             <form method="get" class="search-main">
+                <input type="hidden" name="search" value="true" />
                 <div class="input-icon grow"><svg class="icon"><use href="#i-search" /></svg>
                     <input name="q" value="@Model.Q" placeholder="Patient ID, name, mobile or CNIC" autofocus autocomplete="off" maxlength="100" /></div>
                 <button class="btn btn-primary" type="submit">Search</button>
@@ -43,7 +44,6 @@ else
         <form method="post" class="card" novalidate>
             <div class="card-header">
                 <h2><svg class="icon"><use href="#i-stethoscope" /></svg> New OPD visit</h2>
-                <span class="pill @(Model.HospitalType == HospitalType.Government ? "pill-navy" : "pill-blue")">@Model.HospitalType hospital</span>
             </div>
             <div class="card-body">
                 <partial name="_ValidationSummary" />
@@ -72,7 +72,7 @@ else
                         <select id="Visit_ServiceItemId" name="Visit.ServiceItemId">
                             @foreach (var s in Model.Services) { <option value="@s.Id" selected="@(Model.Visit.ServiceItemId == s.Id)">@s.Name (@Fmt.Fee(s.DefaultFee, s.IsFree))</option> }
                         </select>
-                        <small class="muted">Reference only – fee collection and receipts come with the billing module.</small>
+                        <small class="muted">Fee from Fees &amp; Services – recorded in your cash account (no fee set = free slip).</small>
                     </div>
                     <div class="field">
                         <label for="Visit_ChiefComplaint">Presenting complaint <span class="muted">(optional)</span></label>
