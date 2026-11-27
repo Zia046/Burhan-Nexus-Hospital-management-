@@ -93,10 +93,10 @@ try {
   await submit("button[value='profile']");
   await shot(page, "p2-04-duplicate-warning");
 
-  // ---- Private hospital: appointment with doctor-wise token + thermal slip ----
-  await go(patientUrl.replace(base, ""));
-  await submit("a:has-text('New OPD visit')");
-  step("private OPD link → " + page.url());
+  // ---- Consultant: doctor-wise token + thermal slip (Update 16: every hospital) ----
+  const pid0 = new URL(patientUrl).pathname.split("/").pop();
+  await go(`/Appointments/Book?patientId=${pid0}`);
+  step("consultant booking → " + page.url());
   await page.check(`label.doctor-choice:has-text('Dr. Sana Khan') input`);
   await page.fill("#Input_Complaint", "Lower abdominal pain");
   await shot(page, "pa-05-appointment-book");
@@ -131,15 +131,9 @@ try {
   await go("/");
   await shot(page, "pa-09b-dashboard-private");
 
-  // ---- Switch to Government mode ----
-  await go("/Settings/HospitalType");
-  await page.selectOption("#NewType", "Government");
-  await page.fill("#Password", "Hospital#2026");
-  await page.fill("#Confirmation", "CHANGE");
-  await submit("button:has-text('Change hospital type')");
-
-  // ---- Government OPD: new patient through "Register & OPD visit" ----
-  await go("/Patients/Register");
+  // ---- OPD (Update 16): Home → OPD opens the registration form; the OPD button prints the slip ----
+  await go("/Opd/Register");
+  await shot(page, "p2-05-opd-registration-form");
   await page.fill("[name='Patient.FullName']", "Fazal Rabi");
   await page.selectOption("[name='Patient.Gender']", "Male");
   await page.fill("[name='Patient.GuardianName']", "Sher Ali Khan");
@@ -148,12 +142,9 @@ try {
   await page.fill("[name='Patient.Address']", "Village Shabqadar");
   await page.fill("[name='Patient.CityOrVillage']", "Charsadda");
   await submit("button[value='opd']");
-  await page.fill("#Visit_ChiefComplaint", "Fever and cough for 3 days");
-  await shot(page, "p2-06-opd-register-government");
-  await submit("button:has-text('Register')");
   const regUrl = page.url().split("?")[0].replace(base, "");
-  step("Government OPD registration lands on the OPD slip (no receipt): " + regUrl);
-  if (!regUrl.startsWith("/Print/Opd/")) throw new Error("Government OPD registration should open the OPD slip, got " + regUrl);
+  step("OPD button lands on the OPD slip: " + regUrl);
+  if (!regUrl.startsWith("/Print/Opd/")) throw new Error("The OPD button should open the OPD slip, got " + regUrl);
   await shot(page, "p2-06b-government-opd-slip-direct");
   const govUrl = regUrl;
   await pdf(govUrl.replace("/Print/Opd/", "/Print/Registration/"), "sample-registration-receipt-thermal-80mm.pdf");
@@ -346,6 +337,12 @@ try {
   await shot(page, "p4-16-lab-reports");
 
   // ---- Phase 5: pharmacy (Government first, then Private) ----
+  // Update 16: the hospital type is no longer shown anywhere; the pharmacy still reads the stored value (hidden page).
+  await go("/Settings/HospitalType");
+  await page.selectOption("#NewType", "Government");
+  await page.fill("#Password", "Hospital#2026");
+  await page.fill("#Confirmation", "CHANGE");
+  await submit("button:has-text('Change hospital type')");
   const ym = m => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + m); return d.toISOString().slice(0, 7); };
   const addMed = async q => {
     await page.fill("[data-med-search]", "");

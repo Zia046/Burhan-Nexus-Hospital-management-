@@ -28,7 +28,7 @@ public partial class Update10Tests
         var pid = await RegisterPatientAsync(admin, PatientFields("Private Emergency", "Father Private"));
         var er = await PostEmergencyAsync(admin, pid, ("Visit.BriefComplaint", "Fall"));
         Assert.Equal(HttpStatusCode.Redirect, er.StatusCode);
-        Assert.StartsWith("/Print/Registration/", er.Headers.Location!.OriginalString);
+        Assert.StartsWith("/Print/Emergency/", er.Headers.Location!.OriginalString); // Update 16: one HMS – the emergency slip
     }
 
     [Fact]

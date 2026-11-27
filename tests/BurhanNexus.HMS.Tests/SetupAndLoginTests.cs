@@ -34,7 +34,7 @@ public class SetupAndLoginTests : HmsTestBase
         var r1 = await b.PostMultipartAsync("/Setup", bad);
         Assert.Equal(HttpStatusCode.OK, r1.StatusCode);
         var body = await r1.Content.ReadAsStringAsync();
-        Assert.Contains("Please select the hospital type", body);
+        Assert.DoesNotContain("Please select the hospital type", body); // Update 16: no hospital type any more
         Assert.Contains("The passwords do not match", body);
 
         await SetupAsync("Government");

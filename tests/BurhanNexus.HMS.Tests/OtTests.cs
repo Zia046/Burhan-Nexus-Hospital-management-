@@ -608,7 +608,7 @@ public partial class OtTests : Phase2TestBase
     {
         await SetupAsync("Government");
         var admin = await LoginAdminAsync();
-        Assert.Contains("Government hospital mode", await admin.GetHtmlAsync("/Ot/Setup"));
+        Assert.DoesNotContain("Government hospital mode", await admin.GetHtmlAsync("/Ot/Setup")); // Update 16: one HMS
         var theatreFee = await ServiceAsync(admin, "OT-GOV", "OT registration fee", 200, "Procedure");
         var ot = await TheatreAsync(admin, "OT1", "Main OT 1", charge: theatreFee);
         var surgeon = await DoctorAsync(admin, "Dr. Govt Surgeon");
