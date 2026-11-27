@@ -115,5 +115,12 @@ public class Update15LicenseTests : HmsTestBase
         }
         Assert.NotEmpty(EcdsaLicenseKeyVerifier.TrustedPublicKeys);
         Assert.All(EcdsaLicenseKeyVerifier.TrustedPublicKeys, k => Assert.Contains("BEGIN PUBLIC KEY", k));
+        // The generator key 69997459AA0BC5EB is trusted (key ID = first 16 hex of SHA-256 of the PEM, as the generator shows it).
+        Assert.Contains(EcdsaLicenseKeyVerifier.GeneratorPublicKey69997459, EcdsaLicenseKeyVerifier.TrustedPublicKeys);
+        var id = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(EcdsaLicenseKeyVerifier.GeneratorPublicKey69997459.Replace("\r", "").Trim())))[..16];
+        Assert.Equal("69997459AA0BC5EB", id);
+        using var ecdsa = System.Security.Cryptography.ECDsa.Create();
+        ecdsa.ImportFromPem(EcdsaLicenseKeyVerifier.GeneratorPublicKey69997459);
+        Assert.Equal(256, ecdsa.KeySize);
     }
 }
