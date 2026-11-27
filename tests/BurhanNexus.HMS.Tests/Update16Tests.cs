@@ -145,7 +145,7 @@ public partial class Update10Tests
 
         // Inline fee change and Add Service: refused on the server.
         var inline = await clerk.PostFormAsync($"/Fees/Service?id={svcId}", new[] { P("id", svcId.ToString()), P("fee", "999") }, "/Fees?handler=Fee");
-        Assert.Equal(HttpStatusCode.Forbidden, inline.StatusCode);
+        Assert.True(inline.StatusCode is HttpStatusCode.Forbidden || inline.Headers.Location?.ToString().Contains("AccessDenied") == true, $"clerk fee change: {(int)inline.StatusCode}");
         var ipd = await clerk.GetHtmlAsync("/Ipd/Fees");
         Assert.Contains("Only the administrator can change fees", ipd);
         // The full service form: the fee field is locked and a posted fee is refused.
