@@ -295,16 +295,16 @@ public partial class FinanceTests : Phase2TestBase
         Assert.Equal(1500m, await OutstandingAsync(aId));
         Assert.Contains("already", Errors(await (await ConfirmAsync(admin, dep3, 1500)).Content.ReadAsStringAsync()));
 
-        // Admin cannot confirm his own deposit.
+        // Update 18: the administrator's own deposit needs no approval – it is confirmed at once (and can never be confirmed twice).
         var (_, adminId) = (admin, await UserIdAsync(AdminUser));
         await CollectAsync(admin, pid, counter, new Line(svc));
         Assert.Equal(HttpStatusCode.Redirect, (await SubmitDepositAsync(admin, 500)).StatusCode);
         var own = await DepositIdAsync(AdminUser, 500);
         Assert.Contains("own deposit", Errors(await (await ConfirmAsync(admin, own, 500)).Content.ReadAsStringAsync()));
-        Assert.Equal(10000m, await OutstandingAsync(adminId));
+        Assert.Equal(9500m, await OutstandingAsync(adminId));
 
         Assert.Equal(4, (await AuditAsync(AuditActions.DepositSubmitted)).Count);
-        Assert.Equal(2, (await AuditAsync(AuditActions.DepositConfirmed)).Count);
+        Assert.Equal(3, (await AuditAsync(AuditActions.DepositConfirmed)).Count);
         Assert.Single(await AuditAsync(AuditActions.DepositRejected));
     }
 
