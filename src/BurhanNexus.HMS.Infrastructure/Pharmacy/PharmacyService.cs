@@ -513,7 +513,7 @@ public sealed class PharmacyService : IPharmacyService
             MedicineIssueMode.Discounted => rights.PaidSale && rights.Discount,
             _ => false,
         };
-        if (!allowed) return (null, $"You are not allowed to use {ModeLabel(mode)}.");
+        if (!allowed) return (null, mode == MedicineIssueMode.Discounted && rights.PaidSale ? "You are not allowed to give discounts." : $"You are not allowed to use {ModeLabel(mode)}.");
         return (mode, null);
     }
 

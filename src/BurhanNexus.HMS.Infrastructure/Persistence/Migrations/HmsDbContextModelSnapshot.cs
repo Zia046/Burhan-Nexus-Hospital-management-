@@ -1604,6 +1604,10 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ContactNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.Property<DateTime>("CreatedUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -4622,6 +4626,10 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                         .HasPrecision(14, 2)
                         .HasColumnType("numeric(14,2)");
 
+                    b.Property<string>("StockClass")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<int?>("SupplierId")
                         .HasColumnType("integer");
 
@@ -6502,6 +6510,24 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("ApprovalNote")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("ApprovalStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int?>("ApprovedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ApprovedByUsername")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("ApprovedUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateOnly>("BusinessDate")
                         .HasColumnType("date");
 
@@ -6522,6 +6548,10 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Property<long?>("EncounterId")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("FreeReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
                     b.Property<decimal?>("GrossAmount")
                         .HasPrecision(14, 2)
                         .HasColumnType("numeric(14,2)");
@@ -6531,6 +6561,10 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
 
                     b.Property<long?>("IpdAdmissionId")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("IssueMode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<int>("LocationId")
                         .HasColumnType("integer");
@@ -6553,14 +6587,28 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<decimal?>("PatientAmount")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
                     b.Property<long>("PatientId")
                         .HasColumnType("bigint");
+
+                    b.Property<decimal?>("SubsidyAmount")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<decimal?>("TotalValue")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
 
                     b.Property<string>("Workstation")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ApprovalStatus");
 
                     b.HasIndex("BusinessDate");
 
@@ -6581,7 +6629,7 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
 
                     b.ToTable("PatientMedicineIssues", null, t =>
                         {
-                            t.HasCheckConstraint("CK_PatientMedicineIssues_Government", "\"Mode\" = 'Private' OR (\"EncounterId\" IS NOT NULL AND \"GrossAmount\" IS NULL AND \"NetAmount\" IS NULL)");
+                            t.HasCheckConstraint("CK_PatientMedicineIssues_Government", "\"Mode\" = 'Private' OR (\"GrossAmount\" IS NULL AND \"NetAmount\" IS NULL)");
                         });
                 });
 
@@ -6969,8 +7017,24 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Property<int>("Id")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("AllowChangeIssueMode")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("DefaultIssueMode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("DiscountEnabled")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("EncounterValidDays")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("FreeIssueApprovalRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("FreeIssueEnabled")
+                        .HasColumnType("boolean");
 
                     b.Property<int?>("GovernmentIssueServiceItemId")
                         .HasColumnType("integer");
@@ -6980,6 +7044,9 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("NearExpiryDays")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("PaidSaleEnabled")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("PharmacyName")
                         .HasMaxLength(150)
@@ -6994,6 +7061,12 @@ namespace BurhanNexus.HMS.Infrastructure.Persistence.Migrations
                     b.Property<string>("SlipFooter")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("StockClassificationEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("SubsidyEnabled")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("UpdatedUtc")
                         .HasColumnType("timestamp with time zone");

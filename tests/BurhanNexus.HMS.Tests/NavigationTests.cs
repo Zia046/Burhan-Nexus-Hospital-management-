@@ -22,7 +22,7 @@ public partial class NavigationTests : Phase2TestBase
 
     private static readonly string[] AdminSidebar =
     {
-        "/Appointments/Book", "/Appointments", "/Opd", "/Emergency", "/Finance", "/Finance/Services",
+        "/Patients/Register?next=appointment", "/Appointments", "/Opd", "/Emergency", "/Finance", "/Finance/Services",
         "/Users", "/Departments", "/Audit", "/Settings", "/Backup",
     };
 

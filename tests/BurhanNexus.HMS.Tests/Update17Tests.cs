@@ -82,7 +82,8 @@ public partial class PharmacyTests
         var bad = await admin.PostFormAsync("/Pharmacy/Settings", new[]
         {
             P("RowVersion", rv.ToString()), P("Input.NearExpiryDays", "90"), P("Input.EncounterValidDays", "7"), P("Input.IssueConfigPosted", "true"),
-            P("Input.FreeIssueEnabled", "true"), P("Input.DefaultIssueMode", "Paid"),
+            P("Input.FreeIssueEnabled", "true"), P("Input.PaidSaleEnabled", "false"), P("Input.SubsidyEnabled", "false"), P("Input.DiscountEnabled", "false"),
+            P("Input.DefaultIssueMode", "Paid"),
         });
         Assert.Equal(HttpStatusCode.OK, bad.StatusCode);
         Assert.Contains("default issue mode must be one of the enabled modes", await bad.Content.ReadAsStringAsync());
@@ -176,7 +177,7 @@ public partial class PharmacyTests
         await ConfigureAsync(s => { s.PaidSaleEnabled = true; s.FreeIssueApprovalRequired = true; s.AllowChangeIssueMode = true; });
         var admin = await LoginAdminAsync();
         var med = await MedicineAsync(admin, "Metformin");
-        await IdAsync(await ReceiveAsync(admin, null, "District Health Office", null, "DHO-17", (med, "MF1", Month(12), 100, null)), "Receiving");
+        await IdAsync(await ReceiveAsync(admin, null, "District Health Office", null, "DHO-17", (med, "MF1", Month(12), 100, 1m)), "Receiving"); // prices are used (Paid Sale enabled)
         var pid = await RegisterPatientAsync(admin, PatientFields("Approval Patient", "Approval Father"));
         var enc = await RegisterOpdAsync(admin, pid);
         var pharmacist = await UserWithAsync(admin, "pharm17", PharmacistPerms);
@@ -302,7 +303,7 @@ public partial class PharmacyTests
             Assert.False(d.IsActive);
             Assert.Equal("0300-7654321", d.ContactNumber);
         }
-        Assert.DoesNotContain("Dr. Ayesha Noor", await admin.GetHtmlAsync($"/Appointments/Book?patientId={pid}"));
+        Assert.DoesNotContain($"name=\"Input.DoctorId\" value=\"{doctorId}\"", await admin.GetHtmlAsync($"/Appointments/Book?patientId={pid}"));
     }
 
     [Fact]
