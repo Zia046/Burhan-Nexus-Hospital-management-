@@ -32,7 +32,7 @@
     <div class="t-sep"></div>
     @if (Model.Issue is { } iss)
     {
-        @{ var em = iss.EffectiveMode; }
+        var em = iss.EffectiveMode;
         <div class="t-title" data-slip-mode="@em">@(em switch { BurhanNexus.HMS.Core.Domain.MedicineIssueMode.Free => "FREE MEDICINE ISSUE SLIP", BurhanNexus.HMS.Core.Domain.MedicineIssueMode.Subsidized => "SUBSIDIZED MEDICINE SLIP", _ => "MEDICINE ISSUE SLIP" })</div>
         @if (iss.ApprovalStatus == BurhanNexus.HMS.Core.Domain.FreeIssueApproval.Pending) { <div class="t-title">*** NOT APPROVED YET ***</div> }
         <table class="t-kv">
