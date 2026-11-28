@@ -15,7 +15,7 @@
 </div>
 <div class="card">
     <div class="card-header"><h2><svg class="icon"><use href="#i-pill" /></svg> Pharmacy – @BurhanNexus.HMS.Web.Pages.Finance.FinancePeriod.Label(d.From, d.To)</h2>
-        @{ var pset = await Context.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Pharmacy.IPharmacyCatalogService>().SettingsAsync(); }
+        @{ var pset = await ViewContext.HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Pharmacy.IPharmacyCatalogService>().SettingsAsync(); }
         <span class="pill" data-issue-modes-pill>@string.Join(" · ", pset.EnabledModes.Select(BurhanNexus.HMS.Infrastructure.Pharmacy.PharmacyService.ModeLabel))</span></div>
     <div class="card-body">
         <div class="kpi-grid" data-pharm-kpis>

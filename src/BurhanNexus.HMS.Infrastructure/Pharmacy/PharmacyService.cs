@@ -493,7 +493,7 @@ public sealed class PharmacyService : IPharmacyService
     /// Update 17: decides the issue mode on the server – enabled in the Medicine Issue Configuration, allowed for the user,
     /// and the default unless the user may change it. Paid ↔ Discount is not a "mode change" (a discount needs the discount right).
     /// </summary>
-    internal static (MedicineIssueMode? Mode, string? Error) ResolveMode(PharmacySettings settings, MedicineIssueMode? requested, bool hasDiscount, PharmacyRights rights)
+    public static (MedicineIssueMode? Mode, string? Error) ResolveMode(PharmacySettings settings, MedicineIssueMode? requested, bool hasDiscount, PharmacyRights rights)
     {
         var def = settings.EffectiveDefaultMode;
         if (def is null) return (null, "No medicine issue mode is enabled. Ask the administrator (Pharmacy Settings → Medicine Issue Configuration).");

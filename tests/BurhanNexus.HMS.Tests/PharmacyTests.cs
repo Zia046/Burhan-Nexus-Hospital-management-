@@ -152,7 +152,8 @@ public partial class PharmacyTests : Phase2TestBase
     private static readonly string[] PharmacistPerms =
     {
         Perm.DashboardView, Perm.PharmDashboard, Perm.PharmViewCatalogue, Perm.PharmIssueToPatients, Perm.PharmReceiveStock, Perm.PharmTransferStock,
-        Perm.PharmViewStockReports, Perm.PharmAdjustStock, Perm.PharmProcessReturns, Perm.PatientsSearch
+        Perm.PharmViewStockReports, Perm.PharmAdjustStock, Perm.PharmProcessReturns, Perm.PatientsSearch,
+        Perm.PharmFreeIssue, Perm.PharmPaidSale // update 17: one right per issue mode
     };
 
     // =====================================================================================

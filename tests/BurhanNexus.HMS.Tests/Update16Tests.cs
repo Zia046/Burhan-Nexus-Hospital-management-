@@ -42,7 +42,7 @@ public partial class Update10Tests
         Assert.Equal("/Patients/Register?next=opd", r.Headers.Location!.OriginalString);
         var form = await admin.GetHtmlAsync("/Patients/Register?next=opd");
         Assert.Contains("OPD Registration – Find the Patient", System.Net.WebUtility.HtmlDecode(form));
-        Assert.Contains("href=\"/Opd/Register?search=true\"", form);
+        Assert.Contains("data-opd-search", form); // update 17: the Search button sits beside the search field
         Assert.Contains("data-reg-opd", form);
         Assert.Contains("data-reg-emergency", form);
         Assert.Contains("data-reg-consultant", form);
