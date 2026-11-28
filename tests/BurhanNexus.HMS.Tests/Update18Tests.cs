@@ -78,6 +78,7 @@ public partial class AppointmentTests
 
         // Later visit: a further record – the earlier one is kept (visit-wise).
         Factory.Clock.Advance(TimeSpan.FromDays(3));
+        admin = await LoginAdminAsync(); // the session expired over the days
         var enc = await admin.PostFormAsync($"/Opd/Register?patientId={p1}", new[] { P("DiseaseName", "Respiratory Tract Infection (RTI)") }, $"/Opd/Register?patientId={p1}");
         Assert.Equal(HttpStatusCode.Redirect, enc.StatusCode);
         await using (var db = Factory.NewDb())

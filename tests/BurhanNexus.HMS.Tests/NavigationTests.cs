@@ -40,7 +40,7 @@ public partial class NavigationTests : Phase2TestBase
         foreach (var cat in new[] { "appointments", "patients", "lab", "ipd", "radiology", "pharmacy", "finance", "admin", "system" })
             Assert.Contains($"data-adm-cat=\"{cat}\"", bar);
         foreach (var moved in new[] { "/Appointments/Reports", "/Patients/Register", "/Patients", "/Lab", "/Lab/Settings", "/Ipd", "/Ipd/Nicu", "/Radiology", "/Radiology/Settings",
-                     "/Pharmacy", "/Pharmacy/Sale", "/Finance/Collect", "/Finance/Dashboard", "/Roles", "/Users/LoginHistory", "/Settings/License" })
+                     "/Pharmacy", "/Pharmacy/Sale", "/Finance/Collect", "/Finance", "/Roles", "/Users/LoginHistory", "/Settings/License" })
             Assert.Contains(moved, barLinks);
         // No page appears twice – neither inside the taskbar nor in both places.
         var menuLinks = barLinks.Where(l => l != "/").ToList();
