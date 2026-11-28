@@ -74,7 +74,7 @@ public partial class AppointmentTests
         Assert.Equal(HttpStatusCode.OK, refused.StatusCode);
         Assert.Contains("not in the Disease Master", await refused.Content.ReadAsStringAsync());
         await using (var db = Factory.NewDb()) Assert.False(await db.Patients.AnyAsync(p => p.FullName == "Clerk Patient"));
-        await RegisterWithDiseaseAsync(clerk, "Clerk Patient", "Clerk Father", "RTI respiratory tract infection");
+        await RegisterWithDiseaseAsync(clerk, "Clerk Patient", "Clerk Father", "RESPIRATORY tract infection (rti)");
 
         // Later visit: a further record – the earlier one is kept (visit-wise).
         Factory.Clock.Advance(TimeSpan.FromDays(3));

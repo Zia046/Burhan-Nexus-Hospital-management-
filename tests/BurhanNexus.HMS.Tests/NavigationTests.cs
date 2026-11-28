@@ -22,8 +22,8 @@ public partial class NavigationTests : Phase2TestBase
 
     private static readonly string[] AdminSidebar =
     {
-        "/Patients/Register?next=appointment", "/Appointments", "/Opd", "/Emergency", "/Finance", "/Finance/Services",
-        "/Users", "/Departments", "/Audit", "/Settings", "/Backup",
+        "/Patients/Register?next=appointment", "/Appointments", "/Opd", "/Emergency", "/Finance/Dashboard", "/Finance/Services",
+        "/Users", "/Departments", "/Audit", "/Settings", "/Backup", "/Diseases", // update 18: Finance (dashboard) and the Disease Master
     };
 
     [Fact]
