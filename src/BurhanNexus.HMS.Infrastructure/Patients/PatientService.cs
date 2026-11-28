@@ -210,7 +210,8 @@ public sealed partial class PatientService : IPatientService
         {
             // Keep an earlier estimate if the age did not change (avoids drifting dates on every edit).
             var current = p.DateOfBirth is { } existing ? AgeCalculator.FromDateOfBirth(existing, today) : (PatientAge?)null;
-            if (current is null || current.Value.Value != a || current.Value.Unit != u || !p.DateOfBirthEstimated)
+            // Update 18: the form has no date of birth any more – a date of birth entered earlier is kept while the age matches it.
+            if (current is null || current.Value.Value != a || current.Value.Unit != u)
             {
                 p.DateOfBirth = AgeCalculator.EstimateDateOfBirth(a, u, today);
                 p.DateOfBirthEstimated = true;

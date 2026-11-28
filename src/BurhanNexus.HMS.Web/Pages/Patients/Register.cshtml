@@ -57,6 +57,7 @@
                 <label class="check confirm-dup"><input type="checkbox" name="ConfirmNotDuplicate" value="true" data-confirm-dup /> I have checked the list above – this is a <strong>different person</strong>. Register as a new patient.</label>
             }
         </div>
+        @{ ViewData["DiseasePicker"] = true; ViewData["DiseaseName"] = Model.DiseaseName; }
         <partial name="_PatientFields" for="Patient" />
         <p class="muted small">Registration date and time are recorded automatically: <strong>@Fmt.DateTimeText(DateTime.UtcNow)</strong></p>
     </div>

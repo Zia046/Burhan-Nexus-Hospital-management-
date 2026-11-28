@@ -6,6 +6,31 @@
     var maxDay = d.ByDay.Count == 0 ? 0 : d.ByDay.Max(x => x.Amount);
 }
 <partial name="_FinanceNav" />
+@* Update 18: "Finance" in the sidebar opens this dashboard with every finance option. *@
+@{ var acc = Model.Accounts; }
+<div class="card no-print" data-finance-options>
+    <div class="card-body toolbar-actions wrap">
+        <a class="btn btn-light btn-sm" href="/Finance" data-option="own"><svg class="icon icon-sm"><use href="#i-wallet" /></svg> My Financial Account</a>
+        <a class="btn btn-light btn-sm" href="/Finance/Cashiers" bn-permission="@Perm.FinanceViewAllAccounts"><svg class="icon icon-sm"><use href="#i-users" /></svg> Admin &amp; User Accounts</a>
+        @if (User.IsSystemAdministrator()) { <a class="btn btn-primary btn-sm" href="/Finance/PayToHospital" data-option="pay-hospital"><svg class="icon icon-sm"><use href="#i-check-circle" /></svg> Pay to Hospital</a> }
+        <a class="btn btn-light btn-sm" href="/Finance/Deposits" bn-permission="@Perm.FinanceConfirmDeposits" data-option="deposits"><svg class="icon icon-sm"><use href="#i-download" /></svg> Deposit Approvals @if (acc.PendingCount > 0) { <span class="badge">@acc.PendingCount</span> }</a>
+        <a class="btn btn-light btn-sm" href="/Finance/Revenue">Outstanding Balances</a>
+        <a class="btn btn-light btn-sm" href="/Finance/Reports">Financial Reports</a>
+        <a class="btn btn-light btn-sm" href="/Finance/Receipts">Transaction History</a>
+    </div>
+</div>
+<div class="card" data-hospital-accounts>
+    <div class="card-header"><h2><svg class="icon"><use href="#i-wallet" /></svg> Admin &amp; user accounts</h2></div>
+    <div class="card-body"><div class="kpi-grid">
+        <div class="kpi" data-admin-outstanding><div><span class="kpi-label">Admin outstanding</span><strong class="kpi-value">@Fmt.Money(acc.AdminOutstanding)</strong></div></div>
+        <div class="kpi" data-users-outstanding><div><span class="kpi-label">Users outstanding</span><strong class="kpi-value">@Fmt.Money(acc.UsersOutstanding)</strong></div></div>
+        <div class="kpi" data-total-outstanding><div><span class="kpi-label">Total hospital outstanding</span><strong class="kpi-value">@Fmt.Money(acc.TotalOutstanding)</strong></div></div>
+        <div class="kpi" data-pending-deposits><div><span class="kpi-label">Pending deposits (@acc.PendingCount)</span><strong class="kpi-value">@Fmt.Money(acc.Pending)</strong></div></div>
+        <div class="kpi" data-approved-deposits><div><span class="kpi-label">Approved deposits (@acc.ApprovedCount)</span><strong class="kpi-value">@Fmt.Money(acc.Approved)</strong></div></div>
+        <div class="kpi" data-rejected-deposits><div><span class="kpi-label">Rejected deposits (@acc.RejectedCount)</span><strong class="kpi-value">@Fmt.Money(acc.Rejected)</strong></div></div>
+        <div class="kpi" data-paid-to-hospital><div><span class="kpi-label">Total paid to hospital</span><strong class="kpi-value">@Fmt.Money(acc.TotalPaidToHospital)</strong></div></div>
+    </div></div>
+</div>
 <div class="toolbar no-print">
     <partial name="_FinanceFilters" model="Model" />
     <div class="toolbar-actions">

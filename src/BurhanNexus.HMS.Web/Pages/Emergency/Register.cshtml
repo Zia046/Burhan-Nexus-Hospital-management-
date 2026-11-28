@@ -82,6 +82,7 @@
                 </div>
                 <div class="field"><label for="rb">Referred by <span class="muted">(optional)</span></label><input id="rb" name="Visit.ReferredBy" value="@Model.Visit.ReferredBy" maxlength="200" autocomplete="off" /></div>
                 <label class="check"><input type="checkbox" name="Visit.IsMedicoLegal" value="true" checked="@Model.Visit.IsMedicoLegal" /> Medico-legal case (MLC)</label>
+                <partial name="_DiseasePicker" model="@(Model.DiseaseName ?? string.Empty)" />
                 <div class="field"><label for="en">Additional notes</label><input id="en" name="Visit.Notes" value="@Model.Visit.Notes" maxlength="1000" autocomplete="off" /></div>
             </div>
             <div class="card-footer form-actions">

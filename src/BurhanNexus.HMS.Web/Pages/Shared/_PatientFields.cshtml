@@ -40,10 +40,11 @@
             <label asp-for="GuardianName">Father's / Husband's name</label>
             <input asp-for="GuardianName" maxlength="150" autocomplete="off" data-dup-watch />
         </div>
-        <div class="field">
-            <label asp-for="DateOfBirth">Date of birth <span class="muted">(optional)</span></label>
-            <input asp-for="DateOfBirth" type="date" data-dob />
-        </div>
+        @* Update 18: no date of birth on the form – the optional Disease (central Disease Master) takes its place. *@
+        @if (ViewData["DiseasePicker"] is true)
+        {
+            <partial name="_DiseasePicker" model="@(ViewData["DiseaseName"] as string ?? string.Empty)" />
+        }
         <div class="field">
             <label asp-for="Age">Age @Html.Raw(req)</label>
             <div class="age-input">
@@ -54,7 +55,7 @@
                     <option value="Days">Days</option>
                 </select>
             </div>
-            <small class="muted" data-age-hint>Calculated automatically from the date of birth.</small>
+
         </div>
         <div class="field">
             <label asp-for="BloodGroup">Blood group <span class="muted">(optional)</span></label>

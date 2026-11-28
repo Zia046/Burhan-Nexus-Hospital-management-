@@ -280,6 +280,8 @@ public class Refund
     public DateOnly? BusinessDate { get; set; }
     /// <summary>Cash returned because the doctor waived the fee: the doctor's share was already reduced by the fee-waiver entry (no second reversal).</summary>
     public long? WaiverAppointmentId { get; set; }
+    /// <summary>Update 18: consultation fee returned / discount after payment from the patient profile (appointment).</summary>
+    public long? ConsultationAppointmentId { get; set; }
     public uint RowVersion { get; set; }
 }
 
@@ -310,7 +312,9 @@ public class CashDeposit
 
 public enum CashierEntryType { Collection = 1, ReceiptCancellation = 2, Refund = 3, DepositConfirmed = 4, Adjustment = 5,
     /// <summary>Update 10: patient advance deposit received / returned (cash in hand of the cashier).</summary>
-    AdvanceReceived = 6, AdvanceRefunded = 7 }
+    AdvanceReceived = 6, AdvanceRefunded = 7,
+    /// <summary>Update 18: "Pay to Hospital" – the administrator settled this account's outstanding cash.</summary>
+    HospitalSettlement = 8 }
 
 /// <summary>
 /// Individual cashier ledger. Positive = the cashier holds more hospital money; negative = less.
@@ -332,6 +336,8 @@ public class CashierLedgerEntry
     public long? AdjustmentId { get; set; }
     /// <summary>Update 10: patient advance deposit.</summary>
     public long? AdvanceId { get; set; }
+    /// <summary>Update 18: Pay to Hospital settlement.</summary>
+    public long? SettlementId { get; set; }
     [MaxLength(30)] public string Reference { get; set; } = string.Empty;
     [MaxLength(300)] public string? Description { get; set; }
     public DateOnly BusinessDate { get; set; }

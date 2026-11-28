@@ -89,8 +89,22 @@ public sealed record AppointmentDayCount(DateOnly Date, int DoctorId, Appointmen
 
 public sealed record DoctorDayLoad(int DoctorId, string DoctorName, string? Specialty, int Issued, int LastToken, decimal? Fee, bool FeeIsFree = false);
 
+/// <summary>Update 18: a consultation on the patient profile with its fee, payment, waiver, discount and refunds.</summary>
+public sealed record ConsultationRefundRow(long Id, string Number, decimal Amount, RefundStatus Status, string Reason, string? By, DateTime RequestedUtc);
+public sealed record ConsultationRow(long AppointmentId, string? EncounterNumber, DateOnly Date, int Token, string Doctor, AppointmentStatus Status,
+    AppointmentPayment Payment, decimal Fee, decimal Collected, decimal Refunded, decimal PendingRefunds, bool ChargeUnpaid, Appointment Appointment, IReadOnlyList<ConsultationRefundRow> Refunds)
+{
+    public decimal Returnable => Math.Max(0, Collected - Refunded - PendingRefunds);
+}
+
 public interface IAppointmentService
 {
+    /// <summary>Update 18: consultations of a patient (patient profile – Return Fee, Free by Doctor, Discount).</summary>
+    Task<IReadOnlyList<ConsultationRow>> PatientConsultationsAsync(long patientId, CancellationToken ct = default);
+    /// <summary>Update 18: return a collected consultation fee (full or partial) – a normal refund, never deleting the payment.</summary>
+    Task<ServiceResult<Refund>> ReturnFeeAsync(long id, decimal amount, string? reason, int refundMethodId, CancellationToken ct = default);
+    /// <summary>Update 18: fixed or percentage discount on the consultation fee (unpaid: the charge is reduced; paid: the discount is refunded).</summary>
+    Task<ServiceResult> DiscountAsync(long id, string? type, decimal value, string? reason, int refundMethodId, CancellationToken ct = default);
     Task<ServiceResult<Appointment>> BookAsync(BookAppointmentInput input, bool canCollectFee, bool canMarkFree, CancellationToken ct = default);
     Task<ServiceResult> MarkFreeByDoctorAsync(long id, WaiverInput input, CancellationToken ct = default);
     Task<IReadOnlyList<WaiverRow>> WaiversAsync(DateOnly from, DateOnly to, int? doctorId, CancellationToken ct = default);
@@ -441,6 +455,137 @@ public sealed class AppointmentService : IAppointmentService
             await tx.RollbackAsync(CancellationToken.None);
             _db.ChangeTracker.Clear();
             return ServiceResult.Fail("This waiver was just recorded by someone else.");
+        }
+        catch (DbUpdateConcurrencyException) { return ServiceResult.Fail("The appointment was changed by someone else. Please reload."); }
+        return ServiceResult.Ok();
+    }
+
+    private async Task<(List<(long Id, long ReceiptId, decimal Amount, decimal Refunded)> Lines, decimal Collected)> CollectedAsync(Appointment a, CancellationToken ct)
+    {
+        var lines = await _db.ReceiptLines.AsNoTracking()
+            .Where(l => l.Receipt!.Status == ReceiptStatus.Valid && l.Charge!.Status != ChargeStatus.Cancelled
+                        && (l.ChargeId == a.ChargeId || (l.Charge.EncounterId == a.EncounterId && l.Charge.DoctorId == a.DoctorId)))
+            .Select(l => new { l.Id, l.ReceiptId, l.Amount, l.RefundedAmount }).ToListAsync(ct);
+        var list = lines.Select(l => (l.Id, l.ReceiptId, l.Amount, l.RefundedAmount)).ToList();
+        return (list, list.Sum(l => l.Amount));
+    }
+
+    public async Task<IReadOnlyList<ConsultationRow>> PatientConsultationsAsync(long patientId, CancellationToken ct = default)
+    {
+        var appts = await _db.Appointments.AsNoTracking().Include(a => a.Doctor).Include(a => a.Encounter)
+            .Where(a => a.PatientId == patientId).OrderByDescending(a => a.AppointmentDate).ThenByDescending(a => a.Id).Take(50).ToListAsync(ct);
+        var ids = appts.Select(a => a.Id).ToList();
+        var refunds = await _db.Refunds.AsNoTracking()
+            .Where(r => (r.ConsultationAppointmentId != null && ids.Contains(r.ConsultationAppointmentId.Value)) || (r.WaiverAppointmentId != null && ids.Contains(r.WaiverAppointmentId.Value)))
+            .ToListAsync(ct);
+        var rows = new List<ConsultationRow>();
+        foreach (var a in appts)
+        {
+            var (lines, collected) = await CollectedAsync(a, ct);
+            var receiptIds = lines.Select(l => l.ReceiptId).Distinct().ToList();
+            var mine = refunds.Where(r => r.ConsultationAppointmentId == a.Id || r.WaiverAppointmentId == a.Id).OrderBy(r => r.Id).ToList();
+            var completed = lines.Sum(l => l.Refunded);
+            var pending = mine.Where(r => r.Status == RefundStatus.Pending).Sum(r => r.Amount);
+            var unpaid = a.ChargeId is long cid && await _db.Charges.AnyAsync(c => c.Id == cid && c.PaidAmount == 0 && c.Status == ChargeStatus.Unpaid, ct);
+            rows.Add(new ConsultationRow(a.Id, a.Encounter?.EncounterNumber, a.AppointmentDate, a.TokenNumber, a.Doctor?.Name ?? "", a.Status, a.PaymentStatus,
+                a.ConsultationFee ?? 0, collected, completed, pending, unpaid, a,
+                mine.Select(r => new ConsultationRefundRow(r.Id, r.RefundNumber, r.Amount, r.Status, r.Reason, r.RequestedByUsername, r.RequestedUtc)).ToList()));
+        }
+        return rows;
+    }
+
+    private async Task<int> RefundMethodAsync(int requested, CancellationToken ct) => requested > 0 ? requested
+        : await _db.PaymentMethods.Where(m => m.IsActive && m.CountsAsCashInHand).OrderBy(m => m.Id).Select(m => m.Id).FirstOrDefaultAsync(ct);
+
+    public async Task<ServiceResult<Refund>> ReturnFeeAsync(long id, decimal amount, string? reason, int refundMethodId, CancellationToken ct = default)
+    {
+        reason = Clean(reason, 250);
+        if (reason is null) return ServiceResult<Refund>.Fail("Enter the reason for returning the fee.");
+        if (amount <= 0 || !Finance.FinanceMath.IsMoney(amount)) return ServiceResult<Refund>.Fail("Enter the amount to return.");
+        var a = await _db.Appointments.AsNoTracking().Include(x => x.Doctor).Include(x => x.Encounter).FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (a is null) return ServiceResult<Refund>.Fail("Appointment not found.");
+        var (lines, collected) = await CollectedAsync(a, ct);
+        if (collected <= 0) return ServiceResult<Refund>.Fail("No consultation fee was collected for this appointment, so nothing can be returned.");
+        // The receipt that holds the consultation fee; the billing service refuses more than is still refundable (pending refunds included),
+        // so a fee can never be returned twice – not even from two computers at the same moment (receipt lock).
+        var receiptId = lines.GroupBy(l => l.ReceiptId).OrderByDescending(g => g.Sum(l => l.Amount - l.Refunded)).First().Key;
+        var pendingOnReceipt = await _db.Refunds.Where(r => r.ReceiptId == receiptId && r.Status == RefundStatus.Pending).SumAsync(r => (decimal?)r.Amount, ct) ?? 0;
+        var left = lines.Where(l => l.ReceiptId == receiptId).Sum(l => l.Amount - l.Refunded) - pendingOnReceipt;
+        if (amount > left) return ServiceResult<Refund>.Fail(left <= 0 ? "The consultation fee was already returned (or a return is waiting for approval)." : $"At most {left:N2} can be returned.");
+        var r = await _billing.RequestRefundAsync(receiptId, amount, await RefundMethodAsync(refundMethodId, ct),
+            $"Consultation fee returned ({a.Doctor?.Name}) – {reason}", ct);
+        if (!r.Succeeded) return r;
+        var refund = await _db.Refunds.FirstAsync(x => x.Id == r.Value!.Id, ct);
+        refund.ConsultationAppointmentId = a.Id;
+        await _db.SaveChangesAsync(ct);
+        await _audit.LogAsync(AuditActions.ConsultationFeeReturned, "Appointment", a.Encounter?.EncounterNumber ?? a.Id.ToString(),
+            $"Consultation fee {amount:N2} of {collected:N2} to be returned ({refund.RefundNumber}, {a.Doctor?.Name}): {reason}", ct: ct);
+        return ServiceResult<Refund>.Ok(refund);
+    }
+
+    public async Task<ServiceResult> DiscountAsync(long id, string? type, decimal value, string? reason, int refundMethodId, CancellationToken ct = default)
+    {
+        reason = Clean(reason, 250);
+        if (reason is null) return ServiceResult.Fail("Enter the reason for the discount.");
+        var percent = type == "Percent";
+        if (!percent && type != "Fixed") return ServiceResult.Fail("Select the discount type (fixed amount or percentage).");
+        if (value <= 0 || (percent && value > 100) || !Finance.FinanceMath.IsMoney(value)) return ServiceResult.Fail(percent ? "Enter a percentage between 0 and 100." : "Enter the discount amount.");
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        await _db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(hashtext(@k))",
+            new[] { new NpgsqlParameter("k", NpgsqlDbType.Text) { Value = $"APPT-FEE|{id}" } }, ct);
+        var a = await _db.Appointments.Include(x => x.Doctor).Include(x => x.Encounter).FirstOrDefaultAsync(x => x.Id == id, ct);
+        if (a is null) return ServiceResult.Fail("Appointment not found.");
+        if (a.Status == AppointmentStatus.Cancelled) return ServiceResult.Fail("The appointment is cancelled.");
+        if (a.PaymentStatus is AppointmentPayment.FreeByDoctor or AppointmentPayment.Free) return ServiceResult.Fail("This consultation is free – no discount possible.");
+        if (a.DiscountAmount is not null) return ServiceResult.Fail("A discount was already given on this consultation.");
+        var original = a.ConsultationFee ?? 0;
+        if (original <= 0) return ServiceResult.Fail("This consultation has no fee.");
+        var amount = percent ? Math.Round(original * value / 100m, 2, MidpointRounding.AwayFromZero) : value;
+        if (amount <= 0 || amount > original) return ServiceResult.Fail($"The discount must be more than 0 and at most the fee of {original:N2}.");
+        var (lines, collected) = await CollectedAsync(a, ct);
+        var now = _clock.UtcNow;
+        string how;
+        if (collected <= 0)
+        {
+            // Not paid yet: the unpaid consultation charge is reduced (the original fee stays on the charge and the appointment).
+            var charge = a.ChargeId is long cid ? await _db.Charges.FirstOrDefaultAsync(c => c.Id == cid, ct) : null;
+            if (charge is null || charge.Status != ChargeStatus.Unpaid || charge.PaidAmount != 0)
+                return ServiceResult.Fail("The consultation fee is not open for a discount (no unpaid consultation charge).");
+            if (amount > charge.NetAmount) return ServiceResult.Fail($"The discount cannot be more than the open amount of {charge.NetAmount:N2}.");
+            charge.Discount += amount;
+            charge.NetAmount -= amount;
+            charge.DiscountReason = Clean($"Consultation discount – {reason}", 200);
+            how = $"unpaid charge {charge.ChargeNumber} reduced to {charge.NetAmount:N2}";
+        }
+        else
+        {
+            var receiptId = lines.GroupBy(l => l.ReceiptId).OrderByDescending(g => g.Sum(l => l.Amount - l.Refunded)).First().Key;
+            var r = await _billing.RequestRefundAsync(receiptId, amount, await RefundMethodAsync(refundMethodId, ct), $"Consultation discount ({(percent ? $"{value:0.##}%" : "fixed")}) – {reason}", ct);
+            if (!r.Succeeded)
+            {
+                await tx.RollbackAsync(CancellationToken.None);
+                _db.ChangeTracker.Clear();
+                return ServiceResult.Fail(r.Errors.Prepend("The discount was not saved – the refund could not be recorded:").ToArray());
+            }
+            var refund = await _db.Refunds.FirstAsync(x => x.Id == r.Value!.Id, ct);
+            refund.ConsultationAppointmentId = a.Id;
+            a.DiscountRefundId = refund.Id;
+            how = $"already paid – refund {refund.RefundNumber} of {amount:N2} requested";
+        }
+        a.DiscountType = percent ? "Percent" : "Fixed";
+        a.DiscountValue = value;
+        a.DiscountAmount = amount;
+        a.DiscountOriginalFee = original;
+        a.DiscountReason = reason;
+        a.DiscountedUtc = now;
+        a.DiscountedByUsername = _ctx.Username;
+        a.UpdatedUtc = now;
+        _audit.Add(AuditActions.ConsultationDiscount, "Appointment", a.Encounter?.EncounterNumber ?? a.Id.ToString(),
+            $"Consultation discount: original {original:N2}, {(percent ? $"{value:0.##}%" : "fixed")} = {amount:N2}, final {original - amount:N2} ({how}): {reason}");
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
         }
         catch (DbUpdateConcurrencyException) { return ServiceResult.Fail("The appointment was changed by someone else. Please reload."); }
         return ServiceResult.Ok();

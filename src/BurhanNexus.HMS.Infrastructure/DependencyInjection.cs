@@ -61,6 +61,7 @@ public static class DependencyInjection
         services.AddScoped<Patients.IPatientService, Patients.PatientService>();
         services.AddScoped<Patients.IEncounterService, Patients.EncounterService>();
         services.AddScoped<Patients.IAppointmentService, Patients.AppointmentService>();
+        services.AddScoped<Patients.IDiseaseService, Patients.DiseaseService>(); // update 18
         services.AddScoped<Printing.IPrinterProfileService, Printing.PrinterProfileService>();
         services.AddSingleton<Printing.INetworkPrinter, Printing.NetworkPrinter>();
         services.AddScoped<Finance.IFinanceSetupService, Finance.FinanceSetupService>();

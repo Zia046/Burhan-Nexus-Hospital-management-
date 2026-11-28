@@ -78,6 +78,7 @@ else
                         <label for="Visit_ChiefComplaint">Presenting complaint <span class="muted">(optional)</span></label>
                         <input id="Visit_ChiefComplaint" name="Visit.ChiefComplaint" value="@Model.Visit.ChiefComplaint" maxlength="300" autocomplete="off" />
                     </div>
+                    <partial name="_DiseasePicker" model="@(Model.DiseaseName ?? string.Empty)" />
                     <div class="field span-2">
                         <label for="Visit_Notes">Notes <span class="muted">(optional)</span></label>
                         <input id="Visit_Notes" name="Visit.Notes" value="@Model.Visit.Notes" maxlength="1000" autocomplete="off" />

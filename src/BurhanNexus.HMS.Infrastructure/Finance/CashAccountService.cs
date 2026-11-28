@@ -31,8 +31,25 @@ public sealed record ClosingFigures(
     ClosingScope Scope, string ScopeName, DateOnly Date, decimal Opening, decimal Cash, decimal NonCash, int Receipts, int Cancelled, decimal CancelledAmount,
     decimal Refunds, decimal DepositsSubmitted, decimal DepositsConfirmed, decimal Adjustments, decimal Closing);
 
+/// <summary>Update 18: one account (Admin or user) on the Pay to Hospital screen.</summary>
+public sealed record HospitalAccountRow(int UserId, string Username, string FullName, bool IsAdmin, decimal Outstanding, decimal PendingDeposits)
+{
+    /// <summary>What can be settled now (pending deposits stay for approval).</summary>
+    public decimal Settleable => Math.Max(0, Outstanding - PendingDeposits);
+}
+
+public sealed record HospitalFinanceSummary(decimal AdminOutstanding, decimal UsersOutstanding, decimal TotalOutstanding,
+    int PendingCount, decimal Pending, int ApprovedCount, decimal Approved, int RejectedCount, decimal Rejected, decimal Settled, decimal TotalPaidToHospital);
+
 public interface ICashAccountService
 {
+    /// <summary>Update 18: every account with cash to hand over (Admin and all users).</summary>
+    Task<IReadOnlyList<HospitalAccountRow>> HospitalAccountsAsync(CancellationToken ct = default);
+    /// <summary>Update 18: the administrator settles the selected accounts (one settlement transaction per account, no approval).</summary>
+    Task<ServiceResult<IReadOnlyList<HospitalSettlement>>> PayToHospitalAsync(IReadOnlyCollection<int> userIds, string? notes, CancellationToken ct = default);
+    Task<IReadOnlyList<HospitalSettlement>> SettlementsAsync(DateOnly? from, DateOnly? to, CancellationToken ct = default);
+    Task<HospitalFinanceSummary> HospitalSummaryAsync(CancellationToken ct = default);
+
     Task<CashierAccount> AccountAsync(int userId, DateOnly from, DateOnly to, CancellationToken ct = default);
     Task<IReadOnlyList<CashierLedgerEntry>> LedgerAsync(int userId, DateOnly from, DateOnly to, CancellationToken ct = default);
     Task<IReadOnlyList<CashierBalanceRow>> BalancesAsync(CancellationToken ct = default);
@@ -162,6 +179,24 @@ public sealed class CashAccountService : ICashAccountService
         };
         _db.CashDeposits.Add(d);
         _audit.Add(AuditActions.DepositSubmitted, "CashDeposit", d.DepositNumber, $"Deposit {d.DepositNumber} of {amount:N2} submitted by {d.Username} (outstanding {outstanding:N2})");
+        // Update 18: the administrator's own deposit needs nobody's approval – it is confirmed at once (his balance goes down now).
+        // A normal user's deposit stays Pending until the administrator approves it.
+        if (await _db.Users.AnyAsync(u => u.Id == userId && u.IsSystemAdministrator, ct))
+        {
+            var now = _clock.UtcNow;
+            d.Status = DepositStatus.Confirmed;
+            d.ReceivedAmount = amount;
+            d.ReviewedUtc = now; d.ReviewedByUserId = userId; d.ReviewedByUsername = _ctx.Username;
+            d.ReviewRemarks = "Administrator's own deposit – confirmed automatically";
+            await _db.SaveChangesAsync(ct);
+            _db.CashierLedger.Add(new CashierLedgerEntry
+            {
+                UserId = userId, CounterId = counterId, EntryType = CashierEntryType.DepositConfirmed, Amount = -amount, AffectsCashInHand = true,
+                DepositId = d.Id, Reference = d.DepositNumber, Description = $"Deposit {d.DepositNumber} (administrator) – confirmed automatically",
+                BusinessDate = today, CreatedUtc = now, CreatedByUserId = userId, CreatedByUsername = _ctx.Username
+            });
+            _audit.Add(AuditActions.DepositConfirmed, "CashDeposit", d.DepositNumber, $"Administrator's deposit {d.DepositNumber} of {amount:N2} confirmed automatically");
+        }
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         return ServiceResult<CashDeposit>.Ok(d);
@@ -233,6 +268,83 @@ public sealed class CashAccountService : ICashAccountService
         if (from is { } f) q = q.Where(d => d.BusinessDate >= f);
         if (to is { } t) q = q.Where(d => d.BusinessDate <= t);
         return await q.OrderByDescending(d => d.Id).Take(1000).ToListAsync(ct);
+    }
+
+    // ---------------- Update 18: Pay to Hospital ----------------
+
+    public async Task<IReadOnlyList<HospitalAccountRow>> HospitalAccountsAsync(CancellationToken ct = default)
+    {
+        var balances = await _db.CashierLedger.Where(e => e.AffectsCashInHand).GroupBy(e => e.UserId)
+            .Select(g => new { g.Key, Amount = g.Sum(e => e.Amount) }).ToDictionaryAsync(x => x.Key, x => x.Amount, ct);
+        var pending = await _db.CashDeposits.Where(d => d.Status == DepositStatus.Pending).GroupBy(d => d.UserId)
+            .Select(g => new { g.Key, Amount = g.Sum(d => d.Amount) }).ToDictionaryAsync(x => x.Key, x => x.Amount, ct);
+        var ids = balances.Keys.ToList();
+        var users = await _db.Users.AsNoTracking().Where(u => u.IsSystemAdministrator || ids.Contains(u.Id)).ToListAsync(ct);
+        return users.Select(u => new HospitalAccountRow(u.Id, u.Username, u.FullName, u.IsSystemAdministrator, balances.GetValueOrDefault(u.Id), pending.GetValueOrDefault(u.Id)))
+            .OrderByDescending(r => r.IsAdmin).ThenBy(r => r.FullName).ToList();
+    }
+
+    public async Task<ServiceResult<IReadOnlyList<HospitalSettlement>>> PayToHospitalAsync(IReadOnlyCollection<int> userIds, string? notes, CancellationToken ct = default)
+    {
+        if (_ctx.UserId is not int me || !await _db.Users.AnyAsync(u => u.Id == me && u.IsSystemAdministrator, ct))
+            return ServiceResult<IReadOnlyList<HospitalSettlement>>.Fail("Only the administrator can settle accounts (Pay to Hospital).");
+        if (userIds.Count == 0) return ServiceResult<IReadOnlyList<HospitalSettlement>>.Fail("Select at least one account.");
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        var today = await _clock.TodayAsync();
+        var now = _clock.UtcNow;
+        var done = new List<HospitalSettlement>();
+        foreach (var uid in userIds.Distinct().OrderBy(x => x))
+        {
+            // Same lock as deposits: two computers can never settle (or deposit) the same account twice.
+            await FinanceDb.LockAsync(_db, $"CASHIER|{uid}", ct);
+            var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == uid, ct);
+            if (user is null) continue;
+            var outstanding = await OutstandingAsync(uid, ct);
+            var pending = await _db.CashDeposits.Where(d => d.UserId == uid && d.Status == DepositStatus.Pending).SumAsync(d => (decimal?)d.Amount, ct) ?? 0;
+            var amount = outstanding - pending;
+            if (amount <= 0) continue;
+            var st = new HospitalSettlement
+            {
+                Number = await FinanceDb.NextNumberAsync(_db, HmsDbContext.DepositNumberSequence, "PTH", today, ct),
+                UserId = uid, Username = user.Username, Amount = amount, OutstandingBefore = outstanding, Notes = T(notes, 300),
+                BusinessDate = today, CreatedUtc = now, CreatedByUserId = me, CreatedByUsername = _ctx.Username,
+            };
+            _db.HospitalSettlements.Add(st);
+            await _db.SaveChangesAsync(ct);
+            _db.CashierLedger.Add(new CashierLedgerEntry
+            {
+                UserId = uid, EntryType = CashierEntryType.HospitalSettlement, Amount = -amount, AffectsCashInHand = true, SettlementId = st.Id,
+                Reference = st.Number, Description = $"Paid to hospital – settled by {_ctx.Username}" + (pending > 0 ? $" (pending deposits {pending:N2} wait for approval)" : ""),
+                BusinessDate = today, CreatedUtc = now, CreatedByUserId = me, CreatedByUsername = _ctx.Username
+            });
+            _audit.Add(AuditActions.HospitalSettlement, "HospitalSettlement", st.Number, $"Pay to Hospital {st.Number}: {user.Username} {amount:N2} settled (outstanding {outstanding:N2})");
+            done.Add(st);
+        }
+        if (done.Count == 0) return ServiceResult<IReadOnlyList<HospitalSettlement>>.Fail("The selected accounts have nothing outstanding to settle.");
+        await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return ServiceResult<IReadOnlyList<HospitalSettlement>>.Ok(done);
+    }
+
+    public async Task<IReadOnlyList<HospitalSettlement>> SettlementsAsync(DateOnly? from, DateOnly? to, CancellationToken ct = default)
+    {
+        var q = _db.HospitalSettlements.AsNoTracking().AsQueryable();
+        if (from is { } f) q = q.Where(x => x.BusinessDate >= f);
+        if (to is { } t) q = q.Where(x => x.BusinessDate <= t);
+        return await q.OrderByDescending(x => x.Id).Take(500).ToListAsync(ct);
+    }
+
+    public async Task<HospitalFinanceSummary> HospitalSummaryAsync(CancellationToken ct = default)
+    {
+        var accounts = await HospitalAccountsAsync(ct);
+        var deposits = await _db.CashDeposits.AsNoTracking().GroupBy(d => d.Status)
+            .Select(g => new { g.Key, Count = g.Count(), Amount = g.Sum(d => d.Status == DepositStatus.Confirmed ? d.ReceivedAmount ?? d.Amount : d.Amount) }).ToListAsync(ct);
+        var settled = await _db.HospitalSettlements.SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
+        (int, decimal) D(DepositStatus s) => deposits.FirstOrDefault(x => x.Key == s) is { } x ? (x.Count, x.Amount) : (0, 0m);
+        var (pc, p) = D(DepositStatus.Pending); var (ac, a) = D(DepositStatus.Confirmed); var (rc, r) = D(DepositStatus.Rejected);
+        var admin = accounts.Where(x => x.IsAdmin).Sum(x => x.Outstanding);
+        var users = accounts.Where(x => !x.IsAdmin).Sum(x => x.Outstanding);
+        return new HospitalFinanceSummary(admin, users, admin + users, pc, p, ac, a, rc, r, settled, a + settled);
     }
 
     // ---------------- adjustments ----------------

@@ -115,6 +115,78 @@ else if (p.Status == PatientStatus.Archived)
     </div>
 
     <div class="stack">
+        @if (Model.Diseases is { } dis)
+        {
+            <div class="card" id="diseases" data-profile-diseases>
+                <div class="card-header"><h3><svg class="icon"><use href="#i-activity" /></svg> Disease history</h3></div>
+                <div class="table-wrap"><table class="table table-compact"><tbody>
+                    @foreach (var x in dis) { <tr data-disease-record="@x.Disease?.Name"><td class="small nowrap">@Fmt.Day(x.VisitDate)</td><td><strong>@x.Disease?.Name</strong>@if (x.Disease is { IsActive: false }) { <small class="muted"> (inactive)</small> }</td><td class="small">@(x.Encounter?.EncounterNumber ?? "Registration")</td><td class="small">@(x.AgeYears is int ay ? ay + " y" : "")</td><td class="small">@x.CreatedByUsername</td></tr> }
+                    @if (dis.Count == 0) { <tr><td class="empty">No diseases recorded.</td></tr> }
+                </tbody></table></div>
+                @if (Model.CanAddDisease)
+                {
+                    <form method="post" asp-page-handler="Disease" class="card-body form-grid" data-add-patient-disease>
+                        <div class="span-2"><partial name="_DiseasePicker" model="@string.Empty" /></div>
+                        <div class="field"><label for="visitDate">Visit date</label><input id="visitDate" name="visitDate" type="date" /></div>
+                        <div class="field"><label>&nbsp;</label><button class="btn btn-primary btn-sm" type="submit">Add disease</button></div>
+                    </form>
+                }
+            </div>
+        }
+        @if (Model.Consultations is { } cons && cons.Count > 0)
+        {
+            <div class="card" id="consultations" data-profile-consultations>
+                <div class="card-header"><h3><svg class="icon"><use href="#i-calendar" /></svg> Consultations – fee</h3></div>
+                <div class="table-wrap"><table class="table table-compact">
+                    <thead><tr><th>Date</th><th>Doctor</th><th class="num">Fee</th><th class="num">Paid</th><th>Status</th></tr></thead>
+                    <tbody>
+                    @foreach (var c in cons)
+                    {
+                        var ap = c.Appointment;
+                        <tr data-consultation="@c.AppointmentId">
+                            <td class="small nowrap">@Fmt.Day(c.Date) · T@(c.Token)</td><td>@c.Doctor</td><td class="num">@Fmt.Money(c.Fee)</td><td class="num">@Fmt.Money(c.Collected)</td>
+                            <td class="small">
+                                @if (c.Payment == AppointmentPayment.FreeByDoctor) { <span class="status status-ok" data-free-by-doctor>Free by Doctor</span> <span class="muted">@ap.WaiverDoctorName – @ap.WaiverReason (@ap.WaivedByUsername, @Fmt.DateTimeText(ap.WaivedUtc))</span> }
+                                else if (c.Payment == AppointmentPayment.Free) { <span class="status">Free</span> }
+                                else { <span class="status">@(c.Collected > 0 ? "Paid" : c.ChargeUnpaid ? "Unpaid" : c.Payment.ToString())</span> }
+                                @if (ap.DiscountAmount is decimal da) { <div data-consultation-discount>Discount: @(ap.DiscountType == "Percent" ? $"{ap.DiscountValue:0.##}%" : "fixed") = @Fmt.Money(da) · original @Fmt.Money(ap.DiscountOriginalFee ?? 0) → final @Fmt.Money((ap.DiscountOriginalFee ?? 0) - da) · @ap.DiscountReason (@ap.DiscountedByUsername, @Fmt.DateTimeText(ap.DiscountedUtc))</div> }
+                                @foreach (var r in c.Refunds) { <div data-consultation-refund="@r.Status">Refund @r.Number: @Fmt.Money(r.Amount) – <strong>@r.Status</strong> · @r.Reason (@r.By, @Fmt.DateTimeText(r.RequestedUtc))</div> }
+                            </td>
+                        </tr>
+                        @if (ap.Status != AppointmentStatus.Cancelled && c.Payment is not (AppointmentPayment.FreeByDoctor or AppointmentPayment.Free))
+                        {
+                            <tr class="no-print"><td colspan="5"><div class="toolbar-actions wrap">
+                                @if (Model.CanReturnFee && c.Returnable > 0)
+                                {
+                                    <form method="post" asp-page-handler="ReturnFee" class="inline-form" data-return-fee data-confirm="Return this consultation fee to the patient?">
+                                        <input type="hidden" name="appointmentId" value="@c.AppointmentId" />
+                                        <input name="amount" type="number" step="0.01" min="0.01" max="@c.Returnable.ToString(System.Globalization.CultureInfo.InvariantCulture)" value="@c.Returnable.ToString(System.Globalization.CultureInfo.InvariantCulture)" class="input-sm" aria-label="Amount to return" />
+                                        <input name="reason" maxlength="250" placeholder="Reason *" required class="input-sm" />
+                                        <button class="btn btn-light btn-sm" type="submit">Return Fee</button></form>
+                                }
+                                @if (Model.CanFreeByDoctor)
+                                {
+                                    <form method="post" asp-page-handler="FreeByDoctor" class="inline-form" data-free-form data-confirm="Mark this consultation as Free by Doctor?@(c.Returnable > 0 ? " The collected fee will be refunded." : "")">
+                                        <input type="hidden" name="appointmentId" value="@c.AppointmentId" />
+                                        <input name="reason" maxlength="250" placeholder="Reason *" required class="input-sm" />
+                                        <button class="btn btn-light btn-sm" type="submit">Free by Doctor</button></form>
+                                }
+                                @if (Model.CanDiscount && ap.DiscountAmount is null)
+                                {
+                                    <form method="post" asp-page-handler="Discount" class="inline-form" data-discount-form>
+                                        <input type="hidden" name="appointmentId" value="@c.AppointmentId" />
+                                        <select name="discountType" aria-label="Discount type"><option value="Fixed">Fixed (Rs.)</option><option value="Percent">Percent (%)</option></select>
+                                        <input name="value" type="number" step="0.01" min="0.01" class="input-sm" placeholder="Value" aria-label="Discount value" />
+                                        <input name="reason" maxlength="250" placeholder="Reason *" required class="input-sm" />
+                                        <button class="btn btn-light btn-sm" type="submit">Discount</button></form>
+                                }
+                            </div></td></tr>
+                        }
+                    }
+                    </tbody>
+                </table></div>
+            </div>
+        }
         @if (Model.Medicines is { } meds)
         {
             <div class="card" data-profile-medicines>

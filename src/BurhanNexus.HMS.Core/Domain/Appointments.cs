@@ -84,6 +84,20 @@ public class Appointment
     public DateTime? WaivedUtc { get; set; }
     public int? WaivedByUserId { get; set; }
     [MaxLength(64)] public string? WaivedByUsername { get; set; }
+
+    // ---- Update 18: consultation fee discount (fixed or percentage) from the patient profile ----
+    /// <summary>"Fixed" or "Percent".</summary>
+    [MaxLength(10)] public string? DiscountType { get; set; }
+    /// <summary>The value entered (amount or percent).</summary>
+    public decimal? DiscountValue { get; set; }
+    public decimal? DiscountAmount { get; set; }
+    /// <summary>Original fee at the time of the discount (the doctor's fee configuration never changes).</summary>
+    public decimal? DiscountOriginalFee { get; set; }
+    [MaxLength(300)] public string? DiscountReason { get; set; }
+    /// <summary>When the fee had been paid: the refund of the discount amount.</summary>
+    public long? DiscountRefundId { get; set; }
+    public DateTime? DiscountedUtc { get; set; }
+    [MaxLength(64)] public string? DiscountedByUsername { get; set; }
     public DateTime UpdatedUtc { get; set; }
     public uint RowVersion { get; set; }
 }

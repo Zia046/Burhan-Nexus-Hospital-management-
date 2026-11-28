@@ -1,0 +1,82 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Diseases.AnalyticsModel
+@{
+    ViewData["Title"] = "Disease Analytics";
+    var r = Model.Result;
+    string Q(string? v) => Uri.EscapeDataString(v ?? "");
+    var exportUrl = $"/Diseases/Analytics?handler=Export&disease={Q(Model.Disease)}&from={Model.From:yyyy-MM-dd}&to={Model.To:yyyy-MM-dd}&minAge={Model.MinAge}&maxAge={Model.MaxAge}&gender={Model.Gender}&ageGroups={Q(Model.AgeGroups)}";
+    var maxGroup = r is null || r.AgeGroups.Count == 0 ? 1 : Math.Max(1, r.AgeGroups.Max(g => g.Patients));
+}
+<div class="page-header no-print">
+    <div><h1><svg class="icon"><use href="#i-chart" /></svg> Disease Analytics</h1><p class="muted">How many patients were registered with a disease in a period – from the visit-wise disease records.</p></div>
+    <div class="toolbar-actions"><a class="btn btn-light" href="/Diseases">Disease Master</a></div>
+</div>
+<form method="get" class="card filters no-print" data-disease-filters>
+    <div class="card-body form-grid">
+        <div class="span-2">@{ ViewData["DiseaseField"] = "disease"; }<partial name="_DiseasePicker" model="@(Model.Disease ?? string.Empty)" /></div>
+        <div class="field"><label for="from">From date</label><input id="from" name="from" type="date" value="@Model.From?.ToString("yyyy-MM-dd")" /></div>
+        <div class="field"><label for="to">To date</label><input id="to" name="to" type="date" value="@Model.To?.ToString("yyyy-MM-dd")" /><small class="muted">Both empty = all dates</small></div>
+        <div class="field"><label for="minAge">Minimum age</label><input id="minAge" name="minAge" type="number" min="0" max="130" value="@Model.MinAge" /></div>
+        <div class="field"><label for="maxAge">Maximum age</label><input id="maxAge" name="maxAge" type="number" min="0" max="130" value="@Model.MaxAge" /><small class="muted">Both empty = all ages</small></div>
+        <div class="field"><label for="gender">Gender</label><select id="gender" name="gender"><option value="">All</option>
+            @foreach (var g in new[] { Gender.Male, Gender.Female, Gender.Other }) { <option value="@g" selected="@(Model.Gender == g)">@g</option> }</select></div>
+        <div class="field"><label for="ageGroups">Age groups (upper limits)</label><input id="ageGroups" name="ageGroups" value="@Model.AgeGroups" placeholder="5,12,18,35,50,65" /></div>
+    </div>
+    <div class="card-footer form-actions">
+        <a class="btn btn-light" href="/Diseases/Analytics" data-reset-filters>Reset Filters</a>
+        <button class="btn btn-primary" type="submit" data-apply-filters>Apply Filters</button>
+    </div>
+</form>
+@if (Model.NotFound is { } nf)
+{
+    <div class="alert alert-warning" data-disease-not-found><svg class="icon"><use href="#i-info" /></svg><div>“@nf” is not in the Disease Master – no records.
+        @if (Model.CanAdd) { <form method="post" asp-page-handler="Add" class="inline-form"><input type="hidden" name="name" value="@nf" /><button class="btn btn-primary btn-sm" data-add-from-analytics>Add “@nf” to the Disease Master</button></form> }</div></div>
+}
+@if (r is not null)
+{
+    <div class="card" data-disease-results>
+        <div class="card-header"><h2>@(Model.Disease ?? "All diseases")</h2>
+            <div class="toolbar-actions no-print">
+                @if (Model.CanExport) { <a class="btn btn-light btn-sm" href="@exportUrl" data-export-xlsx><svg class="icon icon-sm"><use href="#i-download" /></svg> Excel</a> }
+                <button class="btn btn-light btn-sm" type="button" data-print><svg class="icon icon-sm"><use href="#i-printer" /></svg> Print / PDF</button>
+            </div></div>
+        <div class="card-body">
+            <p class="small muted">Disease: <strong>@(Model.Disease ?? "All")</strong> · Date: <strong>@Model.DateText</strong> · Age: <strong>@Model.AgeText</strong> · Gender: <strong>@Model.GenderText</strong></p>
+            <div class="kpi-grid">
+                <div class="kpi" data-unique-patients><div><span class="kpi-label">Total unique patients</span><strong class="kpi-value">@r.UniquePatients</strong></div></div>
+                <div class="kpi" data-visits><div><span class="kpi-label">Total visits</span><strong class="kpi-value">@r.Visits</strong></div></div>
+                <div class="kpi" data-male><div><span class="kpi-label">Male</span><strong class="kpi-value">@r.Male</strong></div></div>
+                <div class="kpi" data-female><div><span class="kpi-label">Female</span><strong class="kpi-value">@r.Female</strong></div></div>
+                <div class="kpi" data-other><div><span class="kpi-label">Other</span><strong class="kpi-value">@r.Other</strong></div></div>
+            </div>
+            @if (r.UniquePatients == 0) { <p class="empty">No disease records for these filters.</p> }
+        </div>
+    </div>
+    <div class="grid-2">
+        <div class="card"><div class="card-header"><h2>Age distribution</h2></div>
+            <div class="table-wrap"><table class="table table-compact" data-age-groups>
+                <thead><tr><th>Age group</th><th class="num">Patients</th><th style="width:40%"></th></tr></thead>
+                <tbody>
+                @foreach (var g in r.AgeGroups)
+                {
+                    <tr data-age-group="@g.Label"><td>@g.Label</td><td class="num">@g.Patients</td><td><div style="background:var(--primary,#2563eb);height:10px;border-radius:5px;width:@(g.Patients * 100 / maxGroup)%"></div></td></tr>
+                }
+                @if (r.AgeUnknown > 0) { <tr><td class="muted">Age not recorded</td><td class="num">@r.AgeUnknown</td><td></td></tr> }
+                </tbody></table></div></div>
+        <div class="card"><div class="card-header"><h2>Date-wise registrations</h2></div>
+            <div class="table-wrap"><table class="table table-compact" data-by-date>
+                <thead><tr><th>Date</th><th class="num">Unique patients</th><th class="num">Visits</th></tr></thead>
+                <tbody>
+                @foreach (var d in r.ByDate) { <tr><td>@Fmt.Day(d.Date)</td><td class="num">@d.Patients</td><td class="num">@d.Visits</td></tr> }
+                @if (r.ByDate.Count == 0) { <tr><td colspan="3" class="empty">—</td></tr> }
+                </tbody></table></div></div>
+    </div>
+    @if (Model.Disease is null && r.ByDisease.Count > 0)
+    {
+        <div class="card"><div class="card-header"><h2>Disease-wise</h2></div>
+            <div class="table-wrap"><table class="table table-compact" data-by-disease>
+                <thead><tr><th>Disease</th><th class="num">Unique patients</th><th class="num">Visits</th><th class="num">Male</th><th class="num">Female</th><th class="num">Other</th></tr></thead>
+                <tbody>@foreach (var d in r.ByDisease) { <tr><td><a href="/Diseases/Analytics?disease=@Uri.EscapeDataString(d.Disease)">@d.Disease</a></td><td class="num">@d.Patients</td><td class="num">@d.Visits</td><td class="num">@d.Male</td><td class="num">@d.Female</td><td class="num">@d.Other</td></tr> }</tbody>
+            </table></div></div>
+    }
+}

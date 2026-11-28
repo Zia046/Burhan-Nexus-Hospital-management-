@@ -1,0 +1,72 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Diseases.IndexModel
+@{
+    ViewData["Title"] = "Diseases";
+    var f = Model.Form;
+    var pages = (Model.Total + BurhanNexus.HMS.Web.Pages.Diseases.IndexModel.PageSize - 1) / BurhanNexus.HMS.Web.Pages.Diseases.IndexModel.PageSize;
+}
+<div class="page-header">
+    <div><h1><svg class="icon"><use href="#i-activity" /></svg> Disease Management</h1>
+        <p class="muted">The central Disease Master – used by patient registration, the patient disease history and Disease Analytics.</p></div>
+    <div class="toolbar-actions">
+        <a class="btn btn-light" href="/Diseases/Analytics" bn-permission="@Perm.DiseasesAnalytics" data-disease-analytics-link><svg class="icon icon-sm"><use href="#i-chart" /></svg> Disease Analytics</a>
+        @if (Model.CanAdd) { <a class="btn btn-primary" href="/Diseases?new=true" data-add-disease><svg class="icon icon-sm"><use href="#i-plus" /></svg> Add Disease</a> }
+    </div>
+</div>
+@* The search sits at the top: typing filters the list at once (no reload); Search looks in the whole master. *@
+<form method="get" class="card filters" data-disease-search>
+    <div class="search-main">
+        <div class="input-icon grow"><svg class="icon"><use href="#i-search" /></svg>
+            <input name="q" value="@Model.Q" placeholder="Search disease name or code" autocomplete="off" data-live-filter="[data-disease-row]" aria-label="Search diseases" /></div>
+        <select name="status" aria-label="Status"><option value="">Active</option><option value="inactive" selected="@(Model.Status == "inactive")">Inactive</option><option value="all" selected="@(Model.Status == "all")">All</option></select>
+        <button class="btn btn-primary" type="submit">Search</button>
+    </div>
+</form>
+<partial name="_ValidationSummary" />
+@if (Model.ShowForm)
+{
+    <form method="post" asp-route-edit="@Model.Editing?.Id" class="card" novalidate data-disease-form>
+        <div class="card-header"><h2>@(Model.Editing is null ? "Add Disease" : "Edit " + Model.Editing.Name)</h2></div>
+        <div class="card-body form-grid">
+            <input type="hidden" name="RowVersion" value="@Model.RowVersion" />
+            <div class="field span-2"><label for="Form_Name">Disease name <em>*</em></label><input id="Form_Name" name="Form.Name" value="@f.Name" maxlength="150" required /></div>
+            <div class="field"><label for="Form_Code">Disease code <span class="muted">(optional)</span></label><input id="Form_Code" name="Form.Code" value="@f.Code" maxlength="30" placeholder="e.g. J06.9" /></div>
+            <div class="field"><label for="Form_IsActive">Status</label><select id="Form_IsActive" name="Form.IsActive"><option value="true" selected="@f.IsActive">Active</option><option value="false" selected="@(!f.IsActive)">Inactive</option></select></div>
+            <div class="field span-3"><label for="Form_Description">Description <span class="muted">(optional)</span></label><input id="Form_Description" name="Form.Description" value="@f.Description" maxlength="500" /></div>
+        </div>
+        <div class="card-footer form-actions"><a class="btn btn-light" href="/Diseases">Cancel</a><button class="btn btn-primary" type="submit" data-save-disease>Save</button></div>
+    </form>
+}
+<div class="card">
+    <div class="card-header"><h2>@Model.Total disease(s)</h2></div>
+    <div class="table-wrap"><table class="table table-compact" data-disease-list>
+        <thead><tr><th>Disease name</th><th>Code</th><th>Description</th><th>Status</th><th class="num">Patients</th><th>Created</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            var d = r.Disease;
+            <tr data-disease-row data-filter-text="@($"{d.Name} {d.Code}")" class="@(d.IsActive ? "" : "row-muted")" data-disease="@d.Id">
+                <td><strong>@d.Name</strong></td><td class="mono">@d.Code</td><td class="small">@d.Description</td>
+                <td><span class="status @(d.IsActive ? "status-ok" : "")">@(d.IsActive ? "Active" : "Inactive")</span></td>
+                <td class="num">@r.Patients</td><td class="nowrap">@Fmt.DateTimeText(d.CreatedUtc)</td>
+                <td class="actions">
+                    @if (Model.CanEdit) { <a class="btn btn-light btn-sm" href="/Diseases?edit=@d.Id">Edit</a> }
+                    @if (Model.CanDelete)
+                    {
+                        <form method="post" asp-page-handler="Delete" asp-route-id="@d.Id" class="inline-form"
+                              data-confirm="@(r.Records > 0 ? $"'{d.Name}' is used in {r.Patients} patient record(s). It will be deactivated and hidden from new registrations – the records are kept. Continue?" : $"Delete '{d.Name}'?")">
+                            <button class="btn btn-danger-outline btn-sm" type="submit" data-delete-disease>@(r.Records > 0 ? "Deactivate" : "Delete")</button></form>
+                    }
+                </td>
+            </tr>
+        }
+        @if (Model.Rows.Count == 0) { <tr><td colspan="7" class="empty">No diseases found.</td></tr> }
+        </tbody>
+    </table></div>
+    @if (pages > 1)
+    {
+        <div class="card-footer pager">
+            @for (var p = 1; p <= pages; p++) { <a class="btn btn-sm @(p == Model.PageNo ? "btn-primary" : "btn-light")" href="/Diseases?q=@Uri.EscapeDataString(Model.Q ?? "")&status=@Model.Status&pageNo=@p">@p</a> }
+        </div>
+    }
+</div>

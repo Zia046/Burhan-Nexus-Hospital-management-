@@ -10,7 +10,11 @@ public class RegisterModel : HmsPageModel
 {
     private readonly IPatientService _patients;
     private readonly IEncounterService _encounters;
-    public RegisterModel(IPatientService patients, IEncounterService encounters) { _patients = patients; _encounters = encounters; }
+    private readonly IDiseaseService _diseases;
+    public RegisterModel(IPatientService patients, IEncounterService encounters, IDiseaseService diseases) { _patients = patients; _encounters = encounters; _diseases = diseases; }
+
+    /// <summary>Update 18: optional disease from the central Disease Master (replaces the date of birth on the form).</summary>
+    [BindProperty] public string? DiseaseName { get; set; }
 
     [BindProperty] public PatientInput Patient { get; set; } = new() { AgeUnit = Core.Domain.AgeUnit.Years, GuardianRelation = Core.Domain.GuardianRelation.SonOf, Address = PatientInput.DefaultAddress };
     [BindProperty] public bool ConfirmNotDuplicate { get; set; }
@@ -48,6 +52,12 @@ public class RegisterModel : HmsPageModel
     public async Task<IActionResult> OnPostAsync()
     {
         ViewData["Nav"] = "patient-register";
+        var canAddDisease = await CanAsync(Perm.DiseasesAdd);
+        if (!string.IsNullOrWhiteSpace(DiseaseName) && !canAddDisease && await _diseases.ResolveAsync(DiseaseName, false) is { Succeeded: false } bad)
+        {
+            AddErrors(bad);
+            return Page();
+        }
         var result = await _patients.RegisterAsync(Patient, ConfirmNotDuplicate);
         if (result.NeedsDuplicateConfirmation)
         {
@@ -63,6 +73,13 @@ public class RegisterModel : HmsPageModel
 
         var p = result.Patient!;
         FlashSuccess = $"Patient registered. Patient ID: {p.PatientNumber}";
+        long? diseaseRecord = null;
+        if (!string.IsNullOrWhiteSpace(DiseaseName))
+        {
+            var d = await _diseases.RecordAsync(p.Id, DiseaseName, null, null, canAddDisease);
+            if (d.Succeeded) diseaseRecord = d.Value?.Id;
+            else FlashError = "Patient registered, but the disease was not saved: " + string.Join(" ", d.Errors);
+        }
         if (Next == "lab" && await CanAsync(Perm.LabBook)) return Redirect($"/Lab/Book?patientId={p.Id}");
         if (Next == "radiology" && await CanAsync(Perm.RadCreateBooking)) return Redirect($"/Radiology/Book?patientId={p.Id}");
         if (Next == "appointment" && await CanAsync(Perm.AppointmentsAdd)) return Redirect($"/Appointments/Book?patientId={p.Id}");
@@ -71,7 +88,12 @@ public class RegisterModel : HmsPageModel
         {
             // Update 16: the OPD button registers the visit straight away and prints the A4 / A5 OPD slip.
             var visit = await _encounters.RegisterOpdAsync(new OpdVisitInput { PatientId = p.Id });
-            if (visit.Succeeded) { FlashSuccess = $"Patient {p.PatientNumber} registered – OPD slip {visit.Value!.EncounterNumber}."; return Redirect($"/Print/Opd/{visit.Value.Id}?autoprint=true"); }
+            if (visit.Succeeded)
+            {
+                if (diseaseRecord is not null) await _diseases.RecordAsync(p.Id, DiseaseName, visit.Value!.Id, null, canAddDisease); // links the disease to the visit
+                FlashSuccess = $"Patient {p.PatientNumber} registered – OPD slip {visit.Value!.EncounterNumber}.";
+                return Redirect($"/Print/Opd/{visit.Value.Id}?autoprint=true");
+            }
             FlashError = string.Join(" ", visit.Errors);
             return Redirect($"/Opd/Register?patientId={p.Id}");
         }

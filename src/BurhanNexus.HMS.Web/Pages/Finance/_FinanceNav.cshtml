@@ -10,6 +10,7 @@
     <a bn-permission="@Perm.FinanceDashboard" class="@Cls("dashboard")" href="/Finance/Dashboard"><svg class="icon icon-sm"><use href="#i-chart" /></svg> Dashboard</a>
     <a bn-permission="@Perm.FinanceDashboard" class="@Cls("reports")" href="/Finance/Reports"><svg class="icon icon-sm"><use href="#i-file" /></svg> Reports</a>
     <a bn-permission="@Perm.FinanceViewAllAccounts" class="@Cls("cashiers")" href="/Finance/Cashiers"><svg class="icon icon-sm"><use href="#i-users" /></svg> Cashier accounts</a>
+    @if (User.IsSystemAdministrator()) { <a class="@Cls("pay-hospital")" href="/Finance/PayToHospital" data-nav-pay-hospital><svg class="icon icon-sm"><use href="#i-check-circle" /></svg> Pay to Hospital</a> }
     <a bn-permission="@Perm.FinanceConfirmDeposits" class="@Cls("deposits")" href="/Finance/Deposits"><svg class="icon icon-sm"><use href="#i-download" /></svg> Deposits</a>
     <a bn-permission="@Perm.FinanceApproveRefunds" class="@Cls("refunds")" href="/Finance/Refunds"><svg class="icon icon-sm"><use href="#i-refresh" /></svg> Refunds</a>
     <a bn-permission="@Perm.FinanceManageDoctorAccounts" class="@Cls("doctors")" href="/Finance/Doctors"><svg class="icon icon-sm"><use href="#i-stethoscope" /></svg> Doctor accounts</a>

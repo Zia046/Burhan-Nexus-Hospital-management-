@@ -16,11 +16,12 @@ public sealed record NavSection(string Key, string Title, string Icon, bool Visi
 /// </summary>
 public static class NavMenu
 {
-    /// <summary>The 11 pages kept in the administrator's sidebar (by nav key).</summary>
+    /// <summary>The 12 pages kept in the administrator's sidebar (by nav key). Update 18: "Finance" (dashboard) instead of
+    /// "My Financial Account", and the Disease Master.</summary>
     public static readonly IReadOnlySet<string> AdminSidebar = new HashSet<string>
     {
         "appointment-book", "appointments", "opd", "emergency", "finance-account", "finance-services",
-        "users", "departments", "audit", "settings", "backup",
+        "users", "departments", "audit", "settings", "backup", "diseases",
     };
 
     public static IReadOnlyList<NavSection> Build(IReadOnlySet<string> perms, bool isPrivate) => Build(perms, isPrivate, labSimple: false);
@@ -114,11 +115,14 @@ public static class NavMenu
         Add("finance", "Finance", "wallet", Any(Perm.FinanceViewOwnAccount, Perm.FinanceCollect, Perm.FinanceViewOwnReceipts, Perm.FinanceDashboard, Perm.FinanceConfirmDeposits,
                 Perm.FinanceManageDoctorAccounts, Perm.FinanceViewOwnDoctorAccount, Perm.FinanceCounterReports, Perm.FinanceManageServiceFees),
             (Has(Perm.FinanceCollect), new("finance-collect", "/Finance/Collect", "plus", "Collect Payment")),
-            (Has(Perm.FinanceViewOwnAccount), new("finance-account", "/Finance", "wallet", "My Financial Account")),
+            // Update 18: with the hospital dashboard the item is "Finance" (the dashboard with every finance option); own account stays reachable.
+            (Has(Perm.FinanceDashboard), new("finance-account", "/Finance/Dashboard", "wallet", "Finance")),
+            (Has(Perm.FinanceViewOwnAccount) && Has(Perm.FinanceDashboard), new("finance-own", "/Finance", "wallet", "My Financial Account", EmitDataNav: false)),
+            (Has(Perm.FinanceViewOwnAccount) && !Has(Perm.FinanceDashboard), new("finance-account", "/Finance", "wallet", "My Financial Account")),
             (Has(Perm.FinanceViewOwnReceipts), new("finance-receipts", "/Finance/Receipts", "file", "Receipts")),
-            (Has(Perm.FinanceDashboard), new("finance-dashboard", "/Finance/Dashboard", "chart", "Financial Dashboard")),
             (Has(Perm.FinanceDashboard), new("finance-revenue", "/Finance/Revenue", "chart", "Revenue & Outstanding", EmitDataNav: false)),
             (Has(Perm.FinanceConfirmDeposits), new("finance-deposits", "/Finance/Deposits", "download", "Cash Deposits")),
+            (Has(Perm.FinanceConfirmDeposits) && Has(Perm.FinanceViewAllAccounts), new("finance-pay-hospital", "/Finance/PayToHospital", "check-circle", "Pay to Hospital", EmitDataNav: false)),
             (Has(Perm.FinanceManageDoctorAccounts) || Has(Perm.FinanceViewOwnDoctorAccount), new("finance-doctors", "/Finance/Doctors", "stethoscope", Has(Perm.FinanceManageDoctorAccounts) ? "Doctor Accounts" : "My Doctor Account")),
             (Has(Perm.FinanceManageServiceFees), new("finance-services", "/Finance/Services", "sliders", "Counters per Service")));
 
@@ -126,6 +130,11 @@ public static class NavMenu
             (Any(Perm.SvcViewFees, Perm.SvcManageCatalogue, Perm.SvcManageServices, Perm.SvcManageFees), new("fees-catalogue", "/Fees", "sliders", "Service Catalogue")),
             (Has(Perm.SvcManageCategories), new("fees-categories", "/Fees/Categories", "database", "Categories")),
             (Has(Perm.SvcReports), new("fees-reports", "/Fees/Reports", "chart", "Service-wise Report")));
+
+        // Update 18: the Disease Master and disease analytics.
+        Add("diseases", "Diseases", "activity", Any(Perm.DiseasesView, Perm.DiseasesAdd, Perm.DiseasesEdit, Perm.DiseasesDelete, Perm.DiseasesAnalytics),
+            (Any(Perm.DiseasesView, Perm.DiseasesAdd, Perm.DiseasesEdit, Perm.DiseasesDelete), new("diseases", "/Diseases", "activity", "Diseases", EmitDataNav: false)),
+            (Has(Perm.DiseasesAnalytics), new("disease-analytics", "/Diseases/Analytics", "chart", "Disease Analytics", EmitDataNav: false)));
 
         Add("admin", "Administration", "building", Any(Perm.UsersView, Perm.DepartmentsManage, Perm.RolesManage, Perm.LoginHistoryView, Perm.AuditView),
             (Has(Perm.UsersView), new("users", "/Users", "users", "Users", EmitDataNav: false)),

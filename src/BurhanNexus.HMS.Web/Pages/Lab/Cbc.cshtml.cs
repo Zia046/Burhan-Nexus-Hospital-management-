@@ -19,7 +19,7 @@ public class CbcModel : HmsPageModel
     private async Task LoadAsync()
     {
         ViewData["Nav"] = "lab-catalogue";
-        ViewData["LabTab"] = "cbc";
+        ViewData["LabTab"] = "catalogue"; // update 18: opened from Test Catalogue
         Test = await _cbc.CbcTestAsync();
         if (Test is not null && Rows.Count == 0)
             Rows = Test.Parameters.OrderBy(p => p.IsActive ? 0 : 1).ThenBy(p => p.SortOrder).ThenBy(p => p.Id)

@@ -109,6 +109,7 @@ else
                         <label for="Input_Complaint">Presenting complaint <span class="muted">(optional)</span></label>
                         <input id="Input_Complaint" name="Input.Complaint" value="@Model.Input.Complaint" maxlength="300" autocomplete="off" />
                     </div>
+                    <partial name="_DiseasePicker" model="@(Model.DiseaseName ?? string.Empty)" />
                     <div class="field">
                         <label for="Input_Notes">Notes <span class="muted">(optional)</span></label>
                         <input id="Input_Notes" name="Input.Notes" value="@Model.Input.Notes" maxlength="500" autocomplete="off" />

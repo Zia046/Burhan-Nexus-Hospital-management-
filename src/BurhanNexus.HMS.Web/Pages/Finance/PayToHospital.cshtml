@@ -1,0 +1,46 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Finance.PayToHospitalModel
+@{
+    ViewData["Title"] = "Pay to Hospital";
+    var eligible = Model.Accounts.Where(a => a.Settleable > 0).ToList();
+}
+<partial name="_FinanceNav" />
+<partial name="_ValidationSummary" />
+<form method="post" class="card" data-pay-hospital
+      data-confirm="Settle the selected outstanding balances? Every account settled is recorded as its own transaction.">
+    <div class="card-header"><h2><svg class="icon"><use href="#i-check-circle" /></svg> Pay to Hospital – outstanding balances</h2>
+        <span class="muted">Total outstanding: <strong data-total-outstanding>@Fmt.Money(Model.Accounts.Sum(a => a.Outstanding))</strong></span></div>
+    <div class="table-wrap"><table class="table table-compact" data-accounts>
+        <thead><tr><th>@if (Model.IsAdmin) { <input type="checkbox" data-select-all aria-label="Select all eligible accounts" /> }</th><th>Account</th><th class="num">Outstanding</th><th class="num">Pending deposits</th><th class="num">To settle now</th></tr></thead>
+        <tbody>
+        @foreach (var a in Model.Accounts)
+        {
+            <tr data-account="@a.Username">
+                <td>@if (Model.IsAdmin && a.Settleable > 0) { <input type="checkbox" name="UserIds" value="@a.UserId" data-check-item aria-label="Settle @a.Username" /> }</td>
+                <td><strong>@a.FullName</strong> <small class="muted">@a.Username</small> @if (a.IsAdmin) { <span class="pill">Admin</span> }</td>
+                <td class="num">@Fmt.Money(a.Outstanding)</td><td class="num">@Fmt.Money(a.PendingDeposits)</td><td class="num" data-settleable>@Fmt.Money(a.Settleable)</td>
+            </tr>
+        }
+        @if (Model.Accounts.Count == 0) { <tr><td colspan="5" class="empty">No accounts.</td></tr> }
+        </tbody>
+        <tfoot><tr><th></th><th>Total</th><th class="num">@Fmt.Money(Model.Accounts.Sum(a => a.Outstanding))</th><th class="num">@Fmt.Money(Model.Accounts.Sum(a => a.PendingDeposits))</th><th class="num">@Fmt.Money(eligible.Sum(a => a.Settleable))</th></tr></tfoot>
+    </table></div>
+    @if (Model.IsAdmin)
+    {
+        <div class="card-footer form-actions">
+            <input name="Notes" maxlength="300" placeholder="Notes (optional)" />
+            <button class="btn btn-primary" type="submit" disabled="@(eligible.Count == 0)" data-settle>Settle selected accounts</button>
+        </div>
+    }
+    else { <div class="card-footer muted small">Only the administrator can settle accounts.</div> }
+</form>
+<div class="card">
+    <div class="card-header"><h2>Settlements</h2></div>
+    <div class="table-wrap"><table class="table table-compact" data-settlements>
+        <thead><tr><th>No.</th><th>Date</th><th>Account</th><th class="num">Outstanding before</th><th class="num">Settled</th><th>By</th><th>Notes</th></tr></thead>
+        <tbody>
+        @foreach (var s in Model.Recent) { <tr><td class="mono">@s.Number</td><td>@Fmt.DateTimeText(s.CreatedUtc)</td><td>@s.Username</td><td class="num">@Fmt.Money(s.OutstandingBefore)</td><td class="num">@Fmt.Money(s.Amount)</td><td>@s.CreatedByUsername</td><td class="small">@s.Notes</td></tr> }
+        @if (Model.Recent.Count == 0) { <tr><td colspan="7" class="empty">No settlements yet.</td></tr> }
+        </tbody>
+    </table></div>
+</div>

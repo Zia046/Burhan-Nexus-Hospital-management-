@@ -51,8 +51,8 @@
         <span class="muted small">@Model.Result.Total patient(s)</span>
     </div>
     <div class="table-wrap">
-        <table class="table" data-patient-results>
-            <thead><tr><th>Patient ID</th><th>Name</th><th>Age / Gender</th><th>Mobile</th><th>CNIC</th><th>City / village</th><th>Registered</th><th>Visits</th><th></th></tr></thead>
+        <table class="table table-fit" data-patient-results>
+            <thead><tr><th>Patient ID</th><th>Name</th><th>Age / Gender</th><th>Mobile</th><th>CNIC</th><th>City / village</th><th>Registered</th><th>Visits</th><th>Actions</th></tr></thead>
             <tbody>
             @foreach (var p in Model.Result.Items)
             {
@@ -65,15 +65,15 @@
                         @if (p.GuardianName is not null) { <small class="muted block">@BurhanNexus.HMS.Web.Pages.Print.SlipModelBase.RelationLabel(p.GuardianRelation) @p.GuardianName</small> }
                     </td>
                     <td class="nowrap">@(p.AgeText ?? "—") · @p.Gender</td>
-                    <td class="nowrap">@p.MobileNumber</td>
-                    <td class="nowrap mono small">@p.Cnic</td>
+                    <td>@p.MobileNumber</td>
+                    <td class="mono small">@p.Cnic</td>
                     <td>@p.CityOrVillage</td>
                     <td class="nowrap">@Fmt.Date(p.RegisteredUtc)</td>
-                    <td class="nowrap">
+                    <td>
                         @if (p.OpdVisits > 0) { <span class="tag tag-blue">OPD @p.OpdVisits</span> }
                         @if (p.EmergencyVisits > 0) { <span class="tag tag-red">ER @p.EmergencyVisits</span> }
                     </td>
-                    <td class="actions nowrap">
+                    <td class="actions actions-wrap">
                         @if (canView) { <a class="btn btn-light btn-sm" href="/Patients/Profile/@p.Id">Profile</a> }
                         @if (p.Status == PatientStatus.Active)
                         {

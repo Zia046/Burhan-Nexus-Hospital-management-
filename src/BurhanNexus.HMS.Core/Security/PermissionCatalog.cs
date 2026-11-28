@@ -374,6 +374,17 @@ public static class PermissionCatalog
                 new(ServicesActions.ManageFees, "Manage Service Fees", "Change fees and government rates (history kept, old bills unchanged)"),
                 new(ServicesActions.Reports, "View Service-wise Reports", "Usage and revenue of each service"),
             }, IsFinancialModule: true),
+        // Update 18: the central Disease Master and disease-wise analytics.
+        new(Modules_.Diseases, "Diseases", "Central Disease Master, visit-wise patient diseases and disease analytics", "activity", true, "/Diseases",
+            new PermissionAction[]
+            {
+                new(Actions.View, "View Diseases", "See the Disease Master and patient disease history"),
+                new(Actions.Add, "Add Diseases", "Add diseases (also new diseases typed in registration)"),
+                new(Actions.Edit, "Edit Diseases", "Rename diseases and change code, description and status"),
+                new(Actions.Delete, "Delete / Deactivate Diseases", "Delete unused diseases; used diseases are deactivated (records kept)"),
+                new(DiseaseActions.Analytics, "Disease Analytics", "Disease-wise patient statistics by date, age and gender"),
+                new(DiseaseActions.Export, "Export Disease Reports", "Excel / PDF export of disease analytics"),
+            }),
         Future("Reports", "Reports", "Operational and financial reports", "chart"),
 
         new(Modules_.UserManagement, "User Management", "Users, departments and responsibilities", "user-cog", true, "/Users",
@@ -445,6 +456,13 @@ public static class PermissionCatalog
         public const string Ipd = "Ipd";
         public const string Ot = "Ot";
         public const string Services = "Services";
+        public const string Diseases = "Diseases";
+    }
+
+    public static class DiseaseActions
+    {
+        public const string Analytics = "Analytics";
+        public const string Export = "Export";
     }
 
     public static class ServicesActions
@@ -748,6 +766,13 @@ public static class Perm
     public const string UsersAssignDepartments = "UserManagement.AssignDepartments";
     public const string UsersAssignPermissions = "UserManagement.AssignPermissions";
     public const string DepartmentsManage = "UserManagement.ManageDepartments";
+    // Update 18
+    public const string DiseasesView = "Diseases.View";
+    public const string DiseasesAdd = "Diseases.Add";
+    public const string DiseasesEdit = "Diseases.Edit";
+    public const string DiseasesDelete = "Diseases.Delete";
+    public const string DiseasesAnalytics = "Diseases.Analytics";
+    public const string DiseasesExport = "Diseases.Export";
     public const string RolesManage = "UserManagement.ManageRoles";
     public const string LoginHistoryView = "UserManagement.ViewLoginHistory";
 

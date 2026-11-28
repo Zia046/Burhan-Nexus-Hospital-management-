@@ -91,6 +91,17 @@ public class BookModel : HmsPageModel
         return Page();
     }
 
+    /// <summary>Update 18: optional disease of this visit (central Disease Master, visit-wise history).</summary>
+    [Microsoft.AspNetCore.Mvc.BindProperty] public string? DiseaseName { get; set; }
+
+    private async Task RecordDiseaseAsync(long patientId, long encounterId, long? appointmentId = null)
+    {
+        if (string.IsNullOrWhiteSpace(DiseaseName)) return;
+        var svc = HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Patients.IDiseaseService>();
+        var d = await svc.RecordAsync(patientId, DiseaseName, encounterId, appointmentId, await CanAsync(Perm.DiseasesAdd));
+        if (!d.Succeeded) FlashError = "The disease was not saved: " + string.Join(" ", d.Errors);
+    }
+
     public async Task<IActionResult> OnPostAsync()
     {
         Input.PatientId = PatientId ?? 0;
@@ -105,6 +116,7 @@ public class BookModel : HmsPageModel
         }
         var a = r.Value!;
         FlashSuccess = $"Appointment {a.Encounter?.EncounterNumber} booked – token {a.TokenNumber}.";
+        await RecordDiseaseAsync(a.PatientId, a.EncounterId, a.Id);
         if (await CanAsync(Perm.AppointmentsPrint))
             return Redirect($"/Print/Appointment/{a.Id}" + ((await _setup.GetSettingsAsync()).AutoPrintAfterRegistration ? "?autoprint=true" : ""));
         return Redirect($"/Appointments/Details/{a.Id}");

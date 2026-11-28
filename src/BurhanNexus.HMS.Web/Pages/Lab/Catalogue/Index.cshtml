@@ -4,6 +4,7 @@
 <partial name="_LabNav" />
 <div class="toolbar">
     <input type="search" placeholder="Filter tests…" data-table-filter="#lab-tests" maxlength="60" />
+    <a bn-permission="@Perm.LabManageParameters" class="btn btn-light" href="/Lab/Cbc" data-cbc-config><svg class="icon"><use href="#i-sliders" /></svg> CBC configuration</a>
     <a class="btn btn-primary" href="/Lab/Catalogue/Test" data-test="new-test"><svg class="icon"><use href="#i-plus" /></svg> New test</a>
 </div>
 <div class="card">

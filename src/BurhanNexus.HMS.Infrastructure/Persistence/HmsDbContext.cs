@@ -52,6 +52,10 @@ public class HmsDbContext : DbContext
     public DbSet<ReceiptPrint> ReceiptPrints => Set<ReceiptPrint>();
     public DbSet<Refund> Refunds => Set<Refund>();
     public DbSet<CashDeposit> CashDeposits => Set<CashDeposit>();
+    // Update 18
+    public DbSet<Disease> Diseases => Set<Disease>();
+    public DbSet<PatientDisease> PatientDiseases => Set<PatientDisease>();
+    public DbSet<HospitalSettlement> HospitalSettlements => Set<HospitalSettlement>();
     public DbSet<CashierLedgerEntry> CashierLedger => Set<CashierLedgerEntry>();
     public DbSet<DoctorLedgerEntry> DoctorLedger => Set<DoctorLedgerEntry>();
     public DbSet<DoctorSettlement> DoctorSettlements => Set<DoctorSettlement>();
@@ -476,6 +480,9 @@ public class HmsDbContext : DbContext
             e.Property(x => x.PaymentStatus).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.AmountPaid).HasPrecision(12, 2);
             e.Property(x => x.WaivedAmount).HasPrecision(12, 2);
+            e.Property(x => x.DiscountValue).HasPrecision(12, 2); // update 18
+            e.Property(x => x.DiscountAmount).HasPrecision(12, 2);
+            e.Property(x => x.DiscountOriginalFee).HasPrecision(12, 2);
             e.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL").HasDatabaseName("UX_Appointments_Idempotency");
             e.HasIndex(x => new { x.PaymentStatus, x.AppointmentDate });
             e.HasIndex(x => x.ReceiptId);
@@ -647,6 +654,32 @@ public class HmsDbContext : DbContext
             e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Counter).WithMany().HasForeignKey(x => x.CounterId).OnDelete(DeleteBehavior.Restrict);
         });
+        // ---- Update 18: Disease Master, visit-wise patient diseases, Pay to Hospital ----
+        b.Entity<Disease>(e =>
+        {
+            e.HasIndex(x => x.NormalizedName).IsUnique();
+            e.HasIndex(x => x.IsActive);
+            e.Property(x => x.RowVersion).IsRowVersion();
+        });
+        b.Entity<PatientDisease>(e =>
+        {
+            e.HasIndex(x => new { x.DiseaseId, x.VisitDate });
+            e.HasIndex(x => new { x.PatientId, x.VisitDate });
+            e.Property(x => x.Gender).HasConversion<string>().HasMaxLength(10);
+            e.HasOne(x => x.Patient).WithMany().HasForeignKey(x => x.PatientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Disease).WithMany().HasForeignKey(x => x.DiseaseId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Encounter).WithMany().HasForeignKey(x => x.EncounterId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Appointment>().WithMany().HasForeignKey(x => x.AppointmentId).OnDelete(DeleteBehavior.Restrict);
+        });
+        b.Entity<HospitalSettlement>(e =>
+        {
+            e.ToTable("HospitalSettlements", t => t.HasCheckConstraint("CK_HospitalSettlements_Positive", "\"Amount\" > 0"));
+            Money(e);
+            e.HasIndex(x => x.Number).IsUnique();
+            e.HasIndex(x => new { x.UserId, x.BusinessDate });
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         b.Entity<CashierLedgerEntry>(e =>
         {
             e.ToTable("CashierLedger");
@@ -662,6 +695,7 @@ public class HmsDbContext : DbContext
             e.HasOne<CashDeposit>().WithMany().HasForeignKey(x => x.DepositId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<FinancialAdjustment>().WithMany().HasForeignKey(x => x.AdjustmentId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<PaymentMethod>().WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<HospitalSettlement>().WithMany().HasForeignKey(x => x.SettlementId).OnDelete(DeleteBehavior.Restrict);
         });
         b.Entity<DoctorLedgerEntry>(e =>
         {

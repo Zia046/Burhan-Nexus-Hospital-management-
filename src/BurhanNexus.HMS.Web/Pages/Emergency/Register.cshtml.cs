@@ -59,6 +59,17 @@ public class RegisterModel : HmsPageModel
         ArrivalLocal = ArrivalLocal.Value.AddSeconds(-ArrivalLocal.Value.Second).AddMilliseconds(-ArrivalLocal.Value.Millisecond);
     }
 
+    /// <summary>Update 18: optional disease of this visit (central Disease Master, visit-wise history).</summary>
+    [Microsoft.AspNetCore.Mvc.BindProperty] public string? DiseaseName { get; set; }
+
+    private async Task RecordDiseaseAsync(long patientId, long encounterId, long? appointmentId = null)
+    {
+        if (string.IsNullOrWhiteSpace(DiseaseName)) return;
+        var svc = HttpContext.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Patients.IDiseaseService>();
+        var d = await svc.RecordAsync(patientId, DiseaseName, encounterId, appointmentId, await CanAsync(Perm.DiseasesAdd));
+        if (!d.Succeeded) FlashError = "The disease was not saved: " + string.Join(" ", d.Errors);
+    }
+
     public async Task<IActionResult> OnPostAsync()
     {
         if (PatientId is null && !await CanAsync(Perm.PatientsAdd))
@@ -78,6 +89,7 @@ public class RegisterModel : HmsPageModel
             return Page();
         }
         var enc = r.Value!;
+        await RecordDiseaseAsync(enc.PatientId, enc.Id);
         FlashSuccess = $"Emergency {enc.EncounterNumber} registered. Patient ID: {enc.Patient?.PatientNumber}";
         var settings = await _setup.GetSettingsAsync();
         if (await CanAsync(Perm.EmergencyPrint))

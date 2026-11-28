@@ -248,6 +248,15 @@ public static class AuditActions
     public const string PharmFreeIssueApproved = "Pharmacy.FreeIssueApproved";
     public const string PharmFreeIssueRejected = "Pharmacy.FreeIssueRejected";
     public const string PharmStockClassChanged = "Pharmacy.StockClassChanged";
+    // Update 18
+    public const string DiseaseAdded = "Disease.Added";
+    public const string DiseaseChanged = "Disease.Changed";
+    public const string DiseaseDeleted = "Disease.Deleted";
+    public const string PatientDiseaseRecorded = "Patient.DiseaseRecorded";
+    public const string DiseaseReportExported = "Disease.ReportExported";
+    public const string ConsultationFeeReturned = "Appointment.FeeReturned";
+    public const string ConsultationDiscount = "Appointment.FeeDiscount";
+    public const string HospitalSettlement = "Finance.PaidToHospital";
     public const string PharmExported = "Pharmacy.Exported";
     public const string PharmSlipPrinted = "Pharmacy.SlipPrinted";
 

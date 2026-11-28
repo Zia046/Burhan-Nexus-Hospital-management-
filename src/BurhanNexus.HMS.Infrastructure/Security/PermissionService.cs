@@ -98,6 +98,7 @@ public static class PermissionSeeder
         [Perm.PharmPaidSale] = Perm.PharmIssueToPatients,
         [Perm.PharmRefund] = Perm.PharmProcessReturns,
         [Perm.AppointmentsManageDoctors] = Perm.OpdSettings, // update 17: doctors were managed in OPD setup
+        [Perm.DiseasesView] = Perm.PatientsView, // update 18: patient disease history
         // update 10: whoever managed service fees in Finance manages the central Fees & Services catalogue
         [Perm.SvcViewFees] = Perm.FinanceManageServiceFees,
         [Perm.SvcManageCatalogue] = Perm.FinanceManageServiceFees,

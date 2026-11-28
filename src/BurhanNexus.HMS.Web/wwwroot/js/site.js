@@ -595,3 +595,49 @@ document.querySelectorAll("[data-copy-button]").forEach(btn => {
     else { src.select && src.select(); document.execCommand("copy"); done(); }
   });
 });
+
+// Update 18: disease picker – tells the operator whether the typed disease exists or will be added to the Disease Master.
+(function () {
+  "use strict";
+  const norm = s => (s || "").toUpperCase().replace(/[^\p{L}\p{N}]/gu, "");
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("[data-disease-picker]").forEach(box => {
+      const input = box.querySelector("[data-disease-input]"), hint = box.querySelector("[data-disease-hint]");
+      const list = document.getElementById(input.getAttribute("list"));
+      const names = [...list.options].map(o => o.value);
+      const canAdd = box.dataset.canAdd === "1";
+      const base = hint.textContent;
+      const update = () => {
+        const v = input.value.trim();
+        if (!v) { hint.textContent = base; hint.classList.remove("text-warn"); return; }
+        const match = names.find(n => norm(n) === norm(v));
+        if (match) { hint.textContent = "Disease Master: " + match; hint.classList.remove("text-warn"); }
+        else if (canAdd) { hint.textContent = "Add New Disease: “" + v + "” will be added to the Disease Master."; hint.classList.add("text-warn"); }
+        else { hint.textContent = "Not in the Disease Master – select a disease from the list."; hint.classList.add("text-warn"); }
+      };
+      input.addEventListener("input", update);
+      update();
+    });
+  });
+})();
+
+// Update 18: live list filter – typing shows the matching rows at once (partial, case-insensitive), no page reload.
+(function () {
+  "use strict";
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("input[data-live-filter]").forEach(input => {
+      const rows = () => document.querySelectorAll(input.dataset.liveFilter);
+      input.addEventListener("input", () => {
+        const t = input.value.trim().toLowerCase();
+        rows().forEach(r => { r.hidden = t !== "" && !(r.dataset.filterText || r.textContent).toLowerCase().includes(t); });
+      });
+    });
+  });
+})();
+
+// Update 18: "select all eligible accounts" on Pay to Hospital.
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("[data-select-all]").forEach(all => all.addEventListener("change", () => {
+    all.closest("form").querySelectorAll("[data-check-item]").forEach(c => { c.checked = all.checked; });
+  }));
+});

@@ -1,0 +1,17 @@
+@model string?
+@inject BurhanNexus.HMS.Infrastructure.Patients.IDiseaseService DiseaseService
+@{
+    // Update 18: searchable disease field – suggestions come from the central Disease Master while typing.
+    var diseases = await DiseaseService.ActiveAsync();
+    var canAdd = await PermCtx.HasAsync(BurhanNexus.HMS.Core.Security.Perm.DiseasesAdd);
+    var listId = "disease-list-" + Guid.NewGuid().ToString("N")[..8];
+    var fieldName = ViewData["DiseaseField"] as string ?? "DiseaseName";
+}
+<div class="field" data-disease-picker data-can-add="@(canAdd ? "1" : "0")">
+    <label for="@listId-input">Disease <span class="muted">(optional)</span></label>
+    <input id="@listId-input" name="@fieldName" value="@Model" list="@listId" maxlength="150" autocomplete="off" placeholder="Type to search diseases" data-disease-input />
+    <datalist id="@listId">
+        @foreach (var d in diseases) { <option value="@d.Name">@d.Code</option> }
+    </datalist>
+    <small class="muted" data-disease-hint>@(canAdd ? "Select from the list, or type a new name – it is added to the Disease Master (Add New Disease)." : "Select a disease from the list.")</small>
+</div>
