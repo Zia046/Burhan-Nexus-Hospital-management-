@@ -1,0 +1,19 @@
+@page
+@model BurhanNexus.HMS.Web.Pages.Pharmacy.ApprovalsModel
+@{ ViewData["Title"] = "Free issue approvals"; }
+<partial name="_PharmNav" />
+<div class="card" data-free-approvals>
+    <div class="card-header"><h2><svg class="icon"><use href="#i-check" /></svg> Free medicine issues waiting for approval</h2><span class="muted">@Model.Pending.Count</span></div>
+    <div class="table-wrap"><table class="table table-compact">
+        <thead><tr><th>Issue</th><th>Date</th><th>Patient</th><th>Medicines</th><th class="num">Value</th><th>Reason</th><th>Issued by</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var i in Model.Pending)
+        {
+            <tr data-pending="@i.Number"><td class="mono">@i.Number</td><td class="nowrap">@Fmt.DateTimeText(i.CreatedUtc)</td><td>@i.Patient?.PatientNumber · @i.Patient?.FullName</td>
+                <td class="small">@string.Join(", ", i.Items.Select(x => $"{x.MedicineName} × {x.Quantity}"))</td><td class="num">@((i.TotalValue ?? 0).ToString("N2"))</td>
+                <td class="small">@i.FreeReason</td><td>@i.CreatedByUsername</td><td class="actions"><a class="btn btn-primary btn-sm" href="/Pharmacy/Doc/ISS/@i.Id">Open</a></td></tr>
+        }
+        @if (Model.Pending.Count == 0) { <tr><td colspan="8" class="empty">Nothing is waiting for approval.</td></tr> }
+        </tbody>
+    </table></div>
+</div>

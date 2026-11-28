@@ -1408,6 +1408,7 @@ public class HmsDbContext : DbContext
             e.ToTable("MedicineBatches");
             Money(e);
             e.HasIndex(x => new { x.MedicineId, x.BatchNumber }).IsUnique().HasDatabaseName("UX_MedicineBatches_Batch");
+            e.Property(x => x.StockClass).HasConversion<string>().HasMaxLength(20); // update 17
             e.HasIndex(x => x.ExpiryDate);
             e.Property(x => x.RowVersion).IsRowVersion();
             e.HasOne(x => x.Medicine).WithMany().HasForeignKey(x => x.MedicineId).OnDelete(DeleteBehavior.Restrict);
@@ -1461,10 +1462,15 @@ public class HmsDbContext : DbContext
         });
         b.Entity<PatientMedicineIssue>(e =>
         {
+            // Update 17: a free issue has no amounts (its value is kept in TotalValue); the visit rule is checked by the service
+            // (inpatient free issues have no OPD / Emergency visit).
             e.ToTable("PatientMedicineIssues", t => t.HasCheckConstraint("CK_PatientMedicineIssues_Government",
-                "\"Mode\" = 'Private' OR (\"EncounterId\" IS NOT NULL AND \"GrossAmount\" IS NULL AND \"NetAmount\" IS NULL)"));
+                "\"Mode\" = 'Private' OR (\"GrossAmount\" IS NULL AND \"NetAmount\" IS NULL)"));
             Money(e);
             e.Property(x => x.Mode).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.IssueMode).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.ApprovalStatus).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => x.ApprovalStatus);
             e.HasIndex(x => x.Number).IsUnique();
             e.HasIndex(x => x.IdempotencyKey).IsUnique().HasDatabaseName("UX_PatientMedicineIssues_Idempotency");
             e.HasIndex(x => new { x.PatientId, x.BusinessDate });
@@ -1602,6 +1608,7 @@ public class HmsDbContext : DbContext
         {
             e.ToTable("PharmacySettings", t => t.HasCheckConstraint("CK_PharmacySettings_Singleton", "\"Id\" = 1"));
             e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.DefaultIssueMode).HasConversion<string>().HasMaxLength(20); // update 17
             e.Property(x => x.RowVersion).IsRowVersion();
             e.HasOne(x => x.MedicineServiceItem).WithMany().HasForeignKey(x => x.MedicineServiceItemId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.GovernmentIssueServiceItem).WithMany().HasForeignKey(x => x.GovernmentIssueServiceItemId).OnDelete(DeleteBehavior.Restrict);

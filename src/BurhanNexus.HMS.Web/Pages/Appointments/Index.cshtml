@@ -31,7 +31,9 @@
     <div class="toolbar-actions">
         <a bn-permission="@Perm.AppointmentsReports" class="btn btn-light" href="/Appointments/Reports"><svg class="icon icon-sm"><use href="#i-chart" /></svg> Reports</a>
         <a bn-permission="@Perm.PrinterSettings" class="btn btn-light" href="/Settings/Printers"><svg class="icon icon-sm"><use href="#i-printer" /></svg> Printers</a>
-        <a bn-permission="@Perm.AppointmentsAdd" class="btn btn-primary" href="/Appointments/Book" data-test="appt-book"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New appointment</a>
+        <a class="btn btn-light" href="/Appointments/Doctors" data-doctors-link><svg class="icon icon-sm"><use href="#i-user-cross" /></svg> Doctors</a>
+        <a bn-permission="@Perm.AppointmentsManageDoctors" class="btn btn-success" href="/Appointments/Doctors?new=true" data-add-doctor><svg class="icon icon-sm"><use href="#i-plus" /></svg> Add Doctor</a>
+        <a bn-permission="@Perm.AppointmentsAdd" class="btn btn-primary" href="/Patients/Register?next=appointment" data-test="appt-book"><svg class="icon icon-sm"><use href="#i-plus" /></svg> New appointment</a>
     </div>
 </div>
 

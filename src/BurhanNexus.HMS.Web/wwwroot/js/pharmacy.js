@@ -335,3 +335,20 @@
     }
   });
 })();
+
+// Update 17: medicine issue mode – show the selected mode before saving and only the fields of that mode.
+(function () {
+  "use strict";
+  document.addEventListener("DOMContentLoaded", () => {
+    const radios = [...document.querySelectorAll("[data-issue-mode]")];
+    if (radios.length === 0) return;
+    const label = document.querySelector("[data-mode-label]");
+    const apply = () => {
+      const sel = radios.find(r => r.checked) || radios[0];
+      if (label) label.textContent = sel.dataset.label;
+      document.querySelectorAll("[data-mode-only]").forEach(el => { el.hidden = el.dataset.modeOnly !== sel.value; });
+    };
+    radios.forEach(r => r.addEventListener("change", apply));
+    apply();
+  });
+})();

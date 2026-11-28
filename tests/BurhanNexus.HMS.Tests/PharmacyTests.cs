@@ -152,7 +152,8 @@ public partial class PharmacyTests : Phase2TestBase
     private static readonly string[] PharmacistPerms =
     {
         Perm.DashboardView, Perm.PharmDashboard, Perm.PharmViewCatalogue, Perm.PharmIssueToPatients, Perm.PharmReceiveStock, Perm.PharmTransferStock,
-        Perm.PharmViewStockReports, Perm.PharmAdjustStock, Perm.PharmProcessReturns, Perm.PatientsSearch
+        Perm.PharmViewStockReports, Perm.PharmAdjustStock, Perm.PharmProcessReturns, Perm.PatientsSearch,
+        Perm.PharmFreeIssue, Perm.PharmPaidSale // update 17: one right per issue mode
     };
 
     // =====================================================================================
@@ -176,7 +177,7 @@ public partial class PharmacyTests : Phase2TestBase
         // Prices are refused on receiving; stock comes in batch-wise from a source.
         var priced = await ReceiveAsync(admin, null, "District Health Office", null, "DHO-1", (para, "B001", Month(6), 500, 2.5m));
         Assert.Equal(HttpStatusCode.OK, priced.StatusCode);
-        Assert.Contains("not used in a Government hospital", await priced.Content.ReadAsStringAsync());
+        Assert.Contains("Purchase and sale prices are not used", await priced.Content.ReadAsStringAsync()); // update 17
         var grn = await IdAsync(await ReceiveAsync(admin, null, "District Health Office", null, "DHO-1",
             (para, "B001", Month(6), 500, null), (para, "B002", Month(12), 300, null), (para, "B003", Month(18), 200, null)), "Receiving");
         Assert.Equal(1000, await StockAsync("MAIN", para));
@@ -229,7 +230,7 @@ public partial class PharmacyTests : Phase2TestBase
             var ex = await Assert.ThrowsAnyAsync<Exception>(() => db.Database.ExecuteSqlRawAsync(
                 "INSERT INTO \"PharmacySales\" (\"Number\",\"IdempotencyKey\",\"LocationId\",\"GrossAmount\",\"DiscountAmount\",\"NetAmount\",\"CounterId\",\"BusinessDate\",\"CreatedUtc\") " +
                 "VALUES ('X', gen_random_uuid(), 1, 1, 0, 1, 1, CURRENT_DATE, now())"));
-            Assert.Contains("Private hospital mode", ex.Message + ex.InnerException?.Message);
+            Assert.Contains("only available when medicine prices are used", ex.Message + ex.InnerException?.Message); // update 17
         }
 
         // Patient profile and pharmacy history show what was issued.

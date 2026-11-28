@@ -58,14 +58,32 @@ internal static class StockEngine
     private static NpgsqlParameter P(string name, object value) => new(name, value);
 
     /// <summary>Batches of a medicine at a location that may be issued today, earliest expiry first (FEFO).</summary>
-    public static async Task<List<(MedicineBatch Batch, int Available)>> EligibleAsync(HmsDbContext db, int locationId, int medicineId, DateOnly today, CancellationToken ct) =>
-        (await db.StockBalances.AsNoTracking().Include(s => s.Batch)
-            .Where(s => s.LocationId == locationId && s.MedicineId == medicineId && s.Quantity > 0 && s.Batch!.ExpiryDate >= today)
-            .OrderBy(s => s.Batch!.ExpiryDate).ThenBy(s => s.BatchId)
-            .Select(s => new { s.Batch, s.Quantity }).ToListAsync(ct))
-        .Select(x => (x.Batch!, x.Quantity)).ToList();
+    public static async Task<List<(MedicineBatch Batch, int Available)>> EligibleAsync(HmsDbContext db, int locationId, int medicineId, DateOnly today, CancellationToken ct,
+        IReadOnlyCollection<MedicineStockClass>? classes = null)
+    {
+        var q = db.StockBalances.AsNoTracking().Include(s => s.Batch)
+            .Where(s => s.LocationId == locationId && s.MedicineId == medicineId && s.Quantity > 0 && s.Batch!.ExpiryDate >= today);
+        if (classes is not null)
+        {
+            // Update 17 (stock classification on): only the stock the transaction may use (null = General stock).
+            bool g = classes.Contains(MedicineStockClass.General), f = classes.Contains(MedicineStockClass.FreeDistribution), sl = classes.Contains(MedicineStockClass.Sale);
+            q = q.Where(s => ((s.Batch!.StockClass == null || s.Batch.StockClass == MedicineStockClass.General) && g)
+                             || (s.Batch.StockClass == MedicineStockClass.FreeDistribution && f) || (s.Batch.StockClass == MedicineStockClass.Sale && sl));
+        }
+        return (await q.OrderBy(s => s.Batch!.ExpiryDate).ThenBy(s => s.BatchId).Select(s => new { s.Batch, s.Quantity }).ToListAsync(ct))
+            .Select(x => (x.Batch!, x.Quantity)).ToList();
+    }
 
     public static bool IsExpired(DateOnly expiry, DateOnly today) => expiry < today;
+
+    public static string ClassLabel(MedicineStockClass? c) => c switch
+    {
+        MedicineStockClass.FreeDistribution => "Free Distribution Stock", MedicineStockClass.Sale => "Sale Stock", _ => "General Stock",
+    };
+
+    /// <summary>Update 17: stock a transaction may use when stock classification is on (null = no restriction).</summary>
+    public static IReadOnlyCollection<MedicineStockClass>? ClassesFor(PharmacySettings s, bool free) => !s.StockClassificationEnabled ? null
+        : free ? new[] { MedicineStockClass.General, MedicineStockClass.FreeDistribution } : new[] { MedicineStockClass.General, MedicineStockClass.Sale };
 
     /// <summary>
     /// Decides the batches for one line. Without a chosen batch the quantity is taken from the earliest-expiring batches
@@ -73,19 +91,22 @@ internal static class StockEngine
     /// the "Select another batch" permission. Expired batches are never allocated.
     /// </summary>
     public static async Task<(List<Allocation>? Allocations, string? Error)> AllocateAsync(
-        HmsDbContext db, int locationId, Medicine medicine, int quantity, long? chosenBatchId, bool canSelectBatch, DateOnly today, CancellationToken ct)
+        HmsDbContext db, int locationId, Medicine medicine, int quantity, long? chosenBatchId, bool canSelectBatch, DateOnly today, CancellationToken ct,
+        IReadOnlyCollection<MedicineStockClass>? classes = null)
     {
         if (quantity <= 0) return (null, $"Enter the quantity of {medicine.Name}.");
-        var eligible = await EligibleAsync(db, locationId, medicine.Id, today, ct);
+        var eligible = await EligibleAsync(db, locationId, medicine.Id, today, ct, classes);
         if (chosenBatchId is long bid)
         {
             var batch = await db.MedicineBatches.AsNoTracking().FirstOrDefaultAsync(b => b.Id == bid && b.MedicineId == medicine.Id, ct);
             if (batch is null) return (null, $"Batch not found for {medicine.Name}.");
             if (IsExpired(batch.ExpiryDate, today)) return (null, $"{medicine.Name} batch {batch.BatchNumber} expired on {batch.ExpiryDate:dd MMM yyyy} and cannot be issued or sold.");
+            if (classes is not null && !classes.Contains(batch.StockClass ?? MedicineStockClass.General))
+                return (null, $"{medicine.Name} batch {batch.BatchNumber} is {ClassLabel(batch.StockClass)} and cannot be used for this transaction.");
             var e = eligible.FirstOrDefault(x => x.Batch.Id == bid);
             if (e.Batch is null || e.Available < quantity)
                 return (null, $"Only {(e.Batch is null ? 0 : e.Available)} {medicine.Unit}(s) of {medicine.Name} batch {batch.BatchNumber} are in stock.");
-            var overridden = eligible[0].Batch.Id != bid && eligible[0].Batch.ExpiryDate < batch.ExpiryDate;
+            var overridden = eligible.Count > 0 && eligible[0].Batch.Id != bid && eligible[0].Batch.ExpiryDate < batch.ExpiryDate;
             if (overridden && !canSelectBatch)
                 return (null, $"{medicine.Name}: use batch {eligible[0].Batch.BatchNumber} (expires first). Choosing another batch needs the “Select another batch” permission.");
             return (new List<Allocation> { new(batch, quantity, overridden) }, null);

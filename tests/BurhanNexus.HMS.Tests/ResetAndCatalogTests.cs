@@ -28,7 +28,7 @@ public class ResetAndCatalogTests : HmsTestBase
         // Phase 5: Pharmacy became a real module.
         var pharm = PermissionCatalog.FindModule("Pharmacy")!;
         Assert.True(pharm.IsAvailable);
-        Assert.Equal(26, pharm.Actions.Count); // update 9: ward medicine requests
+        Assert.Equal(32, pharm.Actions.Count); // update 9: ward medicine requests; update 17: one right per issue mode, approval, refund
         Assert.Contains(Perm.PharmApproveAdjustments, PermissionCatalog.AllKeys);
         // Phase 6: X-Ray and Ultrasound became one real Radiology module.
         var rad = PermissionCatalog.FindModule("Radiology")!;

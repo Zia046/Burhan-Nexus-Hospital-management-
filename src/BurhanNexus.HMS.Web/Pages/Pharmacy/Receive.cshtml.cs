@@ -38,6 +38,8 @@ public class ReceiveModel : PharmacyPageModel
 
     [BindProperty] public ReceiveInput Input { get; set; } = new();
     [BindProperty] public List<Line> Lines { get; set; } = new();
+    /// <summary>Update 17: stock classification is on – new batches get a stock class.</summary>
+    public bool ClassificationOn { get; private set; }
     public IReadOnlyList<Supplier> Suppliers { get; private set; } = Array.Empty<Supplier>();
     public IReadOnlyList<PharmacyLookup> DosageForms { get; private set; } = Array.Empty<PharmacyLookup>();
     public bool WithPrices { get; private set; }
@@ -47,6 +49,7 @@ public class ReceiveModel : PharmacyPageModel
     private async Task LoadAsync()
     {
         await InitAsync("receive");
+        ClassificationOn = (await Catalog.SettingsAsync()).StockClassificationEnabled;
         Suppliers = await Catalog.SuppliersAsync(null, activeOnly: true);
         WithPrices = IsPrivate && await CanAsync(Perm.PharmManagePurchases);
         CanSalePrice = WithPrices && await CanAsync(Perm.PharmManagePrices);

@@ -93,6 +93,11 @@ public static class PermissionSeeder
         [Perm.AppointmentsCollectFee] = Perm.AppointmentsAdd,
         [Perm.IpdRequestMedicines] = Perm.IpdRecordMedication,
         [Perm.PharmProcessWardRequests] = Perm.PharmIssueToPatients,
+        // update 17: the medicine issue modes split "Issue Medicine to Patients" / retail sales / returns
+        [Perm.PharmFreeIssue] = Perm.PharmIssueToPatients,
+        [Perm.PharmPaidSale] = Perm.PharmIssueToPatients,
+        [Perm.PharmRefund] = Perm.PharmProcessReturns,
+        [Perm.AppointmentsManageDoctors] = Perm.OpdSettings, // update 17: doctors were managed in OPD setup
         // update 10: whoever managed service fees in Finance manages the central Fees & Services catalogue
         [Perm.SvcViewFees] = Perm.FinanceManageServiceFees,
         [Perm.SvcManageCatalogue] = Perm.FinanceManageServiceFees,

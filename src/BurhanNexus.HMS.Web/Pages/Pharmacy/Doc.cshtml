@@ -44,6 +44,34 @@
             <div><h3>@iss.Patient.FullName</h3><span class="muted">@(iss.Encounter is null ? "No visit linked" : $"{iss.Encounter.EncounterNumber} · {(iss.Encounter.Type == EncounterType.Opd ? "OPD" : "Emergency")} · {Fmt.Day(iss.Encounter.EncounterDate)}") · issued by @iss.CreatedByUsername · @Fmt.DateTimeText(iss.CreatedUtc)</span>
                 @if (iss.Notes is not null) { <div class="small">Notes: @iss.Notes</div> }</div>
         </div>
+        @* Update 17: issue mode and the three values (medicine value, patient payment, subsidy) *@
+        <div class="card-body" data-issue-mode="@iss.EffectiveMode">
+            <dl class="details-grid">
+                <dt>Issue mode</dt><dd><strong data-mode>@PharmacyService.ModeLabel(iss.EffectiveMode)</strong>@if (iss.FreeReason is not null) { <span class="muted"> – @iss.FreeReason</span> }</dd>
+                @if (showPrices || iss.EffectiveMode == MedicineIssueMode.Free)
+                {
+                    <dt>Medicine value</dt><dd data-total-value>@((iss.TotalValue ?? iss.GrossAmount ?? 0).ToString("N2"))</dd>
+                    @if ((iss.DiscountAmount ?? 0) > 0) { <dt>Discount</dt><dd data-discount>@iss.DiscountAmount?.ToString("N2")</dd> }
+                    @if ((iss.SubsidyAmount ?? 0) > 0) { <dt>Subsidy</dt><dd data-subsidy>@iss.SubsidyAmount?.ToString("N2")</dd> }
+                    <dt>Patient pays</dt><dd data-patient-amount><strong>@((iss.EffectiveMode == MedicineIssueMode.Free ? 0 : iss.NetAmount ?? 0).ToString("N2"))</strong></dd>
+                }
+                @if (iss.ApprovalStatus is { } ap)
+                {
+                    <dt>Approval</dt><dd data-approval="@ap"><span class="status @(ap == FreeIssueApproval.Approved ? "status-ok" : ap == FreeIssueApproval.Pending ? "status-warn" : "status-danger")">@ap</span>
+                        @if (iss.ApprovedByUsername is not null) { <span class="muted"> · @iss.ApprovedByUsername · @(iss.ApprovedUtc is { } au ? Fmt.DateTimeText(au) : "")</span> }
+                        @if (iss.ApprovalNote is not null) { <span class="muted"> – @iss.ApprovalNote</span> }</dd>
+                }
+            </dl>
+            @if (iss.ApprovalStatus == FreeIssueApproval.Pending)
+            {
+                <div class="alert alert-warning"><svg class="icon"><use href="#i-info" /></svg><div>Waiting for approval – the stock has not been taken yet. Do not hand over the medicines.</div></div>
+                <form method="post" asp-page-handler="Decide" class="inline-form" bn-permission="@Perm.PharmApproveFreeIssue" data-approve-form>
+                    <input name="note" maxlength="300" placeholder="Note (optional)" />
+                    <button class="btn btn-primary btn-sm" name="approve" value="true" data-approve>Approve</button>
+                    <button class="btn btn-danger-outline btn-sm" name="approve" value="false" data-reject>Reject</button>
+                </form>
+            }
+        </div>
         <div class="table-wrap"><table class="table table-compact" data-issue-items>
             <thead><tr><th>Medicine</th><th>Batch</th><th>Expiry</th><th class="num">Qty</th><th class="num">Returned</th><th>Dosage / instructions</th>@if (showPrices && iss.Mode == HospitalType.Private) { <th class="num">Price</th><th class="num">Discount</th><th class="num">Total</th> }</tr></thead>
             <tbody>@foreach (var i in iss.Items) { <tr data-item="@i.MedicineName"><td>@i.MedicineName @if (i.FefoOverridden) { <span class="status status-warn" title="Not the earliest-expiring batch">FEFO override</span> }</td><td class="mono">@i.BatchNumber</td><td>@Fmt.Day(i.ExpiryDate)</td><td class="num">@i.Quantity</td><td class="num">@i.ReturnedQuantity</td><td>@i.Instructions</td>

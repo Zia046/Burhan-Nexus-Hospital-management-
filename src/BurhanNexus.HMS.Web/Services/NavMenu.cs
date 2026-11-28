@@ -35,7 +35,7 @@ public static class NavMenu
             sections.Add(new NavSection(key, title, icon, visible, items.Where(i => i.Show).Select(i => i.Item).ToList()));
 
         Add("appointments", "Appointments", "calendar", Any(Perm.AppointmentsView, Perm.AppointmentsAdd, Perm.AppointmentsReports),
-            (Has(Perm.AppointmentsAdd), new("appointment-book", "/Appointments/Book", "plus", "New Appointment")),
+            (Has(Perm.AppointmentsAdd), new("appointment-book", Has(Perm.PatientsAdd) ? "/Patients/Register?next=appointment" : "/Appointments/Book", "plus", "New Appointment")), // update 17: opens registration directly
             (Has(Perm.AppointmentsView), new("appointments", "/Appointments", "calendar", "Doctor-wise Lists")),
             (Has(Perm.AppointmentsReports), new("appointment-reports", "/Appointments/Reports", "chart", "Appointment Reports", EmitDataNav: false)));
 
@@ -100,10 +100,11 @@ public static class NavMenu
             (Has(Perm.RadSettings), new("rad-settings", "/Radiology/Settings", "settings", "Radiology Settings")));
 
         Add("pharmacy", "Pharmacy", "pill", Any(Perm.PharmDashboard, Perm.PharmViewCatalogue, Perm.PharmIssueToPatients, Perm.PharmRetailSales, Perm.PharmReceiveStock, Perm.PharmTransferStock,
-                Perm.PharmViewStockReports, Perm.PharmViewDepartmentStock, Perm.PharmAdjustStock, Perm.PharmApproveAdjustments, Perm.PharmManageSuppliers, Perm.PharmSettings),
+                Perm.PharmViewStockReports, Perm.PharmViewDepartmentStock, Perm.PharmAdjustStock, Perm.PharmApproveAdjustments, Perm.PharmManageSuppliers, Perm.PharmSettings, Perm.PharmApproveFreeIssue),
             (Has(Perm.PharmDashboard), new("pharm-dashboard", "/Pharmacy", "pill", "Pharmacy Dashboard")),
             (Has(Perm.PharmIssueToPatients), new("pharm-issue", "/Pharmacy/Issue", "users-round", "Patient Issue")),
             (Has(Perm.PharmProcessWardRequests), new("pharm-ward", "/Pharmacy/WardRequests", "file", "Ward Requests")),
+            (Has(Perm.PharmApproveFreeIssue), new("pharm-approvals", "/Pharmacy/Approvals", "check", "Free Issue Approvals", EmitDataNav: false)),
             (Has(Perm.PharmRetailSales) && isPrivate, new("pharm-sale", "/Pharmacy/Sale", "wallet", "Retail Sale", PrivateOnly: true)),
             (Has(Perm.PharmReceiveStock), new("pharm-receive", "/Pharmacy/Receive", "download", "Supplier Invoice")),
             (Has(Perm.PharmTransferStock), new("pharm-transfer", "/Pharmacy/Transfer", "refresh", "Stock Transfer")),

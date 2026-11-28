@@ -42,7 +42,10 @@ public class SettingsModel : PharmacyPageModel
             Input = new PharmacySettingsInput
             {
                 PharmacyName = Settings.PharmacyName, NearExpiryDays = Settings.NearExpiryDays, EncounterValidDays = Settings.EncounterValidDays,
-                GovernmentIssueServiceItemId = Settings.GovernmentIssueServiceItemId, SlipFooter = Settings.SlipFooter
+                GovernmentIssueServiceItemId = Settings.GovernmentIssueServiceItemId, SlipFooter = Settings.SlipFooter,
+                FreeIssueEnabled = Settings.FreeIssueEnabled, PaidSaleEnabled = Settings.PaidSaleEnabled, SubsidyEnabled = Settings.SubsidyEnabled,
+                DiscountEnabled = Settings.DiscountEnabled, FreeIssueApprovalRequired = Settings.FreeIssueApprovalRequired,
+                DefaultIssueMode = Settings.EffectiveDefaultMode, AllowChangeIssueMode = Settings.AllowChangeIssueMode, StockClassificationEnabled = Settings.StockClassificationEnabled,
             };
         }
     }
@@ -52,6 +55,7 @@ public class SettingsModel : PharmacyPageModel
     public async Task<IActionResult> OnPostAsync()
     {
         if (await DenyUnlessAsync(Perm.PharmSettings) is { } deny) return deny;
+        Input.IssueConfigPosted = Request.Form.ContainsKey("Input.IssueConfigPosted"); // update 17
         var r = await Catalog.SaveSettingsAsync(Input, RowVersion);
         if (!r.Succeeded) { await LoadAsync(false); AddErrors(r); return Page(); }
         FlashSuccess = "Pharmacy settings saved.";

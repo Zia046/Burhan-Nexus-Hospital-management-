@@ -43,13 +43,22 @@ public class IssueModel : PharmacyPageModel
     public int LocationId { get; private set; }
     public bool CanDiscount { get; private set; }
     public int ValidDays { get; private set; }
+    /// <summary>Update 17: the enabled issue modes this user may pick (the default first) – checked again by the service.</summary>
+    public IReadOnlyList<MedicineIssueMode> Modes { get; private set; } = Array.Empty<MedicineIssueMode>();
+    public MedicineIssueMode? DefaultMode { get; private set; }
+    public PharmacySettings Settings { get; private set; } = new();
 
     private async Task LoadAsync()
     {
         await InitAsync("issue");
         LocationId = (await Catalog.MainLocationAsync()).Id;
-        CanDiscount = IsPrivate && await CanAsync(Perm.PharmApplyDiscount);
-        ValidDays = (await Catalog.SettingsAsync()).EncounterValidDays;
+        Settings = await Catalog.SettingsAsync();
+        CanDiscount = IsPrivate && Settings.DiscountEnabled && await CanAsync(Perm.PharmApplyDiscount);
+        ValidDays = Settings.EncounterValidDays;
+        DefaultMode = Settings.EffectiveDefaultMode;
+        var rights = await RightsAsync();
+        Modes = Settings.EnabledModes.Where(m => PharmacyService.ResolveMode(Settings, m, false, rights).Error is null)
+            .OrderBy(m => m == DefaultMode ? 0 : 1).ThenBy(m => (int)m).ToList();
         if (AdmissionId is long aid)
         {
             Admission = await _db.IpdAdmissions.AsNoTracking().FirstOrDefaultAsync(a => a.Id == aid);
@@ -76,7 +85,7 @@ public class IssueModel : PharmacyPageModel
     public async Task OnGetAsync()
     {
         await LoadAsync();
-        Input = new IssueInput { IdempotencyKey = Guid.NewGuid(), PatientId = PatientId ?? 0, IpdAdmissionId = Admission?.Id,
+        Input = new IssueInput { IdempotencyKey = Guid.NewGuid(), PatientId = PatientId ?? 0, IpdAdmissionId = Admission?.Id, Mode = DefaultMode,
             EncounterId = Admission is null ? EncounterId ?? Encounters.FirstOrDefault()?.Id : null };
     }
 

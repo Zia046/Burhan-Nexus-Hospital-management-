@@ -47,6 +47,8 @@ public sealed class DoctorInput
     public string? Qualification { get; set; }
     public string? Specialty { get; set; }
     public string? RegistrationNumber { get; set; }
+    /// <summary>Update 17 (null = keep the stored contact number).</summary>
+    public string? ContactNumber { get; set; }
     public int? DepartmentId { get; set; }
     public bool IsActive { get; set; } = true;
 }
@@ -238,6 +240,12 @@ public sealed partial class RegistrationSetupService : IRegistrationSetupService
         if ((i.Qualification?.Length ?? 0) > 150 || (i.Specialty?.Length ?? 0) > 100 || (i.RegistrationNumber?.Length ?? 0) > 50)
             return ServiceResult<int>.Fail("Qualification, specialty or registration number is too long.");
         if (i.DepartmentId is int dep && !await _db.Departments.AnyAsync(x => x.Id == dep, ct)) return ServiceResult<int>.Fail("Department not found.");
+        if ((i.ContactNumber?.Trim().Length ?? 0) > 30) return ServiceResult<int>.Fail("The contact number is too long (max 30).");
+        // Update 17: no duplicate doctors (same name, "Dr." / spaces / case ignored).
+        static string Norm(string n) => System.Text.RegularExpressions.Regex.Replace(n.Trim().ToUpperInvariant(), @"^(DR\.?\s*)|[\s\.]", "");
+        var norm = Norm(i.Name);
+        var names = await _db.Doctors.AsNoTracking().Where(d => d.Id != (id ?? 0)).Select(d => new { d.Id, d.Name }).ToListAsync(ct);
+        if (names.Any(d => Norm(d.Name) == norm)) return ServiceResult<int>.Fail($"A doctor named '{i.Name.Trim()}' already exists. Edit the existing doctor instead.");
         Doctor doc;
         object? old = null;
         if (id is null)
@@ -256,12 +264,13 @@ public sealed partial class RegistrationSetupService : IRegistrationSetupService
         doc.Qualification = Clean(i.Qualification);
         doc.Specialty = Clean(i.Specialty);
         doc.RegistrationNumber = Clean(i.RegistrationNumber);
+        if (i.ContactNumber is not null) doc.ContactNumber = Clean(i.ContactNumber);
         doc.DepartmentId = i.DepartmentId;
         doc.IsActive = i.IsActive;
         doc.UpdatedUtc = Now;
         await _db.SaveChangesAsync(ct);
         await _audit.LogAsync(AuditActions.DoctorSaved, "Doctor", doc.Id.ToString(), $"Doctor '{doc.Name}' {(id is null ? "added" : "updated")}", old,
-            new { doc.Name, doc.Qualification, doc.Specialty, doc.RegistrationNumber, doc.DepartmentId, doc.IsActive }, ct: ct);
+            new { doc.Name, doc.Qualification, doc.Specialty, doc.RegistrationNumber, doc.ContactNumber, doc.DepartmentId, doc.IsActive }, ct: ct);
         return ServiceResult<int>.Ok(doc.Id);
     }
 

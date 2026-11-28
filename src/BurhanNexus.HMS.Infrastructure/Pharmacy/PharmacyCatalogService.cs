@@ -62,6 +62,17 @@ public sealed class PharmacySettingsInput
     public int EncounterValidDays { get; set; } = 7;
     public int? GovernmentIssueServiceItemId { get; set; }
     public string? SlipFooter { get; set; }
+    // Update 17: Medicine Issue Configuration
+    public bool FreeIssueEnabled { get; set; }
+    public bool PaidSaleEnabled { get; set; } = true;
+    public bool SubsidyEnabled { get; set; }
+    public bool DiscountEnabled { get; set; } = true;
+    public bool FreeIssueApprovalRequired { get; set; }
+    public MedicineIssueMode? DefaultIssueMode { get; set; } = MedicineIssueMode.Paid;
+    public bool AllowChangeIssueMode { get; set; } = true;
+    public bool StockClassificationEnabled { get; set; }
+    /// <summary>False when a form without the Medicine Issue Configuration is saved – the configuration is then kept as it is.</summary>
+    public bool IssueConfigPosted { get; set; } = true;
 }
 
 /// <summary>Result of the duplicate check: medicines that look like the one being saved.</summary>
@@ -75,7 +86,8 @@ public sealed class DuplicateMedicineException : Exception
 
 public interface IPharmacyCatalogService
 {
-    /// <summary>True in Private hospital mode. Every commercial operation checks this on the server.</summary>
+    /// <summary>Update 17: true when prices are used (Paid Sale, Subsidy or Discount enabled in the Medicine Issue Configuration).
+    /// Every commercial operation checks this on the server. (The name is kept from the Government / Private pharmacy modes.)</summary>
     Task<bool> IsPrivateAsync(CancellationToken ct = default);
     Task<PharmacySettings> SettingsAsync(CancellationToken ct = default);
     Task<ServiceResult> SaveSettingsAsync(PharmacySettingsInput input, uint rowVersion, CancellationToken ct = default);
@@ -117,8 +129,27 @@ public sealed class PharmacyCatalogService : IPharmacyCatalogService
 
     internal static string? T(string? v, int max) => string.IsNullOrWhiteSpace(v) ? null : v.Trim().Length > max ? v.Trim()[..max] : v.Trim();
 
-    public async Task<bool> IsPrivateAsync(CancellationToken ct = default) =>
-        await _db.HospitalConfigurations.AsNoTracking().Select(c => c.HospitalType).FirstOrDefaultAsync(ct) == HospitalType.Private;
+    public async Task<bool> IsPrivateAsync(CancellationToken ct = default) => (await SettingsAsync(ct)).PricesUsed;
+
+    /// <summary>
+    /// Update 17: the pharmacy no longer depends on a Government / Private hospital. The stored hospital type only gives the
+    /// starting configuration: free issue (Government) or paid sale with discounts (Private). The administrator changes it later
+    /// in Pharmacy Settings → Medicine Issue Configuration.
+    /// </summary>
+    public static async Task ApplyIssuePresetAsync(HmsDbContext db, HospitalType type, CancellationToken ct = default)
+    {
+        var s = await db.PharmacySettings.FirstOrDefaultAsync(ct);
+        if (s is null) return;
+        var free = type == HospitalType.Government;
+        s.FreeIssueEnabled = free;
+        s.PaidSaleEnabled = !free;
+        s.DiscountEnabled = !free;
+        s.SubsidyEnabled = false;
+        s.FreeIssueApprovalRequired = false;
+        s.DefaultIssueMode = free ? MedicineIssueMode.Free : MedicineIssueMode.Paid;
+        s.AllowChangeIssueMode = true;
+        await db.SaveChangesAsync(ct);
+    }
 
     // =====================================================================================
     // Settings
@@ -134,17 +165,39 @@ public sealed class PharmacyCatalogService : IPharmacyCatalogService
         if (input.EncounterValidDays is < 0 or > 365) return ServiceResult.Fail("The visit validity must be between 0 and 365 days.");
         if (input.GovernmentIssueServiceItemId is int sid && !await _db.ServiceItems.AnyAsync(x => x.Id == sid && x.IsActive && x.Kind != ServiceKind.Pharmacy, ct))
             return ServiceResult.Fail("Select an active service for the pharmacy issue fee.");
+        if (!input.IssueConfigPosted)
+        {
+            var cur = await _db.PharmacySettings.AsNoTracking().FirstAsync(ct);
+            input.FreeIssueEnabled = cur.FreeIssueEnabled; input.PaidSaleEnabled = cur.PaidSaleEnabled; input.SubsidyEnabled = cur.SubsidyEnabled;
+            input.DiscountEnabled = cur.DiscountEnabled; input.FreeIssueApprovalRequired = cur.FreeIssueApprovalRequired; input.DefaultIssueMode = cur.DefaultIssueMode;
+            input.AllowChangeIssueMode = cur.AllowChangeIssueMode; input.StockClassificationEnabled = cur.StockClassificationEnabled;
+        }
+        if (!input.FreeIssueEnabled && !input.PaidSaleEnabled && !input.SubsidyEnabled && !input.DiscountEnabled)
+            return ServiceResult.Fail("Enable at least one medicine issue mode.");
+        if (input.DefaultIssueMode is not { } dm || !Enum.IsDefined(dm)) return ServiceResult.Fail("Select the default medicine issue mode.");
+        var enabled = new PharmacySettings { FreeIssueEnabled = input.FreeIssueEnabled, PaidSaleEnabled = input.PaidSaleEnabled, SubsidyEnabled = input.SubsidyEnabled, DiscountEnabled = input.DiscountEnabled };
+        if (!enabled.IsEnabled(dm)) return ServiceResult.Fail("The default issue mode must be one of the enabled modes.");
         var s = await _db.PharmacySettings.FirstAsync(ct);
         _db.Entry(s).Property(x => x.RowVersion).OriginalValue = rowVersion;
-        var old = new { s.PharmacyName, s.NearExpiryDays, s.EncounterValidDays, s.GovernmentIssueServiceItemId, s.SlipFooter };
+        var old = new { s.PharmacyName, s.NearExpiryDays, s.EncounterValidDays, s.GovernmentIssueServiceItemId, s.SlipFooter,
+            s.FreeIssueEnabled, s.PaidSaleEnabled, s.SubsidyEnabled, s.DiscountEnabled, s.FreeIssueApprovalRequired, s.DefaultIssueMode, s.AllowChangeIssueMode, s.StockClassificationEnabled };
         s.PharmacyName = T(input.PharmacyName, 150);
         s.NearExpiryDays = input.NearExpiryDays;
         s.EncounterValidDays = input.EncounterValidDays;
         s.GovernmentIssueServiceItemId = input.GovernmentIssueServiceItemId;
         s.SlipFooter = T(input.SlipFooter, 200);
+        s.FreeIssueEnabled = input.FreeIssueEnabled;
+        s.PaidSaleEnabled = input.PaidSaleEnabled;
+        s.SubsidyEnabled = input.SubsidyEnabled;
+        s.DiscountEnabled = input.DiscountEnabled;
+        s.FreeIssueApprovalRequired = input.FreeIssueApprovalRequired;
+        s.DefaultIssueMode = input.DefaultIssueMode;
+        s.AllowChangeIssueMode = input.AllowChangeIssueMode;
+        s.StockClassificationEnabled = input.StockClassificationEnabled;
         s.UpdatedUtc = _clock.UtcNow;
-        _audit.Add(AuditActions.PharmSettingsChanged, "PharmacySettings", "1", "Pharmacy settings changed", old,
-            new { s.PharmacyName, s.NearExpiryDays, s.EncounterValidDays, s.GovernmentIssueServiceItemId, s.SlipFooter });
+        _audit.Add(AuditActions.PharmSettingsChanged, "PharmacySettings", "1", "Pharmacy settings changed (incl. Medicine Issue Configuration)", old,
+            new { s.PharmacyName, s.NearExpiryDays, s.EncounterValidDays, s.GovernmentIssueServiceItemId, s.SlipFooter,
+                s.FreeIssueEnabled, s.PaidSaleEnabled, s.SubsidyEnabled, s.DiscountEnabled, s.FreeIssueApprovalRequired, s.DefaultIssueMode, s.AllowChangeIssueMode, s.StockClassificationEnabled });
         try { await _db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException) { return ServiceResult.Fail("Someone else changed the settings. Reload and try again."); }
         return ServiceResult.Ok();
@@ -325,7 +378,7 @@ public sealed class PharmacyCatalogService : IPharmacyCatalogService
 
     public async Task<ServiceResult> SetBatchSalePriceAsync(long batchId, decimal? salePrice, CancellationToken ct = default)
     {
-        if (!await IsPrivateAsync(ct)) return ServiceResult.Fail("Prices are not used in a Government hospital.");
+        if (!await IsPrivateAsync(ct)) return ServiceResult.Fail("Prices are not used – enable Paid Sale, Subsidy or Discount in the Medicine Issue Configuration.");
         if (salePrice is < 0 || salePrice is decimal sp && !FinanceMath.IsMoney(sp)) return ServiceResult.Fail("Enter a valid sale price.");
         var b = await _db.MedicineBatches.Include(x => x.Medicine).FirstOrDefaultAsync(x => x.Id == batchId, ct);
         if (b is null) return ServiceResult.Fail("Batch not found.");

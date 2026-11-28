@@ -9,7 +9,8 @@
     var hospitalName = profile?.HospitalName ?? "Burhan Nexus Hospital Management";
     string Active(string key) => nav == key ? "active" : "";
     bool Any(params string[] keys) => keys.Any(perms.Contains);
-    var isPrivate = profile?.HospitalType == HospitalType.Private;
+    // Update 17: the pharmacy retail sale follows the Medicine Issue Configuration (Paid Sale enabled), not a hospital type.
+    var isPrivate = (await Context.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Pharmacy.IPharmacyCatalogService>().SettingsAsync()).PaidSaleEnabled;
     // Phase 7.1: the system administrator keeps 11 pages in the sidebar; every other category moves to the top taskbar.
     var isAdmin = User.IsSystemAdministrator();
     var labSimple = (await Context.RequestServices.GetRequiredService<BurhanNexus.HMS.Infrastructure.Laboratory.ILabCatalogService>().SettingsAsync()).SimpleWorkflow;

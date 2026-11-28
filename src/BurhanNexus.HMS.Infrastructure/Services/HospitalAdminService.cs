@@ -215,6 +215,7 @@ public sealed class HospitalAdminService : IHospitalAdminService
             $"Hospital type changed to {type}" + (applyDefaults ? " (default rules applied)" : " (existing rules kept)"), old, RulesSnapshot(c));
         var saved = await SaveAsync(ct);
         if (saved.Succeeded && applyDefaults) await Radiology.RadiologyCatalogService.ApplyHospitalTypeDefaultsAsync(_db, type, ct);
+        if (saved.Succeeded) await Pharmacy.PharmacyCatalogService.ApplyIssuePresetAsync(_db, type, ct); // update 17: pharmacy issue preset
         return saved;
     }
 

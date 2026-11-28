@@ -215,9 +215,16 @@ public static class PermissionCatalog
                 new(PharmacyActions.ViewPatientHistory, "View Patient Medicine History", "Medicines issued to a patient"),
                 new(PharmacyActions.ViewFinancialReports, "View Pharmacy Financial Reports", "Private: prices, sales, purchases, profit and stock value"),
                 new(PharmacyActions.ManagePrices, "Manage Medicine Prices", "Private: change purchase / sale prices (history kept)"),
-                new(PharmacyActions.Settings, "Manage Pharmacy Settings", "Expiry warning period, slip text and pharmacy charges"),
+                new(PharmacyActions.Settings, "Manage Pharmacy Settings", "Expiry warning period, slip text, pharmacy charges and the Medicine Issue Configuration"),
+                // Update 17: separate rights for every medicine issue mode
+                new(PharmacyActions.FreeIssue, "Free Medicine Issue", "Issue medicines without patient charges"),
+                new(PharmacyActions.PaidSale, "Paid Medicine Sale", "Sell medicines to patients (and walk-in retail sales)"),
+                new(PharmacyActions.Subsidy, "Partial Payment / Subsidy", "Process subsidized medicine transactions"),
+                new(PharmacyActions.ChangeIssueMode, "Change Issue Mode", "Switch between the enabled medicine issue modes"),
+                new(PharmacyActions.ApproveFreeIssue, "Approve Free Issue", "Approve or reject free medicine issues (when approval is required)"),
+                new(PharmacyActions.Refund, "Refund", "Refund money for returned medicines"),
             }),
-        new(Modules_.Appointments, "Appointments", "Private hospital doctor appointments and thermal token slips", "calendar", true, "/Appointments",
+        new(Modules_.Appointments, "Appointments", "Doctor (consultant) appointments and thermal token slips", "calendar", true, "/Appointments",
             new PermissionAction[]
             {
                 new(Actions.View, "View Appointments", "Doctor-wise appointment lists and details"),
@@ -230,6 +237,7 @@ public static class PermissionCatalog
                 new(AppointmentActions.Reprint, "Reprint Appointment Slip", "Print further copies (same token)"),
                 new(AppointmentActions.Reports, "Doctor-Wise Appointment Reports", "Daily, monthly and yearly statistics per doctor"),
                 new(AppointmentActions.PrinterSettings, "Manage Printer Settings", "Thermal printer settings for workstations"),
+                new(AppointmentActions.ManageDoctors, "Manage Doctors", "Add doctors and edit their details in the doctor list (fees: administrator)"),
                 new(Actions.FinancialAccess, "See Consultation Fees", "See fee amounts in appointment screens"),
                 new(Actions.SettingsAccess, "Appointment Settings", "Slip text, appointment time and booking rules"),
                 new(Actions.Delete, "Delete", "Reserved – appointments are never deleted"),
@@ -590,6 +598,12 @@ public static class PermissionCatalog
         public const string ViewFinancialReports = "ViewFinancialReports";
         public const string ManagePrices = "ManagePrices";
         public const string Settings = "Settings";
+        public const string FreeIssue = "FreeIssue";
+        public const string PaidSale = "PaidSale";
+        public const string Subsidy = "Subsidy";
+        public const string ChangeIssueMode = "ChangeIssueMode";
+        public const string ApproveFreeIssue = "ApproveFreeIssue";
+        public const string Refund = "Refund";
     }
 
     public static class LabActions
@@ -661,6 +675,7 @@ public static class PermissionCatalog
 
     public static class AppointmentActions
     {
+        public const string ManageDoctors = "ManageDoctors";
         public const string Reprint = "Reprint";
         public const string Reports = "Reports";
         public const string PrinterSettings = "PrinterSettings";
@@ -788,6 +803,7 @@ public static class Perm
     public const string PrinterSettings = "Appointments.PrinterSettings";
     public const string AppointmentsFees = "Appointments.FinancialAccess";
     public const string AppointmentsSettings = "Appointments.SettingsAccess";
+    public const string AppointmentsManageDoctors = "Appointments.ManageDoctors";
     public const string FinanceViewOwnAccount = "Finance.ViewOwnAccount";
     public const string FinanceViewOwnReceipts = "Finance.ViewOwnReceipts";
     public const string FinanceCollect = "Finance.Collect";
@@ -982,6 +998,12 @@ public static class Perm
     public const string PharmViewFinancialReports = "Pharmacy.ViewFinancialReports";
     public const string PharmManagePrices = "Pharmacy.ManagePrices";
     public const string PharmSettings = "Pharmacy.Settings";
+    public const string PharmFreeIssue = "Pharmacy.FreeIssue";
+    public const string PharmPaidSale = "Pharmacy.PaidSale";
+    public const string PharmSubsidy = "Pharmacy.Subsidy";
+    public const string PharmChangeIssueMode = "Pharmacy.ChangeIssueMode";
+    public const string PharmApproveFreeIssue = "Pharmacy.ApproveFreeIssue";
+    public const string PharmRefund = "Pharmacy.Refund";
 
     public const string AuditView = "AuditLog.View";
     public const string AuditExport = "AuditLog.Export";

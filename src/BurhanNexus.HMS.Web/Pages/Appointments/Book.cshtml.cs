@@ -75,12 +75,15 @@ public class BookModel : HmsPageModel
         }
         else if (!string.IsNullOrWhiteSpace(Q))
         {
-            Matches = (await _patients.SearchAsync(new PatientSearchQuery { Q = Q, PageSize = 15, Routine = true })).Items;
+            Matches = (await _patients.SearchAsync(new PatientSearchQuery { Q = Q, PageSize = 15, Routine = !await CanAsync(Perm.PatientsSearch) })).Items;
         }
     }
 
     public async Task<IActionResult> OnGetAsync()
     {
+        // Update 17: New Appointment opens the registration screen with the patient search at the top.
+        if (PatientId is null && string.IsNullOrWhiteSpace(Q) && await CanAsync(Perm.PatientsAdd))
+            return Redirect("/Patients/Register?next=appointment" + (PreselectDoctor is int pd ? $"&doctor={pd}" : ""));
         await LoadAsync();
         Input.AppointmentDate = Today;
         Input.DoctorId = PreselectDoctor ?? 0;

@@ -32,7 +32,9 @@
     <div class="t-sep"></div>
     @if (Model.Issue is { } iss)
     {
-        <div class="t-title">MEDICINE ISSUE SLIP</div>
+        var em = iss.EffectiveMode;
+        <div class="t-title" data-slip-mode="@em">@(em switch { BurhanNexus.HMS.Core.Domain.MedicineIssueMode.Free => "FREE MEDICINE ISSUE SLIP", BurhanNexus.HMS.Core.Domain.MedicineIssueMode.Subsidized => "SUBSIDIZED MEDICINE SLIP", _ => "MEDICINE ISSUE SLIP" })</div>
+        @if (iss.ApprovalStatus == BurhanNexus.HMS.Core.Domain.FreeIssueApproval.Pending) { <div class="t-title">*** NOT APPROVED YET ***</div> }
         <table class="t-kv">
             <tr><td>Issue no.</td><td>@iss.Number</td></tr>
             <tr><td>Date</td><td>@Fmt.DateTimeText(iss.CreatedUtc)</td></tr>
@@ -48,7 +50,18 @@
                     <td class="r">× @i.Quantity@if (prices && i.LineTotal is decimal lt) { <br />@lt.ToString("N2") }</td></tr>
             }
         </table>
-        @if (prices && iss.NetAmount is decimal net) { <div class="t-sep"></div><table class="t-kv"><tr><td><strong>Total</strong></td><td><strong>@net.ToString("N2")</strong></td></tr></table><div class="t-tiny">Please pay at the cash counter.</div> }
+        @if (prices && iss.NetAmount is decimal net)
+        {
+            <div class="t-sep"></div><table class="t-kv">
+                @if ((iss.SubsidyAmount ?? 0) > 0 || (iss.DiscountAmount ?? 0) > 0)
+                {
+                    <tr><td>Medicine value</td><td>@((iss.TotalValue ?? iss.GrossAmount ?? 0).ToString("N2"))</td></tr>
+                    @if ((iss.DiscountAmount ?? 0) > 0) { <tr><td>Discount</td><td>@iss.DiscountAmount?.ToString("N2")</td></tr> }
+                    @if ((iss.SubsidyAmount ?? 0) > 0) { <tr><td>Subsidy</td><td>@iss.SubsidyAmount?.ToString("N2")</td></tr> }
+                }
+                <tr><td><strong>Total</strong></td><td><strong>@net.ToString("N2")</strong></td></tr></table><div class="t-tiny">Please pay at the cash counter.</div>
+        }
+        @if (em == BurhanNexus.HMS.Core.Domain.MedicineIssueMode.Free) { <div class="t-sep"></div><div class="t-tiny">Free of charge – no payment.</div> }
         <div class="t-sep"></div><div class="t-tiny">Issued by @iss.CreatedByUsername</div>
     }
     @if (Model.Sale is { } sale)
