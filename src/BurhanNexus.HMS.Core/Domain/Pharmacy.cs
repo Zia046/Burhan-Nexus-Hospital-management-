@@ -12,6 +12,15 @@ namespace BurhanNexus.HMS.Core.Domain;
 // =====================================================================================================
 
 /// <summary>Simple master lists used by the medicine catalogue.</summary>
+/// <summary>Update 17: how medicines are given to a patient (configured in Pharmacy Settings → Medicine Issue Configuration).</summary>
+public enum MedicineIssueMode { Free = 1, Paid = 2, Subsidized = 3, Discounted = 4 }
+
+/// <summary>Update 17 (optional): which stock a batch belongs to. Null = General.</summary>
+public enum MedicineStockClass { General = 1, FreeDistribution = 2, Sale = 3 }
+
+/// <summary>Update 17: approval of a free issue (only when "Free Issue Approval Required" is on).</summary>
+public enum FreeIssueApproval { Pending = 1, Approved = 2, Rejected = 3 }
+
 public enum PharmacyLookupKind { Category = 1, Manufacturer = 2, DosageForm = 3, Strength = 4, PackSize = 5, Unit = 6 }
 
 public class PharmacyLookup
@@ -132,6 +141,8 @@ public class MedicineBatch
     public decimal? UnitCost { get; set; }
     /// <summary>Private only: sale price per unit for this batch (falls back to the medicine's sale price).</summary>
     public decimal? SalePrice { get; set; }
+    /// <summary>Update 17: Free Distribution / Sale / General stock (null = General). Used only when stock classification is on.</summary>
+    public MedicineStockClass? StockClass { get; set; }
     public DateTime CreatedUtc { get; set; }
     [MaxLength(64)] public string? CreatedByUsername { get; set; }
     public uint RowVersion { get; set; }
@@ -252,12 +263,32 @@ public class PatientMedicineIssue
     public decimal? GrossAmount { get; set; }
     public decimal? DiscountAmount { get; set; }
     public decimal? NetAmount { get; set; }
+    /// <summary>Update 17: Free / Paid / Subsidized / Discounted (null on documents saved before update 17 – see <see cref="EffectiveMode"/>).</summary>
+    public MedicineIssueMode? IssueMode { get; set; }
+    /// <summary>Update 17: value of the medicines at sale price (also for free issues – never counted as revenue).</summary>
+    public decimal? TotalValue { get; set; }
+    /// <summary>Update 17: part of the value covered by subsidy / free allocation.</summary>
+    public decimal? SubsidyAmount { get; set; }
+    /// <summary>Update 17: what the patient has to pay (net after discount and subsidy).</summary>
+    public decimal? PatientAmount { get; set; }
+    [MaxLength(300)] public string? FreeReason { get; set; }
+    public FreeIssueApproval? ApprovalStatus { get; set; }
+    public int? ApprovedByUserId { get; set; }
+    [MaxLength(64)] public string? ApprovedByUsername { get; set; }
+    public DateTime? ApprovedUtc { get; set; }
+    [MaxLength(300)] public string? ApprovalNote { get; set; }
     public DateOnly BusinessDate { get; set; }
     public DateTime CreatedUtc { get; set; }
     public int? CreatedByUserId { get; set; }
     [MaxLength(64)] public string? CreatedByUsername { get; set; }
     [MaxLength(100)] public string? Workstation { get; set; }
     public List<PatientMedicineIssueItem> Items { get; set; } = new();
+
+    /// <summary>The issue mode, also for documents saved before update 17.</summary>
+    public MedicineIssueMode EffectiveMode => IssueMode ?? (Mode == HospitalType.Government ? MedicineIssueMode.Free
+        : (DiscountAmount ?? 0) > 0 ? MedicineIssueMode.Discounted : MedicineIssueMode.Paid);
+    /// <summary>Waiting for approval – stock not yet taken.</summary>
+    public bool IsPendingApproval => ApprovalStatus is FreeIssueApproval.Pending or FreeIssueApproval.Rejected;
 }
 
 public class PatientMedicineIssueItem
@@ -542,6 +573,28 @@ public class PharmacySettings
     public int? GovernmentIssueServiceItemId { get; set; }
     public ServiceItem? GovernmentIssueServiceItem { get; set; }
     [MaxLength(200)] public string? SlipFooter { get; set; } = "Please check your medicines before leaving the counter.";
+
+    // ---- Update 17: Medicine Issue Configuration (replaces the Government / Private pharmacy mode) ----
+    public bool FreeIssueEnabled { get; set; }
+    public bool PaidSaleEnabled { get; set; } = true;
+    public bool SubsidyEnabled { get; set; }
+    public bool DiscountEnabled { get; set; } = true;
+    public bool FreeIssueApprovalRequired { get; set; }
+    public MedicineIssueMode? DefaultIssueMode { get; set; } = MedicineIssueMode.Paid;
+    public bool AllowChangeIssueMode { get; set; } = true;
+    /// <summary>Optional Free Distribution / Sale / General stock. Off = everything is General stock.</summary>
+    public bool StockClassificationEnabled { get; set; }
+
+    /// <summary>Prices are used (purchase / sale prices, invoices, supplier accounts) when any paid mode is on.</summary>
+    public bool PricesUsed => PaidSaleEnabled || SubsidyEnabled || DiscountEnabled;
+    public bool IsEnabled(MedicineIssueMode m) => m switch
+    {
+        MedicineIssueMode.Free => FreeIssueEnabled, MedicineIssueMode.Paid => PaidSaleEnabled,
+        MedicineIssueMode.Subsidized => SubsidyEnabled, MedicineIssueMode.Discounted => DiscountEnabled, _ => false,
+    };
+    public IEnumerable<MedicineIssueMode> EnabledModes => Enum.GetValues<MedicineIssueMode>().Where(IsEnabled);
+    /// <summary>The default mode – the configured one if it is enabled, otherwise the first enabled mode.</summary>
+    public MedicineIssueMode? EffectiveDefaultMode => DefaultIssueMode is { } d && IsEnabled(d) ? d : EnabledModes.Cast<MedicineIssueMode?>().FirstOrDefault();
     public DateTime UpdatedUtc { get; set; }
     public uint RowVersion { get; set; }
 }

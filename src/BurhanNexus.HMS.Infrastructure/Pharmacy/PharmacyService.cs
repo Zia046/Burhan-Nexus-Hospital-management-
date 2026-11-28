@@ -43,6 +43,8 @@ public sealed class ReceiveInput
     public decimal DiscountAmount { get; set; }
     public decimal AdditionalCharges { get; set; }
     public string? Notes { get; set; }
+    /// <summary>Update 17 (stock classification on): Free Distribution / Sale / General stock for new batches.</summary>
+    public MedicineStockClass? StockClass { get; set; }
     public List<ReceiveLineInput> Lines { get; set; } = new();
 }
 
@@ -55,6 +57,13 @@ public sealed class IssueInput
     public long? IpdAdmissionId { get; set; }
     public string? Notes { get; set; }
     public string? DiscountReason { get; set; }
+    /// <summary>Update 17: Free / Paid / Subsidized / Discounted – null = the configured default mode.</summary>
+    public MedicineIssueMode? Mode { get; set; }
+    /// <summary>Update 17: reason for a free issue (required when free is not the default mode).</summary>
+    public string? FreeReason { get; set; }
+    /// <summary>Update 17: Subsidized mode – the part of the amount covered by subsidy / free allocation.</summary>
+    public decimal SubsidyAmount { get; set; }
+    public string? SubsidyReason { get; set; }
     public List<StockLineInput> Lines { get; set; } = new();
 }
 
@@ -135,7 +144,9 @@ public sealed class SupplierPaymentInput
 }
 
 /// <summary>What the signed-in user may do (checked by the page, enforced again here).</summary>
-public sealed record PharmacyRights(bool SelectBatch = false, bool Discount = false, bool ManagePurchases = false, bool ManagePrices = false, bool ApproveAdjustments = false);
+public sealed record PharmacyRights(bool SelectBatch = false, bool Discount = false, bool ManagePurchases = false, bool ManagePrices = false, bool ApproveAdjustments = false,
+    // Update 17: separate rights for every medicine issue mode
+    bool FreeIssue = false, bool PaidSale = false, bool Subsidy = false, bool ChangeIssueMode = false, bool ApproveFreeIssue = false);
 
 public sealed record DocumentResult(long Id, string Number, bool WasDuplicate);
 
@@ -151,6 +162,10 @@ public interface IPharmacyService
     Task<ServiceResult<DocumentResult>> ReturnIssueAsync(long issueId, ReturnInput input, CancellationToken ct = default);
     Task<ServiceResult<DocumentResult>> ReturnToSupplierAsync(SupplierReturnInput input, CancellationToken ct = default);
     Task<ServiceResult<DocumentResult>> PaySupplierAsync(SupplierPaymentInput input, CancellationToken ct = default);
+    /// <summary>Update 17: approve (stock is taken now) or reject a free issue waiting for approval.</summary>
+    Task<ServiceResult> DecideFreeIssueAsync(long issueId, bool approve, string? note, PharmacyRights rights, CancellationToken ct = default);
+    /// <summary>Update 17: change the stock class of a batch (administrator / pharmacy settings).</summary>
+    Task<ServiceResult> SetBatchClassAsync(long batchId, MedicineStockClass? stockClass, CancellationToken ct = default);
 }
 
 public sealed class PharmacyService : IPharmacyService
@@ -232,7 +247,7 @@ public sealed class PharmacyService : IPharmacyService
 
     /// <summary>Allocates batches for all lines and prices them (Private). Returns errors instead of throwing.</summary>
     private async Task<(List<Priced> Lines, List<string> Errors)> PrepareAsync(int locationId, IReadOnlyList<StockLineInput> input, bool priced,
-        PharmacyRights rights, string? discountReason, DateOnly today, CancellationToken ct)
+        PharmacyRights rights, string? discountReason, DateOnly today, CancellationToken ct, IReadOnlyCollection<MedicineStockClass>? classes = null)
     {
         var errors = new List<string>();
         var lines = input.Where(l => l.MedicineId > 0).ToList();
@@ -248,7 +263,7 @@ public sealed class PharmacyService : IPharmacyService
             if (!m.IsActive) { errors.Add($"{m.Name} is inactive."); continue; }
             if (l.Quantity is <= 0 or > 1_000_000) { errors.Add($"Enter a valid quantity for {m.Name}."); continue; }
             if (l.Discount != 0 && !priced) { errors.Add("Discounts are not used here."); continue; }
-            var (alloc, error) = await StockEngine.AllocateAsync(_db, locationId, m, l.Quantity, l.BatchId, rights.SelectBatch, today, ct);
+            var (alloc, error) = await StockEngine.AllocateAsync(_db, locationId, m, l.Quantity, l.BatchId, rights.SelectBatch, today, ct, classes);
             if (error is not null) { errors.Add(error); continue; }
             if (!priced)
             {
@@ -314,6 +329,8 @@ public sealed class PharmacyService : IPharmacyService
             {
                 if (input.IdempotencyKey == Guid.Empty) return Fail("The form has expired. Please reload the page.");
                 var isPrivate = await _catalog.IsPrivateAsync(ct);
+                var pharmSettings = await _catalog.SettingsAsync(ct);
+                MedicineStockClass? stockClass = pharmSettings.StockClassificationEnabled && input.StockClass is { } sc && Enum.IsDefined(sc) && sc != MedicineStockClass.General ? sc : null;
                 var today = await _clock.TodayAsync();
                 var errors = new List<string>();
                 Supplier? supplier = null;
@@ -332,7 +349,7 @@ public sealed class PharmacyService : IPharmacyService
                 // Prices: Private only, and only for users who manage purchases. Government receiving never stores prices.
                 var withPrices = isPrivate && rights.ManagePurchases;
                 var anyPrice = input.Lines.Any(l => l.UnitCost is not null and not 0 || l.SalePrice is not null || l.Discount is not null and not 0) || input.DiscountAmount != 0 || input.AdditionalCharges != 0;
-                if (anyPrice && !isPrivate) errors.Add("Purchase and sale prices are not used in a Government hospital.");
+                if (anyPrice && !isPrivate) errors.Add("Purchase and sale prices are not used (Free Issue only – enable Paid Sale, Subsidy or Discount in the Medicine Issue Configuration).");
                 else if (anyPrice && !withPrices) errors.Add("You may receive stock, but entering purchase amounts needs the “Manage Purchases” permission.");
                 if (input.Lines.Any(l => l.SalePrice is not null) && !rights.ManagePrices) errors.Add("Setting a sale price needs the “Manage Medicine Prices” permission.");
                 var lines = input.Lines.Where(l => l.MedicineId > 0).ToList();
@@ -402,6 +419,7 @@ public sealed class PharmacyService : IPharmacyService
                             MedicineId = m.Id, BatchNumber = bn, ExpiryDate = l.ExpiryDate!.Value, ManufactureDate = l.ManufactureDate, SupplierId = supplier?.Id,
                             UnitCost = withPrices ? l.UnitCost : isPrivate ? m.PurchasePrice : null,
                             SalePrice = withPrices && l.SalePrice is not null && l.SalePrice != m.SalePrice ? l.SalePrice : null,
+                            StockClass = stockClass, // update 17
                             CreatedUtc = now, CreatedByUsername = _ctx.Username
                         };
                         _db.MedicineBatches.Add(batch);
@@ -463,6 +481,44 @@ public sealed class PharmacyService : IPharmacyService
     // Issue to a registered patient
     // =====================================================================================
 
+    public static string StockClassLabel(MedicineStockClass? c) => StockEngine.ClassLabel(c);
+
+    public static string ModeLabel(MedicineIssueMode m) => m switch
+    {
+        MedicineIssueMode.Free => "Free Issue", MedicineIssueMode.Paid => "Paid Sale", MedicineIssueMode.Subsidized => "Partial Payment / Subsidy",
+        MedicineIssueMode.Discounted => "Discount", _ => m.ToString(),
+    };
+
+    /// <summary>
+    /// Update 17: decides the issue mode on the server – enabled in the Medicine Issue Configuration, allowed for the user,
+    /// and the default unless the user may change it. Paid ↔ Discount is not a "mode change" (a discount needs the discount right).
+    /// </summary>
+    internal static (MedicineIssueMode? Mode, string? Error) ResolveMode(PharmacySettings settings, MedicineIssueMode? requested, bool hasDiscount, PharmacyRights rights)
+    {
+        var def = settings.EffectiveDefaultMode;
+        if (def is null) return (null, "No medicine issue mode is enabled. Ask the administrator (Pharmacy Settings → Medicine Issue Configuration).");
+        var mode = requested ?? def.Value;
+        if (!Enum.IsDefined(mode)) return (null, "Select the medicine issue mode.");
+        if (mode == MedicineIssueMode.Paid && hasDiscount) mode = MedicineIssueMode.Discounted;
+        if (!settings.IsEnabled(mode)) return (null, $"{ModeLabel(mode)} is disabled in the Medicine Issue Configuration.");
+        static int Family(MedicineIssueMode m) => m is MedicineIssueMode.Paid or MedicineIssueMode.Discounted ? 2 : (int)m;
+        if (Family(mode) != Family(def.Value) && !(settings.AllowChangeIssueMode && rights.ChangeIssueMode))
+            return (null, $"The issue mode is {ModeLabel(def.Value)}. Changing it to {ModeLabel(mode)} needs the “Change Issue Mode” permission" +
+                          (settings.AllowChangeIssueMode ? "." : " and must be allowed in the Medicine Issue Configuration."));
+        var allowed = mode switch
+        {
+            MedicineIssueMode.Free => rights.FreeIssue,
+            MedicineIssueMode.Paid => rights.PaidSale,
+            MedicineIssueMode.Subsidized => rights.Subsidy,
+            MedicineIssueMode.Discounted => rights.PaidSale && rights.Discount,
+            _ => false,
+        };
+        if (!allowed) return (null, $"You are not allowed to use {ModeLabel(mode)}.");
+        return (mode, null);
+    }
+
+    private static decimal ValueOf(Priced l) => R((l.Batch.SalePrice ?? l.Medicine.SalePrice ?? 0) * l.Quantity);
+
     public Task<ServiceResult<DocumentResult>> IssueAsync(IssueInput input, PharmacyRights rights, CancellationToken ct = default) =>
         RunAsync("UX_PatientMedicineIssues_Idempotency",
             async () => await _db.PatientMedicineIssues.AsNoTracking().Where(r => r.IdempotencyKey == input.IdempotencyKey && input.IdempotencyKey != Guid.Empty)
@@ -470,8 +526,12 @@ public sealed class PharmacyService : IPharmacyService
             async () =>
             {
                 if (input.IdempotencyKey == Guid.Empty) return Fail("The form has expired. Please reload the page.");
-                var isPrivate = await _catalog.IsPrivateAsync(ct);
                 var settings = await _catalog.SettingsAsync(ct);
+                var (resolved, modeError) = ResolveMode(settings, input.Mode, input.Lines.Any(l => l.Discount != 0), rights);
+                if (modeError is not null) return Fail(modeError);
+                var mode = resolved!.Value;
+                var free = mode == MedicineIssueMode.Free;
+                var priced = !free; // free issue: no prices on the document and no charge (the value is kept for reports only)
                 var today = await _clock.TodayAsync();
                 var errors = new List<string>();
                 var patient = await _db.Patients.AsNoTracking().FirstOrDefaultAsync(p => p.Id == input.PatientId, ct);
@@ -489,55 +549,83 @@ public sealed class PharmacyService : IPharmacyService
                         && (a.Status == AdmissionStatus.Registered || a.Status == AdmissionStatus.Admitted || a.Status == AdmissionStatus.UnderTreatment
                             || a.Status == AdmissionStatus.Transferred || a.Status == AdmissionStatus.DischargeRequested), ct))
                     errors.Add("The selected admission is not an active admission of this patient.");
-                if (!isPrivate && input.IpdAdmissionId is null)
+                if (free && input.IpdAdmissionId is null)
                 {
-                    // Government: only for a registered OPD / Emergency visit (or an inpatient admission), never for walk-ins.
-                    if (input.EncounterId is null) errors.Add("Select the patient's OPD or Emergency visit. Medicines are only issued against a registered visit.");
+                    // Free issue: only for a registered OPD / Emergency visit (or an inpatient admission), never for walk-ins.
+                    if (input.EncounterId is null) errors.Add("Select the patient's OPD or Emergency visit. Free medicines are only issued against a registered visit.");
                     else if (encounter is not null && encounter.EncounterDate < today.AddDays(-settings.EncounterValidDays))
                         errors.Add($"Visit {encounter.EncounterNumber} of {encounter.EncounterDate:dd MMM yyyy} is older than {settings.EncounterValidDays} day(s). Register a new OPD / Emergency visit.");
-                    if (input.Lines.Any(l => l.Discount != 0)) errors.Add("Discounts are not used in a Government hospital.");
                 }
+                if (free && input.Lines.Any(l => l.Discount != 0)) errors.Add("Discounts are not used with Free Issue.");
+                var freeReason = T(input.FreeReason, 300);
+                if (free && settings.EffectiveDefaultMode != MedicineIssueMode.Free && freeReason is null)
+                    errors.Add("Enter the reason for the free issue.");
+                var subsidy = mode == MedicineIssueMode.Subsidized ? input.SubsidyAmount : 0;
+                if (mode == MedicineIssueMode.Subsidized && (subsidy <= 0 || !FinanceMath.IsMoney(subsidy))) errors.Add("Enter the subsidy amount (the part not paid by the patient).");
+                if (mode != MedicineIssueMode.Subsidized && input.SubsidyAmount != 0) errors.Add("A subsidy is only used with Partial Payment / Subsidy.");
+                if (input.Lines.Any(l => l.Discount != 0) && !settings.DiscountEnabled) errors.Add("Discounts are disabled in the Medicine Issue Configuration.");
                 if (errors.Count > 0) return Fail(errors);
                 var location = await MainAsync(ct);
-                var (lines, lineErrors) = await PrepareAsync(location.Id, input.Lines, isPrivate, rights, input.DiscountReason, today, ct);
+                var (lines, lineErrors) = await PrepareAsync(location.Id, input.Lines, priced, rights, input.DiscountReason, today, ct, StockEngine.ClassesFor(settings, free));
                 if (lineErrors.Count > 0) return Fail(lineErrors);
+                var gross = priced ? lines.Sum(l => R(l.UnitPrice!.Value * l.Quantity)) : lines.Sum(ValueOf);
+                var afterDiscount = priced ? lines.Sum(l => l.LineTotal ?? 0) : 0;
+                if (mode == MedicineIssueMode.Subsidized && subsidy > afterDiscount) return Fail($"The subsidy cannot be more than the amount ({afterDiscount:N2}).");
+                var pending = free && settings.FreeIssueApprovalRequired && !rights.ApproveFreeIssue;
 
                 var now = _clock.UtcNow;
                 var issue = new PatientMedicineIssue
                 {
                     Number = await NumberAsync(HmsDbContext.MedicineIssueSequence, "ISS", today, ct), IdempotencyKey = input.IdempotencyKey,
-                    Mode = isPrivate ? HospitalType.Private : HospitalType.Government, PatientId = patient.Id, EncounterId = encounter?.Id, LocationId = location.Id, IpdAdmissionId = input.IpdAdmissionId,
+                    Mode = priced ? HospitalType.Private : HospitalType.Government, IssueMode = mode,
+                    PatientId = patient.Id, EncounterId = encounter?.Id, LocationId = location.Id, IpdAdmissionId = input.IpdAdmissionId,
                     Notes = T(input.Notes, 500), BusinessDate = today, CreatedUtc = now, CreatedByUserId = _ctx.UserId, CreatedByUsername = _ctx.Username,
-                    Workstation = T(_ctx.Workstation, 100)
+                    Workstation = T(_ctx.Workstation, 100), TotalValue = gross, FreeReason = free ? freeReason : null,
+                    ApprovalStatus = !free || !settings.FreeIssueApprovalRequired ? null : pending ? FreeIssueApproval.Pending : FreeIssueApproval.Approved,
                 };
+                if (issue.ApprovalStatus == FreeIssueApproval.Approved) { issue.ApprovedByUserId = _ctx.UserId; issue.ApprovedByUsername = _ctx.Username; issue.ApprovedUtc = now; }
                 foreach (var l in lines)
                     issue.Items.Add(new PatientMedicineIssueItem
                     {
                         MedicineId = l.Medicine.Id, BatchId = l.Batch.Id, MedicineName = l.Medicine.DisplayName, BatchNumber = l.Batch.BatchNumber, ExpiryDate = l.Batch.ExpiryDate,
                         Quantity = l.Quantity, Instructions = l.Instructions, FefoOverridden = l.FefoOverridden,
-                        UnitPrice = l.UnitPrice, UnitCost = isPrivate ? l.UnitCost : null, Discount = isPrivate ? l.Discount : null, LineTotal = l.LineTotal
+                        UnitPrice = l.UnitPrice, UnitCost = priced ? l.UnitCost : null, Discount = priced ? l.Discount : null, LineTotal = l.LineTotal
                     });
-                if (isPrivate)
+                if (priced)
                 {
-                    issue.GrossAmount = issue.Items.Sum(i => R(i.UnitPrice!.Value * i.Quantity));
+                    issue.GrossAmount = gross;
                     issue.DiscountAmount = issue.Items.Sum(i => i.Discount ?? 0);
-                    issue.NetAmount = issue.Items.Sum(i => i.LineTotal ?? 0);
+                    issue.SubsidyAmount = mode == MedicineIssueMode.Subsidized ? subsidy : null;
+                    issue.NetAmount = afterDiscount - subsidy;   // what the patient pays (collected revenue)
+                    issue.PatientAmount = issue.NetAmount;
                 }
+                else issue.PatientAmount = 0;
                 _db.PatientMedicineIssues.Add(issue);
                 await _db.SaveChangesAsync(ct);
-                foreach (var i in issue.Items)
-                    if (await PostAsync(new StockMove(InventoryTxnType.PatientIssue, location.Id, i.MedicineId, i.BatchId, -i.Quantity, "ISS", issue.Id, issue.Number,
-                            UnitCost: i.UnitCost, UnitPrice: i.UnitPrice, PatientId: patient.Id), today, ct) is { } err) return Fail(err);
+                if (!pending)
+                    foreach (var i in issue.Items)
+                        if (await PostAsync(new StockMove(InventoryTxnType.PatientIssue, location.Id, i.MedicineId, i.BatchId, -i.Quantity, "ISS", issue.Id, issue.Number,
+                                UnitCost: i.UnitCost, UnitPrice: i.UnitPrice, PatientId: patient.Id), today, ct) is { } err) return Fail(err);
 
-                // Money: Private → one Phase 3 charge per line (paid at the cash counter). Government → optional fixed issue fee.
-                if (isPrivate)
+                // Money: paid modes → one Phase 3 charge per line (paid at the cash counter); the subsidy is a separate reduction.
+                // Free → no medicine charge (optional fixed issue fee, as before).
+                if (priced)
                 {
                     var svc = await _db.ServiceItems.AsNoTracking().FirstAsync(s => s.Id == settings.MedicineServiceItemId, ct);
-                    foreach (var i in issue.Items)
+                    var subsidyLeft = subsidy;
+                    var items = issue.Items.ToList();
+                    for (var n = 0; n < items.Count; n++)
                     {
-                        var gross = R(i.UnitPrice!.Value * i.Quantity);
-                        var charge = await NewChargeAsync(svc, patient.Id, encounter?.Id, $"{i.MedicineName} × {i.Quantity}", gross, i.Discount ?? 0,
-                            i.Discount > 0 ? T(input.DiscountReason, 200) : null, today, now, ct);
+                        var i = items[n];
+                        var lineGross = R(i.UnitPrice!.Value * i.Quantity);
+                        var lineNet = lineGross - (i.Discount ?? 0);
+                        var lineSubsidy = subsidy == 0 ? 0 : n == items.Count - 1 ? subsidyLeft : afterDiscount == 0 ? 0 : Math.Min(subsidyLeft, R(subsidy * lineNet / afterDiscount));
+                        subsidyLeft -= lineSubsidy;
+                        var reason = lineSubsidy > 0
+                            ? $"Subsidy {lineSubsidy:N2}" + (T(input.SubsidyReason, 150) is { } sr ? $" – {sr}" : "") + (i.Discount > 0 ? $"; discount {i.Discount:N2} – {T(input.DiscountReason, 100)}" : "")
+                            : i.Discount > 0 ? T(input.DiscountReason, 200) : null;
+                        var charge = await NewChargeAsync(svc, patient.Id, encounter?.Id, $"{i.MedicineName} × {i.Quantity}", lineGross, (i.Discount ?? 0) + lineSubsidy,
+                            reason, today, now, ct);
                         charge.PharmacyIssueId = issue.Id;
                         charge.IpdAdmissionId = input.IpdAdmissionId;
                         if (input.IpdAdmissionId is not null) charge.AllowPartialPayment = true; // update 11: like every IPD charge (part payments on the admission account)
@@ -548,26 +636,78 @@ public sealed class PharmacyService : IPharmacyService
                         i.ChargeId = charge.Id;
                     }
                 }
-                else if (settings.GovernmentIssueServiceItemId is int govSvc)
-                {
-                    var svc = await _db.ServiceItems.AsNoTracking().FirstAsync(s => s.Id == govSvc, ct);
-                    var fee = await _finance.FeeOnAsync(svc.Id, today, ct);
-                    if (fee > 0)
-                    {
-                        var charge = await NewChargeAsync(svc, patient.Id, encounter?.Id, svc.Name, fee, 0, null, today, now, ct);
-                        charge.PharmacyIssueId = issue.Id;
-                        charge.IpdAdmissionId = input.IpdAdmissionId;
-                        if (input.IpdAdmissionId is not null) charge.AllowPartialPayment = true; // update 11: like every IPD charge (part payments on the admission account)
-                        _db.Charges.Add(charge);
-                    }
-                }
+                else if (!pending && settings.GovernmentIssueServiceItemId is int govSvc)
+                    await AddIssueFeeAsync(issue, govSvc, encounter?.Id, today, now, ct);
                 AuditFefo(issue.Number, lines);
                 _audit.Add(AuditActions.PharmMedicineIssued, "PatientMedicineIssue", issue.Number,
-                    $"{issue.Number}: {issue.Items.Count} medicine line(s) issued to {patient.PatientNumber}{(encounter is null ? "" : $" ({encounter.EncounterNumber})")}" +
-                    (issue.NetAmount is decimal n ? $", amount {n:N2}" : ""),
-                    newValues: new { issue.Number, Items = issue.Items.Select(i => new { i.MedicineName, i.BatchNumber, i.Quantity, i.UnitPrice }) });
+                    $"{issue.Number} ({ModeLabel(mode)}{(pending ? ", waiting for approval" : "")}): {issue.Items.Count} medicine line(s) to {patient.PatientNumber}{(encounter is null ? "" : $" ({encounter.EncounterNumber})")}" +
+                    (priced ? $", value {gross:N2}, patient pays {issue.NetAmount:N2}" + (subsidy > 0 ? $", subsidy {subsidy:N2}" : "") : $", free value {gross:N2}"),
+                    newValues: new { issue.Number, Mode = mode.ToString(), issue.TotalValue, issue.DiscountAmount, issue.SubsidyAmount, issue.NetAmount, issue.FreeReason,
+                        Items = issue.Items.Select(i => new { i.MedicineName, i.BatchNumber, i.Quantity, i.UnitPrice }) });
                 return ServiceResult<DocumentResult>.Ok(new DocumentResult(issue.Id, issue.Number, false));
             }, ct);
+
+    private async Task AddIssueFeeAsync(PatientMedicineIssue issue, int serviceId, long? encounterId, DateOnly today, DateTime now, CancellationToken ct)
+    {
+        var svc = await _db.ServiceItems.AsNoTracking().FirstAsync(s => s.Id == serviceId, ct);
+        var fee = await _finance.FeeOnAsync(svc.Id, today, ct);
+        if (fee <= 0) return;
+        var charge = await NewChargeAsync(svc, issue.PatientId, encounterId, svc.Name, fee, 0, null, today, now, ct);
+        charge.PharmacyIssueId = issue.Id;
+        charge.IpdAdmissionId = issue.IpdAdmissionId;
+        if (issue.IpdAdmissionId is not null) charge.AllowPartialPayment = true; // update 11: like every IPD charge (part payments on the admission account)
+        _db.Charges.Add(charge);
+    }
+
+    public async Task<ServiceResult> DecideFreeIssueAsync(long issueId, bool approve, string? note, PharmacyRights rights, CancellationToken ct = default)
+    {
+        if (!rights.ApproveFreeIssue) return ServiceResult.Fail("You are not allowed to approve free medicine issues.");
+        var r = await RunAsync("UX_PatientMedicineIssues_Idempotency", () => Task.FromResult<DocumentResult?>(null), async () =>
+        {
+            var issue = await _db.PatientMedicineIssues.Include(i => i.Items).FirstOrDefaultAsync(i => i.Id == issueId, ct);
+            if (issue is null) return Fail("Issue not found.");
+            if (issue.ApprovalStatus != FreeIssueApproval.Pending) return Fail($"{issue.Number} is not waiting for approval.");
+            var today = await _clock.TodayAsync();
+            var now = _clock.UtcNow;
+            issue.ApprovalStatus = approve ? FreeIssueApproval.Approved : FreeIssueApproval.Rejected;
+            issue.ApprovedByUserId = _ctx.UserId;
+            issue.ApprovedByUsername = _ctx.Username;
+            issue.ApprovedUtc = now;
+            issue.ApprovalNote = T(note, 300);
+            if (approve)
+            {
+                // The stock is taken now (it may have been used by others meanwhile – then the approval fails and nothing changes).
+                foreach (var i in issue.Items)
+                {
+                    if (StockEngine.IsExpired(i.ExpiryDate, today)) return Fail($"{i.MedicineName} batch {i.BatchNumber} has expired. Reject this issue and issue again.");
+                    if (await PostAsync(new StockMove(InventoryTxnType.PatientIssue, issue.LocationId, i.MedicineId, i.BatchId, -i.Quantity, "ISS", issue.Id, issue.Number,
+                            PatientId: issue.PatientId), today, ct) is { } err) return Fail(err);
+                }
+                var settings = await _catalog.SettingsAsync(ct);
+                if (settings.GovernmentIssueServiceItemId is int govSvc) await AddIssueFeeAsync(issue, govSvc, issue.EncounterId, today, now, ct);
+            }
+            _audit.Add(approve ? AuditActions.PharmFreeIssueApproved : AuditActions.PharmFreeIssueRejected, "PatientMedicineIssue", issue.Number,
+                $"Free issue {issue.Number} {(approve ? "approved – stock taken" : "rejected – no stock taken")}" + (issue.ApprovalNote is { } n ? $": {n}" : ""));
+            return ServiceResult<DocumentResult>.Ok(new DocumentResult(issue.Id, issue.Number, false));
+        }, ct);
+        return r.Succeeded ? ServiceResult.Ok() : ServiceResult.Fail(r.Errors.ToArray());
+    }
+
+    public async Task<ServiceResult> SetBatchClassAsync(long batchId, MedicineStockClass? stockClass, CancellationToken ct = default)
+    {
+        if (stockClass is { } c && !Enum.IsDefined(c)) return ServiceResult.Fail("Select the stock class.");
+        var b = await _db.MedicineBatches.Include(x => x.Medicine).FirstOrDefaultAsync(x => x.Id == batchId, ct);
+        if (b is null) return ServiceResult.Fail("Batch not found.");
+        var value = stockClass == MedicineStockClass.General ? null : stockClass;
+        if (b.StockClass == value) return ServiceResult.Ok();
+        var old = StockEngine.ClassLabel(b.StockClass);
+        b.StockClass = value;
+        _audit.Add(AuditActions.PharmStockClassChanged, "MedicineBatch", b.BatchNumber,
+            $"{b.Medicine?.Name} batch {b.BatchNumber}: {old} → {StockEngine.ClassLabel(value)}", new { StockClass = old }, new { StockClass = StockEngine.ClassLabel(value) });
+        try { await _db.SaveChangesAsync(ct); }
+        catch (DbUpdateConcurrencyException) { return ServiceResult.Fail("The batch was changed by someone else. Reload and try again."); }
+        return ServiceResult.Ok();
+    }
 
     private async Task<Charge> NewChargeAsync(ServiceItem svc, long? patientId, long? encounterId, string name, decimal fee, decimal discount, string? discountReason,
         DateOnly today, DateTime now, CancellationToken ct) => new()
@@ -591,13 +731,15 @@ public sealed class PharmacyService : IPharmacyService
             async () =>
             {
                 if (input.IdempotencyKey == Guid.Empty) return Fail("The form has expired. Please reload the page.");
-                if (!await _catalog.IsPrivateAsync(ct)) return Fail("Retail sales are only available in a Private hospital.");
                 var settings = await _catalog.SettingsAsync(ct);
+                if (!settings.PaidSaleEnabled) return Fail("Paid Sale is disabled in the Medicine Issue Configuration."); // update 17
+                if (!rights.PaidSale) return Fail("You are not allowed to sell medicines (Paid Medicine Sale).");
+                if (input.Lines.Any(l => l.Discount != 0) && !settings.DiscountEnabled) return Fail("Discounts are disabled in the Medicine Issue Configuration.");
                 if (!await _db.Counters.AnyAsync(c => c.Id == input.CounterId && c.IsActive, ct)) return Fail("Select the cash counter.");
                 if (!await _db.PaymentMethods.AnyAsync(m => m.Id == input.PaymentMethodId && m.IsActive, ct)) return Fail("Select the payment method.");
                 var today = await _clock.TodayAsync();
                 var location = await MainAsync(ct);
-                var (lines, errors) = await PrepareAsync(location.Id, input.Lines, true, rights, input.DiscountReason, today, ct);
+                var (lines, errors) = await PrepareAsync(location.Id, input.Lines, true, rights, input.DiscountReason, today, ct, StockEngine.ClassesFor(settings, free: false));
                 if (errors.Count > 0) return Fail(errors);
                 var now = _clock.UtcNow;
                 var sale = new PharmacySale
@@ -801,8 +943,7 @@ public sealed class PharmacyService : IPharmacyService
             async () =>
             {
                 if (ValidateReturn(input, out var reason) is { } v) return Fail(v);
-                if (!await _catalog.IsPrivateAsync(ct)) return Fail("Retail sales are only available in a Private hospital.");
-                var sale = await _db.PharmacySales.Include(s => s.Items).FirstOrDefaultAsync(s => s.Id == saleId, ct);
+                var sale = await _db.PharmacySales.Include(s => s.Items).FirstOrDefaultAsync(s => s.Id == saleId, ct); // update 17: returns of old sales stay possible
                 if (sale is null) return Fail("Sale not found.");
                 if (sale.ReceiptId is null) return Fail("This sale has no receipt to refund.");
                 if (input.RefundPaymentMethodId is null) return Fail("Select how the money is refunded.");
@@ -858,6 +999,7 @@ public sealed class PharmacyService : IPharmacyService
                 if (ValidateReturn(input, out var reason) is { } v) return Fail(v);
                 var issue = await _db.PatientMedicineIssues.Include(s => s.Items).FirstOrDefaultAsync(s => s.Id == issueId, ct);
                 if (issue is null) return Fail("Issue not found.");
+                if (issue.IsPendingApproval) return Fail($"{issue.Number} was not approved – no stock was taken, nothing to return."); // update 17
                 var today = await _clock.TodayAsync();
                 var now = _clock.UtcNow;
                 var ret = new MedicineReturn
@@ -997,7 +1139,7 @@ public sealed class PharmacyService : IPharmacyService
             async () =>
             {
                 if (input.IdempotencyKey == Guid.Empty) return Fail("The form has expired. Please reload the page.");
-                if (!await _catalog.IsPrivateAsync(ct)) return Fail("Supplier accounts are only used in a Private hospital.");
+                if (!await _catalog.IsPrivateAsync(ct)) return Fail("Supplier accounts are used only when prices are used (Paid Sale, Subsidy or Discount enabled).");
                 var supplier = await _db.Suppliers.AsNoTracking().FirstOrDefaultAsync(s => s.Id == input.SupplierId, ct);
                 if (supplier is null) return Fail("Supplier not found.");
                 if (input.Amount <= 0 || !FinanceMath.IsMoney(input.Amount)) return Fail("Enter the amount paid.");

@@ -18,14 +18,32 @@ public class RegisterModel : HmsPageModel
     [BindProperty(SupportsGet = true)] public string? Next { get; set; }
 
     public IReadOnlyList<DuplicateCandidate> Duplicates { get; private set; } = Array.Empty<DuplicateCandidate>();
+    /// <summary>Update 17: the patient search bar at the top (New Appointment / OPD): Patient ID (MR no.) or name.</summary>
+    [BindProperty(SupportsGet = true, Name = "q")] public string? Q { get; set; }
+    public IReadOnlyList<PatientListItem> Matches { get; private set; } = Array.Empty<PatientListItem>();
+    public bool Searched => !string.IsNullOrWhiteSpace(Q);
+    public bool SearchMode => Next is "appointment" or "opd" or "consultant";
 
-    public void OnGet(string? name, string? mobile, string? cnic)
+    public async Task OnGetAsync(string? name, string? mobile, string? cnic)
     {
-        ViewData["Nav"] = "patient-register";
+        ViewData["Nav"] = Next == "appointment" ? "appointment-book" : "patient-register";
         Patient.FullName = name;
         Patient.MobileNumber = mobile;
         Patient.Cnic = cnic;
+        if (SearchMode && Searched)
+        {
+            Matches = (await _patients.SearchAsync(new PatientSearchQuery { Q = Q!.Trim(), PageSize = 20, Routine = !await CanAsync(Perm.PatientsSearch) })).Items;
+            // No match by name: the name is carried into the new registration form.
+            if (Matches.Count == 0 && !Q.Any(char.IsDigit)) Patient.FullName ??= Q.Trim();
+        }
     }
+
+    /// <summary>Where "Select" takes an existing patient (no second registration).</summary>
+    public string SelectUrl(long patientId) => Next switch
+    {
+        "opd" => $"/Opd/Register?patientId={patientId}",
+        _ => $"/Appointments/Book?patientId={patientId}",
+    };
 
     public async Task<IActionResult> OnPostAsync()
     {

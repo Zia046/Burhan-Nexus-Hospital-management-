@@ -8,19 +8,38 @@
 {
     <form method="post" class="card">
         <input type="hidden" asp-for="RowVersion" />
-        <div class="card-header"><h2><svg class="icon"><use href="#i-settings" /></svg> Pharmacy settings</h2><span class="pill">@(Model.IsPrivate ? "Private hospital" : "Government hospital")</span></div>
+        <div class="card-header"><h2><svg class="icon"><use href="#i-settings" /></svg> Pharmacy settings</h2></div>
         <div class="card-body form-grid">
             <div class="field span-2"><label for="Input_PharmacyName">Pharmacy name on slips</label><input asp-for="Input.PharmacyName" maxlength="150" placeholder="empty = hospital name" /></div>
             <div class="field"><label for="Input_NearExpiryDays">Near-expiry warning (days)</label><input asp-for="Input.NearExpiryDays" type="number" min="1" max="730" /></div>
             <div class="field"><label for="Input_EncounterValidDays">Visit valid for issue (days)</label><input asp-for="Input.EncounterValidDays" type="number" min="0" max="365" />
-                <small class="muted">Government: medicines only against an OPD / Emergency visit from the last N days.</small></div>
-            @if (!Model.IsPrivate)
+                <small class="muted">Free Issue: medicines only against an OPD / Emergency visit from the last N days.</small></div>
+            @if (Model.Settings.FreeIssueEnabled)
             {
                 <div class="field span-2"><label for="Input_GovernmentIssueServiceItemId">Pharmacy fee per issue (optional)</label>
-                    <select asp-for="Input.GovernmentIssueServiceItemId"><option value="">No fee – medicines are free</option>@foreach (var s in Model.Services) { <option value="@s.Item.Id">@s.Item.Name (@(s.CurrentFee == 0 ? "free" : s.CurrentFee.ToString("N2")))</option> }</select>
-                    <small class="muted">Uses the Phase 3 service fee. No medicine prices are shown.</small></div>
+                    <select asp-for="Input.GovernmentIssueServiceItemId"><option value="">No fee – free medicines are free</option>@foreach (var s in Model.Services) { <option value="@s.Item.Id">@s.Item.Name (@(s.CurrentFee == 0 ? "free" : s.CurrentFee.ToString("N2")))</option> }</select>
+                    <small class="muted">Free Issue only: uses the service fee. No medicine prices are charged.</small></div>
             }
             <div class="field span-3"><label for="Input_SlipFooter">Slip footer</label><input asp-for="Input.SlipFooter" maxlength="200" /></div>
+        </div>
+        @* Update 17: Medicine Issue Configuration – one HMS, the pharmacy rules are configured here (no Government / Private type). *@
+        <div class="card-body" data-issue-config>
+            <input type="hidden" name="Input.IssueConfigPosted" value="true" />
+            <h3 class="section-title">Medicine Issue Configuration</h3>
+            <div class="form-grid">
+                @{ var i = Model.Input; }
+                <label class="toggle"><input type="checkbox" name="Input.FreeIssueEnabled" value="true" checked="@i.FreeIssueEnabled" data-config="free" /><span><strong>Free Medicine Issue</strong><small>Medicines without patient charges (stock is reduced, no revenue)</small></span></label><input type="hidden" name="Input.FreeIssueEnabled" value="false" />
+                <label class="toggle"><input type="checkbox" name="Input.PaidSaleEnabled" value="true" checked="@i.PaidSaleEnabled" data-config="paid" /><span><strong>Paid Medicine Sale</strong><small>Sale at the configured prices with invoice / receipt</small></span></label><input type="hidden" name="Input.PaidSaleEnabled" value="false" />
+                <label class="toggle"><input type="checkbox" name="Input.SubsidyEnabled" value="true" checked="@i.SubsidyEnabled" data-config="subsidy" /><span><strong>Partial Payment / Subsidy</strong><small>Patient pays a part, the rest is subsidy</small></span></label><input type="hidden" name="Input.SubsidyEnabled" value="false" />
+                <label class="toggle"><input type="checkbox" name="Input.DiscountEnabled" value="true" checked="@i.DiscountEnabled" data-config="discount" /><span><strong>Discount</strong><small>Authorized users may give discounts</small></span></label><input type="hidden" name="Input.DiscountEnabled" value="false" />
+                <label class="toggle"><input type="checkbox" name="Input.FreeIssueApprovalRequired" value="true" checked="@i.FreeIssueApprovalRequired" /><span><strong>Free Issue Approval Required</strong><small>Free issues of users without “Approve Free Issue” wait for approval</small></span></label><input type="hidden" name="Input.FreeIssueApprovalRequired" value="false" />
+                <label class="toggle"><input type="checkbox" name="Input.AllowChangeIssueMode" value="true" checked="@i.AllowChangeIssueMode" /><span><strong>Allow authorized users to change the issue mode</strong><small>Users with “Change Issue Mode” may pick another enabled mode</small></span></label><input type="hidden" name="Input.AllowChangeIssueMode" value="false" />
+                <label class="toggle"><input type="checkbox" name="Input.StockClassificationEnabled" value="true" checked="@i.StockClassificationEnabled" /><span><strong>Stock classification</strong><small>Free Distribution / Sale / General stock (off = everything is General stock)</small></span></label><input type="hidden" name="Input.StockClassificationEnabled" value="false" />
+                <div class="field"><label for="Input_DefaultIssueMode">Default issue mode</label>
+                    <select id="Input_DefaultIssueMode" name="Input.DefaultIssueMode" data-default-mode>
+                        @foreach (var m in Enum.GetValues<MedicineIssueMode>()) { <option value="@m" selected="@(i.DefaultIssueMode == m)">@BurhanNexus.HMS.Infrastructure.Pharmacy.PharmacyService.ModeLabel(m)</option> }
+                    </select><small class="muted">Selected automatically when a medicine transaction starts.</small></div>
+            </div>
         </div>
         <div class="card-footer form-actions"><button class="btn btn-primary" type="submit" data-test="save-pharm-settings">Save settings</button></div>
     </form>

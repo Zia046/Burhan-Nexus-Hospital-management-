@@ -245,6 +245,9 @@ public static class AuditActions
     public const string PharmSupplierPayment = "Pharmacy.SupplierPayment";
     public const string PharmDuplicateBlocked = "Pharmacy.DuplicateBlocked";
     public const string PharmSettingsChanged = "Pharmacy.SettingsChanged";
+    public const string PharmFreeIssueApproved = "Pharmacy.FreeIssueApproved";
+    public const string PharmFreeIssueRejected = "Pharmacy.FreeIssueRejected";
+    public const string PharmStockClassChanged = "Pharmacy.StockClassChanged";
     public const string PharmExported = "Pharmacy.Exported";
     public const string PharmSlipPrinted = "Pharmacy.SlipPrinted";
 

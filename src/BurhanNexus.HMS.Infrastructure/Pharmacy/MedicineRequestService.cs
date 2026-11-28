@@ -243,7 +243,7 @@ public sealed class MedicineRequestService : IMedicineRequestService
             Lines = issue.Select(x => new StockLineInput { MedicineId = x.Line.MedicineId, Quantity = x.Qty, Instructions = x.Line.Instructions }).ToList()
         };
         ServiceResult<DocumentResult> r;
-        try { r = await _pharmacy.IssueAsync(pharmacyInput, rights with { SelectBatch = false, Discount = false }, ct); }
+        try { r = await _pharmacy.IssueAsync(pharmacyInput, rights with { SelectBatch = false, Discount = false, FreeIssue = true, PaidSale = true, ApproveFreeIssue = true /* update 17: the ward request (default issue mode) was already approved by the pharmacist */ }, ct); }
         catch { await tx.RollbackAsync(CancellationToken.None); _db.ChangeTracker.Clear(); throw; }
         if (!r.Succeeded || r.Value is null)
         {

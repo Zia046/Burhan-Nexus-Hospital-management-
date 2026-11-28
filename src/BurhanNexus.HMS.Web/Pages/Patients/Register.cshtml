@@ -7,16 +7,43 @@
     var canConsultant = await PermCtx.HasAsync(Perm.AppointmentsAdd);
     var opdMode = Model.Next == "opd";
 }
-@if (opdMode)
+@if (Model.SearchMode)
 {
-    <div class="card" data-opd-find>
-        <div class="card-header">
-            <h2><svg class="icon"><use href="#i-search" /></svg> OPD Registration – Find the Patient</h2>
-            <a class="btn btn-light" href="/Opd/Register?search=true" data-opd-search><svg class="icon icon-sm"><use href="#i-search" /></svg> Search</a>
+    @* Update 16/17: the patient search bar sits at the top, directly below the taskbar – Search button beside the field. *@
+    <form method="get" class="card" data-patient-find data-opd-find="@(opdMode ? "1" : null)">
+        <input type="hidden" name="next" value="@Model.Next" />
+        <div class="card-header"><h2><svg class="icon"><use href="#i-search" /></svg> @(opdMode ? "OPD Registration – Find the Patient" : "New Appointment – Find the Patient")</h2></div>
+        <div class="card-body">
+            <div class="search-main">
+                <div class="input-icon grow"><svg class="icon"><use href="#i-search" /></svg>
+                    <input name="q" value="@Model.Q" placeholder="Patient ID / MR number or patient name" autocomplete="off" maxlength="100" aria-label="Patient ID or name" data-patient-search /></div>
+                <button class="btn btn-primary" type="submit" data-opd-search data-patient-search-button><svg class="icon icon-sm"><use href="#i-search" /></svg> Search</button>
+            </div>
+            @if (Model.Searched)
+            {
+                @if (Model.Matches.Count > 0)
+                {
+                    <div class="table-wrap"><table class="table table-compact" data-patient-matches>
+                        <thead><tr><th>Patient ID</th><th>Name</th><th>Father / Husband</th><th>Age</th><th>Mobile</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var m in Model.Matches)
+                        {
+                            <tr data-match="@m.PatientNumber"><td class="mono">@m.PatientNumber</td><td><strong>@m.FullName</strong></td><td>@m.GuardianName</td><td class="nowrap">@m.AgeText · @m.Gender</td><td>@m.MobileNumber</td>
+                                <td class="actions"><a class="btn btn-primary btn-sm" href="@Model.SelectUrl(m.Id)" data-select-patient>Select</a></td></tr>
+                        }
+                        </tbody>
+                    </table></div>
+                    <p class="muted small">Not in the list? Register a new patient below.</p>
+                }
+                else
+                {
+                    <div class="alert alert-info" data-no-match><svg class="icon"><use href="#i-info" /></svg><div>No patient found for “@Model.Q”. <a href="#new-patient">New Patient Registration</a> – fill in the form below.</div></div>
+                }
+            }
         </div>
-    </div>
+    </form>
 }
-<form method="post" class="card" novalidate data-patient-form>
+<form method="post" class="card" novalidate data-patient-form id="new-patient">
     <div class="card-header">
         <h2><svg class="icon"><use href="#i-plus" /></svg> New patient registration</h2>
         <span class="muted small">Patient ID is assigned automatically and never changes.</span>
@@ -39,6 +66,7 @@
         @* Update 16: the three registration buttons. *@
         @if (canOpd) { <button type="submit" class="btn btn-primary" name="Next" value="opd" data-reg-opd><svg class="icon icon-sm"><use href="#i-stethoscope" /></svg> OPD</button> }
         @if (canEr) { <button type="submit" class="btn btn-danger-outline" name="Next" value="emergency" data-reg-emergency><svg class="icon icon-sm"><use href="#i-siren" /></svg> Emergency</button> }
+        @if (Model.Next == "appointment" && canConsultant) { <button type="submit" class="btn btn-success" name="Next" value="appointment" data-reg-appointment><svg class="icon icon-sm"><use href="#i-calendar" /></svg> Register &amp; New Appointment</button> }
         @if (canConsultant) { <button type="submit" class="btn btn-primary" name="Next" value="consultant" data-reg-consultant><svg class="icon icon-sm"><use href="#i-calendar" /></svg> Consultant</button> }
     </div>
 </form>

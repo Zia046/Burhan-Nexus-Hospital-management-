@@ -99,6 +99,15 @@ public sealed class PharmacyQueryService : IPharmacyQueryService
         new("emergency-issues", "Patients", "Emergency medicine issuance", false, Core.Security.Perm.PharmViewPatientHistory),
         new("daily-issues", "Patients", "Date-wise patient issuance", false, Core.Security.Perm.PharmViewPatientHistory),
         new("medicine-issues", "Patients", "Medicine-wise patient issuance", false, Core.Security.Perm.PharmViewPatientHistory),
+        // Update 17: medicine issue modes. Free issues reduce stock but are never revenue; subsidy and discount are shown separately.
+        new("free-issues", "Issue modes", "Free medicine issue report", false, Core.Security.Perm.PharmViewPatientHistory),
+        new("paid-sales", "Issue modes", "Paid medicine sales report", false, Core.Security.Perm.PharmViewFinancialReports),
+        new("subsidy-issues", "Issue modes", "Partial payment / subsidy report", false, Core.Security.Perm.PharmViewFinancialReports),
+        new("discounts", "Issue modes", "Discount report", false, Core.Security.Perm.PharmViewFinancialReports),
+        new("returns-all", "Issue modes", "Medicine return report", false, Core.Security.Perm.PharmViewStockReports),
+        new("user-issues", "Issue modes", "User-wise medicine issue report", false, Core.Security.Perm.PharmViewPatientHistory),
+        new("pharmacy-daily", "Issue modes", "Daily pharmacy summary", false, Core.Security.Perm.PharmViewFinancialReports),
+        new("pharmacy-monthly", "Issue modes", "Monthly pharmacy summary", false, Core.Security.Perm.PharmViewFinancialReports),
         new("department-stock", "Departments", "Department-wise stock (incl. Minor OT)", false, Core.Security.Perm.PharmViewDepartmentStock),
         new("ot-transfers", "Departments", "Pharmacy → Minor OT transfers", false, Core.Security.Perm.PharmViewDepartmentStock),
         new("department-transfers", "Departments", "Department-wise stock transfers", false, Core.Security.Perm.PharmViewDepartmentStock),
@@ -325,6 +334,7 @@ public sealed class PharmacyQueryService : IPharmacyQueryService
         bool Match(int medId, string batchNo) => (f.MedicineId == null || f.MedicineId == medId) && (batch == null || batchNo.Contains(batch, StringComparison.OrdinalIgnoreCase));
         PharmacyReport R(string[] cols, IEnumerable<object?[]> rows, object?[]? totals = null, string? note = null) => new(def.Key, def.Title, cols, rows.ToList(), totals, note);
 
+        if (def.Group == "Issue modes") return await IssueModeReportAsync(def, from, to, Match, R, ct);
         switch (def.Key)
         {
             case "stock":
@@ -520,6 +530,107 @@ public sealed class PharmacyQueryService : IPharmacyQueryService
             }
         }
         return R(new[] { "Note" }, Array.Empty<object?[]>());
+    }
+
+    private sealed record ModeDoc(string Kind, string Number, long Id, DateOnly Date, string? PatientNumber, string? Patient, MedicineIssueMode Mode,
+        decimal Value, decimal Discount, decimal Subsidy, decimal Payable, decimal Collected, int Units, string? User, string? Reason, FreeIssueApproval? Approval);
+
+    /// <summary>Update 17: issue-mode reports (patient issues and walk-in sales) with value, discount, subsidy and patient payment kept apart.</summary>
+    private async Task<PharmacyReport> IssueModeReportAsync(ReportDefinition def, DateOnly from, DateOnly to, Func<int, string, bool> match,
+        Func<string[], IEnumerable<object?[]>, object?[]?, string?, PharmacyReport> R, CancellationToken ct)
+    {
+        var issues = await _db.PatientMedicineIssues.AsNoTracking().Where(i => i.BusinessDate >= from && i.BusinessDate <= to)
+            .Select(i => new { i.Id, i.Number, i.BusinessDate, i.Patient!.PatientNumber, Patient = i.Patient.FullName, i.Mode, i.IssueMode, i.TotalValue, i.GrossAmount,
+                i.DiscountAmount, i.SubsidyAmount, i.NetAmount, i.CreatedByUsername, i.FreeReason, i.ApprovalStatus, Units = i.Items.Sum(x => x.Quantity) })
+            .ToListAsync(ct);
+        var issueIds = issues.Select(i => i.Id).ToList();
+        var paid = await _db.Charges.AsNoTracking().Where(c => c.PharmacyIssueId != null && issueIds.Contains(c.PharmacyIssueId.Value))
+            .GroupBy(c => c.PharmacyIssueId!.Value).Select(g => new { g.Key, Paid = g.Sum(c => c.PaidAmount - c.RefundedAmount) }).ToDictionaryAsync(x => x.Key, x => x.Paid, ct);
+        var reasons = await _db.Charges.AsNoTracking().Where(c => c.PharmacyIssueId != null && issueIds.Contains(c.PharmacyIssueId.Value) && c.DiscountReason != null)
+            .Select(c => new { Id = c.PharmacyIssueId!.Value, c.DiscountReason }).ToListAsync(ct);
+        var sales = await _db.PharmacySales.AsNoTracking().Where(x => x.BusinessDate >= from && x.BusinessDate <= to)
+            .Select(x => new { x.Id, x.Number, x.BusinessDate, x.CustomerName, x.GrossAmount, x.DiscountAmount, x.NetAmount, x.CreatedByUsername, Units = x.Items.Sum(i => i.Quantity) })
+            .ToListAsync(ct);
+        var docs = issues.Select(i =>
+            {
+                var mode = i.IssueMode ?? (i.Mode == HospitalType.Government ? MedicineIssueMode.Free : (i.DiscountAmount ?? 0) > 0 ? MedicineIssueMode.Discounted : MedicineIssueMode.Paid);
+                var free = mode == MedicineIssueMode.Free;
+                return new ModeDoc("Issue", i.Number, i.Id, i.BusinessDate, i.PatientNumber, i.Patient, mode, i.TotalValue ?? i.GrossAmount ?? 0, i.DiscountAmount ?? 0,
+                    i.SubsidyAmount ?? 0, free ? 0 : i.NetAmount ?? 0, paid.GetValueOrDefault(i.Id), i.Units, i.CreatedByUsername,
+                    free ? i.FreeReason : reasons.FirstOrDefault(r => r.Id == i.Id)?.DiscountReason, i.ApprovalStatus);
+            })
+            .Concat(sales.Select(x => new ModeDoc("Retail sale", x.Number, x.Id, x.BusinessDate, null, x.CustomerName ?? "Walk-in", x.DiscountAmount > 0 ? MedicineIssueMode.Discounted : MedicineIssueMode.Paid,
+                x.GrossAmount, x.DiscountAmount, 0, x.NetAmount, x.NetAmount, x.Units, x.CreatedByUsername, null, null)))
+            .OrderBy(d => d.Date).ThenBy(d => d.Number).ToList();
+        // A free issue that is not (yet) approved took no stock: listed in the free issue report only.
+        var effective = docs.Where(d => d.Approval is not (FreeIssueApproval.Pending or FreeIssueApproval.Rejected)).ToList();
+        var returns = await _db.MedicineReturns.AsNoTracking().Where(r => r.BusinessDate >= from && r.BusinessDate <= to)
+            .Select(r => new { r.Number, r.BusinessDate, r.Kind, Against = r.Sale != null ? r.Sale.Number : r.Issue!.Number, Amount = r.Amount ?? 0, r.Reason,
+                Units = r.Items.Sum(i => i.Quantity), Refund = r.Refund != null ? r.Refund.RefundNumber + " (" + r.Refund.Status + ")" : null, r.CreatedByUsername })
+            .ToListAsync(ct);
+        static string Lbl(MedicineIssueMode m) => PharmacyService.ModeLabel(m);
+        switch (def.Key)
+        {
+            case "free-issues":
+            {
+                var rows = docs.Where(d => d.Mode == MedicineIssueMode.Free).ToList();
+                return R(new[] { "Issue", "Date", "Patient ID", "Patient", "Units", "Medicine value", "Reason", "Approval", "Issued by" },
+                    rows.Select(d => new object?[] { d.Number, d.Date, d.PatientNumber, d.Patient, d.Units, d.Value, d.Reason, d.Approval?.ToString() ?? "—", d.User }),
+                    new object?[] { "Total", null, null, null, rows.Sum(d => d.Units), rows.Sum(d => d.Value), null, null, null },
+                    "Free medicines reduce stock; their value is not revenue.");
+            }
+            case "paid-sales":
+            {
+                var rows = effective.Where(d => d.Mode is MedicineIssueMode.Paid or MedicineIssueMode.Discounted).ToList();
+                return R(new[] { "Document", "Type", "Date", "Patient / customer", "Units", "Value", "Discount", "Net sale", "Collected", "By" },
+                    rows.Select(d => new object?[] { d.Number, d.Kind, d.Date, d.PatientNumber is null ? d.Patient : $"{d.PatientNumber} {d.Patient}", d.Units, d.Value, d.Discount, d.Payable, d.Collected, d.User }),
+                    new object?[] { "Total", null, null, null, rows.Sum(d => d.Units), rows.Sum(d => d.Value), rows.Sum(d => d.Discount), rows.Sum(d => d.Payable), rows.Sum(d => d.Collected), null }, null);
+            }
+            case "subsidy-issues":
+            {
+                var rows = effective.Where(d => d.Mode == MedicineIssueMode.Subsidized).ToList();
+                return R(new[] { "Issue", "Date", "Patient ID", "Patient", "Medicine value", "Discount", "Subsidy", "Patient pays", "Collected", "By" },
+                    rows.Select(d => new object?[] { d.Number, d.Date, d.PatientNumber, d.Patient, d.Value, d.Discount, d.Subsidy, d.Payable, d.Collected, d.User }),
+                    new object?[] { "Total", null, null, null, rows.Sum(d => d.Value), rows.Sum(d => d.Discount), rows.Sum(d => d.Subsidy), rows.Sum(d => d.Payable), rows.Sum(d => d.Collected), null },
+                    "Subsidy is not collected revenue.");
+            }
+            case "discounts":
+            {
+                var rows = effective.Where(d => d.Discount > 0).ToList();
+                return R(new[] { "Document", "Type", "Date", "Patient / customer", "Original value", "Discount", "Final payable", "Reason", "By" },
+                    rows.Select(d => new object?[] { d.Number, d.Kind, d.Date, d.PatientNumber is null ? d.Patient : $"{d.PatientNumber} {d.Patient}", d.Value, d.Discount, d.Payable, d.Reason, d.User }),
+                    new object?[] { "Total", null, null, null, rows.Sum(d => d.Value), rows.Sum(d => d.Discount), rows.Sum(d => d.Payable), null, null }, null);
+            }
+            case "returns-all":
+                return R(new[] { "Return", "Date", "Kind", "Against", "Units", "Amount", "Refund", "Reason", "By" },
+                    returns.OrderBy(r => r.BusinessDate).Select(r => new object?[] { r.Number, r.BusinessDate, r.Kind == MedicineReturnKind.SaleReturn ? "Sale return" : "Patient return", r.Against, r.Units, r.Amount, r.Refund, r.Reason, r.CreatedByUsername }),
+                    new object?[] { "Total", null, null, null, returns.Sum(r => r.Units), returns.Sum(r => r.Amount), null, null, null }, null);
+            case "user-issues":
+            {
+                var groups = effective.GroupBy(d => d.User ?? "—").OrderBy(g => g.Key).ToList();
+                object? M(IEnumerable<ModeDoc> g, MedicineIssueMode m) => g.Count(d => d.Mode == m);
+                return R(new[] { "User", "Documents", Lbl(MedicineIssueMode.Free), Lbl(MedicineIssueMode.Paid), Lbl(MedicineIssueMode.Subsidized), Lbl(MedicineIssueMode.Discounted), "Units", "Medicine value", "Free value", "Patient payable" },
+                    groups.Select(g => new object?[] { g.Key, g.Count(), M(g, MedicineIssueMode.Free), M(g, MedicineIssueMode.Paid), M(g, MedicineIssueMode.Subsidized), M(g, MedicineIssueMode.Discounted),
+                        g.Sum(d => d.Units), g.Sum(d => d.Value), g.Where(d => d.Mode == MedicineIssueMode.Free).Sum(d => d.Value), g.Sum(d => d.Payable) }),
+                    new object?[] { "Total", effective.Count, null, null, null, null, effective.Sum(d => d.Units), effective.Sum(d => d.Value), effective.Where(d => d.Mode == MedicineIssueMode.Free).Sum(d => d.Value), effective.Sum(d => d.Payable) }, null);
+            }
+            default: // pharmacy-daily / pharmacy-monthly
+            {
+                var monthly = def.Key == "pharmacy-monthly";
+                DateOnly Key(DateOnly d) => monthly ? new DateOnly(d.Year, d.Month, 1) : d;
+                var keys = effective.Select(d => Key(d.Date)).Concat(returns.Select(r => Key(r.BusinessDate))).Distinct().OrderBy(k => k).ToList();
+                object?[] Row(object? label, List<ModeDoc> g, decimal ret)
+                {
+                    var free = g.Where(d => d.Mode == MedicineIssueMode.Free).Sum(d => d.Value);
+                    var sold = g.Where(d => d.Mode != MedicineIssueMode.Free).Sum(d => d.Payable);
+                    var collected = g.Where(d => d.Mode != MedicineIssueMode.Free).Sum(d => d.Collected);
+                    return new object?[] { label, g.Sum(d => d.Value), free, sold, collected, g.Sum(d => d.Subsidy), g.Sum(d => d.Discount), ret, sold - ret };
+                }
+                var cols = new[] { monthly ? "Month" : "Date", "Total medicine value", "Free medicine value", "Paid sales", "Patient payments received", "Subsidy", "Discounts", "Returns / refunds", "Net medicine sales" };
+                return R(cols, keys.Select(k => Row(monthly ? k.ToString("MMM yyyy") : k, effective.Where(d => Key(d.Date) == k).ToList(), returns.Where(r => Key(r.BusinessDate) == k).Sum(r => r.Amount))),
+                    Row("Total", effective, returns.Sum(r => r.Amount)), "Free medicine value is never counted as revenue. Net medicine sales = paid sales − returns.");
+            }
+        }
     }
 
     public static string Label(InventoryTxnType t) => t switch

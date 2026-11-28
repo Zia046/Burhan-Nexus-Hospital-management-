@@ -135,6 +135,8 @@ public class Doctor
     [MaxLength(150)] public string? Qualification { get; set; }
     [MaxLength(100)] public string? Specialty { get; set; }
     [MaxLength(50)] public string? RegistrationNumber { get; set; }
+    /// <summary>Update 17: contact number (optional).</summary>
+    [MaxLength(30)] public string? ContactNumber { get; set; }
     public int? DepartmentId { get; set; }
     public Department? Department { get; set; }
     /// <summary>Optional link to a user account (not required).</summary>

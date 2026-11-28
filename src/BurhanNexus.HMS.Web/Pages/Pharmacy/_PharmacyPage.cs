@@ -66,7 +66,13 @@ public abstract class PharmacyPageModel : HmsPageModel
         Discount: IsPrivate && await CanAsync(Perm.PharmApplyDiscount),
         ManagePurchases: IsPrivate && await CanAsync(Perm.PharmManagePurchases),
         ManagePrices: IsPrivate && await CanAsync(Perm.PharmManagePrices),
-        ApproveAdjustments: await CanAsync(Perm.PharmApproveAdjustments));
+        ApproveAdjustments: await CanAsync(Perm.PharmApproveAdjustments),
+        // Update 17: one right per medicine issue mode (the services check them again with the Medicine Issue Configuration)
+        FreeIssue: await CanAsync(Perm.PharmFreeIssue),
+        PaidSale: await CanAsync(Perm.PharmPaidSale) || await CanAsync(Perm.PharmRetailSales),
+        Subsidy: await CanAsync(Perm.PharmSubsidy),
+        ChangeIssueMode: await CanAsync(Perm.PharmChangeIssueMode),
+        ApproveFreeIssue: await CanAsync(Perm.PharmApproveFreeIssue));
 
     /// <summary>Converts "2027-05" (month input) or "2027-05-31" to a date; a month means its last day.</summary>
     public static DateOnly? ParseExpiry(string? s)

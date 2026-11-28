@@ -27,6 +27,13 @@
         <div class="field"><label for="Input_ReceivedDate">Received on</label><input asp-for="Input.ReceivedDate" type="date" /></div>
         <div class="field"><label for="Input_SourceName">No supplier record? Source</label><input asp-for="Input.SourceName" maxlength="150" placeholder="e.g. District Health Office, donation" /></div>
         <div class="field"><label for="Input_Notes">Notes</label><input asp-for="Input.Notes" maxlength="500" /></div>
+        @if (Model.ClassificationOn)
+        {
+            <div class="field" data-stock-class><label for="Input_StockClass">Stock class</label><select id="Input_StockClass" name="Input.StockClass">
+                <option value="General">General Stock</option>
+                <option value="FreeDistribution" selected="@(Model.Input.StockClass == BurhanNexus.HMS.Core.Domain.MedicineStockClass.FreeDistribution)">Free Distribution Stock (government / donated)</option>
+                <option value="Sale" selected="@(Model.Input.StockClass == BurhanNexus.HMS.Core.Domain.MedicineStockClass.Sale)">Sale Stock</option></select></div>
+        }
     </div>
 
     <div class="table-wrap invoice-table-wrap">

@@ -115,9 +115,11 @@ public class IndexModel : PageModel
 
         if (!ModelState.IsValid) return Page();
 
+        // Update 16/17: no Government / Private choice any more. A setup that is run again keeps the stored value (pharmacy presets only).
+        if (HospitalType is null && State == SetupState.ResetRequested) HospitalType = (await _hospital.GetConfigurationAsync()).HospitalType;
         var result = await _setup.CompleteAsync(new SetupInput
         {
-            HospitalName = HospitalName, HospitalType = HospitalType ?? Core.Domain.HospitalType.Private, // Update 16: no choice any more (kept internally for the pharmacy only) RegistrationNumber = RegistrationNumber,
+            HospitalName = HospitalName, HospitalType = HospitalType ?? Core.Domain.HospitalType.Private, RegistrationNumber = RegistrationNumber,
             Address = Address, City = City, Province = Province, ContactNumber = ContactNumber, Email = Email, Website = Website,
             LogoContent = logoBytes, LogoContentType = logoType,
             AdminFullName = AdminFullName ?? string.Empty, AdminUsername = AdminUsername ?? string.Empty,

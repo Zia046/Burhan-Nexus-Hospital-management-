@@ -72,11 +72,12 @@ public static class DatabaseHardening
         END;
         $$;
 
-        -- Phase 5: commercial pharmacy records (retail sales, supplier accounts) cannot exist in a Government hospital.
+        -- Phase 5 / update 17: commercial pharmacy records (retail sales, supplier accounts) exist only when prices are used
+        -- (Paid Sale, Subsidy or Discount enabled in the Medicine Issue Configuration – no Government / Private hospital type any more).
         CREATE OR REPLACE FUNCTION bnhms_pharmacy_private_only() RETURNS trigger LANGUAGE plpgsql AS $$
         BEGIN
-            IF EXISTS (SELECT 1 FROM "HospitalConfiguration" WHERE "HospitalType" = 'Government') THEN
-                RAISE EXCEPTION 'Pharmacy % are only available in Private hospital mode.', TG_TABLE_NAME;
+            IF EXISTS (SELECT 1 FROM "PharmacySettings" WHERE NOT ("PaidSaleEnabled" OR "SubsidyEnabled" OR "DiscountEnabled")) THEN
+                RAISE EXCEPTION 'Pharmacy % are only available when medicine prices are used (Paid Sale, Subsidy or Discount enabled).', TG_TABLE_NAME;
             END IF;
             RETURN NEW;
         END;

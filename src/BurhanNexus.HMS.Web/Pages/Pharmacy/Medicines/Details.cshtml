@@ -1,6 +1,7 @@
 @page "/Pharmacy/Medicines/{id:int}"
 @model BurhanNexus.HMS.Web.Pages.Pharmacy.Medicines.DetailsModel
 @using BurhanNexus.HMS.Infrastructure.Pharmacy
+@using BurhanNexus.HMS.Core.Domain
 @{
     var m = Model.Medicine;
     ViewData["Title"] = m.DisplayName;
@@ -22,7 +23,7 @@
 <div class="card">
     <div class="card-header"><h3>Batches</h3><span class="pill">@Model.Batches.Where(b => b.Quantity > 0).Sum(b => b.Quantity) @(m.Unit)(s) in stock</span></div>
     <div class="table-wrap"><table class="table table-compact" data-batches>
-        <thead><tr><th>Batch</th><th>Expiry</th><th>Location</th><th class="num">Quantity</th><th>Supplier</th>@if (Model.ShowPrices) { <th class="num">Unit cost</th><th class="num">Sale price</th> }</tr></thead>
+        <thead><tr><th>Batch</th><th>Expiry</th><th>Location</th><th class="num">Quantity</th><th>Supplier</th>@if (Model.ClassificationOn) { <th>Stock class</th> }@if (Model.ShowPrices) { <th class="num">Unit cost</th><th class="num">Sale price</th> }</tr></thead>
         <tbody>
         @foreach (var b in Model.Batches)
         {
@@ -30,6 +31,19 @@
                 <td class="mono">@b.BatchNumber</td>
                 <td>@Fmt.Day(b.Expiry) @if (b.State != ExpiryState.Ok) { <span class="status @(b.State == ExpiryState.Expired ? "status-bad" : "status-warn")">@(b.State == ExpiryState.Expired ? "Expired" : "Near expiry")</span> }</td>
                 <td>@b.LocationName</td><td class="num">@b.Quantity</td><td>@b.Supplier</td>
+                @if (Model.ClassificationOn)
+                {
+                    var bc = Model.Classes.GetValueOrDefault(b.BatchId);
+                    <td data-batch-class="@(bc?.ToString() ?? "General")">
+                        @if (Model.CanClassify)
+                        {
+                            <form method="post" asp-page-handler="BatchClass" asp-route-batchId="@b.BatchId" class="inline-form"><select name="stockClass">
+                                <option value="General">General</option><option value="FreeDistribution" selected="@(bc == MedicineStockClass.FreeDistribution)">Free Distribution</option><option value="Sale" selected="@(bc == MedicineStockClass.Sale)">Sale</option></select>
+                                <button class="btn btn-light btn-sm" type="submit">Set</button></form>
+                        }
+                        else { @PharmacyService.StockClassLabel(bc) }
+                    </td>
+                }
                 @if (Model.ShowPrices)
                 {
                     <td class="num">@(b.UnitCost?.ToString("N2") ?? "—")</td>

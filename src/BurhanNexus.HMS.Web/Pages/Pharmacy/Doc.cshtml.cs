@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace BurhanNexus.HMS.Web.Pages.Pharmacy;
 
 /// <summary>One pharmacy document (GRN, patient issue, sale, transfer, return, supplier return) with its stock movements.</summary>
-[HasPermission(Perm.PharmViewCatalogue, Perm.PharmViewStockReports, Perm.PharmIssueToPatients, Perm.PharmRetailSales, Perm.PharmTransferStock,
+[HasPermission(Perm.PharmViewCatalogue, Perm.PharmViewStockReports, Perm.PharmIssueToPatients, Perm.PharmApproveFreeIssue, Perm.PharmRetailSales, Perm.PharmTransferStock,
     Perm.PharmProcessReturns, Perm.PharmReceiveStock, Perm.PharmViewPatientHistory, Perm.PharmViewDepartmentStock)]
 public class DocModel : PharmacyPageModel
 {
@@ -36,6 +36,17 @@ public class DocModel : PharmacyPageModel
         ["RET"] = new[] { Perm.PharmProcessReturns, Perm.PharmViewStockReports },
         ["SRT"] = new[] { Perm.PharmProcessReturns, Perm.PharmViewStockReports },
     };
+
+    /// <summary>Update 17: approve (stock is taken now) or reject a free issue waiting for approval.</summary>
+    public async Task<IActionResult> OnPostDecideAsync(string type, long id, bool approve, string? note)
+    {
+        if (await DenyUnlessAsync(Perm.PharmApproveFreeIssue) is { } deny) return deny;
+        await InitAsync("issue");
+        var r = await Pharmacy.DecideFreeIssueAsync(id, approve, note, await RightsAsync());
+        if (r.Succeeded) FlashSuccess = approve ? "Free issue approved – the stock was taken." : "Free issue rejected – no stock was taken.";
+        else FlashError = string.Join(" ", r.Errors);
+        return Redirect($"/Pharmacy/Doc/ISS/{id}");
+    }
 
     public async Task<IActionResult> OnGetAsync(string type, long id)
     {

@@ -224,6 +224,9 @@ public sealed class SetupService : ISetupService
             await Pharmacy.PharmacyCatalogService.SeedAsync(_db, now, ct);
             await Radiology.RadiologyCatalogService.SeedAsync(_db, now, ct);
             await Radiology.RadiologyCatalogService.ApplyHospitalTypeDefaultsAsync(_db, config.HospitalType, ct);
+            // Update 17: starting Medicine Issue Configuration – only while the pharmacy has not issued anything yet.
+            if (!await _db.PatientMedicineIssues.AnyAsync(ct) && !await _db.PharmacySales.AnyAsync(ct))
+                await Pharmacy.PharmacyCatalogService.ApplyIssuePresetAsync(_db, config.HospitalType, ct);
             await Ipd.IpdSetupService.SeedAsync(_db, now, ct);
             await Ot.OtSetupService.SeedAsync(_db, now, ct);
             await Finance.FinanceSetupService.SeedAsync(_db, now,

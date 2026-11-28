@@ -32,7 +32,7 @@ public class SaleModel : PharmacyPageModel
     public async Task<IActionResult> OnGetAsync()
     {
         await LoadAsync();
-        if (!IsPrivate) return NotFound();
+        if (!(await Catalog.SettingsAsync()).PaidSaleEnabled) return NotFound(); // update 17: Paid Sale enabled
         Input = new SaleInput { IdempotencyKey = Guid.NewGuid(), CounterId = Counters.FirstOrDefault()?.Id ?? 0, PaymentMethodId = Methods.FirstOrDefault()?.Id ?? 0 };
         return Page();
     }
@@ -40,7 +40,7 @@ public class SaleModel : PharmacyPageModel
     public async Task<IActionResult> OnPostAsync()
     {
         await LoadAsync();
-        if (!IsPrivate) return NotFound();
+        if (!(await Catalog.SettingsAsync()).PaidSaleEnabled) return NotFound(); // update 17: Paid Sale enabled
         var r = await Pharmacy.SellAsync(Input, await RightsAsync());
         if (!r.Succeeded) { AddErrors(r); return Page(); }
         FlashSuccess = r.Value!.WasDuplicate ? $"{r.Value.Number} was already saved – it was not charged twice." : $"Sale {r.Value.Number} completed.";
